@@ -1,0 +1,450 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SiteAgent — Project Plan</title>
+<style>
+  :root{
+    --bg:#0e1216; --panel:#161b22; --panel2:#1b2330; --ink:#e9eef3; --mut:#8b949e;
+    --line:#2a313a; --accent:#58a6ff; --done:#2ea043; --prog:#d29922; --blocked:#e5534b;
+    --p1:#f85149; --p2:#d29922; --p3:#8b949e;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+  a{color:var(--accent)}
+  .shell{display:grid;grid-template-columns:280px 1fr 420px;min-height:100vh}
+  /* sidebar */
+  .sidebar{background:var(--panel);border-right:1px solid var(--line);position:sticky;top:0;height:100vh;overflow:auto;padding:18px 16px}
+  .brand{font-weight:700;font-size:18px;display:flex;align-items:center;gap:8px}
+  .badge{font-size:11px;background:var(--panel2);border:1px solid var(--line);color:var(--mut);padding:1px 7px;border-radius:20px}
+  .sub{color:var(--mut);font-size:12px;margin:2px 0 16px}
+  .overall{display:flex;align-items:center;gap:14px;margin:8px 0 18px}
+  .ring{--p:0;width:74px;height:74px;border-radius:50%;display:grid;place-items:center;
+    background:conic-gradient(var(--done) calc(var(--p)*1%), var(--line) 0)}
+  .ring i{width:58px;height:58px;border-radius:50%;background:var(--panel);display:grid;place-items:center;font-weight:700;font-style:normal}
+  .ostat{font-size:12px;color:var(--mut)}
+  .ostat b{color:var(--ink)}
+  .stepper{display:flex;flex-direction:column;gap:4px;margin-top:8px}
+  .step{display:flex;align-items:center;gap:9px;padding:7px 9px;border-radius:8px;cursor:pointer;border:1px solid transparent;text-align:left;background:none;color:var(--ink);font:inherit}
+  .step:hover{background:var(--panel2)}
+  .step .dot{width:9px;height:9px;border-radius:50%;background:var(--line);flex:0 0 auto}
+  .step.done .dot{background:var(--done)} .step.partial .dot{background:var(--prog)}
+  .step .mp{margin-left:auto;font-size:11px;color:var(--mut)}
+  /* main */
+  .main{min-width:0}
+  .topbar{position:sticky;top:0;z-index:5;background:rgba(14,18,22,.82);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);padding:14px 22px}
+  .tb-top{display:flex;align-items:center;gap:12px}
+  .tb-top h1{font-size:18px;margin:0}
+  .tb-top .sp{flex:1}
+  .toolbar{display:flex;flex-wrap:wrap;gap:14px;margin-top:10px;font-size:12px;color:var(--mut)}
+  .toolbar label{display:flex;align-items:center;gap:6px;cursor:pointer}
+  .content{padding:18px 22px 60px}
+  details.mod{border:1px solid var(--line);border-radius:10px;margin:0 0 12px;background:var(--panel)}
+  details.mod>summary{list-style:none;cursor:pointer;padding:12px 14px;display:flex;align-items:center;gap:10px;font-weight:600}
+  details.mod>summary::-webkit-details-marker{display:none}
+  .mbar{flex:1;height:6px;border-radius:6px;background:var(--line);overflow:hidden;max-width:240px}
+  .mbar>i{display:block;height:100%;background:var(--done);width:0}
+  .mpct{font-size:12px;color:var(--mut);min-width:38px;text-align:right}
+  details.sm{margin:0 10px 10px}
+  details.sm>summary{list-style:none;cursor:pointer;padding:8px 10px;color:var(--mut);font-size:12px;text-transform:uppercase;letter-spacing:.04em}
+  details.sm>summary::-webkit-details-marker{display:none}
+  ul.tasks{list-style:none;margin:0;padding:0 6px 6px}
+  li.task{display:flex;gap:10px;padding:10px;border-top:1px solid var(--line)}
+  li.task.hide{display:none}
+  .tk-check{padding-top:2px}
+  .tk-main{flex:1;min-width:0}
+  .tk-title{font-weight:600}
+  .tk-title.done{color:var(--mut);text-decoration:line-through}
+  .tk-meta{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:5px}
+  .chip{font-size:11px;border-radius:20px;padding:1px 8px;border:1px solid var(--line)}
+  .chip.p1{color:var(--p1);border-color:#5a2a2a} .chip.p2{color:var(--p2);border-color:#5a4a1f} .chip.p3{color:var(--p3)}
+  .ref{font-size:11px;color:var(--mut)}
+  select.st{background:var(--panel2);color:var(--ink);border:1px solid var(--line);border-radius:7px;padding:3px 7px;font:inherit;font-size:12px}
+  select.st.s-done{color:var(--done);border-color:#1f4a2a}
+  select.st.s-in_progress{color:var(--accent);border-color:#234a6b}
+  select.st.s-blocked{color:var(--blocked);border-color:#5a2a2a}
+  .tk-deps{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;font-size:11px}
+  .ready{padding:1px 7px;border-radius:20px;border:1px solid var(--line)}
+  .ready.go{color:var(--done);border-color:#1f4a2a} .ready.wait{color:var(--prog);border-color:#5a4a1f} .ready.isdone{color:var(--mut)}
+  .dep{padding:1px 7px;border-radius:6px;border:1px solid var(--line);color:var(--mut)}
+  .dep.met{color:var(--done);border-color:#1f4a2a} .dep.unmet{color:var(--prog);border-color:#5a4a1f}
+  .tk-notes{display:flex;align-items:flex-end;gap:8px;margin-top:7px}
+  .tk-notes textarea{flex:1;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:7px 9px;font:inherit;resize:vertical;min-height:34px}
+  .savestate{font-size:11px;color:var(--mut);min-width:40px}
+  .savestate.saving{color:var(--prog)} .savestate.saved{color:var(--done)} .savestate.error{color:var(--blocked)}
+  /* changelog rail */
+  .changelog{background:var(--panel);border-left:1px solid var(--line);position:sticky;top:0;height:100vh;overflow:auto;padding:18px 16px}
+  .cl-head{font-weight:700;margin-bottom:4px}
+  .cl-sub{font-size:12px;color:var(--mut);margin-bottom:14px}
+  .cl-date{font-size:12px;color:var(--accent);font-weight:600;margin:16px 0 6px;border-top:1px solid var(--line);padding-top:12px}
+  .cl-entry{margin:0 0 12px}
+  .cl-time{font-size:12px;color:var(--ink);font-weight:600}
+  .cl-entry ul{margin:4px 0 0;padding-left:16px}
+  .cl-entry li{font-size:12.5px;color:var(--mut);margin:3px 0}
+  .cl-entry code{background:var(--panel2);border:1px solid var(--line);border-radius:5px;padding:0 4px;font-size:11px;color:var(--ink)}
+  .mode{font-size:11px;color:var(--mut)}
+  @media(max-width:1200px){.shell{grid-template-columns:240px 1fr}.changelog{display:none}}
+  @media(max-width:760px){.shell{grid-template-columns:1fr}.sidebar{display:none}}
+</style>
+</head>
+<body>
+<div class="shell">
+  <aside class="sidebar">
+    <div class="brand">🛰️ SiteAgent <span class="badge">Instatic fleet</span></div>
+    <div class="sub">Project plan · live tracker</div>
+    <div class="overall">
+      <div class="ring" id="ring"><i id="ringtxt">0%</i></div>
+      <div class="ostat">
+        <div><b id="oDone">0</b> / <span id="oTotal">0</span> done</div>
+        <div><b id="oProg">0</b> in progress</div>
+        <div><b id="oBlk">0</b> blocked</div>
+      </div>
+    </div>
+    <div class="stepper" id="stepper"></div>
+    <div style="margin-top:18px" class="mode" id="mode">connecting…</div>
+  </aside>
+
+  <main class="main">
+    <header class="topbar">
+      <div class="tb-top">
+        <h1>Build plan</h1>
+        <span class="sp"></span>
+        <span class="mode" id="rev"></span>
+      </div>
+      <div class="toolbar">
+        <label><input type="checkbox" id="fP1"> P1 only</label>
+        <label><input type="checkbox" id="fReady"> Ready now</label>
+        <label><input type="checkbox" id="fWait"> Waiting on deps</label>
+        <label><input type="checkbox" id="fHideDone"> Hide done</label>
+      </div>
+    </header>
+    <div class="content" id="tree"></div>
+  </main>
+
+  <aside class="changelog">
+    <div class="cl-head">📜 Changelog</div>
+    <div class="cl-sub">live from <code>docs/CHANGELOG.md</code></div>
+    <div id="changelogList"><div class="cl-sub">loading…</div></div>
+  </aside>
+</div>
+
+<script>
+/* ---------------- embedded plan (mirrors docs/PENDING.md) ---------------- */
+const CONTENT = { modules: [
+  { id:"m0", title:"Phase 0 — Spikes (prove first)", subs:[
+    { title:"Prove-first", tasks:[
+      {id:"s9-db", t:"DB isolation: schema-per-tenant, doors locked, idempotent provision + clean teardown", p:"P1", ref:"DB-Architecture.md"},
+      {id:"s9-instatic", t:"Instatic honors a non-public schema (two containers, one DB)", p:"P1", ref:"needs Docker"},
+      {id:"s2-firstrun", t:"Headless first-run — create Owner without a forced 2FA wall", p:"P1", ref:"needs Docker"},
+      {id:"s4-gateway", t:"Instatic accepts a custom OpenRouter base URL (AI Gateway)", p:"P1", ref:"needs Docker"},
+      {id:"s1-assets", t:"Asset-URL portability (baked relative vs absolute)", p:"P2", ref:""},
+      {id:"s3-upload", t:"wrangler Direct Upload of the baked folder renders", p:"P2", ref:""},
+      {id:"sA-anim", t:"Animation import fidelity (import → edit → deploy)", p:"P3", ref:""},
+    ]},
+  ]},
+  { id:"m1", title:"Phase 1 — Foundation & infra", subs:[
+    { title:"Infra", tasks:[
+      {id:"m1-docker", t:"Docker Desktop + pinned Instatic image", p:"P1", ref:""},
+      {id:"m1-postgres", t:"Shared Postgres + admin role (siteagent_platform / siteagent_admin)", p:"P1", ref:""},
+      {id:"m1-registry", t:"Registry schema + migrations (siteagent_control)", p:"P1", ref:"DB-Architecture.md"},
+      {id:"m1-compose", t:"Per-tenant compose template (DATABASE_URL → schema + role)", p:"P1", ref:""},
+    ]},
+  ]},
+  { id:"m2", title:"Phase 2 — Provisioner", subs:[
+    { title:"provisionTenant()", tasks:[
+      {id:"m2-schema-role", t:"Mint schema + least-privilege role (idempotent)", p:"P1", ref:"proven SQL"},
+      {id:"m2-firstrun", t:"Headless first-run (Owner email+password; point AI at Gateway)", p:"P1", ref:"Architecture.md §A"},
+      {id:"m2-cf", t:"Create Cloudflare Pages project (namespaced siteagent-<slug>-<rand>)", p:"P1", ref:""},
+      {id:"m2-saga", t:"Saga state machine + walk-back cleanup on failure", p:"P1", ref:"Architecture.md §A"},
+      {id:"m2-deprovision", t:"Deprovision (drop schema/role/container/CF cleanly)", p:"P2", ref:"SQL proven"},
+    ]},
+  ]},
+  { id:"m3", title:"Phase 3 — AI Gateway", subs:[
+    { title:"Hide the key", tasks:[
+      {id:"m3-proxy", t:"OpenRouter reverse proxy (base URL …/ai/<slug>, injects global key)", p:"P1", ref:"Architecture.md §C"},
+      {id:"m3-token", t:"Signed per-tenant token + validate every call", p:"P1", ref:"plan_review_2 #4"},
+      {id:"m3-rate", t:"Per-tenant rate guard (bound runaway cost)", p:"P2", ref:""},
+      {id:"m3-meter", t:"Usage metering → Registry", p:"P2", ref:""},
+    ]},
+  ]},
+  { id:"m4", title:"Phase 4 — Publish Deployer", subs:[
+    { title:"Bake → Cloudflare", tasks:[
+      {id:"m4-watch", t:"Complete-bake detection (immutable published/<ts>/ + marker)", p:"P1", ref:"Architecture.md §D"},
+      {id:"m4-deploy", t:"wrangler Direct Upload", p:"P1", ref:""},
+      {id:"m4-record", t:"Record deploy + live URL", p:"P2", ref:""},
+      {id:"m4-domains", t:"Custom domains (CF API + DNS verify)", p:"P3", ref:""},
+    ]},
+  ]},
+  { id:"m5", title:"Phase 5 — Operator Console (Astro SSR)", subs:[
+    { title:"Console", tasks:[
+      {id:"m5-settings", t:"Settings: OpenRouter key/model + Cloudflare creds (encrypted)", p:"P1", ref:""},
+      {id:"m5-tenants", t:"Tenants: Add (form) → share link; suspend/resume/remove", p:"P1", ref:"UserFlow.md"},
+      {id:"m5-dash", t:"Usage/Health dashboards (live islands)", p:"P2", ref:""},
+      {id:"m5-alerts", t:"Alerts on provision/deploy/health failures", p:"P2", ref:""},
+    ]},
+  ]},
+  { id:"m6", title:"Phase 6 — Roles · Audit · Metrics · Fleet", subs:[
+    { title:"Config + ops", tasks:[
+      {id:"m6-roles", t:"Tenant Admin + custom toggle roles; suppress system roles", p:"P2", ref:""},
+      {id:"m6-audit", t:"Per-user audit log on", p:"P2", ref:""},
+      {id:"m7-metrics", t:"Metrics collector + time series", p:"P2", ref:""},
+      {id:"m8-upgrade", t:"Fleet upgrade (sequential rolling restart)", p:"P3", ref:""},
+      {id:"m8-backup", t:"Backup/restore (pg_dump -n <schema> + uploads/)", p:"P3", ref:""},
+    ]},
+  ]},
+  { id:"m9", title:"Phase 7 — Deploy / go-live", subs:[
+    { title:"Production", tasks:[
+      {id:"m9-vps", t:"VPS (Linode) + Docker", p:"P2", ref:""},
+      {id:"m9-proxy", t:"Caddy/Traefik editing-domain TLS", p:"P2", ref:""},
+      {id:"m9-secrets", t:"Secrets manager (replace plaintext-on-host)", p:"P1", ref:""},
+      {id:"m9-pool", t:"Connection pooler (PgBouncer) before ~5–8 tenants", p:"P3", ref:""},
+    ]},
+  ]},
+]};
+
+const DEPS = {
+  "s9-instatic":["s9-db"], "m1-registry":["m1-postgres"], "m2-schema-role":["s9-db"],
+  "m2-firstrun":["s2-firstrun","m1-docker"], "m2-cf":["m1-registry"],
+  "m2-saga":["m2-schema-role","m2-firstrun","m2-cf"], "m2-deprovision":["m2-schema-role"],
+  "m3-proxy":["s4-gateway"], "m3-token":["m3-proxy"], "m3-rate":["m3-proxy"], "m3-meter":["m3-proxy","m1-registry"],
+  "m4-watch":["s1-assets"], "m4-deploy":["s3-upload","m4-watch"], "m4-record":["m4-deploy","m1-registry"], "m4-domains":["m4-deploy"],
+  "m5-settings":["m1-registry"], "m5-tenants":["m2-saga"], "m5-dash":["m7-metrics"], "m5-alerts":["m1-registry"],
+  "m6-roles":["m2-firstrun"], "m6-audit":["m2-firstrun"], "m7-metrics":["m1-registry"],
+  "m8-upgrade":["m2-saga"], "m8-backup":["m2-saga"],
+  "m9-vps":["m5-tenants"], "m9-proxy":["m9-vps"], "m9-secrets":["m5-settings"], "m9-pool":["m1-postgres"]
+};
+/* tasks already proven/under way (default state before any server edits) */
+const DEFAULTS = {
+  "s9-db":{status:"done"}, "m1-postgres":{status:"done"},
+  "m2-schema-role":{status:"done"}, "m2-deprovision":{status:"in_progress"}
+};
+
+/* ---------------- state plumbing ---------------- */
+const TASK_BY_ID = {};
+CONTENT.modules.forEach(m=>m.subs.forEach(s=>s.tasks.forEach(t=>{t._mid=m.id;TASK_BY_ID[t.id]=t;})));
+const allIds = ()=>Object.keys(TASK_BY_ID);
+let state = { rev:-1, tasks:{} };
+let serverMode = false;
+
+function getTask(id){ return state.tasks[id] || DEFAULTS[id] || {status:"todo",notes:""}; }
+function depsOf(id){ return DEPS[id]||[]; }
+function readiness(id){
+  const deps = depsOf(id);
+  const unmet = deps.filter(d=>TASK_BY_ID[d] && getTask(d).status!=="done");
+  return { ready: unmet.length===0, unmet, deps };
+}
+
+async function loadState(){
+  try{
+    const r = await fetch("api/state",{cache:"no-store"});
+    const d = await r.json();
+    serverMode = true;
+    if(d.rev!==state.rev){ state.rev=d.rev; state.tasks=d.tasks||{}; if(!editing()) render(); }
+    document.getElementById("mode").textContent = "● shared (server)";
+    document.getElementById("rev").textContent = "rev "+d.rev;
+  }catch(e){
+    serverMode=false;
+    document.getElementById("mode").textContent = "○ offline (read-only)";
+  }
+}
+function editing(){ return document.activeElement && document.activeElement.tagName==="TEXTAREA"; }
+
+async function saveTask(id){
+  const t = getTask(id);
+  state.tasks[id] = {status:t.status, notes:t.notes||""};
+  if(!serverMode) return {ok:false};
+  try{
+    const r = await fetch("api/task",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({id,status:state.tasks[id].status,notes:state.tasks[id].notes})});
+    const d = await r.json(); state.rev=d.rev; return {ok:true};
+  }catch(e){ return {ok:false}; }
+}
+function setStatus(id,val){
+  const cur = getTask(id);
+  state.tasks[id] = {status:val, notes:cur.notes||""};
+  saveTask(id).then(()=>render());
+}
+
+/* ---------------- render ---------------- */
+const PLABEL={P1:"p1",P2:"p2",P3:"p3"};
+function counts(ids){ let done=0; ids.forEach(id=>{ if(getTask(id).status==="done") done++; }); return {done,total:ids.length}; }
+function pct(c){ return c.total? Math.round(c.done*100/c.total):0; }
+
+function render(){
+  // overall
+  const ids = allIds();
+  let done=0,prog=0,blk=0;
+  ids.forEach(id=>{const s=getTask(id).status; if(s==="done")done++; else if(s==="in_progress")prog++; else if(s==="blocked")blk++;});
+  const p = ids.length? Math.round(done*100/ids.length):0;
+  const ring=document.getElementById("ring"); ring.style.setProperty("--p",p);
+  document.getElementById("ringtxt").textContent=p+"%";
+  document.getElementById("oDone").textContent=done;
+  document.getElementById("oTotal").textContent=ids.length;
+  document.getElementById("oProg").textContent=prog;
+  document.getElementById("oBlk").textContent=blk;
+
+  // stepper
+  const step=document.getElementById("stepper"); step.innerHTML="";
+  CONTENT.modules.forEach(m=>{
+    const mids=[]; m.subs.forEach(s=>s.tasks.forEach(t=>mids.push(t.id)));
+    const c=counts(mids); const mp=pct(c);
+    const b=document.createElement("button");
+    b.className="step "+(mp===100?"done":(c.done>0?"partial":""));
+    b.innerHTML='<span class="dot"></span><span>'+m.title.replace(/^Phase \d+ — /,'')+'</span><span class="mp">'+mp+'%</span>';
+    b.onclick=()=>{const el=document.getElementById("mod-"+m.id); if(el){el.open=true; el.scrollIntoView({behavior:"smooth",block:"start"});}};
+    step.appendChild(b);
+  });
+
+  // tree
+  const tree=document.getElementById("tree"); tree.innerHTML="";
+  CONTENT.modules.forEach(m=>{
+    const mids=[]; m.subs.forEach(s=>s.tasks.forEach(t=>mids.push(t.id)));
+    const c=counts(mids);
+    const md=document.createElement("details"); md.className="mod"; md.id="mod-"+m.id; md.open=true;
+    const sum=document.createElement("summary");
+    sum.innerHTML='<span>'+m.title+'</span><span class="mbar"><i style="width:'+pct(c)+'%"></i></span><span class="mpct">'+c.done+'/'+c.total+'</span>';
+    md.appendChild(sum);
+    m.subs.forEach(s=>{
+      const sd=document.createElement("details"); sd.className="sm"; sd.open=true;
+      const ss=document.createElement("summary"); ss.textContent=s.title; sd.appendChild(ss);
+      const ul=document.createElement("ul"); ul.className="tasks";
+      s.tasks.forEach(t=>ul.appendChild(taskRow(t)));
+      sd.appendChild(ul); md.appendChild(sd);
+    });
+    tree.appendChild(md);
+  });
+  applyFilters();
+}
+
+function taskRow(t){
+  const st=getTask(t.id); const r=readiness(t.id);
+  const li=document.createElement("li"); li.className="task";
+  li.dataset.tid=t.id; li.dataset.p=t.p;
+  li.dataset.done=(st.status==="done")?"1":"0";
+  li.dataset.ready=(r.ready && st.status!=="done")?"1":"0";
+  li.dataset.wait=(r.unmet.length>0 && st.status!=="done")?"1":"0";
+
+  // checkbox
+  const ck=document.createElement("span"); ck.className="tk-check";
+  const cb=document.createElement("input"); cb.type="checkbox"; cb.checked=st.status==="done";
+  cb.title="toggle done"; cb.onchange=()=>setStatus(t.id, cb.checked?"done":"todo");
+  ck.appendChild(cb);
+
+  const main=document.createElement("div"); main.className="tk-main";
+  const title=document.createElement("div"); title.className="tk-title"+(st.status==="done"?" done":""); title.textContent=t.t;
+  main.appendChild(title);
+
+  const meta=document.createElement("div"); meta.className="tk-meta";
+  const chip=document.createElement("span"); chip.className="chip "+PLABEL[t.p]; chip.textContent=t.p; meta.appendChild(chip);
+  if(t.ref){const rf=document.createElement("span"); rf.className="ref"; rf.textContent=t.ref; meta.appendChild(rf);}
+  const sel=document.createElement("select"); sel.className="st s-"+st.status;
+  [["todo","○ Pending"],["in_progress","◐ In progress"],["done","● Done"],["blocked","✕ Blocked"]].forEach(([v,l])=>{
+    const o=document.createElement("option"); o.value=v; o.textContent=l; if(v===st.status)o.selected=true; sel.appendChild(o);
+  });
+  sel.onchange=()=>setStatus(t.id, sel.value);
+  meta.appendChild(sel);
+  main.appendChild(meta);
+
+  // deps
+  if(r.deps.length){
+    const dv=document.createElement("div"); dv.className="tk-deps";
+    const rb=document.createElement("span");
+    if(st.status==="done"){rb.className="ready isdone"; rb.textContent="✓ done";}
+    else if(r.ready){rb.className="ready go"; rb.textContent="✓ ready now";}
+    else{rb.className="ready wait"; rb.textContent="⏳ waiting on "+r.unmet.length;}
+    dv.appendChild(rb);
+    r.deps.forEach(d=>{
+      const met=TASK_BY_ID[d]&&getTask(d).status==="done";
+      const c=document.createElement("span"); c.className="dep "+(met?"met":"unmet"); c.textContent=(met?"✓ ":"✗ ")+d; dv.appendChild(c);
+    });
+    main.appendChild(dv);
+  }
+
+  // notes
+  const nz=document.createElement("div"); nz.className="tk-notes";
+  const ta=document.createElement("textarea"); ta.placeholder="Notes…"; ta.value=st.notes||"";
+  const sv=document.createElement("span"); sv.className="savestate";
+  let timer=null;
+  ta.oninput=()=>{
+    const cur=getTask(t.id); state.tasks[t.id]={status:cur.status,notes:ta.value};
+    sv.className="savestate saving"; sv.textContent="…";
+    if(timer)clearTimeout(timer);
+    timer=setTimeout(async()=>{ const res=await saveTask(t.id); sv.className="savestate "+(res.ok?"saved":"error"); sv.textContent=res.ok?"saved":"offline"; },450);
+  };
+  nz.appendChild(ta); nz.appendChild(sv); main.appendChild(nz);
+
+  li.appendChild(ck); li.appendChild(main);
+  return li;
+}
+
+/* ---------------- filters ---------------- */
+function applyFilters(){
+  const p1=document.getElementById("fP1").checked;
+  const ready=document.getElementById("fReady").checked;
+  const wait=document.getElementById("fWait").checked;
+  const hide=document.getElementById("fHideDone").checked;
+  document.querySelectorAll("li.task").forEach(li=>{
+    let show=true;
+    if(p1 && li.dataset.p!=="P1") show=false;
+    if(ready && li.dataset.ready!=="1") show=false;
+    if(wait && li.dataset.wait!=="1") show=false;
+    if(hide && li.dataset.done==="1") show=false;
+    li.classList.toggle("hide",!show);
+  });
+  // hide empty subs/mods
+  document.querySelectorAll("details.sm").forEach(sd=>{
+    const any=[...sd.querySelectorAll("li.task")].some(li=>!li.classList.contains("hide"));
+    sd.style.display=any?"":"none";
+  });
+  document.querySelectorAll("details.mod").forEach(md=>{
+    const any=[...md.querySelectorAll("li.task")].some(li=>!li.classList.contains("hide"));
+    md.style.display=any?"":"none";
+  });
+}
+["fP1","fReady","fWait","fHideDone"].forEach(id=>document.getElementById(id).addEventListener("change",applyFilters));
+
+/* ---------------- changelog ---------------- */
+function inlineMd(s){
+  return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+    .replace(/`([^`]+)`/g,'<code>$1</code>')
+    .replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>');
+}
+function parseChangelog(md){
+  const entries=[]; let date="",cur=null;
+  md.split(/\r?\n/).forEach(line=>{
+    let m;
+    if((m=line.match(/^##\s+(.+?)\s*$/))){date=m[1];cur=null;return;}
+    if((m=line.match(/^\*\*\s*`?\s*([^`*]+?)\s*`?\s*\*\*\s*(.*)$/))){
+      const title=(m[2]||"").replace(/^\s*[—–-]\s*/,"").trim();
+      cur={date,time:m[1].trim(),title,items:[]}; entries.push(cur); return;
+    }
+    if((m=line.match(/^[-*]\s+(.+?)\s*$/))){ if(!cur){cur={date,time:"",title:"",items:[]};entries.push(cur);} cur.items.push(m[1]); }
+  });
+  return entries.filter(e=>e.items.length);
+}
+async function loadChangelog(){
+  const box=document.getElementById("changelogList");
+  try{
+    const r=await fetch("api/changelog",{cache:"no-store"}); const md=await r.text();
+    const entries=parseChangelog(md);
+    let html="",lastDate="";
+    entries.forEach(e=>{
+      if(e.date!==lastDate){ html+='<div class="cl-date">'+inlineMd(e.date)+'</div>'; lastDate=e.date; }
+      html+='<div class="cl-entry"><div class="cl-time">'+inlineMd(e.time)+(e.title?" — "+inlineMd(e.title):"")+'</div><ul>';
+      e.items.forEach(it=>html+='<li>'+inlineMd(it)+'</li>');
+      html+='</ul></div>';
+    });
+    box.innerHTML=html||'<div class="cl-sub">no entries</div>';
+  }catch(e){ box.innerHTML='<div class="cl-sub">changelog unavailable</div>'; }
+}
+
+/* ---------------- boot ---------------- */
+render();
+loadState().then(render);
+loadChangelog();
+setInterval(loadState,4000);
+setInterval(loadChangelog,15000);
+</script>
+</body>
+</html>
