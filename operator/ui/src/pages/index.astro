@@ -1,0 +1,85 @@
+---
+import Layout from '../layouts/Layout.astro';
+const CP = 'http://127.0.0.1:4000';
+let error = '';
+
+if (Astro.request.method === 'POST') {
+  const f = await Astro.request.formData();
+  const intent = f.get('intent');
+  try {
+    if (intent === 'add') {
+      const r = await fetch(`${CP}/api/tenants`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: f.get('name'), ownerEmail: f.get('ownerEmail') }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || 'provision failed');
+    } else if (intent === 'deploy') {
+      const r = await fetch(`${CP}/api/tenants/${f.get('slug')}/deploy`, { method: 'POST' });
+      const j = await r.json();
+      if (!r.ok || j.ok === false) throw new Error(j.error || 'deploy failed');
+    } else if (intent === 'start') {
+      await fetch(`${CP}/api/tenants/${f.get('slug')}/start`, { method: 'POST' });
+    } else if (intent === 'remove') {
+      await fetch(`${CP}/api/tenants/${f.get('slug')}`, { method: 'DELETE' });
+    }
+    if (!error) return Astro.redirect('/');
+  } catch (e) { error = e.message; }
+}
+
+let tenants = [];
+try {
+  const res = await fetch(`${CP}/api/tenants`);
+  tenants = (await res.json()).tenants || [];
+} catch (e) {
+  error = `Control plane not reachable on :4000 — is it running? (${e.message})`;
+}
+---
+<Layout title="Tenants">
+  <h1>Tenants</h1>
+  <p class="sub">Each tenant is an isolated <strong>native Instatic</strong> instance — its own Postgres schema, port, and uploads. No Docker.</p>
+  {error && <div class="banner err">{error}</div>}
+
+  <div class="card">
+    <form method="POST">
+      <input type="hidden" name="intent" value="add" />
+      <div class="grid2">
+        <div><label>Tenant name</label><input name="name" placeholder="Acme Co" required /></div>
+        <div><label>Owner email (optional)</label><input name="ownerEmail" type="email" placeholder="owner@acme.com" /></div>
+      </div>
+      <p class="hint" style="margin:10px 0 0">Provisioning boots a native Instatic instance (~30–60s). The share link opens its setup wizard, where the tenant creates their own owner account.</p>
+      <div style="margin-top:12px"><button type="submit">+ Add tenant</button></div>
+    </form>
+  </div>
+
+  <div class="card">
+    {tenants.length === 0 ? (<p class="hint">No tenants yet — add one above.</p>) : (
+      <table>
+        <thead><tr><th>Slug</th><th>Status</th><th>Instance</th><th>Live URL</th><th>Actions</th></tr></thead>
+        <tbody>
+          {tenants.map((t) => (
+            <tr>
+              <td><strong>{t.slug}</strong></td>
+              <td><span class={'pill ' + (t.status === 'active' ? 'ok' : (t.status === 'failed' ? 'bad' : 'warn'))}>{t.status}</span></td>
+              <td>{t.running
+                ? (<a href={t.admin_url} target="_blank" rel="noreferrer">open :{t.port} ↗</a>)
+                : (<span class="pill warn">stopped</span>)}</td>
+              <td>{t.pages_url
+                ? (<a href={t.pages_url} target="_blank" rel="noreferrer">{t.pages_url.replace('https://', '')} ↗</a>)
+                : (<span class="hint">not published</span>)}</td>
+              <td>
+                <div class="row-actions">
+                  {!t.running && (
+                    <form method="POST"><input type="hidden" name="intent" value="start" /><input type="hidden" name="slug" value={t.slug} /><button class="ghost" type="submit">Start</button></form>
+                  )}
+                  <form method="POST"><input type="hidden" name="intent" value="deploy" /><input type="hidden" name="slug" value={t.slug} /><button class="ghost" type="submit">Publish → CF</button></form>
+                  <form method="POST" onsubmit="return confirm('Remove this tenant, its schema, and its files?')"><input type="hidden" name="intent" value="remove" /><input type="hidden" name="slug" value={t.slug} /><button class="danger" type="submit">Remove</button></form>
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    )}
+  </div>
+</Layout>

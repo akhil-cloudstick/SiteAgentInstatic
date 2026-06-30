@@ -1,0 +1,20 @@
+{
+  "name": "siteagent",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "SiteAgent — fleet of native Instatic instances → Cloudflare. Control plane (Node) + Astro console.",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "node dev.mjs",
+    "migrate": "node operator/control-plane/registry/migrate.mjs",
+    "start": "node operator/control-plane/server.mjs",
+    "console:dev": "npm --prefix operator/ui run dev",
+    "console:build": "npm --prefix operator/ui run build"
+  },
+  "dependencies": {
+    "pg": "^8.22.0"
+  }
+}

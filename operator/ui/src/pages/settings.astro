@@ -1,0 +1,53 @@
+---
+import Layout from '../layouts/Layout.astro';
+const CP = 'http://127.0.0.1:4000';
+let error = '';
+
+if (Astro.request.method === 'POST') {
+  const f = await Astro.request.formData();
+  const str = (k) => (f.get(k) || '').toString().trim() || undefined;
+  const payload = {
+    openrouterKey: str('openrouterKey'),
+    openrouterModel: str('openrouterModel'),
+    cloudflareToken: str('cloudflareToken'),
+    cloudflareAccountId: str('cloudflareAccountId'),
+  };
+  try {
+    const r = await fetch(`${CP}/api/settings`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+    });
+    if (!r.ok) throw new Error('save failed');
+    return Astro.redirect('/settings?saved=1');
+  } catch (e) { error = e.message; }
+}
+
+let s = {};
+try { s = await (await fetch(`${CP}/api/settings`)).json(); }
+catch (e) { error = `Control plane not reachable: ${e.message}`; }
+const justSaved = Astro.url.searchParams.get('saved') === '1';
+---
+<Layout title="Settings">
+  <h1>Settings</h1>
+  <p class="sub">Global OpenRouter key/model and Cloudflare credentials. Secrets are <strong>encrypted at rest</strong> and masked here — leave a field blank to keep its current value.</p>
+  {justSaved && <div class="banner ok">Saved.</div>}
+  {error && <div class="banner err">{error}</div>}
+
+  <div class="card">
+    <form method="POST">
+      <label>OpenRouter API key {s.hasOpenrouterKey && (<span class="hint">(set — blank keeps it)</span>)}</label>
+      <input name="openrouterKey" type="password" autocomplete="off" placeholder={s.hasOpenrouterKey ? '••••••••••••' : 'sk-or-...'} />
+
+      <label>OpenRouter model</label>
+      <input name="openrouterModel" value={s.openrouterModel || ''} placeholder="anthropic/claude-3.5-sonnet" />
+
+      <label>Cloudflare API token {s.hasCloudflareToken && (<span class="hint">(set — blank keeps it)</span>)}</label>
+      <input name="cloudflareToken" type="password" autocomplete="off" placeholder={s.hasCloudflareToken ? '••••••••••••' : 'Cloudflare Pages token'} />
+
+      <label>Cloudflare account id</label>
+      <input name="cloudflareAccountId" value={s.cloudflareAccountId || ''} placeholder="32-char account id" />
+
+      <div style="margin-top:16px"><button type="submit">Save settings</button></div>
+    </form>
+  </div>
+  <p class="hint">The OpenRouter key is injected only by the <strong>AI Gateway</strong> — it is never stored in any tenant instance. The Cloudflare token is used by the Publish Deployer.</p>
+</Layout>

@@ -1,0 +1,21 @@
+# SiteAgent — ignore runtime + secrets + vendored deps
+node_modules/
+.env
+*.local
+.DS_Store
+
+# Per-tenant runtime state (instances, uploads, secrets) — never commit
+tenants/
+
+# Instatic vendored install artifacts (the source is cloned; deps/build are local)
+instatic/vendor/node_modules/
+instatic/vendor/dist/
+instatic/vendor/.tmp/
+
+# Operator console build
+operator/ui/dist/
+operator/ui/.astro/
+
+# Control-plane local state
+operator/control-plane/.state/
+*.log

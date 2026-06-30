@@ -1,0 +1,54 @@
+---
+interface Props { title?: string }
+const { title = 'SiteAgent' } = Astro.props;
+const path = Astro.url.pathname;
+---
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{title} · SiteAgent</title>
+  <style is:global>
+    :root{--bg:#0e1216;--panel:#161b22;--panel2:#1b2330;--ink:#e9eef3;--mut:#8b949e;--line:#2a313a;--accent:#58a6ff;--ok:#2ea043;--warn:#d29922;--bad:#e5534b}
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.55 -apple-system,Segoe UI,Roboto,Arial,sans-serif}
+    a{color:var(--accent);text-decoration:none}
+    header{display:flex;align-items:center;gap:22px;padding:14px 24px;border-bottom:1px solid var(--line);background:var(--panel)}
+    .brand{font-weight:700;font-size:16px;color:var(--ink)}
+    nav{display:flex;gap:16px}
+    nav a{color:var(--mut)} nav a.active,nav a:hover{color:var(--ink)}
+    main{max-width:1000px;margin:0 auto;padding:28px 24px 80px}
+    h1{font-size:20px;margin:0 0 4px} .sub{color:var(--mut);margin:0 0 22px}
+    .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px;margin:0 0 18px}
+    label{display:block;font-size:12px;color:var(--mut);margin:12px 0 4px}
+    input{width:100%;background:var(--bg);border:1px solid var(--line);border-radius:8px;color:var(--ink);padding:9px 11px;font:inherit}
+    button{background:var(--accent);color:#04121f;border:0;border-radius:8px;padding:9px 14px;font:inherit;font-weight:600;cursor:pointer}
+    button.ghost{background:var(--panel2);color:var(--ink);border:1px solid var(--line)}
+    button.danger{background:transparent;color:var(--bad);border:1px solid #5a2a2a}
+    table{width:100%;border-collapse:collapse}
+    th,td{text-align:left;padding:10px 8px;border-bottom:1px solid var(--line);font-size:13px;vertical-align:middle}
+    th{color:var(--mut);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.04em}
+    .pill{font-size:11px;border-radius:20px;padding:1px 9px;border:1px solid var(--line)}
+    .pill.ok{color:var(--ok);border-color:#1f4a2a}.pill.bad{color:var(--bad);border-color:#5a2a2a}.pill.warn{color:var(--warn);border-color:#5a4a1f}
+    .row-actions{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+    .row-actions form{display:inline}
+    .hint{color:var(--mut);font-size:12px}
+    .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+    .banner{padding:10px 12px;border-radius:8px;margin-bottom:16px;font-size:13px}
+    .banner.ok{background:#13261b;border:1px solid #1f4a2a;color:#9be9b0}
+    .banner.err{background:#2a1416;border:1px solid #5a2a2a;color:#f3a0a8}
+    code{background:var(--panel2);border:1px solid var(--line);border-radius:5px;padding:0 5px}
+  </style>
+</head>
+<body>
+  <header>
+    <span class="brand">🛰️ SiteAgent</span>
+    <nav>
+      <a href="/" class={path === '/' ? 'active' : ''}>Tenants</a>
+      <a href="/settings" class={path === '/settings' ? 'active' : ''}>Settings</a>
+    </nav>
+  </header>
+  <main><slot /></main>
+</body>
+</html>
