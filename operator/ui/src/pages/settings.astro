@@ -24,6 +24,13 @@ if (Astro.request.method === 'POST') {
 let s = {};
 try { s = await (await fetch(`${CP}/api/settings`)).json(); }
 catch (e) { error = `Control plane not reachable: ${e.message}`; }
+
+// Live OpenRouter model catalogue for the searchable picker (empty until a key
+// is saved). The gateway/settings decide which model tenants use; this just
+// makes it easy to pick a valid id instead of typing it by hand.
+let models = [];
+try { models = ((await (await fetch(`${CP}/api/models`)).json()).models) || []; } catch {}
+
 const justSaved = Astro.url.searchParams.get('saved') === '1';
 ---
 <Layout title="Settings">
@@ -37,8 +44,20 @@ const justSaved = Astro.url.searchParams.get('saved') === '1';
       <label>OpenRouter API key {s.hasOpenrouterKey && (<span class="hint">(set — blank keeps it)</span>)}</label>
       <input name="openrouterKey" type="password" autocomplete="off" placeholder={s.hasOpenrouterKey ? '••••••••••••' : 'sk-or-...'} />
 
-      <label>OpenRouter model</label>
-      <input name="openrouterModel" value={s.openrouterModel || ''} placeholder="anthropic/claude-3.5-sonnet" />
+      <label>OpenRouter model {models.length > 0 && (<span class="hint">({models.length} available)</span>)}</label>
+      <div class="combo" id="model-combo">
+        <input type="hidden" name="openrouterModel" id="model-value" value={s.openrouterModel || ''} />
+        <button type="button" class="combo-trigger" id="model-trigger" disabled={models.length === 0}>
+          <span id="model-trigger-label" class={s.openrouterModel ? '' : 'placeholder'}>
+            {s.openrouterModel || (models.length > 0 ? 'Select a model…' : 'Save an API key to load models')}
+          </span>
+          <span class="combo-caret">▾</span>
+        </button>
+        <div class="combo-panel" id="model-panel" hidden>
+          <input type="text" class="combo-search" id="model-search" placeholder="Type to search…" autocomplete="off" />
+          <div class="combo-list" id="model-list-box"></div>
+        </div>
+      </div>
 
       <label>Cloudflare API token {s.hasCloudflareToken && (<span class="hint">(set — blank keeps it)</span>)}</label>
       <input name="cloudflareToken" type="password" autocomplete="off" placeholder={s.hasCloudflareToken ? '••••••••••••' : 'Cloudflare Pages token'} />
@@ -51,3 +70,92 @@ const justSaved = Astro.url.searchParams.get('saved') === '1';
   </div>
   <p class="hint">The OpenRouter key is injected only by the <strong>AI Gateway</strong> — it is never stored in any tenant instance. The Cloudflare token is used by the Publish Deployer.</p>
 </Layout>
+
+<style>
+  .combo { position: relative; }
+  .combo-trigger {
+    width: 100%; display: flex; align-items: center; justify-content: space-between;
+    background: var(--bg); border: 1px solid var(--line); border-radius: 8px;
+    color: var(--ink); padding: 9px 11px; font: inherit; cursor: pointer; text-align: left;
+  }
+  .combo-trigger:hover:not(:disabled) { border-color: var(--accent); }
+  .combo-trigger:disabled { cursor: not-allowed; opacity: .6; }
+  .combo-trigger .placeholder { color: var(--mut); }
+  .combo-caret { color: var(--mut); margin-left: 8px; font-size: 12px; }
+  .combo-panel {
+    position: absolute; z-index: 30; left: 0; right: 0; margin-top: 6px;
+    background: var(--panel2); border: 1px solid var(--line); border-radius: 8px;
+    box-shadow: 0 10px 30px rgba(0,0,0,.5); overflow: hidden;
+  }
+  .combo-search {
+    width: 100%; border: 0; border-bottom: 1px solid var(--line); border-radius: 0;
+    background: var(--panel); padding: 10px 12px; color: var(--ink); font: inherit;
+  }
+  .combo-search:focus { outline: none; }
+  .combo-list { max-height: 320px; overflow-y: auto; }
+  .combo-item {
+    padding: 8px 12px; cursor: pointer; border-bottom: 1px solid rgba(42,49,58,.5);
+  }
+  .combo-item:last-child { border-bottom: 0; }
+  .combo-item:hover, .combo-item.active { background: var(--panel); }
+  .combo-item.selected { background: rgba(88,166,255,.12); }
+  .combo-item-id { font-weight: 600; color: var(--ink); font-size: 13px; }
+  .combo-item-name { color: var(--mut); font-size: 12px; margin-top: 1px; }
+  .combo-empty { padding: 16px 12px; color: var(--mut); text-align: center; }
+</style>
+
+<script define:vars={{ models }}>
+  (function () {
+    const combo = document.getElementById('model-combo');
+    if (!combo || !models.length) return;
+    const trigger = document.getElementById('model-trigger');
+    const label = document.getElementById('model-trigger-label');
+    const panel = document.getElementById('model-panel');
+    const search = document.getElementById('model-search');
+    const listBox = document.getElementById('model-list-box');
+    const valueInput = document.getElementById('model-value');
+    let filtered = models, active = -1;
+
+    const esc = (s) => String(s).replace(/[&<>"']/g, (c) =>
+      ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+    function render() {
+      listBox.innerHTML = filtered.length
+        ? filtered.map((m, i) =>
+            `<div class="combo-item${i === active ? ' active' : ''}${m.id === valueInput.value ? ' selected' : ''}" data-id="${esc(m.id)}">` +
+            `<div class="combo-item-id">${esc(m.id)}</div><div class="combo-item-name">${esc(m.name)}</div></div>`).join('')
+        : '<div class="combo-empty">No models match</div>';
+    }
+    function scrollToActive() {
+      const el = listBox.querySelector('.combo-item.active');
+      if (el) el.scrollIntoView({ block: 'nearest' });
+    }
+    function open() { panel.hidden = false; search.value = ''; filtered = models; active = -1; render(); search.focus(); }
+    function close() { panel.hidden = true; }
+    function select(id) {
+      const m = models.find((x) => x.id === id);
+      valueInput.value = id;
+      label.textContent = id;
+      label.classList.remove('placeholder');
+      close();
+    }
+
+    trigger.addEventListener('click', () => (panel.hidden ? open() : close()));
+    search.addEventListener('input', () => {
+      const q = search.value.toLowerCase().trim();
+      filtered = q ? models.filter((m) => m.id.toLowerCase().includes(q) || m.name.toLowerCase().includes(q)) : models;
+      active = -1; render();
+    });
+    listBox.addEventListener('click', (e) => {
+      const item = e.target.closest('.combo-item');
+      if (item) select(item.dataset.id);
+    });
+    search.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowDown') { e.preventDefault(); active = Math.min(active + 1, filtered.length - 1); render(); scrollToActive(); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); active = Math.max(active - 1, 0); render(); scrollToActive(); }
+      else if (e.key === 'Enter') { e.preventDefault(); if (active >= 0 && filtered[active]) select(filtered[active].id); }
+      else if (e.key === 'Escape') { close(); trigger.focus(); }
+    });
+    document.addEventListener('click', (e) => { if (!combo.contains(e.target)) close(); });
+  })();
+</script>

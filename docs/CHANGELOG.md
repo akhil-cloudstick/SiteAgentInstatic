@@ -3,6 +3,9 @@ _Plain-language log of what changed, newest first._
 
 ## 2026-07-01 (continued)
 
+**Console: searchable model picker instead of typing the id**
+The Settings "OpenRouter model" field is now a polished searchable dropdown of the live OpenRouter catalogue (300+ models) instead of a free-text box, so the operator picks a valid model id after saving their key. Each row shows the model id + friendly name; type to filter, arrow-keys/Enter to pick, click to select, Esc to close; the current model is highlighted. Backed by a new control-plane `GET /api/models` (fetches the catalogue with the operator's key; empty until a key is saved). Themed vanilla-JS combobox — no framework.
+
 **Model changes are now live — no tenant restart (read from DB, not env)**
 The operator's model was baked into each tenant's env at boot, so changing it in the console needed a restart. Root cause: env is frozen for a process's life. Fixed by making the model **read live from the DB via the gateway** on both paths:
 - **Actual model:** the gateway rewrites each request's `model` to the operator's current Settings value on every call.

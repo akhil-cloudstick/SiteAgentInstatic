@@ -3,7 +3,7 @@
 import http from 'node:http';
 import config from './lib/env.mjs';
 import { migrate } from './registry/db.mjs';
-import { getSettings, saveSettings } from './registry/settings.mjs';
+import { getSettings, saveSettings, getSecrets } from './registry/settings.mjs';
 import * as tenantsRepo from './registry/tenants.mjs';
 import { provisionTenant, deprovisionTenant, startTenant, resumeAll } from './provisioner/provision.mjs';
 import { deployTenant } from './deployer/deploy.mjs';
@@ -41,6 +41,26 @@ function decorate(row) {
   };
 }
 
+// Live OpenRouter model catalogue for the console picker, fetched with the
+// operator's key. Returns [] until a key is saved (or on any upstream error) so
+// the settings page still renders — it just shows no options yet.
+async function listOpenrouterModels() {
+  const { openrouterKey } = await getSecrets();
+  if (!openrouterKey) return [];
+  try {
+    const r = await fetch('https://openrouter.ai/api/v1/models', {
+      headers: { Authorization: `Bearer ${openrouterKey}` },
+    });
+    if (!r.ok) return [];
+    const data = await r.json();
+    return (data.data || [])
+      .map((m) => ({ id: m.id, name: m.name || m.id }))
+      .sort((a, b) => a.id.localeCompare(b.id));
+  } catch {
+    return [];
+  }
+}
+
 const server = http.createServer(async (req, res) => {
   const path = new URL(req.url, 'http://x').pathname;
   const method = req.method;
@@ -57,6 +77,11 @@ const server = http.createServer(async (req, res) => {
     if (path === '/api/settings') {
       if (method === 'GET') return send(res, 200, await getSettings());
       if (method === 'POST') return send(res, 200, await saveSettings(await readJson(req)));
+    }
+    if (path === '/api/models') {
+      // Model picker source for the console: the live OpenRouter catalogue,
+      // fetched with the operator's key. Empty until a key is saved.
+      if (method === 'GET') return send(res, 200, { models: await listOpenrouterModels() });
     }
     if (path === '/api/tenants') {
       if (method === 'GET') {
