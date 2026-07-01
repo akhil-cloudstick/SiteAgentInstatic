@@ -26,7 +26,11 @@ export const ButtonModule: ModuleDefinition<ButtonStoredProps> = {
   version: '2.0.0',
   icon: CursorClickSolidIcon,
   trusted: true,
-  canHaveChildren: false,
+  // Buttons may wrap element children — an icon-only button
+  // (`<button><svg>…</svg></button>`) is common in imported sites. Mirrors
+  // base.link: render children when present, else fall back to the `label`
+  // prop. Without this an icon button imports as an empty button.
+  canHaveChildren: true,
   inlineTextEdit: { prop: 'label' },
 
   schema: {
@@ -53,17 +57,21 @@ export const ButtonModule: ModuleDefinition<ButtonStoredProps> = {
 
   htmlTag: (props) => (resolveButtonAnchor(props.href) ? 'a' : 'button'),
 
-  render: (props) => {
-    const label = String(props.label ?? '')
+  render: (props, renderedChildren) => {
+    // Render children when the button wraps them (icon buttons); otherwise fall
+    // back to the `label` text prop. Mirrors base.link's content rule so the
+    // publisher and canvas can't drift.
+    const content =
+      renderedChildren.length > 0 ? renderedChildren.join('') : String(props.label ?? '')
     const attrs = htmlAttributesAttr(props.htmlAttributes)
     const anchor = resolveButtonAnchor(props.href)
     if (anchor) {
       const rel = anchorRel(props.target)
       const relAttr = rel ? ` rel="${rel}"` : ''
-      return { html: `<a${attrs} href="${anchor.href}" target="${String(props.target)}"${relAttr}>${label}</a>` }
+      return { html: `<a${attrs} href="${anchor.href}" target="${String(props.target)}"${relAttr}>${content}</a>` }
     }
     const disabledAttr = props.disabled ? ' disabled aria-disabled="true"' : ''
-    return { html: `<button${attrs} type="button"${disabledAttr}>${label}</button>` }
+    return { html: `<button${attrs} type="button"${disabledAttr}>${content}</button>` }
   },
 }
 

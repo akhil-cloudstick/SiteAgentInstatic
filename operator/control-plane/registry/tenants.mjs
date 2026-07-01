@@ -27,11 +27,25 @@ export async function getTenant(slug) {
 }
 
 export async function createTenant({ slug, schemaName, dbRole, ownerEmail, ownerPasswordEnc, secretRef, port }) {
+  // Re-creating a slug that was previously removed (a "tombstone" row) must
+  // FULLY reset the row to the freshly-allocated values. The old clause only
+  // bumped updated_at, so the stale `port` survived — the registry then pointed
+  // at the wrong port while the instance booted on the newly-allocated one
+  // (port drift). Reset every provisioning field from the incoming values.
   const { rows } = await query(
     `insert into siteagent_control.tenants
        (slug, schema_name, db_role, owner_email, owner_password_enc, secret_ref, port, status, provision_state)
      values ($1,$2,$3,$4,$5,$6,$7,'provisioning','new')
-     on conflict (slug) do update set updated_at = now()
+     on conflict (slug) do update set
+       schema_name = excluded.schema_name,
+       db_role = excluded.db_role,
+       owner_email = excluded.owner_email,
+       owner_password_enc = excluded.owner_password_enc,
+       secret_ref = excluded.secret_ref,
+       port = excluded.port,
+       status = excluded.status,
+       provision_state = excluded.provision_state,
+       updated_at = now()
      returning *`,
     [slug, schemaName, dbRole, ownerEmail, ownerPasswordEnc || null, secretRef || null, port || null],
   );

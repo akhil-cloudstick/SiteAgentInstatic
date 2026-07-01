@@ -69,6 +69,15 @@ export function start(tenant) {
     out.write(`\n[runtime] ${slug} exited code=${code} @ ${new Date().toISOString()}\n`);
     running.delete(slug);
   });
+  // A child that fails to spawn (bad cwd, bun not found, EBUSY, killed) emits
+  // an 'error' event. With NO listener Node re-throws it as an uncaught
+  // exception — which crashed the whole control-plane every time a provision
+  // hiccuped. Handle it: log, drop the record, and let the provision saga's
+  // `waitHealthy` time out and report failure instead of taking the server down.
+  child.on('error', (err) => {
+    out.write(`\n[runtime] ${slug} spawn error: ${err?.message ?? err} @ ${new Date().toISOString()}\n`);
+    running.delete(slug);
+  });
 
   const rec = { child, port, pid: child.pid, slug };
   running.set(slug, rec);

@@ -401,14 +401,32 @@ export function generateClassCSS(
     return ao - bo
   })
 
+  // A style rule can end up stored twice with the SAME selector and byte-for-byte
+  // identical declarations — most commonly when an imported class survives both
+  // as a `class` rule AND as an `ambient` rule (different dedup keys: name vs
+  // selector). Emitting both is never meaningful and is actively harmful: the
+  // later copy re-declares the base at a higher `order`, so it wins over
+  // legitimately later rules like `.nav-link-active` on equal specificity —
+  // e.g. the active nav link loses its colour. Collapse exact duplicates,
+  // keeping the FIRST (lowest-order) occurrence so real overrides still win.
+  const seen = new Set<string>()
+
   for (const cls of orderedClasses) {
     if (typeof cls.rawCss === 'string') {
       const rawCss = sanitizeRawKeyframesCss(cls.rawCss)
-      if (rawCss) blocks.push(rawCss)
+      if (!rawCss) continue
+      if (seen.has(rawCss)) continue
+      seen.add(rawCss)
+      blocks.push(rawCss)
       continue
     }
 
-    blocks.push(...emitRule(styleRuleSelector(cls), cls.styles, cls.contextStyles))
+    const selector = styleRuleSelector(cls)
+    const key = `${selector} ${JSON.stringify(cls.styles)} ${JSON.stringify(cls.contextStyles ?? {})}`
+    if (seen.has(key)) continue
+    seen.add(key)
+
+    blocks.push(...emitRule(selector, cls.styles, cls.contextStyles))
   }
 
   return blocks.join('\n\n')

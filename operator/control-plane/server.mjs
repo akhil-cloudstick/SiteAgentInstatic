@@ -83,6 +83,17 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
+// --- resilience: a single tenant/child failure must never crash the whole
+// control-plane. Without these guards an unhandled async error (e.g. a child
+// process 'error' that slipped a listener) took the supervisor down mid-request,
+// which is why provisioning intermittently killed the server. Log and stay up. ---
+process.on('uncaughtException', (err) => {
+  console.error('[control-plane] uncaughtException (kept alive):', err);
+});
+process.on('unhandledRejection', (err) => {
+  console.error('[control-plane] unhandledRejection (kept alive):', err);
+});
+
 // --- boot ---
 await migrate();
 const resumed = await resumeAll();

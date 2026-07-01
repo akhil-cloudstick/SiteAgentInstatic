@@ -414,6 +414,15 @@ export const HTML_TO_MODULE_RULES: ImportRule[] = [
         props: { label: normalizeImportedText(el.textContent ?? ''), disabled: el.hasAttribute('disabled') },
       }
     },
+    // Recurse into a plain button's element children (an icon / inline `<svg>`)
+    // so an icon-only button keeps its glyph as real child nodes. base.button
+    // now allows children (renders them when present, else the `label` prop).
+    // Submit buttons stay leaves — base.submit renders from its `label`.
+    recurse: (el) => {
+      const type = normalizedAttr(el, 'type')
+      const isSubmit = type === 'submit' || (!type && el.closest('form') !== null)
+      return !isSubmit && hasElementChild(el)
+    },
   },
 
   // ul / ol are BUILTIN_HTML_TAGS for base.container → container + RECURSE.
