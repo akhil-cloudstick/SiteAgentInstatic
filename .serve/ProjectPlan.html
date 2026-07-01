@@ -201,6 +201,18 @@ const CONTENT = { modules: [
       {id:"m9-pool", t:"Connection pooler (PgBouncer) before ~5–8 tenants", p:"P3", ref:""},
     ]},
   ]},
+  { id:"m10", title:"Import Fidelity — Site Replica (Path B)", subs:[
+    { title:"Pixel-exact import (verified against AtlasInfra replica → published)", tasks:[
+      {id:"if-media", t:"Preserve minified @media(…) (Vite/Astro no-space) — responsive CSS was silently dropped", p:"P1", ref:"templateRule.md"},
+      {id:"if-cascade", t:"Emit responsive overrides mobile-first (min-width ascending) so the right breakpoint wins", p:"P1", ref:""},
+      {id:"if-lineheight", t:"Reset uses line-height:normal (not 1.5) — buttons/cards no longer +3px taller", p:"P1", ref:""},
+      {id:"if-sticky", t:"Reset uses body{min-height} (not height:100%) — position:sticky spans the page", p:"P1", ref:""},
+      {id:"if-iconbtn", t:"Icon buttons keep their <svg> children (hamburger) — buttons now render children like links", p:"P1", ref:""},
+      {id:"if-dedup", t:"Publisher never emits two byte-identical rules — fixes active-nav colour + halves CSS size", p:"P1", ref:""},
+      {id:"if-portdrift", t:"Operator: createTenant resets port on re-create — no more registry/instance port drift", p:"P2", ref:""},
+      {id:"if-crashguard", t:"Operator: child error handler + global guards — a tenant boot failure can't crash the control-plane", p:"P1", ref:""},
+    ]},
+  ]},
 ]};
 
 const DEPS = {

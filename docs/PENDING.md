@@ -62,6 +62,18 @@ _All remaining work, phased. **Prove-first** spikes gate the build; tick a box a
 - [ ] **Secrets manager** (`m9-secrets`) — replace plaintext-on-host (acceptable only for local dev)
 - [ ] **Connection pooler (PgBouncer)** (`m9-pool`) — before the fleet passes ~5–8 tenants
 
+## Import Fidelity — Site Replica (Path B) _(done 2026-07-01)_
+> Validated by importing a real Astro replica (**AtlasInfra**, built per [`templateRule.md`](templateRule.md)) into a live tenant and diffing the published site against the original. Every gap was a **platform** bug — the replica was correct. All fixed in `instatic/vendor` (every tenant) + `operator/control-plane`.
+
+- [x] **Preserve minified `@media(…)`** (`if-media`) — Vite/Astro's no-space form was silently dropped; all responsive CSS lost
+- [x] **Mobile-first cascade order** (`if-cascade`) — responsive overrides emit min-width ascending / max-width descending so the right breakpoint wins
+- [x] **Neutral reset line-height** (`if-lineheight`) — `normal` not `1.5`; buttons/cards no longer +3px taller
+- [x] **Sticky-safe reset height** (`if-sticky`) — `body{min-height}` not `height:100%`; `position:sticky` spans the page
+- [x] **Icon buttons keep children** (`if-iconbtn`) — `<button><svg></button>` preserves its glyph (renders children like links)
+- [x] **No duplicate identical rules** (`if-dedup`) — publisher never emits two byte-identical rules; fixes active-nav colour + halves CSS
+- [x] **Operator: no port drift on re-create** (`if-portdrift`) — `createTenant` resets all fields incl. port
+- [x] **Operator: crash-proof control-plane** (`if-crashguard`) — child `error` handler + global guards; a tenant boot failure returns a clean error instead of killing the supervisor
+
 ---
 
 ## Notes on deliberate deferrals

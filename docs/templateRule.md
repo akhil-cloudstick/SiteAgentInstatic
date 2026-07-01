@@ -78,6 +78,17 @@ This is exactly what Instatic imports as **color tokens** and **style rules**.
 - Write all CSS in `<style>` blocks inside the `.astro` files or in a global `.css` file imported by the layout.
 - CSS animations (`@keyframes`, `transition`, `animation`) are fully supported — write them in plain CSS.
 
+### Verified to import pixel-exact
+
+These common patterns were tested end-to-end (build → import → publish → diff against the original) and reproduce faithfully — use them freely:
+
+- **Responsive breakpoints** — `@media (min-width: …)` / `(max-width: …)` overrides. Minified output (`@media(min-width:1024px)`, no space) imports correctly, and the widest matching breakpoint wins on the published page just like in the browser.
+- **Sticky headers/sidebars** — `position: sticky; top: 0`. The published `<body>` grows with content, so a sticky element stays stuck for the whole scroll (not just one screen).
+- **Icon buttons** — `<button><svg>…</svg></button>` (hamburger, close, chevrons). The inline `<svg>` and its `<line>`/`<path>`/`<circle>` children are preserved.
+- **`line-height`** — buttons/cards/badges that rely on the browser default (`normal`) keep their exact height; the CMS does not force an opinionated `1.5`.
+
+The tenant edits all of the above inside Instatic and re-publishes with the same result.
+
 ---
 
 ## Required `astro.config.mjs`

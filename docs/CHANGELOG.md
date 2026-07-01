@@ -1,5 +1,19 @@
 # SiteAgent — Changelog
-_Plain-language log of what changed, newest first. Planning + spike phase (no application code yet)._
+_Plain-language log of what changed, newest first._
+
+## 2026-07-01
+
+**Import Fidelity — Site Replica (Path B) now imports pixel-exact**
+Validated by importing a real Astro replica (**AtlasInfra**, built per `templateRule.md`) into a live tenant and comparing the published site to the original at `localhost:4321`. Every difference traced to a **platform** bug (the replica followed the rule correctly). Fixed 6 import/publish bugs + 2 operator bugs — all in `instatic/vendor` and `operator/control-plane`, so they apply to **every** tenant. First application-code change (earlier phases were planning + spikes). Regression tests added; full publisher/import suite green.
+
+- **Responsive CSS was silently dropped.** Vite/Astro minify `@media (min-width:…)` to `@media(min-width:…)` (no space); the CSS engine ignored those rules, so every breakpoint override was lost. Now normalised before parsing (`@media`/`@supports`/`@container`/`@layer`).
+- **Responsive overrides won in the wrong order.** Imported media queries emitted in discovery order, not cascade order — a 640px rule could beat a 1024px rule on a wide screen. Now mobile-first (min-width ascending / max-width descending).
+- **Buttons & cards were ~3px too tall.** The publisher reset forced `body { line-height: 1.5 }`, which every element without its own line-height inherited. Now `normal` — neutral, so imported geometry matches.
+- **Sticky navbars broke after one screen.** The reset pinned `body { height: 100% }`, confining `position: sticky` to one viewport. Now `min-height` — the body grows and sticky spans the page.
+- **Icon buttons lost their icon.** `<button><svg>…</svg></button>` imported as an empty button (only text was kept). Buttons now preserve `<svg>`/element children, like links already did.
+- **Active nav link lost its colour (and CSS was 2× too big).** An imported class could be stored twice — as a class rule AND a byte-identical ambient rule; the later copy overrode `.nav-link-active`. The publisher now never emits two identical rules.
+- **Operator — port drift on tenant re-create.** Re-creating a tenant kept the old port in the registry while the instance booted on a newly-allocated one; console links pointed at a dead port. `createTenant` now resets every field (incl. port) on re-create.
+- **Operator — a tenant boot failure crashed the whole control-plane.** The spawned instance had no `error` handler, so one hiccup took the supervisor down mid-request. Added a child `error` handler + global uncaught/unhandled guards; a failed provision now returns a clean 400 and the server stays up.
 
 ## 2026-06-30 (continued)
 
