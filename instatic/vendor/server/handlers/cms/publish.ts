@@ -50,6 +50,19 @@ export async function handlePublishRoutes(
       metadata: { publishedPages: result.publishedPages },
       ...requestAuditContext(req),
     })
+
+    // Managed hosting: after a successful publish (the site is now baked), ask
+    // the control-plane to deploy the baked output to Cloudflare. Fire-and-forget
+    // — the tenant's Publish must not block on the ~30-60s upload. The webhook is
+    // token-authenticated and the CF token is applied operator-side (never in this
+    // instance). Fires ONLY on explicit Publish, never on autosave.
+    const deployWebhook = process.env.INSTATIC_DEPLOY_WEBHOOK?.trim()
+    if (deployWebhook) {
+      void fetch(deployWebhook, { method: 'POST' }).catch((err) => {
+        console.error('[publish] deploy webhook failed:', err instanceof Error ? err.message : err)
+      })
+    }
+
     return jsonResponse(result)
   }
 

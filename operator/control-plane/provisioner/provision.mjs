@@ -4,6 +4,7 @@ import { mkdirSync, rmSync } from 'node:fs';
 import { query } from '../registry/db.mjs';
 import * as tenants from '../registry/tenants.mjs';
 import * as rt from '../runtime/tenantRuntime.mjs';
+import { initTenantSite, attachTenantDomain, deleteTenantSite } from '../deployer/deploy.mjs';
 import { encrypt, decrypt, genPassword, genSecretKeyHex } from '../lib/crypto.mjs';
 import { getSettings } from '../registry/settings.mjs';
 import config from '../lib/env.mjs';
@@ -21,6 +22,12 @@ async function operatorAiModel() {
 
 export function slugify(s) {
   return String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40);
+}
+// Cloudflare Pages project names: lowercase, alphanumeric + hyphens, no leading/
+// trailing hyphen, <=58 chars. Sanitize operator input; null if it empties out.
+function sanitizeCfProject(s) {
+  const v = String(s || '').toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 58);
+  return v || null;
 }
 // schema/role identifiers derived from slug (hyphens -> underscores), validated.
 function names(slug) {
@@ -66,7 +73,7 @@ function runtimeParams(row) {
   };
 }
 
-export async function provisionTenant({ name, ownerEmail }) {
+export async function provisionTenant({ name, ownerEmail, cfProject, customDomain }) {
   const slug = slugify(name);
   if (!slug) throw new Error('A valid tenant name is required.');
   const existing = await tenants.getTenant(slug);
@@ -77,8 +84,12 @@ export async function provisionTenant({ name, ownerEmail }) {
   const dbPassword = genPassword();
   const secretKey = genSecretKeyHex();
   const port = await allocatePort();
+  const cf_project = sanitizeCfProject(cfProject) || `siteagent-${slug}`;
+  const custom_domain = String(customDomain || '').trim().toLowerCase() || null;
 
-  // 0) registry row
+  // 0) registry row (synchronous, so the console shows the tenant immediately as
+  //    'provisioning'). The heavy work then runs in the BACKGROUND — the POST
+  //    returns right away and the console polls provision_state for progress.
   await tenants.createTenant({
     slug, schemaName: schema, dbRole: role, ownerEmail,
     ownerPasswordEnc: null, secretRef: null, port,
@@ -86,8 +97,24 @@ export async function provisionTenant({ name, ownerEmail }) {
   await tenants.updateTenant(slug, {
     db_password_enc: encrypt(dbPassword),
     secret_key_enc: encrypt(secretKey),
+    cf_project, custom_domain, last_error: null,
+    display_name: String(name || '').trim() || slug,
   });
 
+  // Fire-and-forget: never await the saga here (that is what blocked the page).
+  runProvisionSaga({ slug, schema, role, dbPassword, secretKey, port })
+    .catch((e) => console.error(`[provisioner] saga ${slug} crashed:`, e?.message ?? e));
+
+  return {
+    slug, cfProject: cf_project, customDomain: custom_domain, status: 'provisioning',
+    message: 'Provisioning started (~30–60s). The list updates automatically.',
+  };
+}
+
+// The heavy provisioning steps, run in the background. Advances provision_state so
+// the console can show progress; on failure it cleans up and marks the row 'failed'
+// (visible, with last_error) instead of throwing to an HTTP caller that already left.
+async function runProvisionSaga({ slug, schema, role, dbPassword, secretKey, port }) {
   try {
     // 1) DB
     await mintDb(schema, role, dbPassword);
@@ -100,33 +127,99 @@ export async function provisionTenant({ name, ownerEmail }) {
     await tenants.updateTenant(slug, { provision_state: 'up' });
 
     // 3) self-onboard: the tenant creates their site + owner via the share link.
-    //    (No headless owner creation — Instatic's native setup wizard handles it.)
     await tenants.updateTenant(slug, { provision_state: 'seeded' });
 
-    // 4) Cloudflare project is created lazily on first publish (wrangler --create).
-    await tenants.updateTenant(slug, {
-      provision_state: 'done', status: 'active',
-      cf_project: `siteagent-${slug}`,
-    });
+    // 4) Create the Cloudflare Pages project + "Coming soon" placeholder (and attach
+    //    the custom domain if one was given) so the public URL is live immediately.
+    //    Best-effort: a CF hiccup records last_error but does not fail provisioning.
+    try {
+      const site = await initTenantSite(slug);
+      if (!site.ok && !site.skipped) {
+        await tenants.updateTenant(slug, { last_error: `CF: ${site.error || 'init failed'}` });
+      }
+    } catch (e) {
+      console.error(`[provisioner] CF site init for ${slug} failed (non-fatal):`, e.message);
+      await tenants.updateTenant(slug, { last_error: `CF: ${e.message}` });
+    }
 
-    return {
-      slug, schema, role, port,
-      shareUrl: `http://127.0.0.1:${port}/admin`,
-      message: 'Open the share link to create your owner account and start building.',
-    };
+    await tenants.updateTenant(slug, { provision_state: 'done', status: 'active' });
   } catch (err) {
-    await tenants.updateTenant(slug, { status: 'failed', provision_state: 'failed' });
-    // walk-back cleanup so a partial failure leaves nothing behind
+    console.error(`[provisioner] provision ${slug} failed:`, err.message);
+    // walk-back cleanup so a partial failure leaves nothing behind, then keep a
+    // visible 'failed' row (deprovision sets 'removed', so re-mark it afterwards).
     try { await deprovisionTenant(slug, { force: true }); } catch { /* best effort */ }
-    throw err;
+    try {
+      await tenants.updateTenant(slug, {
+        status: 'failed', provision_state: 'failed', last_error: err.message,
+      });
+    } catch { /* row may be gone; ignore */ }
   }
 }
 
+// Edit an existing tenant's editable details (owner email, CF project name, custom
+// domain). Changing the domain re-attaches it on Cloudflare (safe — never touches
+// published content). CF project name only affects FUTURE deploys.
+export async function editTenant(slug, { displayName, ownerEmail, cfProject, customDomain } = {}) {
+  const row = await tenants.getTenant(slug);
+  if (!row) throw new Error(`Unknown tenant: ${slug}`);
+
+  const fields = {};
+  if (displayName !== undefined) fields.display_name = String(displayName || '').trim() || slug;
+  if (ownerEmail !== undefined) fields.owner_email = String(ownerEmail || '').trim() || null;
+  if (cfProject !== undefined) {
+    const cp = sanitizeCfProject(cfProject);
+    if (cp) fields.cf_project = cp;
+  }
+  let domainChanged = false;
+  if (customDomain !== undefined) {
+    const cd = String(customDomain || '').trim().toLowerCase() || null;
+    domainChanged = cd !== (row.custom_domain || null);
+    fields.custom_domain = cd;
+  }
+  await tenants.updateTenant(slug, fields);
+
+  let domain = null;
+  if (domainChanged && fields.custom_domain) {
+    const r = await attachTenantDomain(slug);
+    domain = r.ok ? fields.custom_domain : null;
+    if (!r.ok) await tenants.updateTenant(slug, { last_error: `CF domain: ${r.error || 'attach failed'}` });
+  }
+  return { ok: true, slug, domain };
+}
+
+// Retry the Cloudflare setup for a tenant (e.g. after fixing the API token). If the
+// tenant has already published a real site, we only (re)attach the domain so we
+// never overwrite live content; otherwise we run the full project + placeholder init.
+export async function repairTenantCf(slug) {
+  const row = await tenants.getTenant(slug);
+  if (!row) throw new Error(`Unknown tenant: ${slug}`);
+  await tenants.updateTenant(slug, { last_error: null });
+
+  if (await tenants.hasLiveDeploy(row.id)) {
+    const r = await attachTenantDomain(slug);
+    if (!r.ok && row.custom_domain) await tenants.updateTenant(slug, { last_error: `CF domain: ${r.error}` });
+    return { ok: true, slug, mode: 'domain-only' };
+  }
+
+  const site = await initTenantSite(slug);
+  if (!site.ok && !site.skipped) {
+    await tenants.updateTenant(slug, { last_error: `CF: ${site.error || 'init failed'}` });
+    return { ok: false, error: site.error || 'init failed' };
+  }
+  return { ok: true, slug, url: site.url || null, mode: 'full' };
+}
+
 // Stop the instance, drop schema + role, remove files. Keeps a 'removed' tombstone.
-export async function deprovisionTenant(slug, { force = false } = {}) {
+export async function deprovisionTenant(slug, { force = false, deleteCf = false } = {}) {
   const row = await tenants.getTenant(slug);
   if (!row && !force) throw new Error(`Unknown tenant: ${slug}`);
   const { schema, role } = names(slug);
+
+  // Optionally tear down the Cloudflare Pages project (the live site) first, while
+  // the row still exists so we can read its cf_project. Best-effort — never blocks.
+  if (deleteCf && row) {
+    try { await deleteTenantSite(slug); } catch (e) { console.error(`[provisioner] CF delete ${slug}:`, e.message); }
+  }
 
   rt.stop(slug);
   await new Promise((r) => setTimeout(r, 1500)); // let connections close

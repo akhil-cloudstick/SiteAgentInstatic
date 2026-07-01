@@ -64,6 +64,16 @@ export async function updateTenant(slug, fields) {
   return rows[0] || null;
 }
 
+// True once a real (successful) publish exists — used to avoid a placeholder
+// re-deploy overwriting a tenant's live site during a CF repair.
+export async function hasLiveDeploy(tenantId) {
+  const { rows } = await query(
+    `select 1 from siteagent_control.deploys where tenant_id = $1 and status = 'live' limit 1`,
+    [tenantId],
+  );
+  return rows.length > 0;
+}
+
 export async function recordDeploy(tenantId, status, url, error) {
   const { rows } = await query(
     `insert into siteagent_control.deploys (tenant_id, status, url, error) values ($1,$2,$3,$4) returning *`,

@@ -47,3 +47,6 @@ create index if not exists deploys_tenant_started
 -- Idempotent column adds (for already-created tables).
 alter table siteagent_control.tenants add column if not exists db_password_enc text;
 alter table siteagent_control.tenants add column if not exists secret_key_enc text;
+alter table siteagent_control.tenants add column if not exists custom_domain text;
+alter table siteagent_control.tenants add column if not exists last_error text;
+alter table siteagent_control.tenants add column if not exists display_name text;

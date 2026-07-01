@@ -5,10 +5,10 @@ import config from './lib/env.mjs';
 import { migrate } from './registry/db.mjs';
 import { getSettings, saveSettings, getSecrets } from './registry/settings.mjs';
 import * as tenantsRepo from './registry/tenants.mjs';
-import { provisionTenant, deprovisionTenant, startTenant, resumeAll } from './provisioner/provision.mjs';
-import { deployTenant } from './deployer/deploy.mjs';
+import { provisionTenant, deprovisionTenant, startTenant, resumeAll, editTenant, repairTenantCf } from './provisioner/provision.mjs';
+import { deployTenant, hasBakedOutput } from './deployer/deploy.mjs';
 import { handleGateway } from './ai-gateway/gateway.mjs';
-import { signTenantToken } from './lib/crypto.mjs';
+import { signTenantToken, verifyTenantToken } from './lib/crypto.mjs';
 import * as rt from './runtime/tenantRuntime.mjs';
 
 const CORS = {
@@ -36,6 +36,7 @@ function decorate(row) {
   return {
     ...row,
     running: rt.isRunning(row.slug),
+    published: hasBakedOutput(row.slug),
     admin_url: row.port ? `http://127.0.0.1:${row.port}/admin` : null,
     ai_base_url: `${config.publicBaseUrl}/ai/${signTenantToken(row.slug)}`,
   };
@@ -93,13 +94,30 @@ const server = http.createServer(async (req, res) => {
         return send(res, 200, await provisionTenant(body));
       }
     }
-    const m = path.match(/^\/api\/tenants\/([a-z0-9-]+)(?:\/(start|deploy))?$/);
+    const m = path.match(/^\/api\/tenants\/([a-z0-9-]+)(?:\/(start|deploy|update|repair))?$/);
     if (m) {
       const slug = m[1];
       const action = m[2];
-      if (!action && method === 'DELETE') return send(res, 200, await deprovisionTenant(slug));
+      if (!action && method === 'DELETE') {
+        const deleteCf = new URL(req.url, 'http://x').searchParams.get('cf') === '1';
+        return send(res, 200, await deprovisionTenant(slug, { deleteCf }));
+      }
       if (action === 'start' && method === 'POST') return send(res, 200, await startTenant(slug));
       if (action === 'deploy' && method === 'POST') return send(res, 200, await deployTenant(slug));
+      if (action === 'update' && method === 'POST') return send(res, 200, await editTenant(slug, await readJson(req)));
+      if (action === 'repair' && method === 'POST') return send(res, 200, await repairTenantCf(slug));
+    }
+    // Tenant-triggered deploy: a tenant's Instatic instance calls this (with its
+    // signed token) right after an explicit Publish. The control-plane runs the
+    // Cloudflare deploy with the operator's token — the token never leaves here.
+    // Kicked off in the BACKGROUND so the tenant's Publish returns immediately;
+    // progress + result land in the deploys registry (visible in the console).
+    const dm = path.match(/^\/deploy\/(.+)$/);
+    if (dm && method === 'POST') {
+      const slug = verifyTenantToken(decodeURIComponent(dm[1]));
+      if (!slug) return send(res, 401, { error: 'invalid tenant token' });
+      deployTenant(slug).catch((e) => console.error(`[deploy] ${slug} failed:`, e.message));
+      return send(res, 202, { accepted: true, slug });
     }
     send(res, 404, { error: 'not found' });
   } catch (e) {

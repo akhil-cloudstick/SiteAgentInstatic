@@ -3,6 +3,9 @@ _Plain-language log of what changed, newest first._
 
 ## 2026-07-01 (continued)
 
+**Tenant Publish now auto-deploys to Cloudflare — no operator step**
+The tenant clicks **Publish** inside Instatic → the site bakes locally AND ships to Cloudflare Pages, all from that one explicit action (never on autosave/edits). The CF token stays operator-only: Instatic just POSTs a token-authenticated webhook to the control-plane (`POST /deploy/<token>`), which runs the deploy with the operator's token — the token never enters the tenant instance. Fire-and-forget so Publish returns instantly; the deploy runs in the background and its live `.pages.dev` URL lands in the deploys registry (visible in the console). Wiring: `INSTATIC_DEPLOY_WEBHOOK` env from TenantRuntime → hook in Instatic's publish handler → token-verified control-plane endpoint.
+
 **Console: searchable model picker instead of typing the id**
 The Settings "OpenRouter model" field is now a polished searchable dropdown of the live OpenRouter catalogue (300+ models) instead of a free-text box, so the operator picks a valid model id after saving their key. Each row shows the model id + friendly name; type to filter, arrow-keys/Enter to pick, click to select, Esc to close; the current model is highlighted. Backed by a new control-plane `GET /api/models` (fetches the catalogue with the operator's key; empty until a key is saved). Themed vanilla-JS combobox — no framework.
 

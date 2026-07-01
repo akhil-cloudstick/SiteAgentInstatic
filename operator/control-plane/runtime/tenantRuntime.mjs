@@ -59,6 +59,10 @@ export function start(tenant) {
     // fallback for when the gateway is briefly unreachable at boot.
     INSTATIC_AI_GATEWAY_URL: `${config.publicBaseUrl}/ai/${signTenantToken(slug)}/v1`,
     ...(tenant.aiModel ? { INSTATIC_AI_MODEL: tenant.aiModel } : {}),
+    // Auto-deploy hook: Instatic POSTs here (token-authenticated) right after an
+    // explicit Publish, so the tenant's Publish also ships the baked site to
+    // Cloudflare — the control-plane runs the deploy with the operator's CF token.
+    INSTATIC_DEPLOY_WEBHOOK: `${config.publicBaseUrl}/deploy/${signTenantToken(slug)}`,
   };
   // Remove inherited vars that would confuse the child.
   delete env.SETTINGS_ENC_KEY;
