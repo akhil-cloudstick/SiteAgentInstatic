@@ -26,6 +26,7 @@ import {
   updateConversationForUser,
 } from '../conversations/store'
 import type { ToolScope } from '../runtime/types'
+import { isManagedAiMode, getManagedModel } from '../managed'
 
 const VALID_SCOPES: ToolScope[] = ['site', 'content', 'data', 'plugin']
 
@@ -94,7 +95,14 @@ async function handleCreate(req: Request, db: DbClient): Promise<Response> {
   const body = await readValidatedBody(req, CreateBodySchema)
   if (!body) return badRequest('Invalid request body.')
 
-  const record = await createConversationForUser(db, userOrResponse.id, body)
+  // Managed mode: never persist the synthetic 'managed' credential id (it has
+  // no ai_provider_credentials row — the FK would reject it). Store a null
+  // credential + the operator's current model; the chat handler resolves the gateway.
+  const input = isManagedAiMode()
+    ? { ...body, credentialId: null, modelId: await getManagedModel() }
+    : body
+
+  const record = await createConversationForUser(db, userOrResponse.id, input)
   return jsonResponse({ conversation: toConversationView(record) }, { status: 201 })
 }
 

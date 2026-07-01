@@ -27,9 +27,36 @@ export async function handleGateway(req, res, pathAfterAi) {
   if (!slug) { res.writeHead(401, { 'Content-Type': 'text/plain' }); return res.end('invalid tenant token'); }
 
   const secrets = await getSecrets();
+
+  // Managed-config probe (NOT proxied). The tenant polls this to read the
+  // operator's CURRENT model live from the DB — so a model change in the console
+  // takes effect on the next tenant refresh, with no restart or re-provision.
+  if (rest === '/model' || rest === '/model/') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify({ model: secrets.openrouterModel || '' }));
+  }
+
   if (!secrets.openrouterKey) { res.writeHead(503, { 'Content-Type': 'text/plain' }); return res.end('AI not configured'); }
 
-  const body = ['GET', 'HEAD'].includes(req.method) ? undefined : await readRawBody(req);
+  let body = ['GET', 'HEAD'].includes(req.method) ? undefined : await readRawBody(req);
+
+  // Managed model enforcement: rewrite the request's `model` to the operator's
+  // CURRENT choice, read live from settings on every call. Changing the model in
+  // the console then takes effect immediately for every tenant — no tenant
+  // restart, no re-provision. (The tenant's own model only enables managed mode
+  // + labels the UI; the gateway decides which model actually runs.)
+  if (body && secrets.openrouterModel && String(req.headers['content-type'] || '').includes('json')) {
+    try {
+      const payload = JSON.parse(body.toString('utf8'));
+      if (payload && typeof payload === 'object' && 'model' in payload) {
+        payload.model = secrets.openrouterModel;
+        body = Buffer.from(JSON.stringify(payload), 'utf8');
+      }
+    } catch {
+      // Non-JSON body — forward unchanged.
+    }
+  }
+
   let upstream;
   try {
     upstream = await fetch(`${OPENROUTER}${rest}`, {

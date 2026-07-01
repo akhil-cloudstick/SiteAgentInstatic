@@ -4,6 +4,7 @@ import { spawn } from 'node:child_process';
 import { mkdirSync, createWriteStream, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import config from '../lib/env.mjs';
+import { signTenantToken } from '../lib/crypto.mjs';
 
 const isWin = process.platform === 'win32';
 const running = new Map(); // slug -> { child, port, pid, slug }
@@ -50,6 +51,14 @@ export function start(tenant) {
     STATIC_DIR: distDir(),
     INSTATIC_SECRET_KEY: tenant.secretKey,
     PUBLIC_ORIGIN: `http://127.0.0.1:${port}`,
+    // Managed AI: point the tenant's OpenRouter driver at this tenant's signed
+    // AI-Gateway URL. This alone enables managed mode (gateway credential
+    // auto-provided, provider settings locked). The MODEL is read LIVE from the
+    // gateway per request — a Settings change applies without a restart — so it
+    // is NOT pinned here; INSTATIC_AI_MODEL is passed only as an offline
+    // fallback for when the gateway is briefly unreachable at boot.
+    INSTATIC_AI_GATEWAY_URL: `${config.publicBaseUrl}/ai/${signTenantToken(slug)}/v1`,
+    ...(tenant.aiModel ? { INSTATIC_AI_MODEL: tenant.aiModel } : {}),
   };
   // Remove inherited vars that would confuse the child.
   delete env.SETTINGS_ENC_KEY;

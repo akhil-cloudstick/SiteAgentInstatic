@@ -27,8 +27,23 @@ import { resolveDriver } from '../drivers'
 import type { CredentialRecord } from '../credentials/types'
 import { listDefaults, setDefaultForScope } from '../defaults/store'
 import type { ToolScope } from '../runtime/types'
+import { isManagedAiMode, managedCredentialView } from '../managed'
 
 const ALL_SCOPES: ToolScope[] = ['site', 'content', 'data', 'plugin']
+
+/**
+ * In managed AI mode the operator owns the provider + key + model; the tenant
+ * must not add, edit, delete, or test their own credential. Every mutation
+ * endpoint returns this 403 instead.
+ */
+function managedMutationLock(): Response | null {
+  return isManagedAiMode()
+    ? jsonResponse(
+        { error: 'AI is managed by the operator and cannot be changed here.' },
+        { status: 403 },
+      )
+    : null
+}
 
 const ProviderId = Type.Union([
   Type.Literal('anthropic'),
@@ -95,6 +110,11 @@ async function dispatchCollection(req: Request, db: DbClient): Promise<Response>
 async function handleList(req: Request, db: DbClient): Promise<Response> {
   const userOrResponse = await requireCapability(req, db, 'ai.providers.manage')
   if (userOrResponse instanceof Response) return userOrResponse
+  // Managed mode surfaces exactly one read-only credential (the gateway) so the
+  // picker + AI Assistant work without the tenant configuring anything.
+  if (isManagedAiMode()) {
+    return jsonResponse({ credentials: [managedCredentialView()] })
+  }
   const records = await listCredentialsForUser(db, userOrResponse.id)
   const views = await Promise.all(records.map(toCredentialView))
   return jsonResponse({ credentials: views })
@@ -103,6 +123,8 @@ async function handleList(req: Request, db: DbClient): Promise<Response> {
 async function handleCreate(req: Request, db: DbClient): Promise<Response> {
   const userOrResponse = await requireCapability(req, db, 'ai.providers.manage')
   if (userOrResponse instanceof Response) return userOrResponse
+  const locked = managedMutationLock()
+  if (locked) return locked
 
   const body = await readValidatedBody(req, CreateBodySchema)
   if (!body) return badRequest('Invalid request body.')
@@ -213,6 +235,8 @@ async function dispatchItem(req: Request, db: DbClient, id: string): Promise<Res
 async function handleUpdate(req: Request, db: DbClient, id: string): Promise<Response> {
   const userOrResponse = await requireCapability(req, db, 'ai.providers.manage')
   if (userOrResponse instanceof Response) return userOrResponse
+  const locked = managedMutationLock()
+  if (locked) return locked
 
   const body = await readValidatedBody(req, UpdateBodySchema)
   if (!body) return badRequest('Invalid request body.')
@@ -249,6 +273,8 @@ async function handleUpdate(req: Request, db: DbClient, id: string): Promise<Res
 async function handleDelete(req: Request, db: DbClient, id: string): Promise<Response> {
   const userOrResponse = await requireCapability(req, db, 'ai.providers.manage')
   if (userOrResponse instanceof Response) return userOrResponse
+  const locked = managedMutationLock()
+  if (locked) return locked
 
   // Snapshot identity BEFORE the delete so the audit row carries provider +
   // label even though the row no longer exists post-commit.
@@ -284,6 +310,8 @@ async function handleDelete(req: Request, db: DbClient, id: string): Promise<Res
 // ---------------------------------------------------------------------------
 
 async function dispatchTest(req: Request, db: DbClient, id: string): Promise<Response> {
+  const locked = managedMutationLock()
+  if (locked) return locked
   if (req.method !== 'POST') {
     return jsonResponse({ error: 'Method not allowed' }, { status: 405 })
   }

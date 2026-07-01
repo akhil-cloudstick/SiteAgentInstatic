@@ -22,6 +22,7 @@ Building:
 - Insert structure as semantic HTML with site_insert_html (<section>, <h1>, <p>, <a>, <button>, <img>, <ul>, <article>, <nav>, <footer>, ...). One site_insert_html per section (nav, hero, pricing, footer = 4-6 calls). Smaller chunks recover better when one fails.
 - Empty page → start inserting immediately; the dynamic suffix has the root id + breakpoints. Don't inspect first.
 - Editing existing content → site_read_document to read the current document as annotated HTML + CSS (every element carries uid="<nodeId>"). If site_read_document returns pageInfo.nextPart, keep calling site_read_document({ part: nextPart }) until you have the part(s) needed. Use site_get_node_html for one subtree; then site_update_node_props / site_replace_node_html addressing nodes by their uid.
+- Selected block: the dynamic suffix's \`selected:\` line names the node the user has highlighted in the canvas AND its current content. When the user says "this", "this text/block", "the selected element", "change this", or otherwise refers to the selection without naming a node, they mean that \`selected\` node — act on it directly by its uid (site_update_node_props for a text/prop change, site_replace_node_html for markup). Don't ask which element and don't re-read the document just to find it.
 - Repetition: site_duplicate_node (N copies of a card) and site_duplicate_page (clone a page) — don't rebuild from scratch.
 
 Design system first:
@@ -108,8 +109,30 @@ function describeTokenDigest(tokens: SnapshotTokens): string {
   return `Tokens — ${parts.join('; ')}`
 }
 
+/**
+ * Describe the currently-selected node with enough of its content that the
+ * agent can act on "change this" without a document round-trip. Pulls the node
+ * out of the active page tree (the snapshot already ships full active-page
+ * nodes) and surfaces its module + the salient content props.
+ */
+function describeSelectedNode(snap: SiteAgentSnapshot): string {
+  const id = snap.selectedNodeId
+  if (!id) return 'none'
+  const node = snap.page.nodes[id]
+  if (!node) return `${id} (not on the active page — read the current document to inspect it)`
+  const props = (node.props ?? {}) as Record<string, unknown>
+  const bits = [`${id} (${node.moduleId})`]
+  for (const key of ['text', 'label', 'href', 'src', 'alt', 'tag']) {
+    const v = props[key]
+    if (typeof v === 'string' && v.trim() !== '') {
+      bits.push(`${key}=${JSON.stringify(v.length > 200 ? `${v.slice(0, 200)}…` : v)}`)
+    }
+  }
+  return bits.join(' ')
+}
+
 function buildDynamicSuffix(snap: SiteAgentSnapshot): string {
-  const selected = snap.selectedNodeId ?? 'none'
+  const selected = describeSelectedNode(snap)
   const active = snap.activeBreakpointId || '(none)'
   const breakpoints = snap.site.breakpoints.length > 0
     ? snap.site.breakpoints

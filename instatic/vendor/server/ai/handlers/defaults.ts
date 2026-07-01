@@ -14,8 +14,19 @@ import type { DbClient } from '../../db/client'
 import { createAuditEvent } from '../../repositories/audit'
 import { clearDefaultForScope, listDefaults, setDefaultForScope } from '../defaults/store'
 import type { ToolScope } from '../runtime/types'
+import { isManagedAiMode, getManagedModel, managedDefaultsMap } from '../managed'
 
 const VALID_SCOPES: ToolScope[] = ['site', 'content', 'data', 'plugin']
+
+/** In managed AI mode the operator fixes the default model; block writes. */
+function managedMutationLock(): Response | null {
+  return isManagedAiMode()
+    ? jsonResponse(
+        { error: 'AI is managed by the operator and cannot be changed here.' },
+        { status: 403 },
+      )
+    : null
+}
 
 const PutBodySchema = Type.Object({
   credentialId: Type.String({ minLength: 1 }),
@@ -44,6 +55,13 @@ async function handleList(req: Request, db: DbClient): Promise<Response> {
   const userOrResponse = await requireCapability(req, db, 'ai.chat')
   if (userOrResponse instanceof Response) return userOrResponse
 
+  // Managed mode: every scope defaults to the gateway credential + operator's
+  // CURRENT model (read live), so the AI Assistant has a ready default without
+  // any DB rows and reflects a model change on refresh.
+  if (isManagedAiMode()) {
+    return jsonResponse({ defaults: managedDefaultsMap(await getManagedModel()) })
+  }
+
   const records = await listDefaults(db)
   // Project into a scope-keyed map; UI groups by scope.
   const defaults: Record<string, { credentialId: string; modelId: string }> = {}
@@ -54,6 +72,10 @@ async function handleList(req: Request, db: DbClient): Promise<Response> {
 }
 
 async function handleScope(req: Request, db: DbClient, scope: string): Promise<Response> {
+  if (req.method === 'PUT' || req.method === 'DELETE') {
+    const locked = managedMutationLock()
+    if (locked) return locked
+  }
   if (req.method === 'PUT') {
     return handleSet(req, db, scope)
   }

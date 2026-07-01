@@ -101,7 +101,10 @@ export interface ConversationDetailView extends ConversationView {
 export interface CreateConversationInput {
   readonly scope: ToolScope
   readonly title?: string
-  readonly credentialId: string
+  // Null in managed AI mode: the synthetic gateway credential has no
+  // ai_provider_credentials row, so the conversation stores no credential and
+  // the chat handler resolves the gateway from env instead.
+  readonly credentialId: string | null
   readonly modelId: string
 }
 

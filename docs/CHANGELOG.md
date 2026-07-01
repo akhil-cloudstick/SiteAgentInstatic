@@ -1,6 +1,29 @@
 # SiteAgent — Changelog
 _Plain-language log of what changed, newest first._
 
+## 2026-07-01 (continued)
+
+**Model changes are now live — no tenant restart (read from DB, not env)**
+The operator's model was baked into each tenant's env at boot, so changing it in the console needed a restart. Root cause: env is frozen for a process's life. Fixed by making the model **read live from the DB via the gateway** on both paths:
+- **Actual model:** the gateway rewrites each request's `model` to the operator's current Settings value on every call.
+- **Displayed model:** the gateway exposes a `/model` probe (token-authenticated), and the tenant fetches it live (10s cache) for the picker/default/label — so a model change reflects on the next refresh.
+Managed mode is now enabled by the gateway URL alone (`INSTATIC_AI_GATEWAY_URL`); `INSTATIC_AI_MODEL` remains only as an offline fallback. Change the model in the console → it applies to every tenant with no restart and no re-provision.
+
+**AI chat was silently broken on Postgres — messages couldn't be read back**
+Root cause of the AI Assistant "just greets, never acts": `ai_messages.content_json` was declared `text` in the Postgres migration while every other `*_json` column is `jsonb`. Postgres returns a `text` column as a raw string (only `jsonb` is auto-parsed), so message content failed schema validation and every history read returned empty — the model saw no conversation and could only reply generically. Changed the PG column to `jsonb` (matching the 20+ other JSON columns and the code's own assumption); SQLite keeps `text` (its adapter parses `*_json` strings itself). Existing tenants: the column is converted in place (chat history is disposable).
+
+**AI Assistant — "change this block" now works from the canvas selection**
+The in-editor AI Assistant already received the selected node's *id* each turn, but not its *content*, so "change this text to X" got a generic reply instead of an edit. The site system prompt now surfaces the selected node's module + current content (text/label/href/src/…) and a directive: when the user says "this" / "the selected block", act on that node directly by its uid (site_update_node_props / site_replace_node_html) without asking or re-reading the document. Select a block → "change this to …" now edits it.
+
+**Managed AI mode — tenants use the operator's AI Gateway, locked (`s4-gateway` done)**
+Wired the AI Gateway into each tenant instance so the operator's single OpenRouter key/model powers every tenant's AI, and the tenant can neither bring their own key nor change the model. Fixes the "No credentials yet" gap (AI wasn't connected) and the isolation gap (tenants could add their own key).
+
+- **Env-driven managed mode** (`server/ai/managed.ts`, new): when the operator's runtime sets `INSTATIC_AI_GATEWAY_URL` + `INSTATIC_AI_MODEL`, Instatic runs "managed" — a synthetic gateway credential + the operator's model are auto-provided, so the editor AI Assistant works with zero tenant config.
+- **OpenRouter driver** now honours a per-credential base URL, so it can point at the OpenRouter-compatible gateway instead of `openrouter.ai` directly.
+- **Locked config**: every credential/default/test **write returns 403** in managed mode (`credentials.ts`, `defaults.ts`) — the tenant (even as owner) can't add a key, edit, delete, or change the model. Reads surface exactly one credential + one model.
+- **Chat/conversations** resolve through the managed gateway credential + fixed model; the synthetic id is never persisted (stored as a null credential so the FK holds).
+- **Operator**: `TenantRuntime` passes each tenant's signed gateway URL + the operator's model (from Settings) as env; `provision.mjs` supplies it on provision, start, and resume. The real key never leaves the gateway.
+
 ## 2026-07-01
 
 **Import Fidelity — Site Replica (Path B) now imports pixel-exact**

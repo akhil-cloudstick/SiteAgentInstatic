@@ -5,7 +5,19 @@ import { query } from '../registry/db.mjs';
 import * as tenants from '../registry/tenants.mjs';
 import * as rt from '../runtime/tenantRuntime.mjs';
 import { encrypt, decrypt, genPassword, genSecretKeyHex } from '../lib/crypto.mjs';
+import { getSettings } from '../registry/settings.mjs';
 import config from '../lib/env.mjs';
+
+// The operator's chosen model (from Settings) enables managed AI on each tenant:
+// when set, TenantRuntime wires the instance to this tenant's AI-Gateway URL and
+// pins the model. Empty string → managed AI stays off (standalone BYO-key AI).
+async function operatorAiModel() {
+  try {
+    return (await getSettings()).openrouterModel || '';
+  } catch {
+    return '';
+  }
+}
 
 export function slugify(s) {
   return String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40);
@@ -82,7 +94,7 @@ export async function provisionTenant({ name, ownerEmail }) {
     await tenants.updateTenant(slug, { provision_state: 'db_ready' });
 
     // 2) start native instance (Instatic auto-migrates into its schema on boot)
-    rt.start({ slug, port, dbRole: role, dbPassword, secretKey });
+    rt.start({ slug, port, dbRole: role, dbPassword, secretKey, aiModel: await operatorAiModel() });
     const healthy = await rt.waitHealthy(port, 60000);
     if (!healthy) throw new Error('Instance did not become healthy in time.');
     await tenants.updateTenant(slug, { provision_state: 'up' });
@@ -139,7 +151,7 @@ export async function startTenant(slug) {
   const row = await tenants.getTenant(slug);
   if (!row) throw new Error(`Unknown tenant: ${slug}`);
   if (rt.isRunning(slug)) return { slug, alreadyRunning: true, port: row.port };
-  rt.start(runtimeParams(row));
+  rt.start({ ...runtimeParams(row), aiModel: await operatorAiModel() });
   const healthy = await rt.waitHealthy(row.port, 45000);
   return { slug, port: row.port, healthy };
 }
@@ -148,8 +160,9 @@ export async function startTenant(slug) {
 export async function resumeAll() {
   const rows = await tenants.listTenants();
   const active = rows.filter((r) => r.status === 'active');
+  const aiModel = await operatorAiModel();
   for (const r of active) {
-    try { rt.start(runtimeParams(r)); } catch (e) { console.error(`[provisioner] resume ${r.slug} failed:`, e.message); }
+    try { rt.start({ ...runtimeParams(r), aiModel }); } catch (e) { console.error(`[provisioner] resume ${r.slug} failed:`, e.message); }
   }
   return active.map((r) => r.slug);
 }

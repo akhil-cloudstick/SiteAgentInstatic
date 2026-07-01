@@ -58,6 +58,7 @@ import type {
   ToolScope,
 } from '../runtime/types'
 import type { AiStreamRequest } from '../drivers/types'
+import { isManagedAiMode, managedResolvedCredential, getManagedModel } from '../managed'
 
 const ChatRequestBodySchema = Type.Object({
   conversationId: Type.String({ minLength: 1 }),
@@ -116,29 +117,45 @@ async function handleAiChat(
       { status: 400 },
     )
   }
-  if (!conversation.credentialId) {
-    return jsonResponse(
-      { error: 'Conversation has no credential set. Open AI settings to configure a provider.' },
-      { status: 400 },
-    )
-  }
-
-  const credential = await readCredentialForUser(db, user.id, conversation.credentialId)
-  if (!credential) {
-    return jsonResponse(
-      { error: 'Credential not found or no longer accessible.' },
-      { status: 404 },
-    )
-  }
+  // Managed mode: route every chat through the operator's AI Gateway with the
+  // operator's fixed model, ignoring any per-conversation credential. Otherwise
+  // resolve the user's own credential from the conversation.
   let resolvedCredential
-  try {
-    resolvedCredential = await resolveCredentialForDriver(credential)
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'Credential resolution failed.'
-    return jsonResponse({ error: message }, { status: 409 })
+  let providerId
+  let modelId: string
+  let credentialIdToTouch: string | null
+  if (isManagedAiMode()) {
+    resolvedCredential = managedResolvedCredential()
+    providerId = resolvedCredential.providerId
+    modelId = await getManagedModel()
+    credentialIdToTouch = null
+  } else {
+    if (!conversation.credentialId) {
+      return jsonResponse(
+        { error: 'Conversation has no credential set. Open AI settings to configure a provider.' },
+        { status: 400 },
+      )
+    }
+
+    const credential = await readCredentialForUser(db, user.id, conversation.credentialId)
+    if (!credential) {
+      return jsonResponse(
+        { error: 'Credential not found or no longer accessible.' },
+        { status: 404 },
+      )
+    }
+    try {
+      resolvedCredential = await resolveCredentialForDriver(credential)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Credential resolution failed.'
+      return jsonResponse({ error: message }, { status: 409 })
+    }
+    providerId = credential.providerId
+    modelId = conversation.modelId
+    credentialIdToTouch = credential.id
   }
 
-  const driver = resolveDriver(credential.providerId)
+  const driver = resolveDriver(providerId)
   // Capability-filtered toolset. Callers without `ai.tools.write` only see
   // read tools registered with the driver — the model has no way to
   // emit a write call. See B6 in the capabilities review.
@@ -172,8 +189,8 @@ async function handleAiChat(
     targetId: conversation.id,
     metadata: {
       scope,
-      providerId: credential.providerId,
-      modelId: conversation.modelId,
+      providerId,
+      modelId,
     },
   })
 
@@ -199,7 +216,7 @@ async function handleAiChat(
         // wire.) `usage` stays billing-only — the meter is driven by `context`.
         const wireEvent: AiStreamEvent =
           event.type === 'context'
-            ? { ...event, contextTokens: normalizeContextTokens(credential.providerId, event) }
+            ? { ...event, contextTokens: normalizeContextTokens(providerId, event) }
             : event
         try {
           controller.enqueue(encodeStreamEvent(wireEvent))
@@ -236,8 +253,8 @@ async function handleAiChat(
           // turn (there is no server-side session to resume).
           messages,
           tools,
-          modelId: conversation.modelId,
-          modelCapabilities: driver.capabilities(conversation.modelId),
+          modelId,
+          modelCapabilities: driver.capabilities(modelId),
           credentials: resolvedCredential,
           signal: req.signal,
           bridge,
@@ -245,13 +262,16 @@ async function handleAiChat(
         }
 
         const persister = createConversationsPersister(db, conversation.id, {
-          providerId: credential.providerId,
-          modelId: conversation.modelId,
+          providerId,
+          modelId,
         })
         await runChat({ driver, request, persister, emit })
 
-        // Best-effort: record that this credential was used.
-        await touchCredentialLastUsed(db, credential.id).catch(() => { /* noop */ })
+        // Best-effort: record that this credential was used (managed mode has
+        // no DB credential to touch).
+        if (credentialIdToTouch) {
+          await touchCredentialLastUsed(db, credentialIdToTouch).catch(() => { /* noop */ })
+        }
       } catch (err) {
         const detail = err instanceof Error ? err.message : String(err)
         // Full Error preserves the stack trace in the operator's terminal.
@@ -275,8 +295,8 @@ async function handleAiChat(
             targetId: conversation.id,
             metadata: {
               scope,
-              providerId: credential.providerId,
-              modelId: conversation.modelId,
+              providerId,
+              modelId,
               promptTokens: promptDelta,
               completionTokens: completionDelta,
               costUsd: costDelta,

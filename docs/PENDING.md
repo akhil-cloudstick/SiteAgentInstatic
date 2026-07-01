@@ -11,7 +11,7 @@ _All remaining work, phased. **Prove-first** spikes gate the build; tick a box a
 - [x] **DB isolation** (`s9-db`) — two tenants, one DB, schema-per-tenant; doors locked by GRANT/REVOKE; idempotent provision + clean teardown _(passed 2026-06-30, real PG18)_
 - [ ] **Instatic honors a non-`public` schema** (`s9-instatic`) — two containers, same DB, separate schemas; migrate into own schema, no collision. _Fallback: DB-per-tenant._ **Needs Docker.**
 - [ ] **Headless first-run** (`s2-firstrun`) — create Owner (email+password) without a forced 2FA wall; DB-seed vs Playwright vs semi-manual. **Needs Docker.**
-- [ ] **AI Gateway base URL** (`s4-gateway`) — does Instatic accept a custom OpenRouter base URL? Else the network-proxy fallback. **Needs Docker.**
+- [x] **AI Gateway base URL** (`s4-gateway`) — Instatic's OpenRouter driver now honours a custom base URL; managed AI wired end-to-end (tenant uses the operator's gateway + model, provider config locked). _(done 2026-07-01)_
 - [ ] **Asset-URL portability** (`s1-assets`) — baked HTML relative vs absolute (maybe a `publish.html` rewrite).
 - [ ] **Direct Upload renders** (`s3-upload`) — `wrangler pages deploy` of the baked folder serves correctly.
 - [ ] **Animation import fidelity** (`sA-anim`) — import 1 animated page, edit, deploy; observe what survives.

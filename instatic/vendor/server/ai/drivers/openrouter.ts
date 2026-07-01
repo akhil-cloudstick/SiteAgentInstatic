@@ -34,7 +34,17 @@ import { createResponsesAdapter } from './responses-shared'
 const SUPPORTED_AUTH_MODES: AiAuthMode[] = ['apiKey']
 
 const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1'
-const OPENROUTER_ENDPOINT = `${OPENROUTER_BASE_URL}/responses`
+
+/**
+ * Resolve the API base for a request. A credential may carry a `baseUrl`
+ * override (used by the managed AI Gateway, which is OpenRouter-compatible);
+ * otherwise the public OpenRouter endpoint is used. Trailing slash trimmed so
+ * `${base}/responses` / `${base}/models` never doubles up.
+ */
+function resolveBaseUrl(creds: AiResolvedCredential): string {
+  const override = creds.baseUrl?.trim()
+  return (override || OPENROUTER_BASE_URL).replace(/\/+$/, '')
+}
 
 // Capabilities are per-model and only knowable after `listModels()` has hit
 // the catalog. The sync `capabilities()` accessor returns a permissive default
@@ -47,16 +57,19 @@ const DEFAULT_CAPABILITIES: AiProviderCapabilities = {
   streaming: true,
 }
 
-const openrouterAdapter = createResponsesAdapter({
-  label: 'OpenRouter',
-  endpoint: OPENROUTER_ENDPOINT,
-  buildHeaders(req) {
-    return {
-      Authorization: `Bearer ${req.credentials.apiKey!}`,
-      'content-type': 'application/json',
-    }
-  },
-})
+/** Build the Responses adapter for one request, honouring a `baseUrl` override. */
+function adapterFor(creds: AiResolvedCredential) {
+  return createResponsesAdapter({
+    label: 'OpenRouter',
+    endpoint: `${resolveBaseUrl(creds)}/responses`,
+    buildHeaders(req) {
+      return {
+        Authorization: `Bearer ${req.credentials.apiKey!}`,
+        'content-type': 'application/json',
+      }
+    },
+  })
+}
 
 export const openrouterDriver: AiProvider = {
   id: 'openrouter' as AiProviderId,
@@ -83,7 +96,7 @@ export const openrouterDriver: AiProvider = {
       }
       return
     }
-    yield* runToolLoop(openrouterAdapter, req)
+    yield* runToolLoop(adapterFor(req.credentials), req)
   },
 }
 
@@ -131,7 +144,7 @@ async function fetchOpenRouterModels(creds: AiResolvedCredential): Promise<AiPro
   // availability (e.g. BYOK-only models) reflect in the list.
   if (creds.apiKey) headers.Authorization = `Bearer ${creds.apiKey}`
 
-  const res = await fetch(`${OPENROUTER_BASE_URL}/models`, { headers })
+  const res = await fetch(`${resolveBaseUrl(creds)}/models`, { headers })
   if (!res.ok) {
     throw new Error(`[ai/openrouter] models request failed: ${res.status} ${res.statusText}`)
   }

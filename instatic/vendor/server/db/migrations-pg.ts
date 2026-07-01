@@ -810,7 +810,13 @@ export const pgMigrations: Migration[] = [
         conversation_id text not null references ai_conversations(id) on delete cascade,
         position integer not null,
         role text not null,
-        content_json text not null,
+        -- jsonb (not text) like every other *_json column: Bun auto-serialises on
+        -- write and auto-parses on read, so message content round-trips. As a
+        -- plain text column it came back as a raw string, failed
+        -- ContentBlocksSchema, and every history read returned empty — the model
+        -- saw no messages and could only greet. (SQLite keeps text; its adapter
+        -- parses *_json string columns itself.)
+        content_json jsonb not null,
         tool_call_id text,
         tool_name text,
         prompt_tokens integer not null default 0,

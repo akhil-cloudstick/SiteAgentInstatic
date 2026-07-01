@@ -18,6 +18,7 @@ import {
 import { getModelCatalogue, pricingKey } from '../pricing'
 import type { AiProviderModel } from '../drivers/types'
 import type { AiProviderId } from '../runtime/types'
+import { isManagedAiMode, getManagedModel, managedModelList } from '../managed'
 
 const VALID_PROVIDERS: AiProviderId[] = ['anthropic', 'openai', 'ollama', 'openrouter']
 
@@ -43,6 +44,12 @@ async function handleModels(
   }
   const userOrResponse = await requireCapability(req, db, 'ai.chat')
   if (userOrResponse instanceof Response) return userOrResponse
+
+  // Managed mode: the tenant may use ONLY the operator's model — return exactly
+  // that (read live), never the gateway's full 400-model catalogue.
+  if (isManagedAiMode()) {
+    return jsonResponse({ models: managedModelList(await getManagedModel()) })
+  }
 
   if (!VALID_PROVIDERS.includes(providerParam as AiProviderId)) {
     return jsonResponse(
