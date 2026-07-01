@@ -268,6 +268,40 @@ export function compareViewportContextCascade(
 }
 
 /**
+ * Sort key for a custom condition's cascade position. Only pure width media
+ * queries carry cascade semantics: `min-width` is mobile-first (widest wins,
+ * so emit narrowest first), `max-width` is desktop-first (narrowest wins, so
+ * emit widest first). Everything else (`@supports`, `@container`, non-width
+ * media) keeps registry order via the `other` fallback.
+ */
+function conditionQuerySort(condition: Condition): ViewportQuerySort {
+  if (condition.kind !== 'media') return { kind: 'other', width: 0 }
+  const max = condition.query.match(PURE_MAX_WIDTH_QUERY_RE)
+  if (max) return { kind: 'max', width: Number(max[1]) }
+  const min = condition.query.match(PURE_MIN_WIDTH_QUERY_RE)
+  if (min) return { kind: 'min', width: Number(min[1]) }
+  return { kind: 'other', width: 0 }
+}
+
+/**
+ * Cascade order for custom-condition overrides. Pure width media queries sort
+ * by viewport semantics (matching `compareViewportContextCascade`) so an
+ * imported mobile-first sheet keeps its `min-width` overrides in ascending
+ * order — otherwise two matching breakpoints tie on specificity and the wrong
+ * one wins. Mixed or non-width conditions fall back to stable registry order.
+ */
+export function compareConditionCascade(
+  a: { condition: Condition; index: number },
+  b: { condition: Condition; index: number },
+): number {
+  const aQuery = conditionQuerySort(a.condition)
+  const bQuery = conditionQuerySort(b.condition)
+  if (aQuery.kind === 'max' && bQuery.kind === 'max') return bQuery.width - aQuery.width
+  if (aQuery.kind === 'min' && bQuery.kind === 'min') return aQuery.width - bQuery.width
+  return a.index - b.index
+}
+
+/**
  * Emit the CSS blocks for ONE style rule under an arbitrary selector: the base
  * declaration block plus every `contextStyles` override wrapped in its real
  * `@media`/`@container`/`@supports` prelude.
@@ -324,7 +358,10 @@ export function createStyleRuleCssEmitter(
 
     // Custom conditions emit AFTER base but BEFORE viewport contexts, so
     // viewport-specific overrides keep winning when both contexts match.
-    conditionEntries.sort((a, b) => a.index - b.index)
+    // Pure width media queries sort by viewport cascade semantics (mobile-first
+    // min-width ascending, desktop-first max-width descending) so an imported
+    // responsive sheet keeps the breakpoint that should win on equal specificity.
+    conditionEntries.sort(compareConditionCascade)
     for (const { bag, condition } of conditionEntries) {
       const decls = bagToCSS(bag)
       if (!decls) continue
