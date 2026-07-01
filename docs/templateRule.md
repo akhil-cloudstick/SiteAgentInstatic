@@ -200,6 +200,60 @@ import heroImg from './hero.jpg';
 
 ---
 
+## Editable text — wrap every text run in its own element
+
+Instatic makes an element editable by turning it into a **Text node**. The rule it
+follows on import:
+
+- A heading/paragraph that contains **only text** → becomes **one editable Text node**. ✅
+- A heading/paragraph that also contains a **child element** (e.g. a `<span>` to color
+  part of it) → becomes a **Container**. The child element stays editable, but any
+  **bare text sitting loose next to it** becomes a "no-wrapper" text node that has no
+  clickable box on the canvas — so the tenant **cannot select or edit it**. ❌
+
+This is the #1 cause of "I can edit the colored word but not the rest of the sentence."
+
+### The rule: never leave bare text next to an inline element
+
+If any part of a heading/sentence is wrapped (for color, bold, a link, etc.), then
+**every** part must be wrapped in its own element too.
+
+**Wrong — bare white text next to a colored `<span>` (white text not editable):**
+```html
+<h1>
+  Powering the AI era with
+  <span class="accent">high-density compute</span>
+  built to last.
+</h1>
+```
+
+**Correct — every run wrapped, so all parts are editable:**
+```html
+<h1>
+  <span>Powering the AI era with </span>
+  <span class="accent">high-density compute</span>
+  <span> built to last.</span>
+</h1>
+
+<style>
+  .accent { color: var(--color-accent); }
+</style>
+```
+
+**Also correct — if no part needs its own color/style, use plain text (one editable node):**
+```html
+<h1>Powering the AI era built to last.</h1>
+```
+
+**Rules:**
+- Keep the spaces inside the spans (`"Powering the AI era with "`) so words don't run together.
+- This applies to any element that mixes text with an inline child: `<h1>`–`<h6>`, `<p>`,
+  `<span>`, `<strong>`, `<em>`, list items, buttons, links with partial styling.
+- If you only need one accent color for the whole line, put the color on the heading
+  itself (no inner span) — then it stays a single editable Text node.
+
+---
+
 ## Mark editable content with `data-sa`
 
 Add a `data-sa` attribute to every piece of text or image the tenant will want to change.
@@ -363,6 +417,7 @@ The tenant can then edit content, restyle, change colors, add pages, and publish
 - [ ] All JS libraries loaded from CDN `<script>` tags — not npm packages
 - [ ] All images in `public/` as plain `<img src="/...">` tags
 - [ ] All pages have real HTML content — no JavaScript-rendered blank pages
+- [ ] **No bare text next to an inline element** — in any heading/sentence where part is wrapped (color/bold/link), every run is wrapped in its own `<span>` so all parts are editable
 - [ ] `data-sa` markers on all headings, paragraphs, and images the tenant will edit
 - [ ] `npm run build` runs without errors
 - [ ] `dist/` folder exists with `.html` files
