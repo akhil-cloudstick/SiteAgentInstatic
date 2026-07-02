@@ -20,6 +20,7 @@ import { ConfirmDeleteProvider } from '@admin/shared/dialogs/ConfirmDeleteDialog
 import { Dialog } from '@ui/components/Dialog'
 import { Button } from '@ui/components/Button'
 import { cn } from '@ui/cn'
+import { BRAND_NAME } from '@core/brand'
 import styles from './AdminCanvasLayout.module.css'
 
 // Register the editor-only runtime graph from the lazy body, not the route
@@ -154,7 +155,7 @@ function ImportHtmlModalLoading() {
       open={true}
       onClose={closeModal}
       title="Import HTML"
-      eyebrow="Instatic"
+      eyebrow={BRAND_NAME}
       size="lg"
       className={styles.importHtmlLoadingDialog}
       bodyClassName={styles.importHtmlLoadingBody}

@@ -198,6 +198,21 @@ import heroImg from './hero.jpg';
 <Image src={heroImg} />
 ```
 
+### Changing an image later — rebuild from this rule, do not swap it in the editor
+
+Images placed in `public/` are **baked into the build**, so they import into Instatic
+and publish to Cloudflare correctly — the image file travels with the site.
+
+To **change** an image after import, replace the file in `public/` (keep the same path)
+and **rebuild + re-import using this rule**. That keeps the new image inside the
+deployed bundle, so it shows on the live Cloudflare site.
+
+Do **not** rely on uploading/replacing an image directly from the Instatic editor's
+media library for a template-built site: that image is stored on the editing server
+and is **not part of the built bundle**, so it can appear in the editor preview but
+not on the published Cloudflare page. The source-of-truth for a template site is the
+`public/` folder — change it there and rebuild.
+
 ---
 
 ## Editable text — wrap every text run in its own element

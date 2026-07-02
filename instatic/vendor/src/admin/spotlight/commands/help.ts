@@ -4,11 +4,12 @@
  * - Show keyboard shortcuts
  * - Open documentation
  * - Report an issue
- * - About Instatic
+ * - About <product>
  * - Copy environment info (for bug reports)
  */
 
 import type { Command } from '../types'
+import { BRAND_NAME, BRAND_DOCS_URL, BRAND_REPO_URL, BRAND_ISSUES_URL } from '@core/brand'
 
 export function getHelpCommands(): Command[] {
   return [
@@ -30,14 +31,14 @@ export function getHelpCommands(): Command[] {
     {
       id: 'help.documentation',
       title: 'Open documentation',
-      subtitle: 'View the Instatic docs',
+      subtitle: `View the ${BRAND_NAME} docs`,
       group: 'help',
       iconName: 'book-open-solid',
       keywords: ['docs', 'documentation', 'help', 'guide', 'reference'],
       workspaces: ['any'],
       run: (ctx) => {
         ctx.closeSpotlight()
-        window.open('https://github.com/corebunch/instatic/blob/main/docs/', '_blank', 'noopener,noreferrer')
+        window.open(BRAND_DOCS_URL, '_blank', 'noopener,noreferrer')
       },
     },
 
@@ -51,13 +52,13 @@ export function getHelpCommands(): Command[] {
       workspaces: ['any'],
       run: (ctx) => {
         ctx.closeSpotlight()
-        window.open('https://github.com/corebunch/instatic/issues/new', '_blank', 'noopener,noreferrer')
+        window.open(BRAND_ISSUES_URL, '_blank', 'noopener,noreferrer')
       },
     },
 
     {
       id: 'help.about',
-      title: 'About Instatic',
+      title: `About ${BRAND_NAME}`,
       subtitle: 'Version information and license',
       group: 'help',
       iconName: 'book-open-solid',
@@ -66,7 +67,7 @@ export function getHelpCommands(): Command[] {
       run: (ctx) => {
         ctx.closeSpotlight()
         // Navigate to About section in settings when available, else open docs
-        window.open('https://github.com/corebunch/instatic', '_blank', 'noopener,noreferrer')
+        window.open(BRAND_REPO_URL, '_blank', 'noopener,noreferrer')
       },
     },
 
@@ -81,7 +82,7 @@ export function getHelpCommands(): Command[] {
       run: (ctx) => {
         ctx.closeSpotlight()
         const info = [
-          `Instatic`,
+          BRAND_NAME,
           `Browser: ${navigator.userAgent}`,
           `Platform: ${navigator.platform}`,
           `URL: ${window.location.href}`,

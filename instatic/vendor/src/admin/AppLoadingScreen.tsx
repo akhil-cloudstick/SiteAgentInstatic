@@ -1,3 +1,4 @@
+import { BRAND_NAME } from '@core/brand'
 import styles from './AppLoadingScreen.module.css'
 
 export function AppLoadingScreen() {
@@ -6,7 +7,7 @@ export function AppLoadingScreen() {
       className={styles.screen}
       role="status"
       aria-busy="true"
-      aria-label="Loading Instatic"
+      aria-label={`Loading ${BRAND_NAME}`}
     >
       <BanterLoader />
     </div>

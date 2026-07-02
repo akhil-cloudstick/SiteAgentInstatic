@@ -81,6 +81,22 @@ export const ReplaceNodeHtmlInputSchema = Type.Object({
 export type ReplaceNodeHtmlInput = Static<typeof ReplaceNodeHtmlInputSchema>
 
 // ---------------------------------------------------------------------------
+// Visual-component reference — place a LIVE reference to an existing shared
+// visual component (a `visualComponent:<id>` document) on the active page,
+// instead of copying its HTML inline. This is the ONLY way to make a shared
+// header/footer/nav that stays in sync: edits to the component then propagate
+// to every page that references it. HTML inserts cannot express this (the
+// importer has no VC-ref mapping), so it gets its own tool.
+// ---------------------------------------------------------------------------
+
+export const InsertComponentRefInputSchema = Type.Object({
+  parentId: Type.String({ minLength: 1 }),
+  componentId: Type.String({ minLength: 1 }),
+  index: Type.Optional(Type.Integer({ minimum: 0 })),
+})
+export type InsertComponentRefInput = Static<typeof InsertComponentRefInputSchema>
+
+// ---------------------------------------------------------------------------
 // Node-level write tools
 // ---------------------------------------------------------------------------
 

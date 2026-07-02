@@ -35,6 +35,7 @@ import { useEditorPreference } from '@site/preferences/editorPreferences'
 import { LayerTreeNodeContent } from '@site/panels/DomPanel'
 import styles from './ImportHtmlModal.module.css'
 import { getErrorMessage } from '@core/utils/errorMessage'
+import { BRAND_NAME } from '@core/brand'
 
 const CodeMirrorEditor = lazy(() => import('@site/code-editor/CodeMirrorEditor'))
 
@@ -287,7 +288,7 @@ export function ImportHtmlModal() {
       open={true}
       onClose={closeModal}
       title="Import HTML"
-      eyebrow="Instatic"
+      eyebrow={BRAND_NAME}
       size="lg"
       className={styles.dialog}
       bodyClassName={styles.dialogBody}

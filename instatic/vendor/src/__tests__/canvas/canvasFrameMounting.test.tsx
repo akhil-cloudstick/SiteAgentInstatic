@@ -129,7 +129,7 @@ describe('canvas frame mounting', () => {
     expect(queryCanvasNodeInFrame('mobile', 'headline')).toBeNull()
   })
 
-  it('hides root iframe overflow in design mode but leaves live mode scrollable', async () => {
+  it('clamps root overflow on <html> only in design mode, leaves <body> to authored CSS, and stays scrollable in live mode', async () => {
     render(<CanvasRoot />)
 
     const designDoc = await waitForCanvasFrameDocument('desktop')
@@ -137,7 +137,10 @@ describe('canvas frame mounting', () => {
     expect(designDoc.body.style.height).toBe('auto')
     expect(designDoc.body.style.minHeight).toBe(`${CANVAS_VIEWPORT_HEIGHT}px`)
     expect(designDoc.documentElement.style.overflow).toBe('hidden')
-    expect(designDoc.body.style.overflow).toBe('hidden')
+    // <body> overflow is left unset so the body is NOT a block formatting
+    // context — margin-collapsing then matches the published page (and live
+    // frame), not the editor-only forced-hidden behaviour it replaced.
+    expect(designDoc.body.style.overflow).toBe('')
 
     cleanup()
     useEditorStore.setState({ canvasView: 'live' } as Parameters<typeof useEditorStore.setState>[0])

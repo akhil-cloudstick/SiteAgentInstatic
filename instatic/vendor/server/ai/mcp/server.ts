@@ -16,6 +16,7 @@ import {
 } from '@modelcontextprotocol/sdk/types.js'
 import type { DbClient } from '../../db/client'
 import type { CoreCapability } from '@core/capabilities'
+import { BRAND_NAME } from '@core/brand'
 import type { AiBrowserBridge, AiTool } from '../runtime/types'
 import { executeAiTool } from '../drivers/http/execTool'
 import { mcpToolsForCapabilities } from './registry'
@@ -36,7 +37,7 @@ const NOOP_BRIDGE: AiBrowserBridge = {
 }
 
 const NO_EDITOR_MESSAGE =
-  'This tool runs in the Instatic editor. Open the site editor in a browser (signed in as the connector owner) and try again.'
+  `This tool runs in the ${BRAND_NAME} editor. Open the site editor in a browser (signed in as the connector owner) and try again.`
 
 export function buildMcpServer(ctx: McpServerContext): Server {
   const server = new Server(

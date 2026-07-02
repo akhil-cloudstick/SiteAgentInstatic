@@ -15,6 +15,7 @@ import {
 import panelStyles from '../AdminEntry.module.css'
 import styles from './AdminPreAuthForm.module.css'
 import { getErrorMessage } from '@core/utils/errorMessage'
+import { BRAND_NAME } from '@core/brand'
 
 // Phase the unauthenticated form can be in. 'mfa' is a sub-state reached
 // only after a login submit returns `mfaRequired: true` — never set by the
@@ -120,10 +121,10 @@ export function AdminPreAuthForm({
   const submitLabel = submitting ? copy.submitPending : copy.submit
 
   // Pre-auth brand row: when the install has picked a favicon, render it
-  // in place of the default icon AND swap the "Instatic" label for
-  // the operator-configured site name. When neither is set, keep the
+  // in place of the default icon AND swap the product name for the
+  // operator-configured site name. When neither is set, keep the
   // default mark + product name so a fresh clone still looks like itself.
-  const brandLabel = publicSite.name ?? 'Instatic'
+  const brandLabel = publicSite.name ?? BRAND_NAME
 
   const onSubmit =
     phase === 'setup' ? handleSetup :

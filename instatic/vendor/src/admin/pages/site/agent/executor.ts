@@ -26,6 +26,7 @@ import {
   ReadDocumentInputSchema,
   OpenDocumentInputSchema,
   ReplaceNodeHtmlInputSchema,
+  InsertComponentRefInputSchema,
   DeleteNodeInputSchema,
   UpdateNodePropsInputSchema,
   MoveNodeInputSchema,
@@ -51,6 +52,7 @@ import {
   type ReadDocumentInput,
   type OpenDocumentInput,
   type ReplaceNodeHtmlInput,
+  type InsertComponentRefInput,
   type DeleteNodeInput,
   type UpdateNodePropsInput,
   type MoveNodeInput,
@@ -219,6 +221,7 @@ const AUTO_NAVIGATE_TOOLS = new Set<string>([
   'site_insert_html',
   'site_get_node_html',
   'site_replace_node_html',
+  'site_insert_component_ref',
   'site_delete_node',
   'site_update_node_props',
   'site_move_node',
@@ -404,6 +407,46 @@ function runReplaceNodeHtml(input: ReplaceNodeHtmlInput): AiToolOutput {
   }
 
   return aiToolOk({ nodeIds: insertedRootIds })
+}
+
+/**
+ * Place a LIVE reference to an existing shared visual component under
+ * `parentId`, instead of copying its HTML inline. Delegates to the store's
+ * `insertComponentRef`, which builds the `base.visual-component-ref` node and
+ * materializes its slot-instance children in one undo step. Editing the shared
+ * component then propagates to every page that references it — the whole point
+ * of "use the same nav/footer" instead of pasting a disconnected copy.
+ */
+function runInsertComponentRef(input: InsertComponentRefInput): AiToolOutput {
+  const store = getStoreState()
+  const site = store.site
+  if (!site) return aiToolError('No active site.')
+
+  const vc = site.visualComponents.find((v) => v.id === input.componentId)
+  if (!vc) {
+    const available = site.visualComponents.map((v) => `${v.id} ("${v.name}")`).join(', ')
+    return aiToolError(
+      `Visual component not found: ${input.componentId}.` +
+        (available
+          ? ` Available components: ${available}.`
+          : ' This site has no visual components to reference.'),
+    )
+  }
+
+  // The parent must live in the active document — the only tree this insert can
+  // touch. (Auto-navigate has already pulled the canvas to the parent's doc.)
+  if (!findNodeInActiveDoc(store, input.parentId)) {
+    return nodeNotInActiveDocError(store, input.parentId)
+  }
+
+  const nodeId = store.insertComponentRef(input.parentId, input.componentId, input.index)
+  if (!nodeId) {
+    return aiToolError(
+      `Could not reference "${vc.name}" under ${input.parentId} — the parent may not accept ` +
+        `children, or the reference would create a component cycle.`,
+    )
+  }
+  return aiToolOk({ nodeId })
 }
 
 function runDeleteNode(input: DeleteNodeInput): AiToolOutput {
@@ -633,6 +676,8 @@ export async function executeAgentTool(
         return runOpenDocumentTool(parseValue(OpenDocumentInputSchema, rawInput))
       case 'site_replace_node_html':
         return runReplaceNodeHtml(parseValue(ReplaceNodeHtmlInputSchema, rawInput))
+      case 'site_insert_component_ref':
+        return runInsertComponentRef(parseValue(InsertComponentRefInputSchema, rawInput))
       case 'site_delete_node':
         return runDeleteNode(parseValue(DeleteNodeInputSchema, rawInput))
       case 'site_update_node_props':

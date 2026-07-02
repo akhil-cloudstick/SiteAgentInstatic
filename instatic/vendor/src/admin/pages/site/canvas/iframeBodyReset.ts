@@ -71,9 +71,19 @@ export function applyIframeBodyReset(
   iframeDoc.body.style.minHeight = `${CANVAS_VIEWPORT_HEIGHT}px`
   // Design frames grow to fit their content on the parent canvas. The iframe
   // document itself must never expose root scrollbars while that fit settles
-  // or because authored CSS sets html/body overflow.
+  // or because authored CSS sets html/body overflow — so the clamp lives on
+  // `<html>` (documentElement) only.
+  //
+  // The clamp must NOT be forced onto `<body>`: `overflow: hidden` on the body
+  // establishes a block formatting context, which suppresses the parent↔first-
+  // child margin collapsing that the published page (and the live frame) DO
+  // perform. Forcing it there made authored top margins render differently in
+  // the design canvas than on the published site — the author would see no gap,
+  // add spacing, and the published page would then be double-spaced. Leaving the
+  // body's overflow to authored CSS (default `visible`) keeps margin-collapsing
+  // identical to published. `''` clears any inline overflow a prior mode set.
   iframeDoc.documentElement.style.overflow = 'hidden'
-  iframeDoc.body.style.overflow = 'hidden'
+  iframeDoc.body.style.overflow = ''
   let chrome = iframeDoc.head.querySelector('style[data-instatic-canvas-chrome]')
   if (!chrome) {
     chrome = iframeDoc.createElement('style')

@@ -25,6 +25,7 @@ import {
   ReadDocumentInputSchema,
   OpenDocumentInputSchema,
   ReplaceNodeHtmlInputSchema,
+  InsertComponentRefInputSchema,
   DeleteNodeInputSchema,
   UpdateNodePropsInputSchema,
   MoveNodeInputSchema,
@@ -125,6 +126,20 @@ const replaceNodeHtmlTool: AiTool = {
   description:
     "Replace a node subtree's children with new HTML. The target node is preserved as the parent; its existing children are rebuilt from the HTML. Style with CSS exactly as in site_insert_html: a <style> block and/or class= attributes; bare `.foo` selectors become reusable classes, other selectors become ambient rules. Custom importer markers work here too: <instatic-loop data-source-id=\"…\" ...> creates a real Loop node and <instatic-outlet> creates a template content outlet. To author or edit CSS on its own (without rebuilding children), use the dedicated site_apply_css tool instead.",
   inputSchema: ReplaceNodeHtmlInputSchema,
+}
+
+// ---------------------------------------------------------------------------
+// Visual-component reference — reuse an existing shared component (not a copy)
+// ---------------------------------------------------------------------------
+
+const insertComponentRefTool: AiTool = {
+  name: 'site_insert_component_ref',
+  scope: 'site',
+  execution: 'browser',
+  requiredCapabilities: SITE_STRUCTURE_CAPS,
+  description:
+    'Place a LIVE reference to an existing shared visual component (a shared header/nav/footer, or any reusable block) on the active page, under `parentId` at optional 0-based `index`. `componentId` is the id from a `visualComponent:<id>` entry in the Documents line (or site_list_documents). This is how you REUSE shared chrome: the page shows a reference, so later edits to the component propagate to every page that references it. Do NOT read a shared component and re-insert its HTML with site_insert_html — that makes a disconnected copy that never updates. Any slot children the component declares are materialized automatically. Success data: `nodeId` (the reference node). To build a page that reuses the site\'s existing header + footer, insert those two component refs (header first, footer last) and put the page-specific content between them.',
+  inputSchema: InsertComponentRefInputSchema,
 }
 
 // ---------------------------------------------------------------------------
@@ -414,6 +429,7 @@ export const siteWriteTools: AiTool[] = [
   readDocumentTool,
   openDocumentTool,
   replaceNodeHtmlTool,
+  insertComponentRefTool,
   deleteNodeTool,
   updateNodePropsTool,
   moveNodeTool,

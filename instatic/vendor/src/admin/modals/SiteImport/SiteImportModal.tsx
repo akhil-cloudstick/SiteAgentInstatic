@@ -73,6 +73,7 @@ import {
 } from './shared/importPlanning'
 import styles from './SiteImportModal.module.css'
 import { getErrorMessage } from '@core/utils/errorMessage'
+import { BRAND_NAME } from '@core/brand'
 import type {
   BundleImportSelection,
   ImportResult as CmsImportResult,
@@ -542,7 +543,7 @@ export function SiteImportModal({ onCmsBundleImportComplete }: SiteImportModalPr
       open={true}
       onClose={handleClose}
       title={titleByStep[step]}
-      eyebrow="Instatic"
+      eyebrow={BRAND_NAME}
       size={step === 'analyze' ? '2xl' : 'xl'}
       tone={isCmsReplace ? 'danger' : 'neutral'}
       footer={step === 'drop' ? undefined : (

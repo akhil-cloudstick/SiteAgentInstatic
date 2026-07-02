@@ -8,6 +8,7 @@ import { PluginSettingsDialog } from './components/PluginSettingsDialog/PluginSe
 import { PluginSchedulesDialog } from './components/PluginSchedulesDialog/PluginSchedulesDialog'
 import { isSandboxRelatedError, usePluginsWorkspace } from './hooks/usePluginsWorkspace'
 import { notifyCmsPluginsChanged } from './utils/pluginEvents'
+import { BRAND_DOCS_URL } from '@core/brand'
 import { useAuthenticatedAdminUser } from '@admin/sessionContext'
 import {
   canConfigurePlugins,
@@ -79,7 +80,7 @@ export function PluginsPage() {
               <p className={styles.errorHint}>
                 This looks like a plugin sandbox issue. See the{' '}
                 <a
-                  href="https://github.com/corebunch/instatic/blob/main/docs/features/plugin-system.md"
+                  href={`${BRAND_DOCS_URL}features/plugin-system.md`}
                   target="_blank"
                   rel="noopener noreferrer"
                 >

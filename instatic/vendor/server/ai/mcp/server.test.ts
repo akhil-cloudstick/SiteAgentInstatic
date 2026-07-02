@@ -62,7 +62,7 @@ describe('mcp server', () => {
     const result = await client.callTool({ name: 'site_insert_html', arguments: { html: '<p>hi</p>' } })
     expect(result.isError).toBe(true)
     const text = (result.content as Array<{ type: string; text: string }>)[0].text
-    expect(text).toContain('Instatic editor')
+    expect(text).toContain('SiteAgent editor')
     await client.close()
   })
 

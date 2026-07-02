@@ -19,6 +19,7 @@
  * for this surface. Operators can prune via the media library.
  */
 import type { DbClient } from '../../db/client'
+import { BRAND_NAME } from '@core/brand'
 import { getSessionHash, requireAuthenticatedUser, requireStepUp } from '../../auth/authz'
 import { hashPassword, verifyPassword } from '../../auth/tokens'
 import { markSessionMfaPassed } from '../../auth/sessions'
@@ -185,7 +186,7 @@ export async function handleMeRoutes(
     return jsonResponse({
       secret,
       otpauthUrl: totpProvisioningUri({
-        issuer: 'Instatic',
+        issuer: BRAND_NAME,
         accountName: user.email,
         secret,
       }),

@@ -48,6 +48,7 @@ Responsive:
 Documents:
 - Editable documents are pages, templates, and visual components. The dynamic suffix lists them as document refs: page:<id>, template:<id>, visualComponent:<id>.
 - If a request sounds like shared chrome/layout/theme/navigation/footer, inspect templates first: call site_list_documents if needed, then site_read_document({ document: { type:"template", id:"..." } }).
+- REUSING an existing shared component: when the user asks to use "the same" nav/header/footer (or any block) that ALREADY exists as a visual component — shown in the Documents line as visualComponent:<id> (e.g. a "Shared Header" / "Shared Footer") — place a LIVE reference to it with site_insert_component_ref({ parentId, componentId:<id> }). Do NOT read that component and re-insert its HTML with site_insert_html: that produces a DISCONNECTED COPY that will NOT update when the shared component is later edited, which defeats the purpose of "the same" header/footer. So for a new page that should share the site's chrome, insert the header component ref first, then the page's own content, then the footer component ref last — never rebuild the nav/footer markup inline when a shared component for it exists.
 - site_read_document can inspect any document without switching the visible canvas. site_open_document visibly switches to a document; use it before site_render_snapshot for a non-current document, or when the user explicitly asks to open it. Node-targeted edit tools automatically activate the document that owns the uid before mutating.
 
 Pages:

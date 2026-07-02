@@ -1619,6 +1619,41 @@ describe('executeAgentTool — insertHtml inline styles + <style> blocks', () =>
 })
 
 // ---------------------------------------------------------------------------
+// site_insert_component_ref — reuse a shared visual component (not a copy)
+// ---------------------------------------------------------------------------
+
+describe('executeAgentTool — site_insert_component_ref', () => {
+  it('places a live base.visual-component-ref referencing the shared component', async () => {
+    const { rootId } = freshStore()
+    const vcId = useEditorStore.getState().createVisualComponent('Shared Header')
+
+    const nodeId = expectNodeId(
+      await executeAgentTool('site_insert_component_ref', { parentId: rootId, componentId: vcId }),
+    )
+
+    // The inserted node is a real VC reference wired to the shared component —
+    // NOT an inline HTML copy — so future edits to the component propagate.
+    const refNode = activePage().nodes[nodeId]
+    expect(refNode.moduleId).toBe('base.visual-component-ref')
+    expect((refNode.props as { componentId?: string }).componentId).toBe(vcId)
+    expect(activePage().nodes[rootId].children).toContain(nodeId)
+  })
+
+  it('errors (and lists what exists) when the component id is unknown', async () => {
+    const { rootId } = freshStore()
+    useEditorStore.getState().createVisualComponent('Shared Header')
+
+    const result = await executeAgentTool('site_insert_component_ref', {
+      parentId: rootId,
+      componentId: 'does-not-exist',
+    })
+    expectToolError(result)
+    expect(result.error).toContain('Visual component not found')
+    expect(result.error).toContain('Shared Header')
+  })
+})
+
+// ---------------------------------------------------------------------------
 // Unknown tool names
 // ---------------------------------------------------------------------------
 

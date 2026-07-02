@@ -72,7 +72,7 @@ MCP exposes the **full tool catalog** (deduped by name), capability-filtered. To
 - `site_list_breakpoints` — configured viewport ids/labels/widths (the first is the base), so `site_render_snapshot` can target one deliberately. Headless version replaces the snapshot-dependent one.
 
 **Browser-relayed (via the live editor bridge) — require an open editor:**
-- Structure editing — `site_insert_html`, `site_replace_node_html`, `site_delete_node`, `site_move_node`, `site_duplicate_node`, `site_rename_node`, `site_update_node_props`.
+- Structure editing — `site_insert_html`, `site_replace_node_html`, `site_insert_component_ref`, `site_delete_node`, `site_move_node`, `site_duplicate_node`, `site_rename_node`, `site_update_node_props`.
 - HTML/CSS authoring (`site_apply_css`, `site_assign_class`, `site_remove_class`), page lifecycle (`site_add_page`, …), design tokens (`site_set_color_tokens`, …), content CRUD (`content_create_document`, `content_set_document_field`, …), code assets, structure reads (`site_read_document`), and live-DOM reads (`site_render_snapshot`, `site_get_node_html`).
 - These have no server implementation — their logic runs in the editor app against the live store. The MCP server relays the call to the connector owner's open editor and awaits the result (see "Live editor bridge"); image attachments (e.g. `site_render_snapshot`'s PNG) come back as MCP image content blocks. No editor connected → a clear error asking the operator to open it.
 

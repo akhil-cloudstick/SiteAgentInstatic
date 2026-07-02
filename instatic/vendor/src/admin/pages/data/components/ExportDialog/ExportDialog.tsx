@@ -29,6 +29,7 @@ import { getExportSummary, submitSiteBundleExport } from '@core/persistence/cmsT
 import { listCmsDataRows } from '@core/persistence/cmsData'
 import { isAbortError } from '@core/http'
 import { getErrorMessage } from '@core/utils/errorMessage'
+import { BRAND_NAME } from '@core/brand'
 import type { DataRow, DataTableKind, DataTableListItem } from '@core/data/schemas'
 import type { ExportRequest, ExportSummary, TableSelection } from '@core/data/bundleSchema'
 import { Settings2SolidIcon } from 'pixel-art-icons/icons/settings-2-solid'
@@ -383,7 +384,7 @@ export function ExportDialog({
     <Dialog
       open={open}
       onClose={onClose}
-      eyebrow="Instatic"
+      eyebrow={BRAND_NAME}
       title="Export site"
       size="2xl"
       bodyClassName={styles.body}
