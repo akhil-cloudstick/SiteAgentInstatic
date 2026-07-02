@@ -89,19 +89,29 @@ const justSaved = Astro.url.searchParams.get('saved') === '1';
   }
   .combo-search {
     width: 100%; border: 0; border-bottom: 1px solid var(--line); border-radius: 0;
-    background: var(--panel); padding: 10px 12px; color: var(--ink); font: inherit;
+    background: var(--panel); padding: 10px 16px; color: var(--ink); font: inherit;
   }
   .combo-search:focus { outline: none; }
-  .combo-list { max-height: 320px; overflow-y: auto; }
-  .combo-item {
-    padding: 8px 12px; cursor: pointer; border-bottom: 1px solid rgba(42,49,58,.5);
+  .combo-list {
+    max-height: 320px; overflow-y: auto;
+    scrollbar-width: thin; scrollbar-color: var(--line) transparent;
   }
-  .combo-item:last-child { border-bottom: 0; }
-  .combo-item:hover, .combo-item.active { background: var(--panel); }
-  .combo-item.selected { background: rgba(88,166,255,.12); }
-  .combo-item-id { font-weight: 600; color: var(--ink); font-size: 13px; }
-  .combo-item-name { color: var(--mut); font-size: 12px; margin-top: 1px; }
-  .combo-empty { padding: 16px 12px; color: var(--mut); text-align: center; }
+  .combo-list::-webkit-scrollbar { width: 10px; }
+  .combo-list::-webkit-scrollbar-track { background: transparent; }
+  .combo-list::-webkit-scrollbar-thumb {
+    background: var(--line); border-radius: 8px;
+    border: 2px solid var(--panel2); background-clip: padding-box;
+  }
+  .combo-list::-webkit-scrollbar-thumb:hover { background: var(--mut); }
+  .combo-list :global(.combo-item) {
+    padding: 8px 16px; cursor: pointer; border-bottom: 1px solid rgba(42,49,58,.5);
+  }
+  .combo-list :global(.combo-item:last-child) { border-bottom: 0; }
+  .combo-list :global(.combo-item:hover), .combo-list :global(.combo-item.active) { background: var(--panel); }
+  .combo-list :global(.combo-item.selected) { background: rgba(88,166,255,.12); }
+  .combo-list :global(.combo-item-id) { font-weight: 600; color: var(--ink); font-size: 13px; }
+  .combo-list :global(.combo-item-name) { color: var(--mut); font-size: 12px; margin-top: 1px; }
+  .combo-list :global(.combo-empty) { padding: 16px 16px; color: var(--mut); text-align: center; }
 </style>
 
 <script define:vars={{ models }}>
