@@ -207,16 +207,31 @@ export async function getUsageByScope(
  * conversation was created with) rather than reading from the conversation
  * directly, because conversations only carry `credential_id + model_id`.
  *
- * A credential whose row was deleted mid-window still shows up here — the
- * left join preserves history. Such rows carry `provider_id = 'unknown'`.
+ * The model is grouped by `ai_messages.model_id` — the model that ACTUALLY ran
+ * the turn — NOT the conversation's nominal `model_id`. In managed mode the AI
+ * Gateway routes each turn to a per-category model (Design, Content, …) while
+ * the conversation carries a single default; grouping on the conversation model
+ * would collapse every category's tokens under that one default. Only the
+ * usage-bearing assistant message per turn carries `model_id` (the persister
+ * stamps it), so `is not null` filters out the zero-token user/tool rows that
+ * would otherwise form a junk "no model" group.
+ *
+ * A conversation with no live credential row carries a null `cred.provider_id`
+ * — either because it ran in MANAGED mode (the synthetic operator credential is
+ * never persisted, so `credential_id` is null) or because a standalone user's
+ * credential was deleted (`on delete set null`). The two never coexist in one
+ * instance, so the caller passes `fallbackProvider` = `'managed'` in managed
+ * mode (rendered as the brand name) or `'unknown'` standalone (a deleted
+ * credential). The client maps the token to a human label.
  */
 export async function getUsageByModel(
   db: DbClient,
   sinceIso: string,
+  fallbackProvider: string,
 ): Promise<UsageByModelRow[]> {
   const { rows } = await db<ModelAggregateRow>`
-    select coalesce(cred.provider_id, 'unknown')      as provider_id,
-           c.model_id                                 as model_id,
+    select coalesce(cred.provider_id, ${fallbackProvider}) as provider_id,
+           m.model_id                                 as model_id,
            coalesce(sum(m.prompt_tokens), 0)          as prompt_tokens,
            coalesce(sum(m.completion_tokens), 0)      as completion_tokens,
            coalesce(sum(m.cost_usd), 0)               as cost_usd,
@@ -227,7 +242,13 @@ export async function getUsageByModel(
     join ai_conversations c on c.id = m.conversation_id
     left join ai_provider_credentials cred on cred.id = c.credential_id
     where m.created_at >= ${sinceIso}
-    group by cred.provider_id, c.model_id
+      and m.model_id is not null
+    -- Group by the RAW provider column (all null-credential rows collapse into
+    -- one NULL group); the coalesce to the fallback happens only in the SELECT.
+    -- Do NOT repeat the coalesce here: each interpolation is a distinct bound
+    -- param, so Postgres would treat the SELECT and GROUP BY expressions as
+    -- different and reject the query ("must appear in the GROUP BY clause").
+    group by cred.provider_id, m.model_id
     order by cost_usd desc, prompt_tokens desc
   `
   return rows.map((row) => ({

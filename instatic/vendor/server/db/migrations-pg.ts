@@ -1045,4 +1045,19 @@ export const pgMigrations: Migration[] = [
         where token_hash is not null;
     `,
   },
+  {
+    id: '019_ai_message_model_id',
+    sql: `
+      -- Per-message routed-model attribution. In managed mode the AI Gateway
+      -- routes each turn to a per-category model (Design, Content, …) while the
+      -- conversation carries a single nominal model_id. Without this column the
+      -- "By model" audit rollup grouped every message under the conversation's
+      -- one model, so a Content-routed turn's tokens were mislabelled as the
+      -- default model. The persister now stamps the actually-routed model onto
+      -- the usage-bearing assistant message; nullable because only that row
+      -- (the one carrying the turn's tokens) is stamped.
+      alter table ai_messages
+        add column model_id text;
+    `,
+  },
 ]

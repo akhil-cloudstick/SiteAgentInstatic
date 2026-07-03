@@ -297,7 +297,11 @@ async function handleAiChat(
 
         const persister = createConversationsPersister(db, conversation.id, {
           providerId,
-          modelId,
+          // The gateway echoes the actually-routed model (managed mode) on the
+          // response headers, captured into `resolvedModel` above. Resolve it
+          // lazily so each turn's usage row records the model that really ran,
+          // not the conversation's nominal default.
+          resolveModelId: () => resolvedModel ?? modelId,
         })
         await runChat({ driver, request, persister, emit })
 

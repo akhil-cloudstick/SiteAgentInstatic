@@ -25,6 +25,7 @@ import {
 } from '../../../ai/api'
 import { UsageTablePanel } from './UsageTablePanel'
 import { formatCost, formatNumber } from './usageFormat'
+import { BRAND_NAME } from '@core/brand'
 import styles from '../AiPage.module.css'
 
 type Range = 'today' | '7d' | '30d' | 'all'
@@ -115,6 +116,9 @@ const PROVIDER_LABEL: Record<string, string> = {
   anthropic: 'Anthropic',
   openai: 'OpenAI',
   ollama: 'Ollama',
+  // Managed mode: usage runs through the operator's gateway, not a user's own
+  // credential, so it's attributed to the product brand rather than a provider.
+  managed: BRAND_NAME,
   unknown: 'Unknown (deleted credential)',
 }
 

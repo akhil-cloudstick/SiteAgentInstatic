@@ -96,3 +96,32 @@ owner won't be able to click and edit that part later.
   class="accent">word</span><span> after</span>` — keep the spaces inside the spans.
 
 This keeps everything the owner can see also something the owner can edit.
+
+---
+
+## When you remove or delete something (important editing rule)
+
+When the owner says "remove this", "delete this button", or "take this out", remove the
+element they point at — but **leave the layout clean**. Do not leave an empty leftover
+box behind.
+
+Many items sit inside their own little wrapper container: nav links, buttons, cards,
+list items, and menu entries are each usually wrapped in a container that exists **only**
+to hold that one thing. If you delete the item and its wrapper is now empty, **delete the
+empty wrapper too**. An empty container shows up as a blank "Empty container" box and an
+ugly gap in the layout — the owner did not ask for a hole, they asked for the thing to be
+gone.
+
+- Remove the element, then check its parent. If the parent is now empty and only existed
+  to hold that element, remove the parent as well. Keep going up only while each parent is
+  left empty by the removal.
+- **Stop** at the first container that still has other real content (e.g. the nav bar
+  itself, which still holds the other links) — never delete a container that other items
+  still live in.
+- Only keep a now-empty container if the owner clearly wants to put something else there
+  right after ("remove the button, I'll add a new one here").
+- **Shared parts (nav, footer):** remove the item — and its empty wrapper — in **both**
+  the desktop and the mobile version so they stay in sync and neither is left with a gap.
+
+The goal: after a removal the page should look like the item was never there — no empty
+box, no leftover gap.

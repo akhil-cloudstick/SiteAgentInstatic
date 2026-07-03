@@ -95,7 +95,7 @@ describe('AI audit usage persistence', () => {
 
     const persister = createConversationsPersister(harness.db, conversation.id, {
       providerId: 'ollama',
-      modelId: 'e2e-model',
+      resolveModelId: () => 'e2e-model',
     })
     const emitted: AiStreamEvent[] = []
 
@@ -156,7 +156,7 @@ describe('AI audit usage persistence', () => {
       chatCount: 1,
     })
 
-    const [model] = await getUsageByModel(harness.db, since)
+    const [model] = await getUsageByModel(harness.db, since, 'unknown')
     expect(model).toMatchObject({
       providerId: 'ollama',
       modelId: 'e2e-model',

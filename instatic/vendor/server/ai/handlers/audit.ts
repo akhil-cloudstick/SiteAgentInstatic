@@ -15,6 +15,7 @@ import { jsonResponse } from '../../http'
 import { requireCapability } from '../../auth/authz'
 import { resolveTimeZone } from '../../time'
 import type { DbClient } from '../../db/client'
+import { isManagedAiMode } from '../managed'
 import {
   getUsageByDay,
   getUsageByModel,
@@ -47,11 +48,15 @@ async function handleAuditList(
   const sinceIso = resolveSince(url.searchParams.get('since'))
   const timeZone = resolveTimeZone(url.searchParams.get('tz'))
 
+  // A conversation with no live credential row is the operator's managed
+  // credential (branded) in managed mode, or a deleted credential standalone.
+  const fallbackProvider = isManagedAiMode() ? 'managed' : 'unknown'
+
   const [totals, byUser, byScope, byModel, byDay] = await Promise.all([
     getUsageTotals(db, sinceIso),
     getUsageByUser(db, sinceIso),
     getUsageByScope(db, sinceIso),
-    getUsageByModel(db, sinceIso),
+    getUsageByModel(db, sinceIso, fallbackProvider),
     getUsageByDay(db, sinceIso, timeZone),
   ])
 

@@ -259,12 +259,16 @@ tz?:    string   // IANA timezone (e.g. "Europe/Bratislava"); defaults to UTC
   totals:  UsageRow         // aggregate totals across the window
   byUser:  UsageByUserRow[] // one row per user_id, sorted by cost desc
   byScope: UsageByScopeRow[]// one row per chat scope ('site' | 'content' | …)
-  byModel: UsageByModelRow[]// one row per (provider, model) pair
+  byModel: UsageByModelRow[]// one row per (provider, routed model) pair
   byDay:   UsageByDayRow[]  // one row per calendar day in the viewer's timezone
 }
 ```
 
 `byDay` is the time-series chart data — each `day` field is `YYYY-MM-DD` in the viewer's local timezone (not UTC). The daily rollup pulls raw message rows and bins them in JS via `localDayKeyFactory(timeZone)` (`server/time.ts`) rather than SQL date-truncation, because the day boundary depends on the viewer's timezone which the database doesn't know. The client (see `AuditTab.tsx` → `listAiAudit`) reads `Intl.DateTimeFormat().resolvedOptions().timeZone` and passes it as `?tz=`.
+
+`byModel` groups on `ai_messages.model_id` — the model that ACTUALLY ran each turn — not the conversation's nominal `model_id`. This matters in managed mode: the AI Gateway routes each turn to a per-category model (Design, Content, …) while the conversation carries a single default, so grouping on the conversation model would collapse every category's tokens under that one default. The persister stamps the gateway-echoed routed model (`x-instatic-resolved-model`) onto the turn's usage-bearing assistant message; the rollup filters `model_id is not null` so the zero-token user/tool rows don't form a junk "no model" group.
+
+The `provider` column comes from the conversation's credential row. When there's no live credential — managed mode (the synthetic operator credential is never persisted) or a deleted standalone credential — `cred.provider_id` is null; the two never coexist in one instance, so the audit handler passes `getUsageByModel` a `fallbackProvider` of `'managed'` (managed mode) or `'unknown'` (standalone). The client maps `'managed'` → `BRAND_NAME` and `'unknown'` → "Unknown (deleted credential)".
 
 The Audit tab (`src/admin/pages/ai/tabs/AuditTab.tsx`) consumes this endpoint. The daily rollup there also aligns its "Today" range window to local midnight (`setHours(0, 0, 0, 0)`) so the day boundary is consistent both in the filter and in the bar chart. The by-model, by-user, and by-scope rollups all render through `UsageTablePanel` (`tabs/UsageTablePanel.tsx`) — a shared table component that takes a `columns` config and handles the empty-state row. Number and cost formatting (`formatNumber`, `formatCost`) live in `tabs/usageFormat.ts`, a plain `.ts` leaf that both the tab components and their tests can import without triggering React Fast Refresh's components-only export rule on the component file.
 

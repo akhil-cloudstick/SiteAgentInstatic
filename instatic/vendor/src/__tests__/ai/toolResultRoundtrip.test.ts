@@ -44,7 +44,7 @@ describe('tool-result persist → buildMessageHistory round-trip', () => {
 
     const persister = createConversationsPersister(testDb.db, conv.id, {
       providerId: 'ollama',
-      modelId: 'model_1',
+      resolveModelId: () => 'model_1',
     })
 
     // A successful call: no error, no persisted data.

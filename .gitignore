@@ -7,6 +7,9 @@ node_modules/
 # Per-tenant runtime state (instances, uploads, secrets) — never commit
 tenants/
 
+# Local dev working dir + auto-generated master key (secret) at repo root — never commit
+.tmp/
+
 # Instatic vendored install artifacts (the source is cloned; deps/build are local)
 instatic/vendor/node_modules/
 instatic/vendor/dist/

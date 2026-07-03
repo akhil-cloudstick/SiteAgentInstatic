@@ -48,8 +48,15 @@ export interface ConversationsPersister {
 interface ConversationsPersisterContext {
   /** Used to price `usage` events whose driver omits a `costUsd` value. */
   providerId: AiProviderId
-  /** Used together with providerId to look up the per-million-token rates. */
-  modelId: string
+  /**
+   * The model that ACTUALLY ran this turn — resolved lazily because in managed
+   * mode the AI Gateway routes each turn to a per-category model and echoes it
+   * back on the first response, after this persister is constructed. Returns
+   * the routed model (falling back to the conversation's nominal model when
+   * there was no echo, e.g. standalone mode). Used for BOTH per-million-token
+   * pricing and per-message model attribution in the audit rollup.
+   */
+  resolveModelId: () => string
 }
 
 export function createConversationsPersister(
@@ -133,6 +140,9 @@ export function createConversationsPersister(
       // simply skip — the totals are still correct, only the per-message
       // attribution is lost in that edge case.
       if (!lastAssistantMessageId) return
+      // The model that actually ran this turn (managed routing resolves it per
+      // turn); drives both pricing and the per-message audit attribution.
+      const modelId = ctx.resolveModelId()
       // Driver-supplied cost wins (OpenRouter reports a native per-call USD
       // cost). When absent (Anthropic, OpenAI) we price from the live
       // OpenRouter catalogue, cache-aware; Ollama is free. Token counts are
@@ -140,7 +150,7 @@ export function createConversationsPersister(
       const costUsd = usage.costUsd ?? await resolveCostUsd(
         db,
         ctx.providerId,
-        ctx.modelId,
+        modelId,
         {
           promptTokens: usage.promptTokens,
           completionTokens: usage.completionTokens,
@@ -164,6 +174,7 @@ export function createConversationsPersister(
       await updateMessageUsage(
         db,
         lastAssistantMessageId,
+        modelId,
         usage.promptTokens,
         usage.completionTokens,
         costUsd,
@@ -178,6 +189,7 @@ export function createConversationsPersister(
 async function updateMessageUsage(
   db: DbClient,
   messageId: string,
+  modelId: string,
   promptTokens: number,
   completionTokens: number,
   costUsd: number,
@@ -200,7 +212,8 @@ async function updateMessageUsage(
 
     await tx`
       update ai_messages
-      set prompt_tokens = ${promptTokens},
+      set model_id = ${modelId},
+          prompt_tokens = ${promptTokens},
           completion_tokens = ${completionTokens},
           cost_usd = ${costUsd},
           cache_read_tokens = ${cacheReadTokens},
