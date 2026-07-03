@@ -3,7 +3,7 @@
 import http from 'node:http';
 import config from './lib/env.mjs';
 import { migrate } from './registry/db.mjs';
-import { getSettings, saveSettings, getSecrets } from './registry/settings.mjs';
+import { getSettings, saveSettings, getSecrets, getDefaultGuidance } from './registry/settings.mjs';
 import * as tenantsRepo from './registry/tenants.mjs';
 import { provisionTenant, deprovisionTenant, startTenant, resumeAll, editTenant, repairTenantCf } from './provisioner/provision.mjs';
 import { deployTenant, hasBakedOutput } from './deployer/deploy.mjs';
@@ -55,10 +55,35 @@ async function listOpenrouterModels() {
     if (!r.ok) return [];
     const data = await r.json();
     return (data.data || [])
-      .map((m) => ({ id: m.id, name: m.name || m.id }))
+      .map((m) => ({
+        id: m.id,
+        name: m.name || m.id,
+        // Tool-calling capability for the category picker (Codex #4). OpenRouter
+        // lists it in supported_parameters; null = unknown metadata (UI warns
+        // instead of hard-blocking). Routed chat categories need this true.
+        toolCalling: Array.isArray(m.supported_parameters)
+          ? m.supported_parameters.includes('tools')
+          : null,
+      }))
       .sort((a, b) => a.id.localeCompare(b.id));
   } catch {
     return [];
+  }
+}
+
+// Reject categories whose model is KNOWN to lack tool-calling (routed chat
+// categories always send tools) — server-side enforcement (Codex R2-#1). Models
+// with unknown capability are allowed (the UI warns). If the catalogue can't be
+// loaded (no key / upstream down) we can't verify, so we don't block.
+async function enforceToolCapability(aiCategories) {
+  if (!Array.isArray(aiCategories) || aiCategories.length === 0) return;
+  const models = await listOpenrouterModels();
+  if (!models.length) return;
+  const cap = new Map(models.map((m) => [m.id, m.toolCalling]));
+  for (const c of aiCategories) {
+    if (c && typeof c === 'object' && cap.get(c.modelId) === false) {
+      throw new Error(`model "${c.modelId}" for category "${c.slug || c.name}" does not support tool calling`);
+    }
   }
 }
 
@@ -77,7 +102,16 @@ const server = http.createServer(async (req, res) => {
     }
     if (path === '/api/settings') {
       if (method === 'GET') return send(res, 200, await getSettings());
-      if (method === 'POST') return send(res, 200, await saveSettings(await readJson(req)));
+      if (method === 'POST') {
+        const bodyIn = await readJson(req);
+        await enforceToolCapability(bodyIn.aiCategories); // throws -> 400
+        return send(res, 200, await saveSettings(bodyIn));
+      }
+    }
+    if (path === '/api/ai-guidance-default') {
+      // The authored project-default guidance (from /rules) for the console to
+      // seed/reset the guidance editor.
+      if (method === 'GET') return send(res, 200, { guidance: getDefaultGuidance() });
     }
     if (path === '/api/models') {
       // Model picker source for the console: the live OpenRouter catalogue,

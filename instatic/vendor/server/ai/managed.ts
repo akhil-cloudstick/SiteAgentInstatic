@@ -22,6 +22,7 @@
  * Instatic behaves exactly as before (users add their own providers).
  */
 
+import { Type, safeParseValue, type Static } from '@core/utils/typeboxHelpers'
 import type { AiResolvedCredential, AiProviderModel } from './drivers/types'
 import type { AiProviderId, ToolScope } from './runtime/types'
 import type { CredentialView } from './credentials/types'
@@ -32,6 +33,11 @@ export const MANAGED_CREDENTIAL_ID = 'managed'
 const MANAGED_LABEL = 'Managed by operator'
 const MANAGED_PROVIDER: AiProviderId = 'openrouter' as AiProviderId
 const MODEL_CACHE_TTL_MS = 10_000
+const CONFIG_CACHE_TTL_MS = 10_000
+// Classification is a tiny best-effort routing call — cap it hard so a slow or
+// stuck classifier never stalls the tenant's actual chat.
+const CLASSIFY_TIMEOUT_MS = 6_000
+const CLASSIFY_MAX_TOKENS = 16
 
 /** The gateway base URL (with the signed tenant token), or null if not managed. */
 export function getGatewayUrl(): string | null {
@@ -76,6 +82,137 @@ export async function getManagedModel(): Promise<string> {
 /** Test-only: clear the live-model cache so tests are order-independent. */
 export function __resetManagedModelCache(): void {
   modelCache = null
+}
+
+// ---------------------------------------------------------------------------
+// Per-task-type routing config + prompt classification (managed mode only)
+// ---------------------------------------------------------------------------
+
+const ManagedAiConfigSchema = Type.Object({
+  categories: Type.Array(
+    Type.Object({
+      slug: Type.String(),
+      name: Type.String(),
+      description: Type.String(),
+    }),
+  ),
+  guidance: Type.String(),
+  hasClassifier: Type.Boolean(),
+})
+export type ManagedAiConfig = Static<typeof ManagedAiConfigSchema>
+
+// Minimal shape of an OpenAI-style chat completion — validated at the boundary.
+const ClassifyResponseSchema = Type.Object({
+  choices: Type.Array(
+    Type.Object({
+      message: Type.Optional(
+        Type.Object({ content: Type.Optional(Type.Union([Type.String(), Type.Null()])) }),
+      ),
+    }),
+  ),
+})
+
+let configCache: { cfg: ManagedAiConfig; at: number } | null = null
+
+/** Strip a trailing `/v1` from the gateway base to reach a probe endpoint. */
+function probeBase(base: string): string {
+  return base.replace(/\/v1\/?$/, '')
+}
+
+/**
+ * The operator's task-type categories + global guidance, read live from the
+ * gateway `/config` probe (10s cache). Returns null in standalone mode or when
+ * the probe is unreachable/invalid — callers then skip routing + guidance.
+ */
+export async function getManagedAiConfig(): Promise<ManagedAiConfig | null> {
+  const base = getGatewayUrl()
+  if (!base) return null
+
+  const now = Date.now()
+  if (configCache && now - configCache.at < CONFIG_CACHE_TTL_MS) return configCache.cfg
+
+  try {
+    const res = await fetch(probeBase(base) + '/config')
+    if (res.ok) {
+      const parsed = safeParseValue(ManagedAiConfigSchema, await res.json())
+      if (parsed.ok) {
+        configCache = { cfg: parsed.value, at: now }
+        return parsed.value
+      }
+    }
+  } catch {
+    // Gateway briefly unreachable — behave as if unconfigured (default routing).
+  }
+  return null
+}
+
+/** Test-only: clear the live-config cache so tests are order-independent. */
+export function __resetManagedConfigCache(): void {
+  configCache = null
+}
+
+/**
+ * Pick the category slug that best fits a tenant prompt, via one cheap,
+ * non-streaming classifier call through the gateway (the gateway swaps in the
+ * operator's classifier model on the `x-instatic-ai-classify` header). Best
+ * effort only: returns null on any failure/timeout/unknown reply so the caller
+ * falls back to the operator's default model. Never throws.
+ */
+export async function classifyCategory(
+  prompt: string,
+  categories: ManagedAiConfig['categories'],
+  signal?: AbortSignal,
+): Promise<string | null> {
+  const base = getGatewayUrl()
+  if (!base || categories.length === 0) return null
+
+  const menu = categories.map((c) => `- ${c.slug}: ${c.name}${c.description ? ` — ${c.description}` : ''}`).join('\n')
+  const body = {
+    // Placeholder — the gateway overrides `model` with the classifier model.
+    model: 'router',
+    stream: false,
+    temperature: 0,
+    max_tokens: CLASSIFY_MAX_TOKENS,
+    messages: [
+      {
+        role: 'system',
+        content:
+          'You route a website-editing request to ONE category. Reply with ONLY the exact category slug ' +
+          'from the list — no punctuation, no explanation.\n\nCategories:\n' + menu,
+      },
+      { role: 'user', content: prompt },
+    ],
+  }
+
+  // Cap the classify call independently of the main request, but still abort if
+  // the whole chat is cancelled.
+  const timeout = AbortSignal.timeout(CLASSIFY_TIMEOUT_MS)
+  const composite = signal ? AbortSignal.any([signal, timeout]) : timeout
+
+  try {
+    const res = await fetch(`${base.replace(/\/+$/, '')}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-instatic-ai-classify': '1',
+        Authorization: `Bearer ${process.env.INSTATIC_AI_GATEWAY_TOKEN?.trim() || MANAGED_CREDENTIAL_ID}`,
+      },
+      body: JSON.stringify(body),
+      signal: composite,
+    })
+    if (!res.ok) return null
+    const parsed = safeParseValue(ClassifyResponseSchema, await res.json())
+    if (!parsed.ok) return null
+    const reply = (parsed.value.choices[0]?.message?.content ?? '').trim().toLowerCase()
+    if (!reply) return null
+    // Accept an exact slug, or a model that echoed the display name instead.
+    const hit = categories.find(
+      (c) => c.slug.toLowerCase() === reply || c.name.toLowerCase() === reply,
+    )
+    return hit ? hit.slug : null
+  } catch {
+    return null
+  }
 }
 
 /** The resolved credential drivers receive — points OpenRouter at the gateway. */

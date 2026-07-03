@@ -6,18 +6,38 @@ let error = '';
 if (Astro.request.method === 'POST') {
   const f = await Astro.request.formData();
   const str = (k) => (f.get(k) || '').toString().trim() || undefined;
-  const payload = {
-    openrouterKey: str('openrouterKey'),
-    openrouterModel: str('openrouterModel'),
-    cloudflareToken: str('cloudflareToken'),
-    cloudflareAccountId: str('cloudflareAccountId'),
-  };
+  // The page has two independent forms (AI agent, Cloudflare). Each posts only
+  // its own section; unmentioned fields are left undefined so the backend
+  // coalesces them to their existing values instead of wiping them.
+  const section = (f.get('section') || '').toString();
+  let payload = {};
+  if (section === 'cloudflare') {
+    payload = {
+      cloudflareToken: str('cloudflareToken'),
+      cloudflareAccountId: str('cloudflareAccountId'),
+    };
+  } else {
+    // AI agent: OpenRouter key + per-task-type models + classifier.
+    // aiGuidance is managed internally (rules/globalAiGuidanceRule.md) and is
+    // intentionally not surfaced to the operator.
+    let aiCategories = [];
+    try { aiCategories = JSON.parse((f.get('aiCategories') || '[]').toString()); } catch {}
+    payload = {
+      openrouterKey: str('openrouterKey'),
+      aiCategories,
+      classifierModel: (f.get('classifierModel') || '').toString().trim(),
+    };
+  }
   try {
     const r = await fetch(`${CP}/api/settings`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
     });
-    if (!r.ok) throw new Error('save failed');
-    return Astro.redirect('/settings?saved=1');
+    if (!r.ok) {
+      let msg = 'save failed';
+      try { msg = (await r.json()).error || msg; } catch {}
+      throw new Error(msg);
+    }
+    return Astro.redirect(`/settings?saved=${section === 'cloudflare' ? 'cloudflare' : 'ai'}`);
   } catch (e) { error = e.message; }
 }
 
@@ -25,147 +45,306 @@ let s = {};
 try { s = await (await fetch(`${CP}/api/settings`)).json(); }
 catch (e) { error = `Control plane not reachable: ${e.message}`; }
 
-// Live OpenRouter model catalogue for the searchable picker (empty until a key
-// is saved). The gateway/settings decide which model tenants use; this just
-// makes it easy to pick a valid id instead of typing it by hand.
+// Live OpenRouter catalogue with tool-calling capability flags for the pickers.
 let models = [];
 try { models = ((await (await fetch(`${CP}/api/models`)).json()).models) || []; } catch {}
 
-const justSaved = Astro.url.searchParams.get('saved') === '1';
+// Seed the category table: stored config, or Design/Content builtins (seeded from
+// the legacy single model) on first use so live installs migrate cleanly.
+const seededCategories = (Array.isArray(s.aiCategories) && s.aiCategories.length)
+  ? s.aiCategories
+  : [
+      { slug: 'design', name: 'Design', builtin: true, isDefault: true, modelId: s.openrouterModel || '',
+        description: 'Layout, visual design, and structure: creating or arranging pages, sections, hero areas, buttons, images, colors, spacing, and fonts.' },
+      { slug: 'content', name: 'Content', builtin: true, isDefault: false, modelId: s.openrouterModel || '',
+        description: 'Writing or editing text: headlines, paragraphs, blog posts, product descriptions, and other wording on the page.' },
+    ];
+
+const savedSection = Astro.url.searchParams.get('saved');
+const savedLabel = savedSection === 'cloudflare' ? 'Cloudflare settings saved.'
+  : savedSection === 'ai' ? 'AI agent settings saved.'
+  : savedSection ? 'Saved.' : '';
 ---
 <Layout title="Settings">
   <h1>Settings</h1>
-  <p class="sub">Global OpenRouter key/model and Cloudflare credentials. Secrets are <strong>encrypted at rest</strong> and masked here — leave a field blank to keep its current value.</p>
-  {justSaved && <div class="banner ok">Saved.</div>}
+  <p class="sub">AI agent and Cloudflare credentials, saved separately. Secrets are <strong>encrypted at rest</strong> and masked — leave a secret field blank to keep its current value.</p>
+  {savedLabel && <div class="banner ok">{savedLabel}</div>}
   {error && <div class="banner err">{error}</div>}
 
   <div class="card">
-    <form method="POST">
+    <h2 class="card-title">AI agent</h2>
+    <p class="hint card-sub">The OpenRouter key is injected only by the <strong>AI Gateway</strong> — it is never stored in any tenant instance, and tenants never see which model runs.</p>
+    <form method="POST" id="settings-form">
+      <input type="hidden" name="section" value="ai" />
       <label>OpenRouter API key {s.hasOpenrouterKey && (<span class="hint">(set — blank keeps it)</span>)}</label>
       <input name="openrouterKey" type="password" autocomplete="off" placeholder={s.hasOpenrouterKey ? '••••••••••••' : 'sk-or-...'} />
 
-      <label>OpenRouter model {models.length > 0 && (<span class="hint">({models.length} available)</span>)}</label>
-      <div class="combo" id="model-combo">
-        <input type="hidden" name="openrouterModel" id="model-value" value={s.openrouterModel || ''} />
-        <button type="button" class="combo-trigger" id="model-trigger" disabled={models.length === 0}>
-          <span id="model-trigger-label" class={s.openrouterModel ? '' : 'placeholder'}>
-            {s.openrouterModel || (models.length > 0 ? 'Select a model…' : 'Save an API key to load models')}
-          </span>
+      <h2 class="sec">AI models by task type</h2>
+      <p class="hint">Each tenant message is auto-routed to one of these models based on what the tenant asks. Exactly one category is the <strong>Default</strong> (used when the request is unclear or classification fails). Category models must support tool-calling; the picker hides models that can't.</p>
+
+      <div id="cat-rows"></div>
+      <div style="margin-top:8px"><button type="button" class="ghost" id="add-cat">+ Add category</button></div>
+      <input type="hidden" name="aiCategories" id="cat-value" />
+
+      <label class="mt">Classifier model <span class="hint">(a cheap model that reads each prompt and picks the category — no tool-calling needed)</span></label>
+      <div class="combo" id="classifier-combo" data-full="1">
+        <input type="hidden" name="classifierModel" class="combo-value" value={s.classifierModel || ''} />
+        <button type="button" class="combo-trigger" disabled={models.length === 0}>
+          <span class:list={['combo-trigger-label', !s.classifierModel && 'placeholder']} data-placeholder={models.length ? 'Select a model…' : 'Save an API key to load models'}>{s.classifierModel || (models.length ? 'Select a model…' : 'Save an API key to load models')}</span>
+          <span class="combo-clear" title="Clear selection" hidden>✕</span>
           <span class="combo-caret">▾</span>
         </button>
-        <div class="combo-panel" id="model-panel" hidden>
-          <input type="text" class="combo-search" id="model-search" placeholder="Type to search…" autocomplete="off" />
-          <div class="combo-list" id="model-list-box"></div>
+        <div class="combo-panel" hidden>
+          <input type="text" class="combo-search" placeholder="Type to search…" autocomplete="off" />
+          <div class="combo-list"></div>
         </div>
       </div>
 
+      <div style="margin-top:18px"><button type="submit">Save AI settings</button></div>
+    </form>
+  </div>
+
+  <div class="card">
+    <h2 class="card-title">Cloudflare</h2>
+    <p class="hint card-sub">Used by the Publish Deployer to ship tenant sites to Cloudflare Pages.</p>
+    <form method="POST" id="cf-form">
+      <input type="hidden" name="section" value="cloudflare" />
       <label>Cloudflare API token {s.hasCloudflareToken && (<span class="hint">(set — blank keeps it)</span>)}</label>
       <input name="cloudflareToken" type="password" autocomplete="off" placeholder={s.hasCloudflareToken ? '••••••••••••' : 'Cloudflare Pages token'} />
 
       <label>Cloudflare account id</label>
       <input name="cloudflareAccountId" value={s.cloudflareAccountId || ''} placeholder="32-char account id" />
 
-      <div style="margin-top:16px"><button type="submit">Save settings</button></div>
+      <div style="margin-top:18px"><button type="submit">Save Cloudflare settings</button></div>
     </form>
   </div>
-  <p class="hint">The OpenRouter key is injected only by the <strong>AI Gateway</strong> — it is never stored in any tenant instance. The Cloudflare token is used by the Publish Deployer.</p>
 </Layout>
 
-<style>
-  .combo { position: relative; }
-  .combo-trigger {
-    width: 100%; display: flex; align-items: center; justify-content: space-between;
-    background: var(--bg); border: 1px solid var(--line); border-radius: 8px;
-    color: var(--ink); padding: 9px 11px; font: inherit; cursor: pointer; text-align: left;
-  }
-  .combo-trigger:hover:not(:disabled) { border-color: var(--accent); }
-  .combo-trigger:disabled { cursor: not-allowed; opacity: .6; }
-  .combo-trigger .placeholder { color: var(--mut); }
-  .combo-caret { color: var(--mut); margin-left: 8px; font-size: 12px; }
-  .combo-panel {
-    position: absolute; z-index: 30; left: 0; right: 0; margin-top: 6px;
-    background: var(--panel2); border: 1px solid var(--line); border-radius: 8px;
-    box-shadow: 0 10px 30px rgba(0,0,0,.5); overflow: hidden;
-  }
-  .combo-search {
-    width: 100%; border: 0; border-bottom: 1px solid var(--line); border-radius: 0;
-    background: var(--panel); padding: 10px 16px; color: var(--ink); font: inherit;
-  }
-  .combo-search:focus { outline: none; }
-  .combo-list {
-    max-height: 320px; overflow-y: auto;
-    scrollbar-width: thin; scrollbar-color: var(--line) transparent;
-  }
-  .combo-list::-webkit-scrollbar { width: 10px; }
-  .combo-list::-webkit-scrollbar-track { background: transparent; }
-  .combo-list::-webkit-scrollbar-thumb {
-    background: var(--line); border-radius: 8px;
-    border: 2px solid var(--panel2); background-clip: padding-box;
-  }
-  .combo-list::-webkit-scrollbar-thumb:hover { background: var(--mut); }
-  .combo-list :global(.combo-item) {
-    padding: 8px 16px; cursor: pointer; border-bottom: 1px solid rgba(42,49,58,.5);
-  }
-  .combo-list :global(.combo-item:last-child) { border-bottom: 0; }
-  .combo-list :global(.combo-item:hover), .combo-list :global(.combo-item.active) { background: var(--panel); }
-  .combo-list :global(.combo-item.selected) { background: rgba(88,166,255,.12); }
-  .combo-list :global(.combo-item-id) { font-weight: 600; color: var(--ink); font-size: 13px; }
-  .combo-list :global(.combo-item-name) { color: var(--mut); font-size: 12px; margin-top: 1px; }
-  .combo-list :global(.combo-empty) { padding: 16px 16px; color: var(--mut); text-align: center; }
+<!--
+  NOTE: this block is `is:global` on purpose. The category rows (and their model
+  combos) are built with innerHTML in the client script below, so they never
+  receive Astro's scoped-style attribute. Scoping these rules would leave the
+  generated combos unstyled — they'd fall back to the global blue `button` style
+  and the card grid would collapse. Generic selectors (textarea, button.ghost)
+  are namespaced under #settings-form so they don't leak to other pages.
+-->
+<style is:global>
+  .card-title { margin: 0 0 4px; font-size: 16px; }
+  .card-sub { margin: 0 0 16px; }
+  #settings-form .sec { margin: 26px 0 4px; font-size: 15px; border-top: 1px solid var(--line); padding-top: 18px; }
+  #settings-form .mt { margin-top: 18px; }
+  #settings-form textarea { width: 100%; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; color: var(--ink); padding: 10px 11px; font: inherit; resize: vertical; }
+  #settings-form button.ghost { background: transparent; border: 1px solid var(--line); color: var(--ink); border-radius: 8px; padding: 7px 12px; cursor: pointer; font: inherit; font-weight: 500; }
+  #settings-form button.ghost:hover { border-color: var(--accent); }
+
+  #settings-form .cat-card { background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; margin-bottom: 12px; }
+  #settings-form .cat-card-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 14px; }
+  #settings-form .cat-name[readonly] { opacity: .85; cursor: default; }
+  #settings-form .cat-card-body { display: flex; flex-direction: column; gap: 14px; }
+  #settings-form .cat-row1 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+  #settings-form .cat-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  #settings-form .cat-field-label { font-size: 11px; color: var(--mut); text-transform: uppercase; letter-spacing: .04em; }
+  #settings-form .cat-desc { width: 100%; min-height: 62px; font-size: 12px; }
+  #settings-form .cat-default { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--mut); white-space: nowrap; }
+  #settings-form .cat-default input { width: auto; }
+  #settings-form .cat-remove { background: transparent; border: 0; color: var(--mut); cursor: pointer; font-size: 16px; line-height: 1; padding: 0 2px; }
+  #settings-form .cat-remove:hover { color: var(--bad); }
+  @media (max-width: 640px) { #settings-form .cat-row1 { grid-template-columns: 1fr; } }
+
+  #settings-form .combo { position: relative; }
+  #settings-form .combo-trigger { width: 100%; display: flex; align-items: center; justify-content: space-between; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; color: var(--ink); padding: 9px 11px; font: inherit; font-weight: 400; cursor: pointer; text-align: left; }
+  #settings-form .combo-trigger:hover:not(:disabled) { border-color: var(--accent); }
+  #settings-form .combo-trigger:disabled { cursor: not-allowed; opacity: .6; }
+  #settings-form .combo-trigger-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #settings-form .combo-trigger-label.placeholder { color: var(--mut); }
+  #settings-form .combo-clear { color: var(--mut); margin-left: 8px; font-size: 12px; line-height: 1; cursor: pointer; padding: 2px 4px; border-radius: 4px; }
+  #settings-form .combo-clear:hover { color: var(--bad); background: rgba(229,83,75,.12); }
+  #settings-form .combo-clear[hidden] { display: none; }
+  #settings-form .combo-caret { color: var(--mut); margin-left: 6px; font-size: 12px; }
+  #settings-form .combo-panel { position: absolute; z-index: 30; left: 0; right: 0; margin-top: 6px; background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,.5); overflow: hidden; }
+  #settings-form .combo-search { width: 100%; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: var(--panel); padding: 10px 16px; color: var(--ink); font: inherit; }
+  #settings-form .combo-search:focus { outline: none; }
+  #settings-form .combo-list { max-height: 300px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+  #settings-form .combo-list::-webkit-scrollbar { width: 10px; }
+  #settings-form .combo-list::-webkit-scrollbar-thumb { background: var(--line); border-radius: 8px; border: 2px solid var(--panel2); background-clip: padding-box; }
+  #settings-form .combo-item { padding: 8px 16px; cursor: pointer; border-bottom: 1px solid rgba(42,49,58,.5); }
+  #settings-form .combo-item:last-child { border-bottom: 0; }
+  #settings-form .combo-item:hover, #settings-form .combo-item.active { background: var(--panel); }
+  #settings-form .combo-item.selected { background: rgba(88,166,255,.12); }
+  #settings-form .combo-item-id { font-weight: 600; color: var(--ink); font-size: 13px; }
+  #settings-form .combo-item-name { color: var(--mut); font-size: 12px; margin-top: 1px; }
+  #settings-form .combo-item-warn { color: #d9a441; font-size: 11px; margin-top: 1px; }
+  #settings-form .combo-empty { padding: 16px; color: var(--mut); text-align: center; }
 </style>
 
-<script define:vars={{ models }}>
+<script define:vars={{ models, seededCategories }}>
   (function () {
-    const combo = document.getElementById('model-combo');
-    if (!combo || !models.length) return;
-    const trigger = document.getElementById('model-trigger');
-    const label = document.getElementById('model-trigger-label');
-    const panel = document.getElementById('model-panel');
-    const search = document.getElementById('model-search');
-    const listBox = document.getElementById('model-list-box');
-    const valueInput = document.getElementById('model-value');
-    let filtered = models, active = -1;
-
     const esc = (s) => String(s).replace(/[&<>"']/g, (c) =>
       ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-    function render() {
-      listBox.innerHTML = filtered.length
-        ? filtered.map((m, i) =>
-            `<div class="combo-item${i === active ? ' active' : ''}${m.id === valueInput.value ? ' selected' : ''}" data-id="${esc(m.id)}">` +
-            `<div class="combo-item-id">${esc(m.id)}</div><div class="combo-item-name">${esc(m.name)}</div></div>`).join('')
-        : '<div class="combo-empty">No models match</div>';
-    }
-    function scrollToActive() {
-      const el = listBox.querySelector('.combo-item.active');
-      if (el) el.scrollIntoView({ block: 'nearest' });
-    }
-    function open() { panel.hidden = false; search.value = ''; filtered = models; active = -1; render(); search.focus(); }
-    function close() { panel.hidden = true; }
-    function select(id) {
-      const m = models.find((x) => x.id === id);
-      valueInput.value = id;
-      label.textContent = id;
-      label.classList.remove('placeholder');
-      close();
+    // Reusable searchable model combo, scoped to a root .combo element.
+    // opts.list = model array to show; opts.onChange(id) fires on selection.
+    function makeCombo(root, opts) {
+      const list = opts.list;
+      const trigger = root.querySelector('.combo-trigger');
+      const label = root.querySelector('.combo-trigger-label');
+      const panel = root.querySelector('.combo-panel');
+      const search = root.querySelector('.combo-search');
+      const listBox = root.querySelector('.combo-list');
+      const valueInput = root.querySelector('.combo-value');
+      const clearBtn = root.querySelector('.combo-clear');
+      if (!trigger || !list.length) return { get: () => valueInput ? valueInput.value : '' };
+      trigger.disabled = false;
+      let filtered = list, active = -1;
+
+      // The ✕ only appears once something is picked. Operators can clear a
+      // selection back to "unset" (they can't otherwise — the list only lets
+      // them switch to another model).
+      function syncClear() { if (clearBtn) clearBtn.hidden = !valueInput.value; }
+      syncClear();
+
+      function render() {
+        listBox.innerHTML = filtered.length
+          ? filtered.map((m, i) =>
+              `<div class="combo-item${i === active ? ' active' : ''}${m.id === valueInput.value ? ' selected' : ''}" data-id="${esc(m.id)}">` +
+              `<div class="combo-item-id">${esc(m.id)}</div><div class="combo-item-name">${esc(m.name)}</div>` +
+              (m.toolCalling === null ? `<div class="combo-item-warn">⚠ tool support unknown</div>` : ``) +
+              `</div>`).join('')
+          : '<div class="combo-empty">No models match</div>';
+      }
+      function open() { panel.hidden = false; search.value = ''; filtered = list; active = -1; render(); search.focus(); }
+      function close() { panel.hidden = true; }
+      function select(id) {
+        valueInput.value = id;
+        label.textContent = id;
+        label.classList.remove('placeholder');
+        syncClear();
+        close();
+        if (opts.onChange) opts.onChange(id);
+      }
+      function clearSelection() {
+        valueInput.value = '';
+        label.textContent = label.dataset.placeholder || 'Select a model…';
+        label.classList.add('placeholder');
+        syncClear();
+        close();
+        if (opts.onChange) opts.onChange('');
+      }
+      trigger.addEventListener('click', () => (panel.hidden ? open() : close()));
+      // Sits inside the trigger button, so swallow the click to avoid re-opening.
+      if (clearBtn) clearBtn.addEventListener('click', (e) => { e.stopPropagation(); clearSelection(); });
+      search.addEventListener('input', () => {
+        const q = search.value.toLowerCase().trim();
+        filtered = q ? list.filter((m) => m.id.toLowerCase().includes(q) || (m.name || '').toLowerCase().includes(q)) : list;
+        active = -1; render();
+      });
+      listBox.addEventListener('click', (e) => {
+        const item = e.target.closest('.combo-item');
+        if (item) select(item.dataset.id);
+      });
+      search.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowDown') { e.preventDefault(); active = Math.min(active + 1, filtered.length - 1); render(); }
+        else if (e.key === 'ArrowUp') { e.preventDefault(); active = Math.max(active - 1, 0); render(); }
+        else if (e.key === 'Enter') { e.preventDefault(); if (active >= 0 && filtered[active]) select(filtered[active].id); }
+        else if (e.key === 'Escape') { close(); trigger.focus(); }
+      });
+      document.addEventListener('click', (e) => { if (!root.contains(e.target)) close(); });
+      return { get: () => valueInput.value };
     }
 
-    trigger.addEventListener('click', () => (panel.hidden ? open() : close()));
-    search.addEventListener('input', () => {
-      const q = search.value.toLowerCase().trim();
-      filtered = q ? models.filter((m) => m.id.toLowerCase().includes(q) || m.name.toLowerCase().includes(q)) : models;
-      active = -1; render();
+    // Category models must support tools: hide KNOWN-false, keep unknown (warned).
+    const toolModels = models.filter((m) => m.toolCalling !== false);
+
+    const rowsBox = document.getElementById('cat-rows');
+    const rowCombos = []; // { getSlug, getName, getDesc, getModel, isDefault, builtin }
+
+    function slugify(name, taken) {
+      let base = String(name).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'category';
+      if (base.length > 60) base = base.slice(0, 60).replace(/-+$/g, '');
+      let slug = base, n = 2;
+      while (taken.has(slug)) slug = `${base}-${n++}`;
+      return slug;
+    }
+
+    function addRow(cat) {
+      const idx = rowCombos.length;
+      const row = document.createElement('div');
+      row.className = 'cat-card';
+      row.innerHTML =
+        `<div class="cat-card-top">` +
+          `<label class="cat-default"><input type="radio" name="__cat_default" ${cat.isDefault ? 'checked' : ''} /> Default</label>` +
+          (cat.builtin ? `` : `<button type="button" class="cat-remove" title="Remove category">✕</button>`) +
+        `</div>` +
+        `<div class="cat-card-body">` +
+          `<div class="cat-row1">` +
+            `<div class="cat-field">` +
+              `<span class="cat-field-label">Category name</span>` +
+              `<input class="cat-name" value="${esc(cat.name || '')}" ${cat.builtin ? 'readonly' : 'placeholder="Category name (e.g. Products)"'} />` +
+            `</div>` +
+            `<div class="cat-field">` +
+              `<span class="cat-field-label">Model</span>` +
+              `<div class="combo cat-model-combo">` +
+                `<input type="hidden" class="combo-value" value="${esc(cat.modelId || '')}" />` +
+                `<button type="button" class="combo-trigger"><span class="combo-trigger-label${cat.modelId ? '' : ' placeholder'}" data-placeholder="Select a model…">${esc(cat.modelId || 'Select a model…')}</span><span class="combo-clear" title="Clear selection" hidden>✕</span><span class="combo-caret">▾</span></button>` +
+                `<div class="combo-panel" hidden><input type="text" class="combo-search" placeholder="Type to search…" autocomplete="off" /><div class="combo-list"></div></div>` +
+              `</div>` +
+            `</div>` +
+          `</div>` +
+          `<div class="cat-field">` +
+            `<span class="cat-field-label">When to use (helps routing)</span>` +
+            `<textarea class="cat-desc" placeholder="e.g. Writing or editing text on the page">${esc(cat.description || '')}</textarea>` +
+          `</div>` +
+        `</div>`;
+      rowsBox.appendChild(row);
+
+      const combo = makeCombo(row.querySelector('.cat-model-combo'), { list: toolModels });
+      const nameEl = row.querySelector('.cat-name');
+      const descEl = row.querySelector('.cat-desc');
+      const radioEl = row.querySelector('input[type=radio]');
+      const entry = {
+        builtin: !!cat.builtin,
+        fixedSlug: cat.builtin ? cat.slug : null,
+        getName: () => nameEl.value.trim(),
+        getDesc: () => descEl.value,
+        getModel: () => combo.get(),
+        isDefault: () => radioEl.checked,
+      };
+      rowCombos.push(entry);
+
+      const rm = row.querySelector('.cat-remove');
+      if (rm) rm.addEventListener('click', () => {
+        const i = rowCombos.indexOf(entry);
+        if (i >= 0) rowCombos.splice(i, 1);
+        row.remove();
+      });
+    }
+
+    seededCategories.forEach(addRow);
+
+    document.getElementById('add-cat').addEventListener('click', () =>
+      addRow({ name: '', description: '', modelId: '', isDefault: false, builtin: false }));
+
+    // Classifier combo (full, unrestricted list).
+    makeCombo(document.getElementById('classifier-combo'), { list: models });
+
+    // Serialize categories to the hidden field + validate on submit.
+    document.getElementById('settings-form').addEventListener('submit', (e) => {
+      const taken = new Set();
+      const out = [];
+      let defaults = 0;
+      for (const r of rowCombos) {
+        const name = r.getName();
+        if (!name) { e.preventDefault(); alert('Every category needs a name.'); return; }
+        const model = r.getModel();
+        if (!model) { e.preventDefault(); alert(`Category "${name}" needs a model.`); return; }
+        const slug = r.fixedSlug || slugify(name, taken);
+        taken.add(slug);
+        const isDefault = r.isDefault();
+        if (isDefault) defaults++;
+        out.push({ slug, name, description: r.getDesc(), modelId: model, isDefault, builtin: r.builtin });
+      }
+      if (defaults !== 1) { e.preventDefault(); alert('Pick exactly one Default category.'); return; }
+      document.getElementById('cat-value').value = JSON.stringify(out);
     });
-    listBox.addEventListener('click', (e) => {
-      const item = e.target.closest('.combo-item');
-      if (item) select(item.dataset.id);
-    });
-    search.addEventListener('keydown', (e) => {
-      if (e.key === 'ArrowDown') { e.preventDefault(); active = Math.min(active + 1, filtered.length - 1); render(); scrollToActive(); }
-      else if (e.key === 'ArrowUp') { e.preventDefault(); active = Math.max(active - 1, 0); render(); scrollToActive(); }
-      else if (e.key === 'Enter') { e.preventDefault(); if (active >= 0 && filtered[active]) select(filtered[active].id); }
-      else if (e.key === 'Escape') { close(); trigger.focus(); }
-    });
-    document.addEventListener('click', (e) => { if (!combo.contains(e.target)) close(); });
   })();
 </script>

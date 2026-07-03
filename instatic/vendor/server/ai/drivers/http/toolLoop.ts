@@ -144,6 +144,10 @@ export async function* runToolLoop<TMessage>(
       return
     }
 
+    // Surface the response headers (e.g. the gateway's resolved-model echo) so
+    // managed mode can audit/price the model that actually ran.
+    req.onResponseHeaders?.(res.headers)
+
     if (!res.ok) {
       const bodyText = await res.text().catch(() => '')
       console.error(`[ai/${adapter.label.toLowerCase()}] HTTP ${res.status}:`, bodyText.slice(0, 500))

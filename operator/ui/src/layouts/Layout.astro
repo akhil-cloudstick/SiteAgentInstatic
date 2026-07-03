@@ -15,7 +15,7 @@ const path = Astro.url.pathname;
     *{box-sizing:border-box}
     body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.55 -apple-system,Segoe UI,Roboto,Arial,sans-serif}
     a{color:var(--accent);text-decoration:none}
-    header{display:flex;align-items:center;gap:22px;padding:14px 24px;border-bottom:1px solid var(--line);background:var(--panel)}
+    header{position:sticky;top:0;z-index:100;display:flex;align-items:center;gap:22px;padding:14px 24px;border-bottom:1px solid var(--line);background:var(--panel)}
     .brand{font-weight:700;font-size:16px;color:var(--ink)}
     nav{display:flex;gap:16px}
     nav a{color:var(--mut)} nav a.active,nav a:hover{color:var(--ink)}

@@ -50,3 +50,15 @@ alter table siteagent_control.tenants add column if not exists secret_key_enc te
 alter table siteagent_control.tenants add column if not exists custom_domain text;
 alter table siteagent_control.tenants add column if not exists last_error text;
 alter table siteagent_control.tenants add column if not exists display_name text;
+
+-- Per-task-type AI model routing + global guidance (managed multi-tenant).
+--   ai_categories: [{ slug, name, description, modelId, isDefault, builtin }]
+--     slug is the stable, header-safe id used for routing (never the display name).
+--     Exactly one row is isDefault. Builtins: design + content.
+--   classifier_model: cheap model used only for the per-message classify call.
+--   ai_guidance: global plain-English guidance injected into every tenant's system prompt.
+-- Live tenants with only openrouter_model keep working: the gateway derives the
+-- default model from openrouter_model when ai_categories is empty.
+alter table siteagent_control.settings add column if not exists ai_categories   jsonb;
+alter table siteagent_control.settings add column if not exists classifier_model text;
+alter table siteagent_control.settings add column if not exists ai_guidance      text;

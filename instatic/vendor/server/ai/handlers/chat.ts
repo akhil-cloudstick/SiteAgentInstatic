@@ -58,7 +58,13 @@ import type {
   ToolScope,
 } from '../runtime/types'
 import type { AiStreamRequest } from '../drivers/types'
-import { isManagedAiMode, managedResolvedCredential, getManagedModel } from '../managed'
+import {
+  isManagedAiMode,
+  managedResolvedCredential,
+  getManagedModel,
+  getManagedAiConfig,
+  classifyCategory,
+} from '../managed'
 
 const ChatRequestBodySchema = Type.Object({
   conversationId: Type.String({ minLength: 1 }),
@@ -171,7 +177,32 @@ async function handleAiChat(
   const existingMessages = await listMessagesForConversation(db, conversation.id)
   const messages = buildMessageHistory(existingMessages)
 
-  const systemPrompt = buildSystemPromptForScope(scope, snapshot)
+  // Managed mode: auto-route this message to the operator's per-task-type model
+  // (Design / Content / custom) and inject the operator's global plain-English
+  // guidance. Classification is best-effort — a null category tells the gateway
+  // to use the operator's default model, so a slow/failed classify never blocks
+  // the tenant's chat.
+  let managedCategory: string | null = null
+  let guidance = ''
+  if (isManagedAiMode()) {
+    const cfg = await getManagedAiConfig()
+    if (cfg) {
+      guidance = cfg.guidance
+      if (cfg.hasClassifier && cfg.categories.length > 0) {
+        managedCategory = await classifyCategory(prompt, cfg.categories, req.signal)
+      }
+    }
+  }
+
+  const systemPrompt = buildSystemPromptForScope(scope, snapshot, guidance)
+
+  // Captures the gateway's echo of the model that actually ran, so the audit
+  // records the routed model rather than the nominal probe model.
+  let resolvedModel: string | null = null
+  const onResponseHeaders = (h: Headers): void => {
+    const m = h.get('x-instatic-resolved-model')
+    if (m) resolvedModel = m
+  }
 
   // Capture totals reported by the persister so the audit row can hold
   // them when the stream completes (we read them off the conversation row
@@ -259,6 +290,9 @@ async function handleAiChat(
           signal: req.signal,
           bridge,
           toolContextBase,
+          ...(isManagedAiMode()
+            ? { managedRouting: { categorySlug: managedCategory }, onResponseHeaders }
+            : {}),
         }
 
         const persister = createConversationsPersister(db, conversation.id, {
@@ -296,7 +330,10 @@ async function handleAiChat(
             metadata: {
               scope,
               providerId,
-              modelId,
+              // The model the gateway actually ran (managed routing), falling
+              // back to the nominal model id when there was no echo.
+              modelId: resolvedModel ?? modelId,
+              ...(managedCategory ? { aiCategory: managedCategory } : {}),
               promptTokens: promptDelta,
               completionTokens: completionDelta,
               costUsd: costDelta,
@@ -329,7 +366,12 @@ async function handleAiChat(
 export function buildSystemPromptForScope(
   scope: ToolScope,
   snapshot: unknown,
+  guidance = '',
 ): string[] {
+  return withGuidance(buildScopePrompt(scope, snapshot), guidance)
+}
+
+function buildScopePrompt(scope: ToolScope, snapshot: unknown): string[] {
   if (scope === 'site') {
     if (snapshot === undefined || snapshot === null) {
       return buildSiteSystemPrompt(emptySiteAgentSnapshot())
@@ -353,6 +395,19 @@ export function buildSystemPromptForScope(
     `You are an AI assistant embedded in the "${scope}" workspace of a CMS. ` +
     `No scope-specific tools are wired up yet — respond conversationally only.`,
   ]
+}
+
+/**
+ * Prepend the operator's global guidance to the STATIC prefix (element 0) of a
+ * scope prompt so it stays inside the cacheable region (a 3-element prompt is
+ * [prefix, DYNAMIC_BOUNDARY, suffix]; guidance is stable across a conversation
+ * so it must live before the boundary, not in the per-request suffix).
+ */
+function withGuidance(prompt: string[], guidance: string): string[] {
+  const text = guidance.trim()
+  if (!text || prompt.length === 0) return prompt
+  const block = `# Operator guidance\n\n${text}\n\n`
+  return [`${block}${prompt[0]}`, ...prompt.slice(1)]
 }
 
 function emptySiteAgentSnapshot(): SiteAgentSnapshot {

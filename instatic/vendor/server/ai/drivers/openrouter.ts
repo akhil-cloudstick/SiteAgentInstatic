@@ -63,10 +63,16 @@ function adapterFor(creds: AiResolvedCredential) {
     label: 'OpenRouter',
     endpoint: `${resolveBaseUrl(creds)}/responses`,
     buildHeaders(req) {
-      return {
+      const headers: Record<string, string> = {
         Authorization: `Bearer ${req.credentials.apiKey!}`,
         'content-type': 'application/json',
       }
+      // Managed mode: tell the AI Gateway which task-type this call is, so it
+      // resolves the operator's model for that category. Absent header -> the
+      // gateway uses the default (see ai-gateway/gateway.mjs).
+      const slug = req.managedRouting?.categorySlug
+      if (slug) headers['x-instatic-ai-category'] = slug
+      return headers
     },
   })
 }

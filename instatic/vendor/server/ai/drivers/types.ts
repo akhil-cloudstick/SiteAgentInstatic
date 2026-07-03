@@ -131,6 +131,22 @@ export interface AiStreamRequest {
    * a single global). Drivers receive their own copy per call.
    */
   readonly toolContextBase: ToolContextBase
+  /**
+   * Managed-mode routing hint. In multi-tenant managed mode the operator maps
+   * task-types to models; the chat handler classifies the prompt and passes the
+   * chosen category slug here. The OpenRouter driver forwards it to the AI
+   * Gateway as `x-instatic-ai-category`, which resolves the concrete model
+   * server-side (the tenant never names the model). Omit / null -> gateway uses
+   * the operator's default. Ignored in standalone mode.
+   */
+  readonly managedRouting?: { readonly categorySlug: string | null }
+  /**
+   * Called with the raw response headers of each provider API call. Used in
+   * managed mode to capture the gateway's `x-instatic-resolved-model` echo so
+   * the audit/cost path records the model that actually ran, not the nominal
+   * one (Codex R2-#3/#4). Optional; standalone drivers ignore it.
+   */
+  readonly onResponseHeaders?: (headers: Headers) => void
 }
 
 /**
