@@ -1,6 +1,6 @@
 ---
 import Layout from '../layouts/Layout.astro';
-const CP = 'http://127.0.0.1:4000';
+const CP = 'http://127.0.0.1:4400';
 let error = '';
 
 if (Astro.request.method === 'POST') {
@@ -54,7 +54,7 @@ try {
   const res = await fetch(`${CP}/api/tenants`);
   tenants = (await res.json()).tenants || [];
 } catch (e) {
-  error = `Control plane not reachable on :4000 — is it running? (${e.message})`;
+  error = `Control plane not reachable on :4400 — is it running? (${e.message})`;
 }
 
 // Friendly progress label + bar percentage per provisioning step.

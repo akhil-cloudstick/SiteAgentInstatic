@@ -18,7 +18,7 @@
  */
 
 /** The product name shown in the admin UI (tab title, login, dialogs, help). */
-export const BRAND_NAME = 'SiteAgent'
+export const BRAND_NAME = 'Site Agent'
 
 // External project links surfaced in the Help menu and the Plugins page.
 // Point these at your own docs/repo/issue tracker for a full white-label; they

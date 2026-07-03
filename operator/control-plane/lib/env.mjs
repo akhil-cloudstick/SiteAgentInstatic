@@ -29,7 +29,7 @@ function loadEncKey() {
   return key;
 }
 
-const cpPort = Number(process.env.CONTROL_PLANE_PORT || 4000);
+const cpPort = Number(process.env.CONTROL_PLANE_PORT || 4400);
 const encKey = loadEncKey();
 
 export const config = {
