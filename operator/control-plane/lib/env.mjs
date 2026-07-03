@@ -44,6 +44,12 @@ export const config = {
   instaticDir: abs(process.env.INSTATIC_DIR || './instatic/vendor'),
   tenantsDir: abs(process.env.TENANTS_DIR || './tenants'),
   tenantBasePort: Number(process.env.TENANT_BASE_PORT || 3101),
+  // Remote client testing: one tenant editor at a time is published on the spare
+  // Tailscale funnel port so a remote client can log in and edit it. The origin
+  // must match the public funnel URL exactly (Instatic checks it for CSRF + uses
+  // it to decide https/Secure cookies).
+  testFunnelPort: Number(process.env.TEST_FUNNEL_PORT || 10000),
+  testFunnelOrigin: process.env.TEST_FUNNEL_ORIGIN || 'https://siteagent.tailbbb0d2.ts.net:10000',
   encKey,
   tokenSecret: (process.env.TOKEN_SECRET || encKey.toString('hex')),
 };

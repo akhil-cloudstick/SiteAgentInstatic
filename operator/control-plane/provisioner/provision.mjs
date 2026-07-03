@@ -1,6 +1,7 @@
 // Provisioner — provisionTenant() saga + deprovision + (re)start supervision.
 // No Docker: each tenant is a native Bun Instatic process (see runtime/).
 import { mkdirSync, rmSync } from 'node:fs';
+import { spawn } from 'node:child_process';
 import { query } from '../registry/db.mjs';
 import * as tenants from '../registry/tenants.mjs';
 import * as rt from '../runtime/tenantRuntime.mjs';
@@ -247,6 +248,31 @@ export async function startTenant(slug) {
   rt.start({ ...runtimeParams(row), aiModel: await operatorAiModel() });
   const healthy = await rt.waitHealthy(row.port, 45000);
   return { slug, port: row.port, healthy };
+}
+
+// --- CLIENT-TEST ONLY (see pending.md): publish ONE tenant editor on the shared
+// Tailscale test funnel port so a remote client (no install, no tailnet) can open
+// the tenant's Instatic admin in a browser, log in, and edit with AI. Only one
+// tenant at a time (a single spare funnel port). No restart needed: every tenant
+// already trusts the funnel origin (see tenantRuntime PUBLIC_ORIGIN), so this just
+// repoints the funnel at the requested tenant's port. ---
+
+function runTailscale(args) {
+  return new Promise((resolve, reject) => {
+    const p = spawn('tailscale', args, { shell: process.platform === 'win32', windowsHide: true });
+    let err = '';
+    p.stderr.on('data', (d) => { err += d; });
+    p.on('error', reject);
+    p.on('exit', (code) => (code === 0 ? resolve() : reject(new Error(err.trim() || `tailscale exited ${code}`))));
+  });
+}
+
+export async function pointTestFunnel(slug) {
+  const row = await tenants.getTenant(slug);
+  if (!row) throw new Error(`Unknown tenant: ${slug}`);
+  if (!rt.isRunning(slug)) await startTenant(slug); // must be up to receive traffic
+  await runTailscale(['funnel', '--bg', `--https=${config.testFunnelPort}`, `http://127.0.0.1:${row.port}`]);
+  return { ok: true, slug, url: `${config.testFunnelOrigin}/admin` };
 }
 
 // On control-plane boot, bring active tenants back up.

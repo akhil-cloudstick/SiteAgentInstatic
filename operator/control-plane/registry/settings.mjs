@@ -1,6 +1,6 @@
 // Operator settings: OpenRouter key/model + Cloudflare creds + per-task-type AI
 // model routing (categories) + global AI guidance. Secrets encrypted at rest.
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { query } from './db.mjs';
 import { encrypt, decrypt } from '../lib/crypto.mjs';
 
@@ -9,6 +9,8 @@ import { encrypt, decrypt } from '../lib/crypto.mjs';
 // (registry/ -> control-plane/ -> operator/ -> repo root -> rules/)
 const DEFAULT_GUIDANCE_URL = new URL('../../../rules/globalAiGuidanceRule.md', import.meta.url);
 let defaultGuidanceCache = null;
+
+const GUIDANCE_MAX = 16_000;
 
 /** The authored default guidance from /rules/globalAiGuidanceRule.md ('' if missing). */
 export function getDefaultGuidance() {
@@ -21,7 +23,18 @@ export function getDefaultGuidance() {
   return defaultGuidanceCache;
 }
 
-const GUIDANCE_MAX = 16_000;
+/**
+ * Overwrite /rules/globalAiGuidanceRule.md with operator-edited text and refresh
+ * the in-memory cache so the AI Gateway's /config probe serves it immediately
+ * (every tenant's AI chat reads it on its next message — no restart needed).
+ */
+export function saveDefaultGuidance(text) {
+  if (typeof text !== 'string') throw new Error('guidance must be text');
+  if (text.length > GUIDANCE_MAX) throw new Error(`guidance too large (max ${GUIDANCE_MAX} chars)`);
+  writeFileSync(DEFAULT_GUIDANCE_URL, text, 'utf8');
+  defaultGuidanceCache = text; // keep the cache in lock-step with the file on disk
+  return text;
+}
 // Header-safe, stable category id. Lowercase alnum + dashes; must start alnum.
 const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{0,62})$/;
 const BUILTIN_SLUGS = ['design', 'content'];

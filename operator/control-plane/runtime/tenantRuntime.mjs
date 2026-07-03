@@ -51,6 +51,15 @@ export function start(tenant) {
     STATIC_DIR: distDir(),
     INSTATIC_SECRET_KEY: tenant.secretKey,
     PUBLIC_ORIGIN: `http://127.0.0.1:${port}`,
+    // CLIENT-TEST ONLY (see pending.md): trust the public test-funnel origin for
+    // the CSRF check so the ONE tenant currently pointed at the funnel accepts a
+    // remote client login. We use VITE_ALLOWED_ORIGIN (Instatic's dev-allowlist,
+    // read into a static const at module load) rather than PUBLIC_ORIGIN because
+    // running tenants from this mapped network drive makes Bun load
+    // server/auth/security.ts twice — the request-time copy never sees the
+    // configured publicOrigins, but the static DEV_ORIGIN_ALLOWLIST is identical
+    // in both copies. See server/auth/security.ts.
+    VITE_ALLOWED_ORIGIN: config.testFunnelOrigin,
     // Managed AI: point the tenant's OpenRouter driver at this tenant's signed
     // AI-Gateway URL. This alone enables managed mode (gateway credential
     // auto-provided, provider settings locked). The MODEL is read LIVE from the

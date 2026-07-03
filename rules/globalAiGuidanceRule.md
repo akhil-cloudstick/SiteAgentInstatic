@@ -1,4 +1,4 @@
-# Global AI Guidance Rule
+# Global AI Guidance Rule 1
 
 This is the standing instruction injected into **every tenant's AI chat** in managed
 mode. It teaches the assistant how to turn a non-technical business owner's plain

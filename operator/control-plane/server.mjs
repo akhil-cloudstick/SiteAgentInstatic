@@ -3,9 +3,9 @@
 import http from 'node:http';
 import config from './lib/env.mjs';
 import { migrate } from './registry/db.mjs';
-import { getSettings, saveSettings, getSecrets, getDefaultGuidance } from './registry/settings.mjs';
+import { getSettings, saveSettings, getSecrets, getDefaultGuidance, saveDefaultGuidance } from './registry/settings.mjs';
 import * as tenantsRepo from './registry/tenants.mjs';
-import { provisionTenant, deprovisionTenant, startTenant, resumeAll, editTenant, repairTenantCf } from './provisioner/provision.mjs';
+import { provisionTenant, deprovisionTenant, startTenant, resumeAll, editTenant, repairTenantCf, pointTestFunnel } from './provisioner/provision.mjs';
 import { deployTenant, hasBakedOutput } from './deployer/deploy.mjs';
 import { handleGateway } from './ai-gateway/gateway.mjs';
 import { signTenantToken, verifyTenantToken } from './lib/crypto.mjs';
@@ -109,9 +109,14 @@ const server = http.createServer(async (req, res) => {
       }
     }
     if (path === '/api/ai-guidance-default') {
-      // The authored project-default guidance (from /rules) for the console to
-      // seed/reset the guidance editor.
+      // The global AI guidance file (/rules/globalAiGuidanceRule.md), edited from
+      // the console. GET reads it; POST overwrites it (the AI Gateway serves the
+      // fresh text to every tenant's next message).
       if (method === 'GET') return send(res, 200, { guidance: getDefaultGuidance() });
+      if (method === 'POST') {
+        const b = await readJson(req);
+        return send(res, 200, { guidance: saveDefaultGuidance(b.guidance ?? '') });
+      }
     }
     if (path === '/api/models') {
       // Model picker source for the console: the live OpenRouter catalogue,
@@ -128,7 +133,7 @@ const server = http.createServer(async (req, res) => {
         return send(res, 200, await provisionTenant(body));
       }
     }
-    const m = path.match(/^\/api\/tenants\/([a-z0-9-]+)(?:\/(start|deploy|update|repair))?$/);
+    const m = path.match(/^\/api\/tenants\/([a-z0-9-]+)(?:\/(start|deploy|update|repair|expose))?$/);
     if (m) {
       const slug = m[1];
       const action = m[2];
@@ -140,6 +145,7 @@ const server = http.createServer(async (req, res) => {
       if (action === 'deploy' && method === 'POST') return send(res, 200, await deployTenant(slug));
       if (action === 'update' && method === 'POST') return send(res, 200, await editTenant(slug, await readJson(req)));
       if (action === 'repair' && method === 'POST') return send(res, 200, await repairTenantCf(slug));
+      if (action === 'expose' && method === 'POST') return send(res, 200, await pointTestFunnel(slug));
     }
     // Tenant-triggered deploy: a tenant's Instatic instance calls this (with its
     // signed token) right after an explicit Publish. The control-plane runs the

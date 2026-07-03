@@ -6,39 +6,56 @@ let error = '';
 if (Astro.request.method === 'POST') {
   const f = await Astro.request.formData();
   const str = (k) => (f.get(k) || '').toString().trim() || undefined;
-  // The page has two independent forms (AI agent, Cloudflare). Each posts only
-  // its own section; unmentioned fields are left undefined so the backend
-  // coalesces them to their existing values instead of wiping them.
+  // The page has three independent forms (AI agent, Global AI guidance,
+  // Cloudflare). Each posts only its own section; unmentioned fields are left
+  // undefined so the backend coalesces them to their existing values.
   const section = (f.get('section') || '').toString();
-  let payload = {};
-  if (section === 'cloudflare') {
-    payload = {
-      cloudflareToken: str('cloudflareToken'),
-      cloudflareAccountId: str('cloudflareAccountId'),
-    };
+
+  // Global AI guidance edits the file rules/globalAiGuidanceRule.md via its own
+  // endpoint (not the settings row), so it posts separately from the other forms.
+  if (section === 'guidance') {
+    try {
+      const r = await fetch(`${CP}/api/ai-guidance-default`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ guidance: (f.get('aiGuidance') || '').toString() }),
+      });
+      if (!r.ok) {
+        let msg = 'save failed';
+        try { msg = (await r.json()).error || msg; } catch {}
+        throw new Error(msg);
+      }
+      return Astro.redirect('/settings?saved=guidance');
+    } catch (e) { error = e.message; }
   } else {
-    // AI agent: OpenRouter key + per-task-type models + classifier.
-    // aiGuidance is managed internally (rules/globalAiGuidanceRule.md) and is
-    // intentionally not surfaced to the operator.
-    let aiCategories = [];
-    try { aiCategories = JSON.parse((f.get('aiCategories') || '[]').toString()); } catch {}
-    payload = {
-      openrouterKey: str('openrouterKey'),
-      aiCategories,
-      classifierModel: (f.get('classifierModel') || '').toString().trim(),
-    };
-  }
-  try {
-    const r = await fetch(`${CP}/api/settings`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
-    });
-    if (!r.ok) {
-      let msg = 'save failed';
-      try { msg = (await r.json()).error || msg; } catch {}
-      throw new Error(msg);
+    let payload = {};
+    if (section === 'cloudflare') {
+      payload = {
+        cloudflareToken: str('cloudflareToken'),
+        cloudflareAccountId: str('cloudflareAccountId'),
+      };
+    } else {
+      // AI agent: OpenRouter key + per-task-type models + classifier. The global
+      // guidance is edited in its own section below, not sent here.
+      let aiCategories = [];
+      try { aiCategories = JSON.parse((f.get('aiCategories') || '[]').toString()); } catch {}
+      payload = {
+        openrouterKey: str('openrouterKey'),
+        aiCategories,
+        classifierModel: (f.get('classifierModel') || '').toString().trim(),
+      };
     }
-    return Astro.redirect(`/settings?saved=${section === 'cloudflare' ? 'cloudflare' : 'ai'}`);
-  } catch (e) { error = e.message; }
+    try {
+      const r = await fetch(`${CP}/api/settings`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+      });
+      if (!r.ok) {
+        let msg = 'save failed';
+        try { msg = (await r.json()).error || msg; } catch {}
+        throw new Error(msg);
+      }
+      return Astro.redirect(`/settings?saved=${section === 'cloudflare' ? 'cloudflare' : 'ai'}`);
+    } catch (e) { error = e.message; }
+  }
 }
 
 let s = {};
@@ -48,6 +65,11 @@ catch (e) { error = `Control plane not reachable: ${e.message}`; }
 // Live OpenRouter catalogue with tool-calling capability flags for the pickers.
 let models = [];
 try { models = ((await (await fetch(`${CP}/api/models`)).json()).models) || []; } catch {}
+
+// The global AI guidance file (rules/globalAiGuidanceRule.md), editable below.
+let guidance = '';
+try { guidance = ((await (await fetch(`${CP}/api/ai-guidance-default`)).json()).guidance) || ''; } catch {}
+const GUIDANCE_MAX = 16000;
 
 // Seed the category table: stored config, or Design/Content builtins (seeded from
 // the legacy single model) on first use so live installs migrate cleanly.
@@ -63,6 +85,7 @@ const seededCategories = (Array.isArray(s.aiCategories) && s.aiCategories.length
 const savedSection = Astro.url.searchParams.get('saved');
 const savedLabel = savedSection === 'cloudflare' ? 'Cloudflare settings saved.'
   : savedSection === 'ai' ? 'AI agent settings saved.'
+  : savedSection === 'guidance' ? 'Global AI guidance saved — all tenants use it on their next message.'
   : savedSection ? 'Saved.' : '';
 ---
 <Layout title="Settings">
@@ -105,6 +128,19 @@ const savedLabel = savedSection === 'cloudflare' ? 'Cloudflare settings saved.'
   </div>
 
   <div class="card">
+    <h2 class="card-title">Global AI guidance</h2>
+    <p class="hint card-sub">The standing instructions injected into <strong>every tenant's AI chat</strong>. This is the file <code>rules/globalAiGuidanceRule.md</code> — edit it and save to change how the assistant behaves for all tenants. Changes take effect on each tenant's next message; no restart needed.</p>
+    <form method="POST" id="guidance-form">
+      <input type="hidden" name="section" value="guidance" />
+      <textarea name="aiGuidance" class="guidance-area" spellcheck="false" maxlength={GUIDANCE_MAX} aria-label="Global AI guidance">{guidance}</textarea>
+      <div class="guidance-actions">
+        <span class="hint" id="guidance-count"></span>
+        <button type="submit">Save guidance</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="card">
     <h2 class="card-title">Cloudflare</h2>
     <p class="hint card-sub">Used by the Publish Deployer to ship tenant sites to Cloudflare Pages.</p>
     <form method="POST" id="cf-form">
@@ -136,6 +172,14 @@ const savedLabel = savedSection === 'cloudflare' ? 'Cloudflare settings saved.'
   #settings-form textarea { width: 100%; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; color: var(--ink); padding: 10px 11px; font: inherit; resize: vertical; }
   #settings-form button.ghost { background: transparent; border: 1px solid var(--line); color: var(--ink); border-radius: 8px; padding: 7px 12px; cursor: pointer; font: inherit; font-weight: 500; }
   #settings-form button.ghost:hover { border-color: var(--accent); }
+
+  /* Global AI guidance editor — a large, monospace, theme-matched textarea. */
+  #guidance-form .guidance-area { width: 100%; min-height: 360px; max-height: 70vh; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; color: var(--ink); padding: 12px 14px; font: 13px/1.65 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; resize: vertical; white-space: pre-wrap; overflow-wrap: anywhere; tab-size: 2; scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+  #guidance-form .guidance-area:focus { outline: none; border-color: var(--accent); }
+  #guidance-form .guidance-area::-webkit-scrollbar { width: 10px; }
+  #guidance-form .guidance-area::-webkit-scrollbar-thumb { background: var(--line); border-radius: 8px; border: 2px solid var(--bg); background-clip: padding-box; }
+  #guidance-form .guidance-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 14px; }
+  #guidance-form #guidance-count.near { color: var(--bad); }
 
   #settings-form .cat-card { background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; margin-bottom: 12px; }
   #settings-form .cat-card-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 14px; }
@@ -346,5 +390,22 @@ const savedLabel = savedSection === 'cloudflare' ? 'Cloudflare settings saved.'
       if (defaults !== 1) { e.preventDefault(); alert('Pick exactly one Default category.'); return; }
       document.getElementById('cat-value').value = JSON.stringify(out);
     });
+  })();
+</script>
+
+<script is:inline>
+  // Global AI guidance: live character counter (warns as it nears the limit).
+  (function () {
+    const area = document.querySelector('#guidance-form .guidance-area');
+    const count = document.getElementById('guidance-count');
+    if (!area || !count) return;
+    const max = Number(area.getAttribute('maxlength')) || 16000;
+    const sync = () => {
+      const n = area.value.length;
+      count.textContent = n.toLocaleString() + ' / ' + max.toLocaleString() + ' characters';
+      count.classList.toggle('near', n > max * 0.9);
+    };
+    area.addEventListener('input', sync);
+    sync();
   })();
 </script>
