@@ -20,6 +20,7 @@
  */
 
 import { Type, safeParseValue } from '@core/utils/typeboxHelpers'
+import type { AiContentBlock } from '@core/ai'
 import { jsonResponse, readValidatedBody, badRequest } from '../../http'
 import { requireCapability } from '../../auth/authz'
 import type { DbClient } from '../../db/client'
@@ -61,14 +62,38 @@ import type { AiStreamRequest } from '../drivers/types'
 import {
   isManagedAiMode,
   managedResolvedCredential,
+  managedModelCapabilities,
   getManagedModel,
   getManagedAiConfig,
   classifyCategory,
 } from '../managed'
 
+// Reference images tenants attach to a message (screenshots / mockups). The
+// browser downscales + base64-encodes before upload; these caps are the
+// server-side backstop against an oversized or malformed payload.
+const MAX_IMAGE_ATTACHMENTS = 8
+// ~7 MB of base64 ≈ ~5 MB of image bytes. Generous — the client downscales the
+// long edge to ~1568px first, so real screenshots land far below this.
+const MAX_IMAGE_BASE64_LEN = 7_000_000
+const ALLOWED_IMAGE_MIME = new Set([
+  'image/png',
+  'image/jpeg',
+  'image/webp',
+  'image/gif',
+])
+
+const ImageInputSchema = Type.Object({
+  mimeType: Type.String({ minLength: 1 }),
+  data: Type.String({ minLength: 1 }), // raw base64, no `data:` URL prefix
+})
+
 const ChatRequestBodySchema = Type.Object({
   conversationId: Type.String({ minLength: 1 }),
-  prompt: Type.String({ minLength: 1 }),
+  // May be empty when the message carries only images — the handler enforces
+  // "text or at least one image" below.
+  prompt: Type.String(),
+  // Optional reference images. Empty/absent for a text-only message.
+  images: Type.Optional(Type.Array(ImageInputSchema)),
   // snapshot stays loose here — scope-specific shape; tools cast it inside
   // their handlers. The handler narrows below based on the conversation's
   // scope before passing to the system-prompt builder.
@@ -112,6 +137,24 @@ async function handleAiChat(
   const chatBody = await readValidatedBody(req, ChatRequestBodySchema)
   if (!chatBody) return badRequest('Invalid request body.')
   const { conversationId, prompt, snapshot } = chatBody
+  const images = chatBody.images ?? []
+  const text = prompt.trim()
+
+  // A message needs a body: either text, at least one image, or both.
+  if (!text && images.length === 0) {
+    return badRequest('Message must include text or at least one image.')
+  }
+  if (images.length > MAX_IMAGE_ATTACHMENTS) {
+    return badRequest(`Too many images — attach at most ${MAX_IMAGE_ATTACHMENTS}.`)
+  }
+  for (const img of images) {
+    if (!ALLOWED_IMAGE_MIME.has(img.mimeType)) {
+      return badRequest(`Unsupported image type "${img.mimeType}". Use PNG, JPEG, WebP, or GIF.`)
+    }
+    if (img.data.length > MAX_IMAGE_BASE64_LEN) {
+      return badRequest('One of the images is too large. Attach a smaller screenshot.')
+    }
+  }
 
   const conversation = await readConversationForUser(db, user.id, conversationId)
   if (!conversation) {
@@ -162,16 +205,47 @@ async function handleAiChat(
   }
 
   const driver = resolveDriver(providerId)
+
+  // In managed mode the model is gateway-routed per request, so the OpenRouter
+  // driver's sync `capabilities()` can't introspect it — it returns a permissive
+  // default with `visionInput: false`. Trust the operator's managed capabilities
+  // instead; otherwise every attached reference image is wrongly rejected below,
+  // and the tool loop would never capture a screenshot the model can read.
+  const modelCapabilities = isManagedAiMode()
+    ? managedModelCapabilities()
+    : driver.capabilities(modelId)
+
+  // Reject attached images up front when the resolved model can't read them,
+  // rather than silently dropping them or letting the provider 400 mid-stream.
+  if (images.length > 0 && !modelCapabilities.visionInput) {
+    return jsonResponse(
+      {
+        error:
+          'The selected model cannot read images. Choose a vision-capable model, or remove the attachments.',
+      },
+      { status: 400 },
+    )
+  }
+
   // Capability-filtered toolset. Callers without `ai.tools.write` only see
   // read tools registered with the driver — the model has no way to
   // emit a write call. See B6 in the capabilities review.
   const tools = selectToolsForScope(scope, user.capabilities)
 
   // Append the user's message BEFORE streaming so it's persisted even if
-  // the stream aborts mid-response.
+  // the stream aborts mid-response. Images render first, then the text — the
+  // order the composer shows them and vision models read best.
+  const userContent: AiContentBlock[] = [
+    ...images.map((img) => ({
+      kind: 'image' as const,
+      mimeType: img.mimeType,
+      data: img.data,
+    })),
+    ...(text ? [{ kind: 'text' as const, text }] : []),
+  ]
   await appendMessage(db, conversation.id, {
     role: 'user',
-    content: [{ kind: 'text', text: prompt }],
+    content: userContent,
   })
 
   const existingMessages = await listMessagesForConversation(db, conversation.id)
@@ -188,8 +262,10 @@ async function handleAiChat(
     const cfg = await getManagedAiConfig()
     if (cfg) {
       guidance = cfg.guidance
-      if (cfg.hasClassifier && cfg.categories.length > 0) {
-        managedCategory = await classifyCategory(prompt, cfg.categories, req.signal)
+      // Classify off the text only. An image-only message has nothing to
+      // classify, so it falls through to the operator's default model.
+      if (cfg.hasClassifier && cfg.categories.length > 0 && text) {
+        managedCategory = await classifyCategory(text, cfg.categories, req.signal)
       }
     }
   }
@@ -285,7 +361,7 @@ async function handleAiChat(
           messages,
           tools,
           modelId,
-          modelCapabilities: driver.capabilities(modelId),
+          modelCapabilities,
           credentials: resolvedCredential,
           signal: req.signal,
           bridge,

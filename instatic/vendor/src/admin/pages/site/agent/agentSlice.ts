@@ -17,7 +17,7 @@
 
 import { nanoid } from 'nanoid'
 import type { EditorStoreSliceCreator } from '@site/store/types'
-import { ApiError } from '@core/http'
+import { ApiError, responseErrorMessage } from '@core/http'
 import {
   listConversations,
   getConversation,
@@ -363,13 +363,22 @@ export function createAgentSlice(
     },
 
     // ── sendAgentMessage ─────────────────────────────────────────────────────
-    async sendAgentMessage(content) {
+    async sendAgentMessage(content, images = []) {
       if (get().isAgentStreaming) return // one request at a time
 
+      // Reference images render first in the user's bubble, then the text —
+      // matches the order the handler persists (images before the text block).
       const userMsg: AgentMessage = {
         id: nanoid(),
         role: 'user',
-        blocks: [{ kind: 'text', text: content }],
+        blocks: [
+          ...images.map((img) => ({
+            kind: 'image' as const,
+            mimeType: img.mimeType,
+            data: img.data,
+          })),
+          ...(content ? [{ kind: 'text' as const, text: content }] : []),
+        ],
         timestamp: Date.now(),
       }
 
@@ -408,7 +417,12 @@ export function createAgentSlice(
           return
         }
 
-        const body: AgentRequestBody = { conversationId, prompt: content, snapshot }
+        const body: AgentRequestBody = {
+          conversationId,
+          prompt: content,
+          ...(images.length > 0 ? { images } : {}),
+          snapshot,
+        }
         const res = await fetch(`/admin/api/ai/chat/${config.scope}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -427,7 +441,11 @@ export function createAgentSlice(
             )
             return
           }
-          throw new Error(`Agent request failed: ${res.status} ${res.statusText}`)
+          // Surface the server's `{ error }` envelope (e.g. "The selected model
+          // cannot read images…", "One of the images is too large…") instead of
+          // a bare status — the catch below prefixes it with "Agent request
+          // failed:". A bare status left the operator with no idea what to fix.
+          throw new Error(await responseErrorMessage(res, `${res.status} ${res.statusText}`))
         }
 
         if (!res.body) throw new Error('Agent response has no body')

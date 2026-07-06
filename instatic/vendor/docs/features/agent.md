@@ -127,6 +127,8 @@ When the panel opens, `AgentPanel` calls `loadScopeDefault()` so the model picke
 
 The composer area includes a `<ContextMeter>` that shows "context used / window" as a progress bar. `AgentPanel` resolves the active model's `contextWindow` from `GET /admin/api/ai/providers/:id/models?credentialId=…` (the same catalogue-enriched response the picker uses), so the meter appears as soon as a model is selected — before the first turn. The "used" half comes from `agentContextTokens` in the store (see slice state below). The meter is hidden when no context window is known (Ollama, uncatalogued models).
 
+**Image attachments.** The composer lets a user attach reference screenshots to a message three ways, all funnelling through `addFiles()`: the `<AttachMenu>` dropdown (file picker + "Paste from clipboard" when the async Clipboard API is available), Ctrl/Cmd+V paste onto the textarea (`onPaste` → `imageFilesFrom`), and drag-and-drop onto the composer. `fileToAttachment()` (in `attachments.ts`) validates the type (PNG/JPEG/WebP/GIF), downscales the long edge to ~1568px, and base64-encodes — small images pass through untouched. Pending attachments render as a thumbnail strip with per-image remove buttons; a message may be sent with only images and no text. On submit they travel as `images: { mimeType, data }[]` and are shown inline in the user's own bubble (`kind:'image'` blocks). Attachments are capped at `MAX_ATTACHMENTS` (8); the handler re-validates and rejects images for a non-vision model.
+
 ---
 
 ## Flow
@@ -135,11 +137,11 @@ The composer area includes a `<ContextMeter>` that shows "context used / window"
 User types prompt → Agent Panel
     │
     ▼
-agentSlice.sendAgentMessage(content)
+agentSlice.sendAgentMessage(content, images?)
     │
     ├─→ buildSnapshot()  →  SiteAgentSnapshot  (raw active page + site tree)
     ├─→ ensure conversation row  (lazily created from AI defaults on first call)
-    ├─→ POST /admin/api/ai/chat/site  { conversationId, prompt, snapshot }
+    ├─→ POST /admin/api/ai/chat/site  { conversationId, prompt, images?, snapshot }
     │
     ▼
 Server: chat.ts
@@ -227,7 +229,8 @@ Only the active page carries full `nodes`. Non-active pages keep metadata (`id`,
 // Request body
 {
   conversationId: string   // ai_conversations row id
-  prompt:         string
+  prompt:         string   // may be empty when images are attached
+  images?:        { mimeType: string; data: string }[]  // base64 reference screenshots
   snapshot:       SiteAgentSnapshot   // built by buildCurrentPageContext()
 }
 
@@ -236,13 +239,15 @@ Only the active page carries full `nodes`. Non-active pages keep metadata (`id`,
 
 The handler (`server/ai/handlers/chat.ts`):
 1. CSRF-checks and requires `ai.chat`.
-2. Loads the conversation row (credentialId, modelId) and the full persisted message history (`listMessagesForConversation` → `buildMessageHistory` → `AiMessage[]`).
-3. Decrypts the credential and resolves the driver.
-4. Calls `selectToolsForScope('site', capabilities)` — write tools excluded without `ai.tools.write`.
-5. Builds the system prompt via `buildSiteSystemPrompt(snapshot)`.
-6. Creates a bridge (`createBridge(emit, req.signal)`), emits `bridgeReady`.
-7. Calls `runChat(...)` with the full history as `req.messages`. Direct HTTP drivers have no server-side session, so each driver maps the whole `AiMessage[]` log into the provider's native message array every turn (the Anthropic driver pairs assistant `tool_use` blocks with their following `tool_result` turns). The runner pipes all stream events to the HTTP response. Before recording a terminal usage event, the runner flushes any pending assistant text so text-only replies have an assistant message row for per-turn usage and audit rollups. The multi-turn agentic loop lives in `drivers/http/toolLoop.ts`, not in a provider SDK.
-8. Emits a terminal `ai.chat.completed` / `ai.chat.failed` audit event.
+2. Validates the body: a message needs text or ≥1 image; images are capped (`MAX_IMAGE_ATTACHMENTS`), MIME-allowlisted (PNG/JPEG/WebP/GIF), and size-bounded. Rejects images when the resolved model reports `visionInput: false`. In **managed mode** the model is gateway-routed per request, so the OpenRouter driver's sync `capabilities()` can't introspect it (it returns a permissive default with `visionInput: false`) — the handler uses `managedModelCapabilities()` (vision-capable) instead, so operator-routed multimodal models accept reference images.
+3. Loads the conversation row (credentialId, modelId) and the full persisted message history (`listMessagesForConversation` → `buildMessageHistory` → `AiMessage[]`).
+4. Decrypts the credential and resolves the driver.
+5. Persists the user message as `AiContentBlock[]` — each attachment becomes a `{ kind:'image', mimeType, data }` block ahead of the text block; drivers map these to native provider image blocks.
+6. Calls `selectToolsForScope('site', capabilities)` — write tools excluded without `ai.tools.write`.
+7. Builds the system prompt via `buildSiteSystemPrompt(snapshot)`.
+8. Creates a bridge (`createBridge(emit, req.signal)`), emits `bridgeReady`.
+9. Calls `runChat(...)` with the full history as `req.messages`. Direct HTTP drivers have no server-side session, so each driver maps the whole `AiMessage[]` log into the provider's native message array every turn (the Anthropic driver pairs assistant `tool_use` blocks with their following `tool_result` turns). The runner pipes all stream events to the HTTP response. Before recording a terminal usage event, the runner flushes any pending assistant text so text-only replies have an assistant message row for per-turn usage and audit rollups. The multi-turn agentic loop lives in `drivers/http/toolLoop.ts`, not in a provider SDK.
+10. Emits a terminal `ai.chat.completed` / `ai.chat.failed` audit event.
 
 ### `GET /admin/api/ai/audit?since=ISO&tz=IANA`
 
@@ -430,7 +435,7 @@ When a node-targeting write tool (`insertHtml`, `getNodeHtml`, `replaceNodeHtml`
 `render_snapshot` (and `read_document` / `getNodeHtml`) return large payloads. Five rules keep them from exploding context (a screenshot inlined as base64 JSON text once pushed a single turn past 1M tokens):
 
 1. **Image channel, not text.** `AiToolOutput` carries an optional `images: { mimeType, data }[]` (`src/core/ai/toolOutput.ts`). `render_snapshot` puts the PNG there — never in `data`. The Anthropic driver forwards it as a **native `image` block** inside the `tool_result` (billed at the rendered image's token cost). Text-only tool channels (Ollama / OpenAI-compatible `function_call_output`) **drop** the image and append a one-line `[N screenshot(s) omitted…]` note. The capture caps the screenshot's long edge at `MAX_IMAGE_EDGE` (1568px in `renderEvidence.ts`) — a tall landing page would otherwise exceed Anthropic's hard 8000px-per-dimension limit (400 error), and the model downsizes the long edge to ~1568px anyway.
-2. **Capture is vision-gated.** The chat handler resolves `driver.capabilities(modelId)` into `AiStreamRequest.modelCapabilities`. The shared tool loop injects `captureScreenshot: visionInput` into every `render_snapshot` call, so a non-vision model never pays the html-to-image cost — it gets the layout report only. (The model never sets `captureScreenshot` itself.)
+2. **Capture is vision-gated.** The chat handler resolves the model's capabilities into `AiStreamRequest.modelCapabilities` — `driver.capabilities(modelId)` normally, or `managedModelCapabilities()` in managed mode (the gateway-routed model isn't introspectable through the OpenRouter driver's sync accessor). The shared tool loop injects `captureScreenshot: visionInput` into every `render_snapshot` call, so a non-vision model never pays the html-to-image cost — it gets the layout report only. (The model never sets `captureScreenshot` itself.)
 3. **`read_document` CSS is document-relevant, not the public full-site CSS bundle.** Public pages can share page-invariant CSS files, but `read_document` inlines CSS into model context. It keeps framework variables/utilities, font token variables, target-document module CSS, used class rules, ambient selectors whose class tokens all exist on the target document, classless/global ambient selectors, and document-targeted user stylesheets. It omits browser-only `@font-face` file declarations and ambient selectors from unrelated imported pages.
 4. **`read_document` is cleaned and paged before it reaches the model.** `renderAgentDocument` strips pathological strings from the broad read surface: long base64/data URLs become `data:<mime>;base64,[omitted N chars]`, and very long URLs are middle-truncated. The returned object always includes `pageInfo` with `part`, `totalParts`, `nextPart`, `ranges`, `serializedChars`, and cleanup counts. The hard budget is measured against `JSON.stringify({ html, css, pageInfo }).length`, because that is the text providers receive as the tool result. If `nextPart` is not `null`, the agent calls `read_document({ document, part: nextPart })` to continue. For exact node-level markup, use the `uid` with `getNodeHtml`.
 5. **Stale evidence is elided.** Within one tool loop, only the **most recent** heavy result per tool name (`render_snapshot`, `read_document`, `getNodeHtml`, or anything with an image) is replayed at full fidelity; earlier ones are rewritten to a one-line breadcrumb (`"Earlier <tool> output removed… Call <tool> again…"`). Older snapshots describe page state the model has since mutated, so they carry no value. See `applyHeavyElision` in `server/ai/drivers/http/toolLoop.ts`.

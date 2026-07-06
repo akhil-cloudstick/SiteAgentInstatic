@@ -21,12 +21,17 @@
  * @see Guideline #410 — 3 Self-Contained Independent Panels
  */
 
-import { useRef, useEffect, memo } from 'react'
+import { useRef, useEffect, useState, memo } from 'react'
 import { useAgentStore } from '@admin/ai/useAgentStore'
 import { useAsyncResource } from '@admin/lib/useAsyncResource'
 import { useAdminNavigate } from '@admin/lib/useAdminNavigate'
 import { listCredentials, listModels } from '@admin/ai/api'
-import { renderMarkdownToHtml, type AgentMessage, type AgentToolCall } from '@site/agent'
+import {
+  renderMarkdownToHtml,
+  type AgentImageAttachment,
+  type AgentMessage,
+  type AgentToolCall,
+} from '@site/agent'
 import { TrashSolidIcon } from 'pixel-art-icons/icons/trash-solid'
 import { SquareSolidIcon } from 'pixel-art-icons/icons/square-solid'
 import { SendSolidIcon } from 'pixel-art-icons/icons/send-solid'
@@ -37,6 +42,7 @@ import { AiBoxSolidIcon } from 'pixel-art-icons/icons/ai-box-solid'
 import { AiSettingsSolidIcon } from 'pixel-art-icons/icons/ai-settings-solid'
 import { EditSolidIcon } from 'pixel-art-icons/icons/edit-solid'
 import { ArrowRightIcon } from 'pixel-art-icons/icons/arrow-right'
+import { CloseIcon } from 'pixel-art-icons/icons/close'
 import { PanelHeader } from '@admin/shared/PanelHeader'
 import { Button } from '@ui/components/Button'
 import { EmptyState } from '@ui/components/EmptyState'
@@ -46,6 +52,15 @@ import { cn } from '@ui/cn'
 import { ModelPicker } from './ModelPicker'
 import { ConversationHistory } from './ConversationHistory'
 import { ContextMeter } from './ContextMeter'
+import { AttachMenu } from './AttachMenu'
+import {
+  attachmentSrc,
+  fileToAttachment,
+  imageFilesFrom,
+  AttachmentError,
+  MAX_ATTACHMENTS,
+  type PendingAttachment,
+} from './attachments'
 import styles from './AgentPanel.module.css'
 
 const PANEL_WIDTH = 320
@@ -126,6 +141,67 @@ export function AgentPanel({ variant = 'floating' }: { variant?: PanelVariant })
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const threadRef = useRef<HTMLDivElement>(null)
 
+  // ── Composer image attachments ─────────────────────────────────────────────
+  // Reference screenshots the user pastes / drops / picks before sending. Held
+  // as local composer state (like the uncontrolled textarea text) and consumed
+  // on submit. `attachError` surfaces validation problems inline.
+  const [attachments, setAttachments] = useState<PendingAttachment[]>([])
+  const [attachError, setAttachError] = useState<string | null>(null)
+  const [isDraggingImage, setIsDraggingImage] = useState(false)
+
+  async function addFiles(files: File[]) {
+    setAttachError(null)
+    const room = MAX_ATTACHMENTS - attachments.length
+    if (room <= 0) {
+      setAttachError(`You can attach up to ${MAX_ATTACHMENTS} images per message.`)
+      return
+    }
+    if (files.length > room) {
+      setAttachError(`Only ${room} more image${room === 1 ? '' : 's'} can be added (max ${MAX_ATTACHMENTS}).`)
+    }
+    const added: PendingAttachment[] = []
+    for (const file of files.slice(0, room)) {
+      try {
+        added.push(await fileToAttachment(file))
+      } catch (err) {
+        if (err instanceof AttachmentError) {
+          setAttachError(err.message)
+        } else {
+          console.error('[AgentPanel] attach failed:', err)
+          setAttachError('That image could not be attached.')
+        }
+      }
+    }
+    if (added.length > 0) setAttachments((prev) => [...prev, ...added])
+  }
+
+  function removeAttachment(id: string) {
+    setAttachments((prev) => prev.filter((att) => att.id !== id))
+  }
+
+  function handlePaste(e: React.ClipboardEvent<HTMLTextAreaElement>) {
+    const files = imageFilesFrom(e.clipboardData)
+    if (files.length === 0) return // plain-text paste — let it fall through
+    e.preventDefault()
+    void addFiles(files)
+  }
+
+  function handleDragOver(e: React.DragEvent) {
+    if (composerLocked) return
+    // Only react to file drags, not text/selection drags.
+    if (!Array.from(e.dataTransfer.types).includes('Files')) return
+    e.preventDefault()
+    setIsDraggingImage(true)
+  }
+
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault()
+    setIsDraggingImage(false)
+    if (composerLocked) return
+    const files = imageFilesFrom(e.dataTransfer)
+    if (files.length > 0) void addFiles(files)
+  }
+
   // ── Draggable panel position ───────────────────────────────────────────────
   // Default to bottom-right corner.
   const { panelRef, headerDragProps, panelPositionStyle } = useDraggablePanel(
@@ -179,10 +255,17 @@ export function AgentPanel({ variant = 'floating' }: { variant?: PanelVariant })
     const input = inputRef.current
     if (!input) return
     const content = input.value.trim()
-    if (!content || isStreaming) return
+    // Allow sending when there's text OR at least one attached image.
+    if ((!content && attachments.length === 0) || isStreaming) return
+    const images: AgentImageAttachment[] = attachments.map((att) => ({
+      mimeType: att.mimeType,
+      data: att.data,
+    }))
     input.value = ''
     input.style.height = 'auto'
-    await sendAgentMessage(content)
+    setAttachments([])
+    setAttachError(null)
+    await sendAgentMessage(content, images)
   }
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -296,7 +379,43 @@ export function AgentPanel({ variant = 'floating' }: { variant?: PanelVariant })
         {/* Live context-window meter — renders once the active model's window
             is known (pre-turn shows 0 / window). */}
         <ContextMeter windowTokens={contextWindowResource.data} />
-        <form onSubmit={handleSubmit} className={styles.inputForm}>
+        <form
+          onSubmit={handleSubmit}
+          className={cn(styles.inputForm, isDraggingImage && styles.inputFormDragging)}
+          onDragOver={handleDragOver}
+          onDragLeave={() => setIsDraggingImage(false)}
+          onDrop={handleDrop}
+        >
+          {/* Pending reference-image thumbnails (paste / drop / picker). */}
+          {attachments.length > 0 && (
+            <ul className={styles.attachmentStrip} aria-label="Attached images">
+              {attachments.map((att) => (
+                <li key={att.id} className={styles.attachmentThumb}>
+                  <img
+                    className={styles.attachmentImage}
+                    src={attachmentSrc(att)}
+                    alt="Attached reference"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="xs"
+                    iconOnly
+                    className={styles.attachmentRemove}
+                    aria-label="Remove image"
+                    onClick={() => removeAttachment(att.id)}
+                  >
+                    <CloseIcon size={10} aria-hidden="true" />
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          )}
+          {attachError && (
+            <p role="status" className={styles.attachError}>
+              {attachError}
+            </p>
+          )}
           {/* Textarea is hidden while streaming — the controls row collapses
               to just the model picker + Stop button. */}
           {!isStreaming && (
@@ -306,12 +425,13 @@ export function AgentPanel({ variant = 'floating' }: { variant?: PanelVariant })
                 ? 'Add AI credentials to start chatting'
                 : lockReason === 'chooseModel'
                   ? 'Choose a model below to start'
-                  : 'Tell me what to build… (Enter to send)'}
+                  : 'Tell me what to build… (paste or drop an image, Enter to send)'}
               aria-label="Message to AI assistant"
               rows={2}
               resize="none"
               disabled={composerLocked}
               onKeyDown={handleKeyDown}
+              onPaste={handlePaste}
               onChange={(e) => {
                 // Auto-grow textarea
                 e.target.style.height = 'auto'
@@ -319,15 +439,24 @@ export function AgentPanel({ variant = 'floating' }: { variant?: PanelVariant })
               }}
             />
           )}
-          {/* Controls row: model picker on the left (saves vertical space),
-              minimal icon-only send/stop button on the right. */}
+          {/* Controls row: attach + model picker on the left (saves vertical
+              space), minimal icon-only send/stop button on the right. */}
           <div className={styles.inputControls}>
-            <ModelPicker
-              className={styles.inputControlsPicker}
-              credentials={credentials}
-              credentialsLoaded={credentialsLoaded}
-              onRefreshCredentials={credentialsResource.refresh}
-            />
+            <div className={styles.inputControlsLeft}>
+              {!isStreaming && (
+                <AttachMenu
+                  onFiles={addFiles}
+                  onError={setAttachError}
+                  disabled={composerLocked}
+                />
+              )}
+              <ModelPicker
+                className={styles.inputControlsPicker}
+                credentials={credentials}
+                credentialsLoaded={credentialsLoaded}
+                onRefreshCredentials={credentialsResource.refresh}
+              />
+            </div>
             {isStreaming ? (
               <Button
                 type="button"
@@ -390,21 +519,36 @@ const MessageBubble = memo(function MessageBubble({ msg }: MessageBubbleProps) {
           shows two separate text bubbles around the tool badges. Text is
           rendered as markdown (bold, lists, inline code, links, …) via a
           DOMPurify-sanitised HTML pipeline. */}
-      {msg.blocks.map((block, index) =>
-        block.kind === 'text' ? (
-          <MarkdownTextBubble
-            // Stable key per text block: text deltas append in place, so each
-            // run of text gets its position-based key.
-            key={`text-${index}`}
-            text={block.text}
-            isUser={isUser}
-          />
-        ) : (
+      {msg.blocks.map((block, index) => {
+        if (block.kind === 'text') {
+          return (
+            <MarkdownTextBubble
+              // Stable key per text block: text deltas append in place, so each
+              // run of text gets its position-based key.
+              key={`text-${index}`}
+              text={block.text}
+              isUser={isUser}
+            />
+          )
+        }
+        if (block.kind === 'image') {
+          // Reference screenshot the user attached — rendered inline in their
+          // own bubble so they see exactly what the model received.
+          return (
+            <img
+              key={`image-${index}`}
+              className={styles.messageImage}
+              src={attachmentSrc(block)}
+              alt="Attached reference"
+            />
+          )
+        }
+        return (
           <div key={block.toolCall.id} className={styles.toolCallsContainer}>
             <ToolCallBadge toolCall={block.toolCall} />
           </div>
-        ),
-      )}
+        )
+      })}
     </div>
   )
 })

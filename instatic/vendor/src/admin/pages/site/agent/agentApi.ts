@@ -121,6 +121,10 @@ export function rehydrateMessages(
     for (const block of rec.content) {
       if (block.kind === 'text') {
         msg.blocks.push({ kind: 'text', text: block.text })
+      } else if (block.kind === 'image') {
+        // Re-render attached reference images (base64) when a saved
+        // conversation is reopened, so the thread looks the same as when sent.
+        msg.blocks.push({ kind: 'image', mimeType: block.mimeType, data: block.data })
       } else if (block.kind === 'toolCall') {
         const toolCall: AgentToolCall = {
           id: nanoid(),

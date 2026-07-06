@@ -163,6 +163,7 @@ export interface AgentToolCall {
  */
 type AgentMessageBlock =
   | { kind: 'text'; text: string }
+  | { kind: 'image'; mimeType: string; data: string }
   | { kind: 'toolCall'; toolCall: AgentToolCall }
 
 export interface AgentMessage {
@@ -176,11 +177,29 @@ export interface AgentMessage {
 // Browser → Server request body
 // ---------------------------------------------------------------------------
 
+/**
+ * One image the user attached to a message (pasted, dropped, or picked from
+ * disk). `data` is raw base64 (no `data:` URL prefix); `mimeType` is one of the
+ * provider-supported image types. Mirrors the server's `AiImageBlock` fields —
+ * the chat handler turns each attachment into a `{ kind:'image', … }` content
+ * block on the persisted user message.
+ */
+export interface AgentImageAttachment {
+  mimeType: string
+  data: string
+}
+
 export interface AgentRequestBody {
   /** Per-conversation id; the chat handler loads its credential + history. */
   conversationId: string
-  /** The user's new message. */
+  /** The user's new message. May be empty when only images are attached. */
   prompt: string
+  /**
+   * Reference images attached to this message (screenshots, mockups). Omitted
+   * when the message is text-only. The model sees them alongside the prompt on
+   * vision-capable models; the handler rejects them otherwise.
+   */
+  images?: AgentImageAttachment[]
   /**
    * Scope-specific snapshot handed to the read tools via
    * `ToolContext.snapshot`. Loose `unknown` here because the body now

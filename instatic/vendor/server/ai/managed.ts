@@ -23,7 +23,11 @@
  */
 
 import { Type, safeParseValue, type Static } from '@core/utils/typeboxHelpers'
-import type { AiResolvedCredential, AiProviderModel } from './drivers/types'
+import type {
+  AiResolvedCredential,
+  AiProviderModel,
+  AiProviderCapabilities,
+} from './drivers/types'
 import type { AiProviderId, ToolScope } from './runtime/types'
 import type { CredentialView } from './credentials/types'
 
@@ -255,18 +259,36 @@ export function managedDefaultsMap(
   return out
 }
 
+/**
+ * Capabilities the tenant's chat assumes for an operator-routed model.
+ *
+ * In managed mode the real model is resolved by the gateway per request (per
+ * task-type category), so the tenant server can't introspect it — the
+ * OpenRouter driver's sync `capabilities()` only knows a permissive default
+ * that reports `visionInput: false`. Operators only wire modern OpenRouter chat
+ * models into the gateway (multimodal + tool-calling), so we assume vision +
+ * tools here. This is the single source of truth for BOTH the picker list and
+ * the chat handler's vision gate: without it, every reference screenshot a
+ * tenant attaches ("build a page like this design") is wrongly rejected, and
+ * the tool loop would never let `render_snapshot` capture a screenshot the
+ * model could actually see.
+ */
+export function managedModelCapabilities(): AiProviderCapabilities {
+  return {
+    toolCalling: true,
+    visionInput: true,
+    promptCache: false,
+    streaming: true,
+  }
+}
+
 /** The picker's model list in managed mode: exactly the operator's model. */
 export function managedModelList(model: string): AiProviderModel[] {
   return [
     {
       id: model,
       label: model,
-      capabilities: {
-        toolCalling: true,
-        visionInput: false,
-        promptCache: false,
-        streaming: true,
-      },
+      capabilities: managedModelCapabilities(),
     },
   ]
 }
