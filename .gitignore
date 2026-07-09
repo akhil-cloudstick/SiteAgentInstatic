@@ -11,17 +11,16 @@ tenant-users/
 .tmp/
 
 # Instatic vendored install artifacts (the source is cloned; deps/build are local)
-instatic/vendor/node_modules/
-instatic/vendor/dist/
-instatic/vendor/.tmp/
+Instatic/node_modules/
+Instatic/dist/
+Instatic/.tmp/
 
 # Operator console build
-operator/ui/dist/
-operator/ui/.astro/
+Operator/ui/dist/
+Operator/ui/.astro/
 
 # Control-plane local state (never commit — contains enc.key master key)
-operator/control-plane/.state/
-Insatic/operator/control-plane/.state/
+Operator/control-plane/.state/
 *.log
 
 # OpenDesign vendored app — install artifacts, local daemon state, secrets
