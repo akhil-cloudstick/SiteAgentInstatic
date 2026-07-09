@@ -50,6 +50,10 @@ export function start(tenant) {
     UPLOADS_DIR: p.uploads,
     STATIC_DIR: distDir(),
     INSTATIC_SECRET_KEY: tenant.secretKey,
+    // Tenant SSO: the hub redirects the tenant to /admin/sso?token=<signed>; the
+    // instance verifies it with this shared secret and mints an Owner session.
+    INSTATIC_SSO_SECRET: config.tokenSecret,
+    INSTATIC_TENANT_SLUG: slug,
     PUBLIC_ORIGIN: `http://127.0.0.1:${port}`,
     // CLIENT-TEST ONLY (see pending.md): trust the public test-funnel origin for
     // the CSRF check so the ONE tenant currently pointed at the funnel accepts a

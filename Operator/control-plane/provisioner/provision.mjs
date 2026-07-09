@@ -120,7 +120,7 @@ export async function provisionTenant({ name, ownerEmail, cfProject, customDomai
   const inviteUrl = `${config.publicBaseUrl}/invite/${inviteToken}`;
 
   // Fire-and-forget: never await the saga here (that is what blocked the page).
-  runProvisionSaga({ slug, schema, role, dbPassword, secretKey, port, odPort })
+  runProvisionSaga({ slug, schema, role, dbPassword, secretKey, port, odPort, tier: tier === 'lite' ? 'lite' : 'advanced' })
     .catch((e) => console.error(`[provisioner] saga ${slug} crashed:`, e?.message ?? e));
 
   return {
@@ -138,24 +138,43 @@ export async function createTenantInvite(slug) {
   return { ok: true, slug, url: `${config.publicBaseUrl}/invite/${token}` };
 }
 
+// Auto-create the Instatic Owner via the one-shot setup endpoint, so the hub can
+// SSO the tenant straight in (no self-serve wizard). The control-plane keeps the
+// generated password (encrypted) as the standalone-login fallback. Server-to-server
+// (no Origin header) passes Instatic's CSRF check; 409 means already set up.
+async function seedInstaticOwner(slug, port) {
+  const row = await tenants.getTenant(slug);
+  const email = (row?.owner_email || '').trim() || `${slug}@tenant.local`;
+  const siteName = (row?.display_name || '').trim() || slug;
+  const password = genPassword(16); // base64url(16 bytes) — comfortably >= 12 chars
+  try {
+    const r = await fetch(`http://127.0.0.1:${port}/admin/api/cms/setup`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ siteName, email, password }),
+    });
+    if (r.status === 201 || r.ok) {
+      await tenants.updateTenant(slug, { owner_email: email, owner_password_enc: encrypt(password) });
+      return { ok: true };
+    }
+    if (r.status === 409) return { ok: true, already: true }; // already set up
+    const body = await r.text().catch(() => '');
+    return { ok: false, error: `setup ${r.status}: ${body.slice(0, 120)}` };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+}
+
 // The heavy provisioning steps, run in the background. Advances provision_state so
 // the console can show progress; on failure it cleans up and marks the row 'failed'
 // (visible, with last_error) instead of throwing to an HTTP caller that already left.
-async function runProvisionSaga({ slug, schema, role, dbPassword, secretKey, port, odPort }) {
+async function runProvisionSaga({ slug, schema, role, dbPassword, secretKey, port, odPort, tier }) {
   try {
-    // 1) DB
-    await mintDb(schema, role, dbPassword);
-    await tenants.updateTenant(slug, { provision_state: 'db_ready' });
+    const advanced = tier !== 'lite';
 
-    // 2) start native instance (Instatic auto-migrates into its schema on boot)
-    rt.start({ slug, port, dbRole: role, dbPassword, secretKey, aiModel: await operatorAiModel() });
-    const healthy = await rt.waitHealthy(port, 60000);
-    if (!healthy) throw new Error('Instance did not become healthy in time.');
-    await tenants.updateTenant(slug, { provision_state: 'up' });
-
-    // 2b) OpenDesign daemon for this tenant (ALL tiers get OpenDesign). Isolated by
-    //     its own OD_DATA_DIR on local disk + port. Non-fatal: an OD hiccup records
-    //     od_status='failed' but doesn't fail the whole provision.
+    // OpenDesign daemon — ALL tiers get OpenDesign. Isolated by its own OD_DATA_DIR
+    // on local disk + port. Non-fatal: an OD hiccup records od_status='failed' but
+    // doesn't fail the whole provision.
     try {
       odrt.start({ slug, odPort });
       const odHealthy = await odrt.waitHealthy(odPort, 90000);
@@ -165,20 +184,35 @@ async function runProvisionSaga({ slug, schema, role, dbPassword, secretKey, por
       await tenants.updateTenant(slug, { od_status: 'failed' });
     }
 
-    // 3) self-onboard: the tenant creates their site + owner via the share link.
-    await tenants.updateTenant(slug, { provision_state: 'seeded' });
+    // Instatic (DB + native instance + Owner + Cloudflare) is ADVANCED-ONLY. A lite
+    // tenant has no Postgres schema, no Instatic process, no CF project.
+    if (advanced) {
+      // 1) DB
+      await mintDb(schema, role, dbPassword);
+      await tenants.updateTenant(slug, { provision_state: 'db_ready' });
 
-    // 4) Create the Cloudflare Pages project + "Coming soon" placeholder (and attach
-    //    the custom domain if one was given) so the public URL is live immediately.
-    //    Best-effort: a CF hiccup records last_error but does not fail provisioning.
-    try {
-      const site = await initTenantSite(slug);
-      if (!site.ok && !site.skipped) {
-        await tenants.updateTenant(slug, { last_error: `CF: ${site.error || 'init failed'}` });
+      // 2) start native instance (Instatic auto-migrates into its schema on boot)
+      rt.start({ slug, port, dbRole: role, dbPassword, secretKey, aiModel: await operatorAiModel() });
+      const healthy = await rt.waitHealthy(port, 60000);
+      if (!healthy) throw new Error('Instance did not become healthy in time.');
+      await tenants.updateTenant(slug, { provision_state: 'up' });
+
+      // 3) auto-create the Instatic Owner so the hub can SSO the tenant in (no
+      //    self-serve wizard). Stores a generated >=12-char password, encrypted.
+      const seeded = await seedInstaticOwner(slug, port);
+      if (!seeded.ok) await tenants.updateTenant(slug, { last_error: `Owner setup: ${seeded.error}` });
+      await tenants.updateTenant(slug, { provision_state: 'seeded' });
+
+      // 4) Cloudflare Pages project + placeholder (best-effort).
+      try {
+        const site = await initTenantSite(slug);
+        if (!site.ok && !site.skipped) {
+          await tenants.updateTenant(slug, { last_error: `CF: ${site.error || 'init failed'}` });
+        }
+      } catch (e) {
+        console.error(`[provisioner] CF site init for ${slug} failed (non-fatal):`, e.message);
+        await tenants.updateTenant(slug, { last_error: `CF: ${e.message}` });
       }
-    } catch (e) {
-      console.error(`[provisioner] CF site init for ${slug} failed (non-fatal):`, e.message);
-      await tenants.updateTenant(slug, { last_error: `CF: ${e.message}` });
     }
 
     await tenants.updateTenant(slug, { provision_state: 'done', status: 'active' });
@@ -193,6 +227,33 @@ async function runProvisionSaga({ slug, schema, role, dbPassword, secretKey, por
       });
     } catch { /* row may be gone; ignore */ }
   }
+}
+
+// Lite -> Advanced upgrade: provision Instatic on demand for a tenant that was
+// created lite (OpenDesign only). Reuses the credentials already generated at
+// create time. Idempotent (mintDb + setup 409 are both safe to re-run).
+export async function upgradeTenantToAdvanced(slug) {
+  const row = await tenants.getTenant(slug);
+  if (!row) throw new Error(`Unknown tenant: ${slug}`);
+  if (rt.isRunning(slug)) return { ok: true, alreadyUp: true };
+  const { schema, role } = names(slug);
+  const dbPassword = decrypt(row.db_password_enc);
+  const secretKey = decrypt(row.secret_key_enc);
+  if (!dbPassword || !secretKey) throw new Error('Missing tenant credentials for upgrade.');
+
+  await mintDb(schema, role, dbPassword);
+  rt.start({ slug, port: row.port, dbRole: role, dbPassword, secretKey, aiModel: await operatorAiModel() });
+  const healthy = await rt.waitHealthy(row.port, 60000);
+  if (!healthy) throw new Error('Instatic did not become healthy on upgrade.');
+  const seeded = await seedInstaticOwner(slug, row.port);
+  if (!seeded.ok) await tenants.updateTenant(slug, { last_error: `Owner setup: ${seeded.error}` });
+  try {
+    await initTenantSite(slug);
+  } catch (e) {
+    await tenants.updateTenant(slug, { last_error: `CF: ${e.message}` });
+  }
+  await tenants.updateTenant(slug, { provision_state: 'done' });
+  return { ok: true };
 }
 
 // Edit an existing tenant's editable details (owner email, CF project name, custom
@@ -212,6 +273,9 @@ export async function editTenant(slug, { displayName, ownerEmail, cfProject, cus
     tierChanged = t !== (row.tier || 'advanced');
     fields.tier = t;
   }
+  // Lite -> Advanced: provision Instatic on demand (fire-and-forget; the console
+  // polls provision_state). Downgrade advanced -> lite only flips the flag here.
+  const upgradingToAdvanced = tierChanged && fields.tier === 'advanced' && !rt.isRunning(slug);
   if (ownerEmail !== undefined) fields.owner_email = String(ownerEmail || '').trim() || null;
   if (cfProject !== undefined) {
     const cp = sanitizeCfProject(cfProject);
@@ -224,6 +288,10 @@ export async function editTenant(slug, { displayName, ownerEmail, cfProject, cus
     fields.custom_domain = cd;
   }
   await tenants.updateTenant(slug, fields);
+
+  if (upgradingToAdvanced) {
+    upgradeTenantToAdvanced(slug).catch((e) => console.error(`[provisioner] upgrade ${slug} failed:`, e.message));
+  }
 
   let domain = null;
   if (domainChanged && fields.custom_domain) {
@@ -329,7 +397,10 @@ export async function resumeAll() {
   const active = rows.filter((r) => r.status === 'active');
   const aiModel = await operatorAiModel();
   for (const r of active) {
-    try { rt.start({ ...runtimeParams(r), aiModel }); } catch (e) { console.error(`[provisioner] resume ${r.slug} failed:`, e.message); }
+    // Instatic only for advanced tenants (lite has no Instatic process).
+    if (r.tier !== 'lite') {
+      try { rt.start({ ...runtimeParams(r), aiModel }); } catch (e) { console.error(`[provisioner] resume ${r.slug} failed:`, e.message); }
+    }
     if (r.od_port) {
       try { odrt.start({ slug: r.slug, odPort: r.od_port }); } catch (e) { console.error(`[provisioner] OD resume ${r.slug} failed:`, e.message); }
     }

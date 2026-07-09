@@ -270,6 +270,17 @@ export async function findUserByEmail(db: DbClient, email: string): Promise<Auth
   return rows[0] ? rowToUser(rows[0]) : null
 }
 
+// The site's Owner (single-site model: there is exactly one). Used by the tenant
+// SSO hand-off to mint an Owner session for a control-plane-authenticated tenant.
+export async function findActiveOwner(db: DbClient): Promise<AuthUser | null> {
+  const rows = await queryUsers(
+    db,
+    `where users.role_id = ${placeholder(db.dialect, 1)} and users.status = ${placeholder(db.dialect, 2)} and users.deleted_at is null limit 1`,
+    ['owner', 'active'],
+  )
+  return rows[0] ? rowToUser(rows[0]) : null
+}
+
 export async function createUser(
   db: DbClient,
   input: {
