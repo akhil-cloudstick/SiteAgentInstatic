@@ -2680,6 +2680,8 @@ export const en: Dict = {
   'fileViewer.screenshotClipboardDenied': 'Browser blocked clipboard access',
   'fileViewer.screenshotPreviewLoading': 'Preview is still loading. Try again in a moment.',
   'fileViewer.screenshotCaptureFailed': 'Could not capture the preview. Please try again.',
+  'fileViewer.screenshotRenderBlank': 'The preview rendered blank. Wait for it to finish loading, then try again.',
+  'fileViewer.screenshotExternalImages': 'This page uses external images or fonts that block in-browser capture. Open it in the desktop app to capture it.',
   'fileViewer.exportPdf': 'Export as PDF',
   'fileViewer.exportPdfAllSlides': 'Export as PDF (all slides)',
   'fileViewer.exportPptxBusy': 'Wait for the current turn to finish.',

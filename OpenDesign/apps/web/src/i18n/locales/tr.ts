@@ -2680,6 +2680,8 @@ export const tr: Dict = {
   'fileViewer.screenshotClipboardDenied': 'Tarayıcı pano erişimini engelledi',
   'fileViewer.screenshotPreviewLoading': 'Önizleme hâlâ yükleniyor. Birazdan tekrar deneyin.',
   'fileViewer.screenshotCaptureFailed': 'Önizleme yakalanamadı. Lütfen tekrar deneyin.',
+  'fileViewer.screenshotRenderBlank': 'The preview rendered blank. Wait for it to finish loading, then try again.',
+  'fileViewer.screenshotExternalImages': 'This page uses external images or fonts that block in-browser capture. Open it in the desktop app to capture it.',
   'fileViewer.exportPdf': 'PDF olarak dışa aktar',
   'fileViewer.exportPdfAllSlides': 'PDF olarak dışa aktar (tüm slaytlar)',
   'fileViewer.exportPptxBusy': 'Güncel sıranın bitmesini bekleyin.',

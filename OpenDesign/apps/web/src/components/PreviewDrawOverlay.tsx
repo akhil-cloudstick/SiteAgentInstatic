@@ -64,6 +64,9 @@ interface Props {
   hideChrome?: boolean;
   sendDisabled?: boolean;
   sendDisabledReason?: string;
+  /** Skip the (unreliable) screenshot capture entirely: the mark is sent with
+   *  its resolved element target + note only, and no "could not capture" toast. */
+  disableScreenshot?: boolean;
   onToolbarClick?: (element: DrawToolbarElement, submitAction?: AnnotationAction) => void;
 }
 
@@ -74,6 +77,46 @@ const TARGET_COLOR = '#1677ff';
 // Render `node` into `host` via a portal when one is provided, otherwise inline.
 function maybePortal(node: ReactNode, host: HTMLElement | null) {
   return host ? createPortal(node, host) : node;
+}
+
+// Ask the preview bridge which element sits under a viewport point (the centre
+// of a free-hand mark). Lets the annotation attach to a real element — so the
+// agent receives a scoped selector even when nothing was explicitly selected
+// and the screenshot capture fails. Resolves null on timeout / no bridge.
+function queryElementAtPoint(
+  iframe: HTMLIFrameElement,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  timeout = 1500,
+): Promise<CaptureTarget | null> {
+  const win = iframe.contentWindow;
+  if (!win) return Promise.resolve(null);
+  const id = `eap-${Math.random().toString(36).slice(2, 10)}`;
+  return new Promise((resolve) => {
+    let done = false;
+    const finish = (value: CaptureTarget | null) => {
+      if (done) return;
+      done = true;
+      window.removeEventListener('message', onMsg);
+      resolve(value);
+    };
+    function onMsg(ev: MessageEvent) {
+      if (ev.source !== win) return;
+      const d = ev.data as { type?: string; id?: string; target?: CaptureTarget | null } | null;
+      if (!d || d.type !== 'od:element-at-point:result' || d.id !== id) return;
+      finish(d.target ?? null);
+    }
+    window.addEventListener('message', onMsg);
+    try {
+      win.postMessage({ type: 'od:element-at-point', id, x, y, w, h }, '*');
+    } catch {
+      finish(null);
+      return;
+    }
+    window.setTimeout(() => finish(null), timeout);
+  });
 }
 
 export function PreviewDrawOverlay({
@@ -88,6 +131,7 @@ export function PreviewDrawOverlay({
   hideChrome = false,
   sendDisabled = false,
   sendDisabledReason,
+  disableScreenshot = false,
   onToolbarClick,
 }: Props) {
   const t = useT();
@@ -524,10 +568,10 @@ export function PreviewDrawOverlay({
     };
   }
 
-  function annotationBounds(): { x: number; y: number; width: number; height: number } | undefined {
+  function annotationBounds(effectiveTarget: CaptureTarget | null = captureTarget): { x: number; y: number; width: number; height: number } | undefined {
     const box = boxBounds();
     const stroke = strokeBounds();
-    const target = captureTarget?.position ?? null;
+    const target = effectiveTarget?.position ?? null;
     const bounds = [box, stroke, target].filter((item): item is { x: number; y: number; width: number; height: number } => Boolean(item));
     if (bounds.length === 0) return undefined;
     if (bounds.length === 1) return bounds[0];
@@ -538,8 +582,8 @@ export function PreviewDrawOverlay({
     return { x: left, y: top, width: Math.max(1, right - left), height: Math.max(1, bottom - top) };
   }
 
-  function markKind(): PreviewVisualMarkKind | undefined {
-    const hasTarget = Boolean(captureTarget);
+  function markKind(effectiveTarget: CaptureTarget | null = captureTarget): PreviewVisualMarkKind | undefined {
+    const hasTarget = Boolean(effectiveTarget);
     const hasVisualMark = hasInk || hasBox;
     if (hasTarget && hasVisualMark) return 'click+stroke';
     if (hasTarget) return 'click';
@@ -676,7 +720,7 @@ export function PreviewDrawOverlay({
 
   async function send(action: AnnotationAction) {
     const hasTarget = Boolean(captureTarget);
-    const shouldCapture = hasInk || hasBox || hasTarget || captureViewport;
+    const shouldCapture = !disableScreenshot && (hasInk || hasBox || hasTarget || captureViewport);
     const canSubmit = shouldCapture || Boolean(note.trim()) || extraFiles.length > 0;
     if (sending || !canSubmit) return;
     // While a task is running the primary Send is disabled (use Queue instead).
@@ -686,6 +730,27 @@ export function PreviewDrawOverlay({
     setCaptureWarning(null);
     setPendingAction(action);
     try {
+      // Attach the mark to the element under the drawn region, so the agent gets
+      // a resolvable, scoped target even if the screenshot fails and no element
+      // was explicitly selected. Falls back to the existing captureTarget/none.
+      let effectiveTarget: CaptureTarget | null = captureTarget;
+      if (!effectiveTarget && (hasBox || hasInk)) {
+        // Query the VISIBLE preview iframe (its coordinate space matches the
+        // drawn box); fall back to the srcDoc bridge frame. Longer timeout for
+        // the SMB dev drive so a slow bridge reply is not dropped.
+        const iframe = activePreviewIframe() ?? snapshotHostIframe();
+        const region = boxBounds() ?? strokeBounds();
+        if (iframe && region) {
+          effectiveTarget = await queryElementAtPoint(
+            iframe,
+            region.x,
+            region.y,
+            region.width,
+            region.height,
+            3000,
+          );
+        }
+      }
       let file: File | null = null;
       if (shouldCapture) {
         let blob: Blob | null = null;
@@ -711,7 +776,7 @@ export function PreviewDrawOverlay({
         }
       }
       const sentWithoutScreenshot = shouldCapture && !file;
-      const kind = markKind();
+      const kind = markKind(effectiveTarget);
       const result = await new Promise<{ ok: boolean; message?: string }>((resolve) => {
         let settled = false;
         const finish = (next: { ok: boolean; message?: string }) => {
@@ -726,10 +791,10 @@ export function PreviewDrawOverlay({
           file,
           note: note.trim(),
           action,
-          filePath: captureTarget?.filePath || filePath,
+          filePath: effectiveTarget?.filePath || filePath,
           markKind: kind,
-          bounds: kind ? annotationBounds() : undefined,
-          target: captureTarget,
+          bounds: kind ? annotationBounds(effectiveTarget) : undefined,
+          target: effectiveTarget,
           extraFiles: extraFiles.length ? extraFiles : undefined,
           ack: finish,
         };

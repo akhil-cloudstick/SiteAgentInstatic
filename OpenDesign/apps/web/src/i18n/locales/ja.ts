@@ -2680,6 +2680,8 @@ export const ja: Dict = {
   'fileViewer.screenshotClipboardDenied': 'ブラウザがクリップボードへのアクセスをブロックしました',
   'fileViewer.screenshotPreviewLoading': 'プレビューを読み込み中です。しばらくしてからもう一度お試しください。',
   'fileViewer.screenshotCaptureFailed': 'プレビューをキャプチャできませんでした。もう一度お試しください。',
+  'fileViewer.screenshotRenderBlank': 'The preview rendered blank. Wait for it to finish loading, then try again.',
+  'fileViewer.screenshotExternalImages': 'This page uses external images or fonts that block in-browser capture. Open it in the desktop app to capture it.',
   'fileViewer.exportPdf': 'PDFとしてエクスポート',
   'fileViewer.exportPdfAllSlides': 'PDFとしてエクスポート（全スライド）',
   'fileViewer.exportPptxBusy': '現在のターンが終わるまでお待ちください。',

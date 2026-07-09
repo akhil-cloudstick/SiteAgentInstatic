@@ -2680,6 +2680,8 @@ export const th: Dict = {
   'fileViewer.screenshotClipboardDenied': 'เบราว์เซอร์บล็อกการเข้าถึงคลิปบอร์ด',
   'fileViewer.screenshotPreviewLoading': 'ตัวอย่างยังคงโหลดอยู่ ลองอีกครั้งในอีกสักครู่',
   'fileViewer.screenshotCaptureFailed': 'ไม่สามารถจับภาพตัวอย่างได้ โปรดลองอีกครั้ง',
+  'fileViewer.screenshotRenderBlank': 'The preview rendered blank. Wait for it to finish loading, then try again.',
+  'fileViewer.screenshotExternalImages': 'This page uses external images or fonts that block in-browser capture. Open it in the desktop app to capture it.',
   'fileViewer.exportPdf': 'เปลี่ยนฟอร์แมตเอาไปเป็น PDF',
   'fileViewer.exportPdfAllSlides': 'ดาวน์โหลดทั้งหน้าเป็น PDF',
   'fileViewer.exportPptxBusy': 'ต้องให้ทำระบบของปัจจุบันจนสำเร็จก่อน',

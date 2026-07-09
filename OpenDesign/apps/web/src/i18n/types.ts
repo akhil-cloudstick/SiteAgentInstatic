@@ -3444,6 +3444,8 @@ export interface Dict {
   'fileViewer.screenshotClipboardDenied': string;
   'fileViewer.screenshotPreviewLoading': string;
   'fileViewer.screenshotCaptureFailed': string;
+  'fileViewer.screenshotRenderBlank': string;
+  'fileViewer.screenshotExternalImages': string;
   'fileViewer.exportPdf': string;
   'fileViewer.exportPdfAllSlides': string;
   'fileViewer.exportPptxBusy': string;

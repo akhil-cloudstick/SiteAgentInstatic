@@ -4,6 +4,7 @@
    Source of truth: C:\Users\itsinfra\Downloads\MMS Design System
    ============================================================ */
 :root {
+  color-scheme: light;
   /* Surface palette — MMS "cream is the canvas, white cards" model. */
   --bg: #f8f1df;
   --bg-app: #f8f1df;

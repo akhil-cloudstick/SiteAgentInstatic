@@ -2905,6 +2905,8 @@ export const zhTW: Dict = {
   "fileViewer.screenshotClipboardDenied": "瀏覽器拒絕寫入剪貼簿",
   "fileViewer.screenshotPreviewLoading": "預覽仍在載入，請稍後再試",
   "fileViewer.screenshotCaptureFailed": "無法截取預覽，請重試",
+  "fileViewer.screenshotRenderBlank": "預覽渲染為空白，請等待其載入完成後重試。",
+  "fileViewer.screenshotExternalImages": "此頁面使用了外部圖片或字體，瀏覽器內截圖受限。請在桌面應用程式中開啟以進行截圖。",
   "fileViewer.exportPdf": "匯出為 PDF",
   "fileViewer.exportPdfAllSlides": "匯出為 PDF（全部投影片）",
   "fileViewer.exportPptxBusy": "請等待當前任務完成。",

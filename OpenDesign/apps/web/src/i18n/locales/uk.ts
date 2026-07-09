@@ -2680,6 +2680,8 @@ export const uk: Dict = {
   'fileViewer.screenshotClipboardDenied': 'Браузер заблокував доступ до буфера обміну',
   'fileViewer.screenshotPreviewLoading': 'Перегляд ще завантажується. Спробуйте за мить.',
   'fileViewer.screenshotCaptureFailed': 'Не вдалося зробити знімок перегляду. Спробуйте ще раз.',
+  'fileViewer.screenshotRenderBlank': 'The preview rendered blank. Wait for it to finish loading, then try again.',
+  'fileViewer.screenshotExternalImages': 'This page uses external images or fonts that block in-browser capture. Open it in the desktop app to capture it.',
   'fileViewer.exportPdf': 'Експортувати як PDF',
   'fileViewer.exportPdfAllSlides': 'Експортувати як PDF (усі слайди)',
   'fileViewer.exportPptxBusy': 'Чекайте, поки поточна черга завершиться.',

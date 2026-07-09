@@ -104,6 +104,32 @@ import { fetchConnectorCatalogSnapshot } from './connectors-state';
 import { PlaceholderCarousel } from './home-hero/PlaceholderCarousel';
 import type { PlaceholderScenario } from './home-hero/placeholderScenarios';
 
+// Explicit edit-scope instruction appended to an annotation prompt so the agent
+// edits ONLY the marked element even when the screenshot capture fails — which
+// is otherwise the sole signal of which element the mark referred to. Prevents
+// the "I'll just rewrite the global tokens / page background" over-reach.
+function annotationScopeHint(detail: AnnotationEventDetail | null | undefined): string {
+  if (!detail) return '';
+  const target = detail.target;
+  const label = (target?.label ?? '').trim();
+  const selector = (target?.selector ?? '').trim();
+  const text = (target?.text ?? '').trim();
+  if (label || selector || target?.elementId) {
+    const descriptors: string[] = [];
+    if (label) descriptors.push(`the \`${label}\` element`);
+    if (selector) descriptors.push(`matching CSS selector \`${selector}\``);
+    if (text) descriptors.push(`with text "${text.slice(0, 80)}"`);
+    const who = descriptors.length ? descriptors.join(', ') : 'the marked element';
+    return `\n\n(Edit scope: apply this ONLY to ${who}. Do NOT change global CSS variables/tokens, the page/body/section background, or any other element. If it cannot be scoped to just that element, ask instead of editing globally.)`;
+  }
+  // Fallback: the user marked a region but the exact element could not be
+  // resolved. Still forbid a global edit so the agent doesn't rewrite tokens.
+  if (detail.markKind || detail.bounds) {
+    return `\n\n(Edit scope: the user marked a specific region/element on the page. Apply this change ONLY to the element(s) in that marked region — do NOT change global CSS variables/tokens, the page/body/section background, or the whole page. If you cannot tell exactly which element, ask instead of editing globally.)`;
+  }
+  return '';
+}
+
 type TranslateFn = (key: keyof Dict, vars?: Record<string, string | number>) => string;
 
 interface TrackedWorkspaceLinkedDir {
@@ -1914,7 +1940,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, Props>(
                   ...visualAttachmentInput,
                 });
               }
-              const prompt = [draft.trim(), detail.note].filter(Boolean).join('\n');
+              const prompt = [draft.trim(), detail.note].filter(Boolean).join('\n') + annotationScopeHint(detail);
               const attachments = sortChatAttachmentsByOrder([...staged, ...uploaded]);
               const nextCommentAttachments = currentCommentAttachments(visualAttachment ? [visualAttachment] : []);
               // Mark draw-overlay → run: tag entry_from='mark' so the dashboard
@@ -1940,7 +1966,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, Props>(
                   ...visualAttachmentInput,
                 });
               }
-              const prompt = [draft.trim(), detail.note].filter(Boolean).join('\n');
+              const prompt = [draft.trim(), detail.note].filter(Boolean).join('\n') + annotationScopeHint(detail);
               const attachments = sortChatAttachmentsByOrder([...staged, ...uploaded]);
               const nextCommentAttachments = currentCommentAttachments(visualAttachment ? [visualAttachment] : []);
               // Mark draw-overlay → run: tag entry_from='mark' so the dashboard

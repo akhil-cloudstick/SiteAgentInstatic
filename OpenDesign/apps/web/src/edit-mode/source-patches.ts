@@ -128,7 +128,11 @@ export function applyManualEditPatch(source: string, patch: ManualEditPatch): Ma
   }
 
   if (patch.kind === 'set-text') {
-    if (hasElementChildren(el)) {
+    // A text element that only wraps inline/phrasing children (e.g. an <h1>
+    // with a styled <span>) edits as plain text — flattening the inline markup
+    // on an actual text change is the intended "text only" behavior. Block
+    // set-text only for real block containers.
+    if (hasElementChildren(el) && !hasOnlyInlineChildren(el)) {
       return { ok: false, source, error: 'This element contains nested markup. Use the HTML tab instead.' };
     }
     el.textContent = patch.value;
@@ -217,6 +221,105 @@ export function readManualEditAttributes(source: string, id: string): Record<str
 export function readManualEditOuterHtml(source: string, id: string): string {
   const doc = parseSource(source);
   return (doc ? findEditableElement(doc, id)?.outerHTML : '') ?? '';
+}
+
+const SYNTHETIC_OD_ID_PREFIXES = ['path-', 'od-', 'dom:', 'pin-', 'file-comment-'];
+
+function isSyntheticOdId(id: string | null | undefined): boolean {
+  if (!id) return true;
+  return SYNTHETIC_OD_ID_PREFIXES.some((prefix) => id.startsWith(prefix));
+}
+
+function slugifyOdId(input: string): string {
+  const base = input
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 40)
+    .replace(/-+$/g, '');
+  return base || 'section';
+}
+
+function uniqueOdId(doc: Document, base: string): string {
+  if (!doc.querySelector(`[data-od-id="${cssEscape(base)}"]`)) return base;
+  for (let n = 2; n < 1000; n += 1) {
+    const candidate = `${base}-${n}`;
+    if (!doc.querySelector(`[data-od-id="${cssEscape(candidate)}"]`)) return candidate;
+  }
+  return `${base}-x`;
+}
+
+function tagFromHtmlHint(htmlHint: string | undefined): string {
+  const match = /^\s*<([a-zA-Z][\w-]*)/.exec(htmlHint ?? '');
+  return match?.[1]?.toLowerCase() ?? '';
+}
+
+function classesFromHtmlHint(htmlHint: string | undefined): string[] {
+  const match = /\sclass\s*=\s*"([^"]*)"/.exec(htmlHint ?? '');
+  const raw = match?.[1];
+  if (!raw) return [];
+  return raw.split(/\s+/).map((c) => c.trim()).filter(Boolean);
+}
+
+export interface EnsureDurableOdIdTarget {
+  elementId: string;
+  selector?: string;
+  htmlHint?: string;
+  text?: string;
+}
+
+export interface EnsureDurableOdIdResult {
+  ok: boolean;
+  source: string;
+  id: string;
+  changed: boolean;
+}
+
+// Annotation/mark mode identifies the marked element with a preview-only
+// synthetic id (e.g. `path-0-2-1`) that is never written to the on-disk file,
+// so the selector handed to the agent matches nothing and it fuzzy-matches the
+// wrong element when component classes repeat. This resolves the marked element
+// in the actual source (the same resolver the manual-edit path uses) and stamps
+// a durable `data-od-id`, returning a selector that truly resolves. It fails
+// safe (ok:false, no write) on any ambiguity so a bad resolve can never corrupt
+// the file or mislabel the wrong element.
+export function ensureDurableOdId(source: string, target: EnsureDurableOdIdTarget): EnsureDurableOdIdResult {
+  const fallback: EnsureDurableOdIdResult = { ok: false, source, id: target.elementId, changed: false };
+  const doc = parseSource(source);
+  if (!doc) return fallback;
+
+  let el = findEditableElement(doc, target.elementId);
+  if (!el && target.selector && !target.selector.startsWith('[data-od-id="path-')) {
+    // Picker/dom-fallback marks carry a real CSS selector; the synthetic
+    // `[data-od-id="path-*"]` selector never matches the file so is skipped.
+    try {
+      el = doc.querySelector(target.selector);
+    } catch {
+      el = null;
+    }
+  }
+  if (!el) return fallback;
+
+  // Positional path/selector resolution can drift (preview normalization,
+  // out-of-band edits). Stamping the wrong element would be worse than the
+  // original bug, so require the opening tag — and every class — from the
+  // snapshot's htmlHint to match the resolved node. If we cannot verify, do
+  // not stamp; the caller then falls back to today's behavior.
+  const expectedTag = tagFromHtmlHint(target.htmlHint);
+  if (!expectedTag || el.tagName.toLowerCase() !== expectedTag) return fallback;
+  const expectedClasses = classesFromHtmlHint(target.htmlHint);
+  if (expectedClasses.some((cls) => !el!.classList.contains(cls))) return fallback;
+
+  const existing = el.getAttribute('data-od-id');
+  if (existing && !isSyntheticOdId(existing)) {
+    // Already durable — reuse it, no write needed (selector already resolves).
+    return { ok: true, source, id: existing, changed: false };
+  }
+
+  const seed = expectedClasses[0] || target.text || el.tagName.toLowerCase();
+  const id = uniqueOdId(doc, slugifyOdId(seed));
+  el.setAttribute('data-od-id', id);
+  return { ok: true, source: serializeSource(doc, source), id, changed: true };
 }
 
 function parseSource(source: string): Document | null {
@@ -593,6 +696,19 @@ function findElementByPath(doc: Document, id: string): Element | null {
 
 function hasElementChildren(el: Element): boolean {
   return Array.from(el.children).some((child) => child.nodeType === 1);
+}
+
+// Inline/phrasing tags a text element may wrap while still editing as plain
+// text. Kept in sync with the bridge's `inlineTextTags` (edit-mode/bridge.ts)
+// so the panel's classification and the save path agree.
+const INLINE_TEXT_TAGS = new Set([
+  'span', 'a', 'strong', 'b', 'em', 'i', 'u', 's', 'small', 'mark', 'sub', 'sup',
+  'br', 'abbr', 'code', 'del', 'ins', 'q', 'cite', 'time', 'wbr', 'bdi', 'bdo', 'kbd', 'var', 'samp',
+]);
+
+function hasOnlyInlineChildren(el: Element): boolean {
+  const children = Array.from(el.children);
+  return children.length > 0 && children.every((child) => INLINE_TEXT_TAGS.has(child.tagName.toLowerCase()));
 }
 
 function setInlineStyles(el: HTMLElement, styles: Partial<ManualEditStyles>): void {

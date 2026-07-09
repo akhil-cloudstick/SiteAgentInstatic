@@ -2680,6 +2680,8 @@ export const ko: Dict = {
   'fileViewer.screenshotClipboardDenied': '브라우저가 클립보드 접근을 차단했습니다',
   'fileViewer.screenshotPreviewLoading': '미리보기를 아직 불러오는 중입니다. 잠시 후 다시 시도하세요.',
   'fileViewer.screenshotCaptureFailed': '미리보기를 캡처할 수 없습니다. 다시 시도해 주세요.',
+  'fileViewer.screenshotRenderBlank': 'The preview rendered blank. Wait for it to finish loading, then try again.',
+  'fileViewer.screenshotExternalImages': 'This page uses external images or fonts that block in-browser capture. Open it in the desktop app to capture it.',
   'fileViewer.exportPdf': 'PDF로 내보내기',
   'fileViewer.exportPdfAllSlides': 'PDF로 내보내기 (모든 슬라이드)',
   'fileViewer.exportPptxBusy': '현재 작업이 끝날 때까지 기다려 주세요.',

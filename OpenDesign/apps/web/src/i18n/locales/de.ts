@@ -2680,6 +2680,8 @@ export const de: Dict = {
   'fileViewer.screenshotClipboardDenied': 'Der Browser hat den Zugriff auf die Zwischenablage blockiert',
   'fileViewer.screenshotPreviewLoading': 'Die Vorschau wird noch geladen. Versuche es gleich erneut.',
   'fileViewer.screenshotCaptureFailed': 'Die Vorschau konnte nicht erfasst werden. Bitte versuche es erneut.',
+  'fileViewer.screenshotRenderBlank': 'The preview rendered blank. Wait for it to finish loading, then try again.',
+  'fileViewer.screenshotExternalImages': 'This page uses external images or fonts that block in-browser capture. Open it in the desktop app to capture it.',
   'fileViewer.exportPdf': 'Als PDF exportieren',
   'fileViewer.exportPdfAllSlides': 'Als PDF exportieren (alle Slides)',
   'fileViewer.exportPptxBusy': 'Warten Sie, bis der aktuelle Turn abgeschlossen ist.',

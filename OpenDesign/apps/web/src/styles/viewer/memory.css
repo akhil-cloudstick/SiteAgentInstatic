@@ -736,7 +736,9 @@
   color: var(--manual-edit-field-text);
   font-size: 10px; min-width: 0;
 }
-.cc-row:focus-within { border-color: var(--accent, #2563eb); }
+/* No focus ring on inspector rows (per design): keep the resting border on
+   focus instead of the accent glow. */
+.cc-row:focus-within { border-color: var(--manual-edit-field-border); }
 .cc-label {
   color: var(--manual-edit-field-muted);
   flex: 0 0 auto; padding-right: 8px;
@@ -778,11 +780,47 @@
   color: var(--manual-edit-field-muted);
 }
 .cc-value > select { cursor: pointer; appearance: none; padding-right: 12px; }
+/* Native <select> popups are OS-drawn: a transparent select + light option text
+   paints cream-on-white in dark theme (unreadable). Give the option list an
+   opaque, theme-flipping surface so the popup is legible in both themes. */
+.cc-value > select option {
+  background: var(--manual-edit-field-bg);
+  color: var(--manual-edit-field-text);
+}
 .cc-unit { flex: 0 0 auto; color: var(--manual-edit-field-muted); font-style: normal; font-size: 11px; }
 .cc-select { position: relative; }
 .cc-chevron {
   position: absolute; right: 0; pointer-events: none;
   color: var(--manual-edit-field-muted); font-style: normal; font-size: 9px;
+}
+/* Inspector dropdowns render the app-wide themed CustomSelect (matching the
+   project's own menus). Size its trigger to sit in the compact field row and
+   drop the standalone-select chrome + focus ring; the popup itself is styled
+   by the shared .od-select-menu / .od-select-option rules. */
+.cc-value > .od-select.cc-select-field { width: 100%; }
+.cc-select-trigger {
+  min-height: 20px;
+  padding: 0 2px 0 6px;
+  gap: 4px;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-xs);
+  color: var(--manual-edit-field-text);
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+.cc-select-trigger .od-select-value { text-align: right; }
+.cc-select-trigger svg { color: var(--manual-edit-field-muted); }
+.cc-select-trigger:hover:not(:disabled),
+.cc-select-trigger[aria-expanded='true'] {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+.cc-select-trigger:focus-visible,
+.cc-select-trigger[aria-expanded='true'] {
+  outline: none;
+  border: none;
+  box-shadow: none;
 }
 .cc-color { padding-right: 4px; position: relative; }
 .cc-color-compact .cc-swatch { margin-left: auto; }

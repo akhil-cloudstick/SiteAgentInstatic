@@ -2895,6 +2895,8 @@ export const zhCN: Dict = {
   "fileViewer.screenshotClipboardDenied": "浏览器拒绝写入剪贴板",
   "fileViewer.screenshotPreviewLoading": "预览还在加载，请稍后再试",
   "fileViewer.screenshotCaptureFailed": "无法截取预览，请重试",
+  "fileViewer.screenshotRenderBlank": "预览渲染为空白，请等待其加载完成后重试。",
+  "fileViewer.screenshotExternalImages": "此页面使用了外部图片或字体，浏览器内截图受限。请在桌面应用中打开以进行截图。",
   "fileViewer.exportPdf": "导出为 PDF",
   "fileViewer.exportPdfAllSlides": "导出为 PDF（全部幻灯片）",
   "fileViewer.exportPptxBusy": "请等待当前任务完成。",

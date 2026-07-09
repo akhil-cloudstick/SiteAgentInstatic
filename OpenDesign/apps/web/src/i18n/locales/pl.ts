@@ -2680,6 +2680,8 @@ export const pl: Dict = {
   'fileViewer.screenshotClipboardDenied': 'Przeglądarka zablokowała dostęp do schowka',
   'fileViewer.screenshotPreviewLoading': 'Podgląd nadal się ładuje. Spróbuj ponownie za chwilę.',
   'fileViewer.screenshotCaptureFailed': 'Nie udało się przechwycić podglądu. Spróbuj ponownie.',
+  'fileViewer.screenshotRenderBlank': 'The preview rendered blank. Wait for it to finish loading, then try again.',
+  'fileViewer.screenshotExternalImages': 'This page uses external images or fonts that block in-browser capture. Open it in the desktop app to capture it.',
   'fileViewer.exportPdf': 'Eksportuj jako PDF',
   'fileViewer.exportPdfAllSlides': 'Eksportuj jako PDF (wszystkie slajdy)',
   'fileViewer.exportPptxBusy': 'Poczekaj, aż bieżąca tura zostanie zakończona.',

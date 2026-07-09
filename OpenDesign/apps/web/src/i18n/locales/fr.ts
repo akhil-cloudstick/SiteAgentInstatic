@@ -2680,6 +2680,8 @@ export const fr: Dict = {
   'fileViewer.screenshotClipboardDenied': 'Le navigateur a bloqué l’accès au presse-papiers',
   'fileViewer.screenshotPreviewLoading': 'L’aperçu est encore en cours de chargement. Réessayez dans un instant.',
   'fileViewer.screenshotCaptureFailed': 'Impossible de capturer l’aperçu. Veuillez réessayer.',
+  'fileViewer.screenshotRenderBlank': 'The preview rendered blank. Wait for it to finish loading, then try again.',
+  'fileViewer.screenshotExternalImages': 'This page uses external images or fonts that block in-browser capture. Open it in the desktop app to capture it.',
   'fileViewer.exportPdf': 'Exporter en PDF',
   'fileViewer.exportPdfAllSlides': 'Exporter en PDF (toutes les diapos)',
   'fileViewer.exportPptxBusy': 'Attendez la fin du tour en cours.',

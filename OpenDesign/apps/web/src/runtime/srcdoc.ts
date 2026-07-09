@@ -513,6 +513,70 @@ function injectSnapshotBridge(doc: string): string {
       return samples > 8;
     } catch (_) { return false; }
   }
+  // Cross-origin images taint the foreignObject->canvas capture (the SVG is
+  // loaded from a data: URL whose opaque origin makes even same-origin
+  // subresources cross-origin). To de-taint, fetch each external image through
+  // the same-origin /api/capture-proxy and inline it as a data: URI before the
+  // clone is serialized into the SVG. Best-effort: any image that can't be
+  // inlined is left as-is (capture may then report an honest tainted-canvas).
+  var __odImageInlineMap = {};
+  function __odBaseOrigin(){
+    try { return new URL(document.baseURI).origin; } catch (e) { return ''; }
+  }
+  function __odIsExternalHttp(abs){
+    try {
+      var u = new URL(abs);
+      if (u.protocol !== 'http:' && u.protocol !== 'https:') return false;
+      return u.origin !== __odBaseOrigin();
+    } catch (e) { return false; }
+  }
+  function __odBlobToDataURL(blob){
+    return new Promise(function(resolve, reject){
+      var fr = new FileReader();
+      fr.onload = function(){ resolve(String(fr.result)); };
+      fr.onerror = function(){ reject(new Error('read failed')); };
+      fr.readAsDataURL(blob);
+    });
+  }
+  function prefetchExternalImages(){
+    var imgs = document.images ? Array.prototype.slice.call(document.images) : [];
+    var seen = {};
+    var jobs = [];
+    imgs.forEach(function(img){
+      var src = img.getAttribute('src');
+      if (!src) return;
+      var abs;
+      try { abs = new URL(src, document.baseURI).href; } catch (e) { return; }
+      if (!__odIsExternalHttp(abs)) return;
+      if (seen[abs] || __odImageInlineMap[abs]) return;
+      seen[abs] = 1;
+      // Bound each fetch so a slow/hung proxy request can never block the whole
+      // capture (a hung fetch would leave Promise.all pending forever and time
+      // the snapshot out). An un-inlined image just stays external.
+      var ctrl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+      var timer = ctrl ? setTimeout(function(){ try { ctrl.abort(); } catch (e) {} }, 4000) : null;
+      jobs.push(
+        fetch('/api/capture-proxy?url=' + encodeURIComponent(abs), ctrl ? { signal: ctrl.signal } : undefined)
+          .then(function(r){ return r && r.ok ? r.blob() : null; })
+          .then(function(blob){ if (blob) return __odBlobToDataURL(blob).then(function(d){ __odImageInlineMap[abs] = d; }); })
+          .catch(function(){})
+          .then(function(){ if (timer) clearTimeout(timer); })
+      );
+    });
+    return Promise.all(jobs);
+  }
+  function inlinePrefetchedImages(root){
+    if (!root || !root.querySelectorAll) return;
+    var imgs = root.querySelectorAll('img');
+    Array.prototype.forEach.call(imgs, function(im){
+      var src = im.getAttribute('src');
+      if (!src) return;
+      var abs;
+      try { abs = new URL(src, document.baseURI).href; } catch (e) { return; }
+      var data = __odImageInlineMap[abs];
+      if (data) { im.setAttribute('src', data); im.removeAttribute('srcset'); im.removeAttribute('crossorigin'); }
+    });
+  }
   // Rasterize the current view (or the whole document, when opts.full) via an
   // SVG <foreignObject>. Returns a Promise so it can be reused by both the
   // od:snapshot message handler AND the export-capture bridge (image export /
@@ -534,6 +598,7 @@ function injectSnapshotBridge(doc: string): string {
       clone.setAttribute('xmlns', 'http://www.w3.org/1999/xhtml');
       inlineSnapshotStyles(document.documentElement, clone);
       pruneHiddenSnapshotNodes(document.documentElement, clone);
+      inlinePrefetchedImages(clone);
       var scroll = full ? { x: 0, y: 0 } : scrollOffset();
       var cloneBody = clone.querySelector('body');
       var rootStyle = clone.getAttribute('style') || '';
@@ -567,16 +632,30 @@ function injectSnapshotBridge(doc: string): string {
           }
           resolve({ dataUrl: canvas.toDataURL('image/png'), w: canvas.width, h: canvas.height });
         } catch (err) {
-          reject(err instanceof Error ? err : new Error(String(err && err.message || err)));
+          // A cross-origin image or font taints the canvas, so toDataURL throws a
+          // SecurityError. Normalize to a stable 'tainted-canvas' code so the host
+          // shows an honest "external images block capture" message instead of a
+          // misleading "still loading".
+          var em = String(err && err.message || err);
+          if ((err && err.name === 'SecurityError') || em.indexOf('aint') >= 0) {
+            reject(new Error('tainted-canvas'));
+            return;
+          }
+          reject(err instanceof Error ? err : new Error(em));
         }
       };
       img.onerror = function(){ reject(new Error('snapshot image failed')); };
       img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+      // Chromium can silently refuse to paint a <foreignObject> loaded via <img>
+      // (neither onload nor onerror fires), which would hang the whole capture
+      // and surface a misleading "Preview is still loading" forever. Fail fast
+      // and honestly instead. (First settle wins, so a real render still resolves.)
+      setTimeout(function(){ reject(new Error('render-timeout')); }, 6000);
     });
   }
   // Exposed so the export-capture bridge (same document) can reuse this renderer.
   window.__odCaptureSnapshot = function(opts){
-    return waitForImages().then(function(){ return captureSnapshot(opts || {}); });
+    return waitForImages().then(prefetchExternalImages).then(function(){ return captureSnapshot(opts || {}); });
   };
   window.addEventListener('message', function(ev){
     var data = ev && ev.data;
@@ -1762,6 +1841,57 @@ function meaningfulDomFallbackTarget(el) {
         stroke = [];
         try { window.parent.postMessage({ type: 'od:pod-clear' }, '*'); } catch (_) {}
       }
+      return;
+    }
+    if (data.type === 'od:element-at-point' && data.id != null) {
+      // Resolve which element the drawn box marks, so the overlay can attach the
+      // annotation to a real element regardless of comment/inspect mode. Pick the
+      // ancestor whose rect best matches the drawn box (highest IoU) so a mark
+      // drawn tightly around an INNER element resolves to that element, not a big
+      // enclosing container. Uses dom-selector fallback for unstamped elements.
+      var eapTarget = null;
+      try {
+        var bx = Number(data.x), by = Number(data.y);
+        var bw = Number(data.w) || 0, bh = Number(data.h) || 0;
+        var cx = bx + bw / 2, cy = by + bh / 2;
+        var pick = document.elementFromPoint(cx, cy);
+        if (bw > 0 && bh > 0) {
+          // 1) Prefer a media element the box mostly covers — the common
+          //    "change this image" case, where a loose box would otherwise
+          //    match a big container that has no usable selector.
+          var media = document.querySelectorAll('img,video');
+          var mediaPick = null, mediaFrac = 0.5;
+          for (var mi = 0; mi < media.length; mi++) {
+            var mr = media[mi].getBoundingClientRect();
+            if (mr.width < 4 || mr.height < 4) continue;
+            var mw = Math.max(0, Math.min(bx + bw, mr.left + mr.width) - Math.max(bx, mr.left));
+            var mh = Math.max(0, Math.min(by + bh, mr.top + mr.height) - Math.max(by, mr.top));
+            var marea = mr.width * mr.height;
+            var frac = marea > 0 ? (mw * mh) / marea : 0;
+            if (frac > mediaFrac) { mediaFrac = frac; mediaPick = media[mi]; }
+          }
+          if (mediaPick) {
+            pick = mediaPick;
+          } else {
+            // 2) Otherwise pick the ancestor whose rect best overlaps the box.
+            var boxArea = bw * bh;
+            var best = pick, bestScore = -1, node = pick;
+            while (node && node !== document.body && node.nodeType === 1) {
+              var r = node.getBoundingClientRect();
+              var iw = Math.max(0, Math.min(bx + bw, r.left + r.width) - Math.max(bx, r.left));
+              var ih = Math.max(0, Math.min(by + bh, r.top + r.height) - Math.max(by, r.top));
+              var inter = iw * ih;
+              var uni = boxArea + (r.width * r.height) - inter;
+              var iou = uni > 0 ? inter / uni : 0;
+              if (iou > bestScore) { bestScore = iou; best = node; }
+              node = node.parentElement;
+            }
+            pick = best;
+          }
+        }
+        if (pick && pick.nodeType === 1) eapTarget = targetFrom(pick, true);
+      } catch (e) {}
+      try { window.parent.postMessage({ type: 'od:element-at-point:result', id: data.id, target: eapTarget }, '*'); } catch (e) {}
       return;
     }
     if (data.type === 'od:preview-scroll-restore') {

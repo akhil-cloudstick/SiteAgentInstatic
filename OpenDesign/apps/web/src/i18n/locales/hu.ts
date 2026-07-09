@@ -2680,6 +2680,8 @@ export const hu: Dict = {
   'fileViewer.screenshotClipboardDenied': 'A böngésző letiltotta a vágólap-hozzáférést',
   'fileViewer.screenshotPreviewLoading': 'Az előnézet még töltődik. Próbálja újra egy pillanat múlva.',
   'fileViewer.screenshotCaptureFailed': 'Az előnézetet nem sikerült rögzíteni. Kérjük, próbálja újra.',
+  'fileViewer.screenshotRenderBlank': 'The preview rendered blank. Wait for it to finish loading, then try again.',
+  'fileViewer.screenshotExternalImages': 'This page uses external images or fonts that block in-browser capture. Open it in the desktop app to capture it.',
   'fileViewer.exportPdf': 'Exportálás PDF-ként',
   'fileViewer.exportPdfAllSlides': 'Exportálás PDF-ként (minden dia)',
   'fileViewer.exportPptxBusy': 'Várj, amíg az aktuális kör befejeződik.',

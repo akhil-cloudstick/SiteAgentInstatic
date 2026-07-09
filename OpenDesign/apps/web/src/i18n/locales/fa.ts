@@ -2680,6 +2680,8 @@ export const fa: Dict = {
   'fileViewer.screenshotClipboardDenied': 'مرورگر دسترسی به کلیپ‌بورد را مسدود کرد',
   'fileViewer.screenshotPreviewLoading': 'پیش‌نمایش هنوز در حال بارگذاری است. لحظه‌ای دیگر دوباره تلاش کنید.',
   'fileViewer.screenshotCaptureFailed': 'ثبت پیش‌نمایش ممکن نشد. لطفاً دوباره تلاش کنید.',
+  'fileViewer.screenshotRenderBlank': 'The preview rendered blank. Wait for it to finish loading, then try again.',
+  'fileViewer.screenshotExternalImages': 'This page uses external images or fonts that block in-browser capture. Open it in the desktop app to capture it.',
   'fileViewer.exportPdf': 'صادرکردن به PDF',
   'fileViewer.exportPdfAllSlides': 'صادرکردن به PDF (همه اسلایدها)',
   'fileViewer.exportPptxBusy': 'منتظر پایان نوبت فعلی باشید.',

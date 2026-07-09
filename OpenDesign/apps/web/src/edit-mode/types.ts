@@ -22,6 +22,7 @@ export interface ManualEditStyles {
   textAlign: string;
   lineHeight: string;
   letterSpacing: string;
+  whiteSpace: string;
   width: string;
   height: string;
   minHeight: string;
@@ -138,7 +139,7 @@ export type ManualEditBridgeMessage =
   | ManualEditTextSessionMessage;
 
 export const MANUAL_EDIT_STYLE_PROPS: readonly (keyof ManualEditStyles)[] = [
-  'fontFamily', 'fontSize', 'fontWeight', 'color', 'textAlign', 'lineHeight', 'letterSpacing',
+  'fontFamily', 'fontSize', 'fontWeight', 'color', 'textAlign', 'lineHeight', 'letterSpacing', 'whiteSpace',
   'width', 'height', 'minHeight',
   'gap', 'flexDirection', 'justifyContent', 'alignItems',
   'backgroundColor', 'opacity',

@@ -2680,6 +2680,8 @@ export const it: Dict = {
   'fileViewer.screenshotClipboardDenied': 'Il browser ha bloccato l\'accesso agli appunti',
   'fileViewer.screenshotPreviewLoading': 'L\'anteprima si sta ancora caricando. Riprova tra un momento.',
   'fileViewer.screenshotCaptureFailed': 'Impossibile acquisire l\'anteprima. Riprova.',
+  'fileViewer.screenshotRenderBlank': 'The preview rendered blank. Wait for it to finish loading, then try again.',
+  'fileViewer.screenshotExternalImages': 'This page uses external images or fonts that block in-browser capture. Open it in the desktop app to capture it.',
   'fileViewer.exportPdf': 'Esporta in PDF',
   'fileViewer.exportPdfAllSlides': 'Esporta in PDF (tutte le diapositive)',
   'fileViewer.exportPptxBusy': 'Attendi la fine del turno in corso.',

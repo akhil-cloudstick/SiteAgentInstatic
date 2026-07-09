@@ -566,6 +566,7 @@ import { registerGenuiRoutes } from './routes/genui.js';
 import { registerDesignSystemRoutes } from './routes/design-systems.js';
 import { registerHostToolsRoutes } from './routes/host-tools.js';
 import { registerPluginAssetRoutes } from './routes/plugins/assets.js';
+import { registerCaptureProxyRoute } from './routes/capture-proxy.js';
 import { registerPluginMarketplaceRoutes } from './routes/plugins/marketplaces.js';
 import { registerPluginEventRoutes, registerPluginRoutes, registerProjectPluginRoutes } from './routes/plugins/index.js';
 import { registerMcpRoutes } from './mcp-routes.js';
@@ -2777,6 +2778,7 @@ export async function startServer({
     });
   });
   registerSocialShareRoutes(app, { http: httpDeps });
+  registerCaptureProxyRoute(app);
   registerProjectRoutes(app, {
     db,
     design,
@@ -3146,7 +3148,7 @@ export async function startServer({
   // plugin context against the live registry. Skills + design systems are
   // walked from disk; craft is empty in v1; atoms come from the
   // first-party catalog. Project-scoped overrides arrive in Phase 4.
-  async function loadPluginRegistryView() {
+  async function computePluginRegistryView() {
     const [skills, designSystems] = await Promise.all([
       listAllSkills(),
       listAllDesignSystems(),
@@ -3163,6 +3165,47 @@ export async function startServer({
       atoms: FIRST_PARTY_ATOMS.map((a) => ({ id: a.id, label: a.label })),
       scenarios,
     };
+  }
+
+  // `computePluginRegistryView` walks the skill + design-system roots from disk
+  // on every call. That scan sat on the hot `POST /api/runs` path (once per
+  // prompt submit) and, over the SMB working drive, made every submit pay a
+  // multi-second directory walk before the run's 202/SSE could start. Cache the
+  // derived view and rebuild it only when a skill/design-system folder is added
+  // or removed (parent-dir mtime changes) or after a short backstop TTL (which
+  // also catches in-folder title/description edits). Signature stats are a
+  // handful of `stat()`s vs. hundreds of readdir/readFile round-trips.
+  const REGISTRY_VIEW_ROOTS = [...SKILL_ROOTS, DESIGN_SYSTEMS_DIR, USER_DESIGN_SYSTEMS_DIR];
+  const REGISTRY_VIEW_TTL_MS = 5 * 60_000;
+  let registryViewCache:
+    | { value: Awaited<ReturnType<typeof computePluginRegistryView>>; signature: string; at: number }
+    | null = null;
+
+  async function registryViewSignature() {
+    const parts = await Promise.all(REGISTRY_VIEW_ROOTS.map(async (dir) => {
+      try {
+        const st = await fs.promises.stat(dir);
+        return `${dir}:${st.mtimeMs}`;
+      } catch {
+        return `${dir}:0`;
+      }
+    }));
+    return parts.join('|');
+  }
+
+  async function loadPluginRegistryView() {
+    const now = Date.now();
+    const signature = await registryViewSignature();
+    if (
+      registryViewCache &&
+      registryViewCache.signature === signature &&
+      now - registryViewCache.at < REGISTRY_VIEW_TTL_MS
+    ) {
+      return registryViewCache.value;
+    }
+    const value = await computePluginRegistryView();
+    registryViewCache = { value, signature, at: now };
+    return value;
   }
 
   // Pure read off `installed_plugins`: rows whose source_kind='bundled'

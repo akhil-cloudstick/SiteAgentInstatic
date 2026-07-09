@@ -2680,6 +2680,8 @@ export const ru: Dict = {
   'fileViewer.screenshotClipboardDenied': 'Браузер заблокировал доступ к буферу обмена',
   'fileViewer.screenshotPreviewLoading': 'Предпросмотр ещё загружается. Повторите попытку через мгновение.',
   'fileViewer.screenshotCaptureFailed': 'Не удалось сделать снимок предпросмотра. Пожалуйста, попробуйте снова.',
+  'fileViewer.screenshotRenderBlank': 'The preview rendered blank. Wait for it to finish loading, then try again.',
+  'fileViewer.screenshotExternalImages': 'This page uses external images or fonts that block in-browser capture. Open it in the desktop app to capture it.',
   'fileViewer.exportPdf': 'Экспорт в PDF',
   'fileViewer.exportPdfAllSlides': 'Экспорт в PDF (все слайды)',
   'fileViewer.exportPptxBusy': 'Дождитесь окончания текущего хода.',

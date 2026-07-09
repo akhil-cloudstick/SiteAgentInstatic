@@ -2680,6 +2680,8 @@ export const ar: Dict = {
   'fileViewer.screenshotClipboardDenied': 'حظر المتصفح الوصول إلى الحافظة',
   'fileViewer.screenshotPreviewLoading': 'لا تزال المعاينة قيد التحميل. حاول مجددًا بعد لحظة.',
   'fileViewer.screenshotCaptureFailed': 'تعذّر التقاط المعاينة. يُرجى المحاولة مرة أخرى.',
+  'fileViewer.screenshotRenderBlank': 'The preview rendered blank. Wait for it to finish loading, then try again.',
+  'fileViewer.screenshotExternalImages': 'This page uses external images or fonts that block in-browser capture. Open it in the desktop app to capture it.',
   'fileViewer.exportPdf': 'تصدير كـ PDF',
   'fileViewer.exportPdfAllSlides': 'تصدير كـ PDF (كل الشرائح)',
   'fileViewer.exportPptxBusy': 'انتظر انتهاء الدور الحالي.',

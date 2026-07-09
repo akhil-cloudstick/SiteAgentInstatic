@@ -99,10 +99,11 @@ import {
   openSandboxedPreviewInNewTab,
   prepareImageExportTarget,
   planDeckImageCapture,
-  requestPreviewSnapshot,
+  requestPreviewSnapshotResult,
   sourceLooksLikeExportableDeck,
   type ExportProgress,
   type ImageExportFormat,
+  type PreviewSnapshotResult,
 } from '../runtime/exports';
 import { copyToClipboard } from '../lib/copy-to-clipboard';
 import { buildReactComponentSrcdoc } from '../runtime/react-component';
@@ -162,6 +163,7 @@ import type {
 import { ManualEditPanel, emptyManualEditDraft, type ManualEditDraft } from './ManualEditPanel';
 import {
   applyManualEditPatch,
+  ensureDurableOdId,
   isManualEditFullHtmlDocument,
   readManualEditAttributes,
   readManualEditFields,
@@ -273,6 +275,12 @@ function previewViewportIcon(viewport: PreviewViewportId): string {
 }
 
 const EXPORT_READY_NUDGE_STORAGE_PREFIX = 'open-design:export-ready-nudge:';
+// Screenshot capture is disabled for now: the in-browser SVG-foreignObject
+// rasterizer is unreliable on image-heavy pages (upstream nexu-io/open-design
+// #3605, and #4084 for the resulting lost annotation metadata). The annotation
+// edit flow no longer needs it. Flip to `true` to re-enable the toolbar buttons
+// + the annotation auto-capture. See docs/annotation-and-screenshot-diagnosis.md.
+const SCREENSHOT_ENABLED = false;
 const COMMENT_SIDE_DOCK_WIDTH = 320;
 const COMMENT_SIDE_DOCK_RAIL_WIDTH = 42;
 const COMMENT_SIDE_DOCK_GAP = 12;
@@ -1132,14 +1140,20 @@ function temporarilyExposeIframeForSnapshot(iframe: HTMLIFrameElement): () => vo
   };
 }
 
-async function requestPreviewSnapshotWithRetry(iframe: HTMLIFrameElement): Promise<Awaited<ReturnType<typeof requestPreviewSnapshot>>> {
+async function requestPreviewSnapshotWithRetry(iframe: HTMLIFrameElement): Promise<PreviewSnapshotResult> {
   const timeouts = [1500, 3000, 6000];
+  let last: PreviewSnapshotResult = { ok: false, reason: 'timeout' };
   for (const timeout of timeouts) {
-    const snapshot = await requestPreviewSnapshot(iframe, timeout);
-    if (snapshot) return snapshot;
+    const result = await requestPreviewSnapshotResult(iframe, timeout);
+    if (result.ok) return result;
+    last = result;
+    // A definitive render failure (blank frame or a cross-origin-tainted
+    // canvas) will not fix itself on retry. Bail out instead of burning the
+    // whole ~10s budget and then reporting a misleading "still loading".
+    if (result.reason === 'render-error') return result;
     await waitForAnimationFrame();
   }
-  return null;
+  return last;
 }
 
 function previewViewportStateKey(projectId: string, file: Pick<ProjectFile, 'name' | 'path'>): string {
@@ -5976,6 +5990,24 @@ function HtmlViewer({
   );
   const [activeCommentTarget, setActiveCommentTarget] = useState<PreviewCommentSnapshot | null>(null);
   const [hoveredCommentTarget, setHoveredCommentTarget] = useState<PreviewCommentSnapshot | null>(null);
+  // The element the draw/annotation overlay should attach to: the marked or
+  // last-hovered element. Passing this to the overlay lets the agent receive a
+  // resolvable selector + scope for that element even when the (fragile)
+  // foreignObject screenshot capture fails — which is otherwise the ONLY way the
+  // element identity reached the agent.
+  const drawOverlayCaptureTarget = useMemo(() => {
+    const target = activeCommentTarget ?? hoveredCommentTarget;
+    if (!target || !target.elementId || target.selectionKind === 'pod') return null;
+    return {
+      filePath: target.filePath,
+      elementId: target.elementId,
+      selector: target.selector,
+      label: target.label,
+      text: target.text,
+      position: target.position,
+      htmlHint: target.htmlHint,
+    };
+  }, [activeCommentTarget, hoveredCommentTarget]);
   // True while the pointer is physically over the floating hover card. The card
   // sits on top of the preview iframe, so reaching it makes the iframe fire a
   // mouseout -> od:comment-leave. We ignore that leave while pinned so the card
@@ -6088,6 +6120,10 @@ function HtmlViewer({
   // cancelled, whether it ends in a save or a modal dismiss.
   const templateExportResolvedRef = useRef(false);
   const screenshotInFlightRef = useRef(false);
+  // Records why the last in-iframe snapshot failed (blank vs cross-origin-tainted
+  // vs still-loading) so the screenshot toast can be honest instead of always
+  // saying "Preview is still loading".
+  const captureFailureReasonRef = useRef<{ reason: string; error?: string } | null>(null);
   const imageExportInFlightRef = useRef(false);
   const [exportToast, setExportToast] = useState<
     { message: string; tone: 'default' | 'success' | 'error' | 'loading' } | null
@@ -8787,6 +8823,46 @@ function HtmlViewer({
     return { ...target, slideIndex: slideState.active };
   }
 
+  // Annotation/mark targets carry a preview-only synthetic id (`path-*`) that is
+  // absent from the on-disk file, so the agent fuzzy-matches and edits the wrong
+  // repeated-component element. Before a marked target becomes a chat attachment
+  // or a saved comment, resolve it in the real source and stamp a durable
+  // `data-od-id`, then hand the agent a selector that actually resolves. Fails
+  // safe (returns the target unchanged) for free pins, file-level or cross-file
+  // targets, and any unresolved/ambiguous case, so a bad resolve never corrupts
+  // the file or mislabels a different element.
+  async function durableizeCommentTarget(target: PreviewCommentTarget): Promise<PreviewCommentTarget> {
+    if (!projectId || !file.name) return target;
+    if (target.filePath && target.filePath !== file.name) return target;
+    const elementId = target.elementId ?? '';
+    if (!elementId || elementId.startsWith('pin-') || elementId.startsWith('file-comment-')) return target;
+    try {
+      const persisted = await fetchProjectFileText(projectId, file.name, {
+        cache: 'no-store',
+        cacheBustKey: Date.now(),
+      });
+      if (persisted == null) return target;
+      const result = ensureDurableOdId(persisted, {
+        elementId,
+        selector: target.selector,
+        htmlHint: target.htmlHint,
+        text: target.text,
+      });
+      if (!result.ok) return target;
+      if (result.changed) {
+        const saved = await writeProjectTextFileDetailed(projectId, file.name, result.source, {
+          artifactManifest: file.artifactManifest,
+          versionSource: 'manual',
+          versionLabel: 'annotate: durable id',
+        });
+        if (!saved.ok) return target;
+      }
+      return { ...target, elementId: result.id, selector: `[data-od-id="${result.id}"]` };
+    } catch {
+      return target;
+    }
+  }
+
   async function sendBoardBatch() {
     if (!activeCommentTarget || !onSendBoardCommentAttachments) return;
     const nextNotes = [...queuedBoardNotes];
@@ -8808,7 +8884,7 @@ function HtmlViewer({
     try {
       const existingAttachments = currentActiveComposerAttachments();
       const attachments = buildBoardCommentAttachments({
-        target: withDeckSlideIndex(targetFromSnapshot(activeCommentTarget)),
+        target: withDeckSlideIndex(await durableizeCommentTarget(targetFromSnapshot(activeCommentTarget))),
         notes: nextNotes,
         includeImageOnly: boardImages.length > 0,
         imageAttachmentCount: boardImages.length,
@@ -8835,7 +8911,7 @@ function HtmlViewer({
     const isFreePin = activeCommentTarget.elementId.startsWith('pin-');
     setSendingBoardBatch(true);
     try {
-      const target = withDeckSlideIndex(targetFromSnapshot(activeCommentTarget));
+      const target = withDeckSlideIndex(await durableizeCommentTarget(targetFromSnapshot(activeCommentTarget)));
       const saved = await onSavePreviewComment(
         target,
         commentDraft.trim(),
@@ -8864,7 +8940,7 @@ function HtmlViewer({
     if (!cleanNote) return false;
     const idSeed = Date.now().toString(36);
     const target: PreviewCommentTarget = activeCommentTarget
-      ? targetFromSnapshot(activeCommentTarget)
+      ? await durableizeCommentTarget(targetFromSnapshot(activeCommentTarget))
       : {
           filePath: file.name,
           elementId: `file-comment-${idSeed}-${Math.floor(Math.random() * 1e6).toString(36)}`,
@@ -9015,6 +9091,16 @@ function HtmlViewer({
     // in the browser screenshot flow (DesignBrowserPanel).
     await waitForAnimationFrame();
     await waitForAnimationFrame();
+    captureFailureReasonRef.current = null;
+    // Unwrap the in-iframe snapshot retry result and remember why it failed so
+    // the caller's toast can be honest (blank / external-images / still-loading)
+    // instead of always blaming a slow preview.
+    const finishWithRetry = async (ifr: HTMLIFrameElement) => {
+      const result = await requestPreviewSnapshotWithRetry(ifr);
+      if (result.ok) return result.snapshot;
+      captureFailureReasonRef.current = { reason: result.reason, error: result.error };
+      return null;
+    };
     // Prefer the daemon's off-screen render (desktop only): viewport-independent
     // and, rendering the artifact alone in a hidden window, it can never capture
     // MMS Design's own UI. `wholeDeck` (Export as image) stitches every slide
@@ -9063,16 +9149,19 @@ function HtmlViewer({
     if (!useUrlLoadPreview) {
       const activeIframe = srcDocPreviewIframeRef.current ?? iframeRef.current;
       if (!activeIframe) return null;
-      await waitForIframeLoadOrTimeout(activeIframe, 250);
+      // Over the SMB working drive the iframe's load event lags well past the
+      // old 250ms cap, so the snapshot bridge had not executed yet. Give it a
+      // realistic window (the retry loop still covers later readiness).
+      await waitForIframeLoadOrTimeout(activeIframe, 1500);
       await waitForAnimationFrame();
-      return requestPreviewSnapshotWithRetry(activeIframe);
+      return finishWithRetry(activeIframe);
     }
 
     const urlIframe = iframeRef.current ?? urlPreviewIframeRef.current;
     if (urlIframe) {
-      await waitForIframeLoadOrTimeout(urlIframe, 250);
+      await waitForIframeLoadOrTimeout(urlIframe, 1500);
       await waitForAnimationFrame();
-      const urlSnapshot = await requestPreviewSnapshotWithRetry(urlIframe);
+      const urlSnapshot = await finishWithRetry(urlIframe);
       if (urlSnapshot) return urlSnapshot;
     }
 
@@ -9080,7 +9169,7 @@ function HtmlViewer({
     if (!srcDocIframe) {
       const activeIframe = iframeRef.current;
       if (!activeIframe) return null;
-      return requestPreviewSnapshotWithRetry(activeIframe);
+      return finishWithRetry(activeIframe);
     }
 
     if (useLazySrcDocTransport && !srcDocShellReady) {
@@ -9092,7 +9181,7 @@ function HtmlViewer({
     const restoreVisibility = temporarilyExposeIframeForSnapshot(srcDocIframe);
     try {
       await waitForAnimationFrame();
-      return requestPreviewSnapshotWithRetry(srcDocIframe);
+      return await finishWithRetry(srcDocIframe);
     } finally {
       restoreVisibility();
     }
@@ -9116,7 +9205,16 @@ function HtmlViewer({
     try {
       const snap = await captureExportImageSnapshot();
       if (!snap) {
-        setExportToast({ message: t('fileViewer.screenshotPreviewLoading'), tone: 'error' });
+        const failure = captureFailureReasonRef.current;
+        const messageKey =
+          failure?.error === 'tainted-canvas'
+            ? 'fileViewer.screenshotExternalImages'
+            : failure?.error === 'empty-render'
+              ? 'fileViewer.screenshotRenderBlank'
+              : failure?.reason === 'render-error'
+                ? 'fileViewer.screenshotCaptureFailed'
+                : 'fileViewer.screenshotPreviewLoading';
+        setExportToast({ message: t(messageKey), tone: 'error' });
         return;
       }
       const result = await copyImageDataUrlToClipboard(snap.dataUrl);
@@ -9942,7 +10040,7 @@ function HtmlViewer({
         <div className="viewer-toolbar-actions">
           {showPreviewToolbarControls ? (
             <div className="viewer-toolbar-inline-actions">
-              {mode === 'preview' ? (
+              {SCREENSHOT_ENABLED && mode === 'preview' ? (
                 <button
                   type="button"
                   className="viewer-action viewer-action-icon od-tooltip"
@@ -10162,7 +10260,7 @@ function HtmlViewer({
                       </>
                     ) : null}
                     <div className="viewer-toolbar-more-separator" role="separator" />
-                    {mode === 'preview' ? (
+                    {SCREENSHOT_ENABLED && mode === 'preview' ? (
                       <button
                         type="button"
                         className="viewer-toolbar-more-item"
@@ -10643,9 +10741,10 @@ function HtmlViewer({
                   <PreviewDrawOverlay
                     active={drawOverlayOpen}
                     onActiveChange={setDrawOverlayOpen}
-                    captureViewport
+                    captureViewport={SCREENSHOT_ENABLED}
+                    disableScreenshot={!SCREENSHOT_ENABLED}
                     captureSnapshot={captureExportImageSnapshot}
-                    captureTarget={null}
+                    captureTarget={drawOverlayCaptureTarget}
                     filePath={file.name}
                     sendDisabled={streaming}
                     sendDisabledReason={t('chat.annotationSendDisabledReason')}

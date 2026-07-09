@@ -2680,6 +2680,8 @@ export const ptBR: Dict = {
   'fileViewer.screenshotClipboardDenied': 'O navegador bloqueou o acesso à área de transferência',
   'fileViewer.screenshotPreviewLoading': 'A pré-visualização ainda está carregando. Tente novamente em instantes.',
   'fileViewer.screenshotCaptureFailed': 'Não foi possível capturar a pré-visualização. Tente novamente.',
+  'fileViewer.screenshotRenderBlank': 'The preview rendered blank. Wait for it to finish loading, then try again.',
+  'fileViewer.screenshotExternalImages': 'This page uses external images or fonts that block in-browser capture. Open it in the desktop app to capture it.',
   'fileViewer.exportPdf': 'Exportar como PDF',
   'fileViewer.exportPdfAllSlides': 'Exportar como PDF (todos os slides)',
   'fileViewer.exportPptxBusy': 'Aguarde o turno atual terminar.',

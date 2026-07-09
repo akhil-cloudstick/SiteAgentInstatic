@@ -170,7 +170,7 @@ export function buildManualEditBridge(enabled: boolean): string {
   var discoverySelector = ${JSON.stringify(MANUAL_EDIT_DISCOVERY_SELECTOR)};
   var hostNodeSelector = ${JSON.stringify(MANUAL_EDIT_HOST_NODE_SELECTOR)};
   var sourcePathAttr = ${JSON.stringify(MANUAL_EDIT_SOURCE_PATH_ATTR)};
-  var styleProps = ['fontFamily','fontSize','fontWeight','color','textAlign','lineHeight','letterSpacing','width','height','minHeight','gap','flexDirection','justifyContent','alignItems','backgroundColor','opacity','padding','paddingTop','paddingRight','paddingBottom','paddingLeft','margin','marginTop','marginRight','marginBottom','marginLeft','border','borderTopWidth','borderRightWidth','borderBottomWidth','borderLeftWidth','borderStyle','borderColor','borderRadius'];
+  var styleProps = ['fontFamily','fontSize','fontWeight','color','textAlign','lineHeight','letterSpacing','whiteSpace','width','height','minHeight','gap','flexDirection','justifyContent','alignItems','backgroundColor','opacity','padding','paddingTop','paddingRight','paddingBottom','paddingLeft','margin','marginTop','marginRight','marginBottom','marginLeft','border','borderTopWidth','borderRightWidth','borderBottomWidth','borderLeftWidth','borderStyle','borderColor','borderRadius'];
   function isHostNode(el){
     return !!(el && el.matches && el.matches(hostNodeSelector));
   }
@@ -266,10 +266,26 @@ export function buildManualEditBridge(enabled: boolean): string {
   function isDiscoveryTarget(el){
     return !!(el && el.matches && el.matches(discoverySelector));
   }
+  var inlineTextTags = { span:1, a:1, strong:1, b:1, em:1, i:1, u:1, s:1, small:1, mark:1, sub:1, sup:1, br:1, abbr:1, code:1, del:1, ins:1, q:1, cite:1, time:1, wbr:1, bdi:1, bdo:1, kbd:1, 'var':1, samp:1 };
+  // Text-semantic elements that should edit as plain text even when they wrap
+  // inline markup. Deliberately excludes div/section/etc. so real layout
+  // containers keep their box (size/padding/background) editing.
+  var textBearingTags = { h1:1, h2:1, h3:1, h4:1, h5:1, h6:1, p:1, span:1, a:1, li:1, button:1, label:1, figcaption:1, blockquote:1, strong:1, em:1, small:1, b:1, i:1, caption:1, dt:1, dd:1, th:1, td:1, summary:1, legend:1 };
   function isTextLeaf(el){
     var text = (el.textContent || '').trim();
     if (!text) return false;
-    return el.children.length === 0;
+    if (el.children.length === 0) return true;
+    // A text-bearing element whose children are all inline/phrasing content
+    // (e.g. an <h1> wrapping a styled <span>) should still edit as plain text,
+    // not fall through to the raw-HTML editor. Editing only rewrites the text
+    // when the user actually changes it, so untouched inline markup is kept.
+    var tag = el.tagName ? el.tagName.toLowerCase() : '';
+    if (!textBearingTags[tag]) return false;
+    for (var i = 0; i < el.children.length; i++) {
+      var childTag = el.children[i].tagName ? el.children[i].tagName.toLowerCase() : '';
+      if (!inlineTextTags[childTag]) return false;
+    }
+    return true;
   }
   function inferKind(el){
     var explicit = el.getAttribute('data-od-edit');

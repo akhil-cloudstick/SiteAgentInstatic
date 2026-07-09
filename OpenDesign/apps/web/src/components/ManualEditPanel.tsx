@@ -2,6 +2,20 @@ import { useEffect, useRef, useState, type CSSProperties, type PointerEvent as R
 import { useT } from '../i18n';
 import { emptyManualEditStyles, type ManualEditHistoryEntry, type ManualEditPatch, type ManualEditStyles, type ManualEditTarget } from '../edit-mode/types';
 import { Icon } from './Icon';
+import { CustomSelect, type CustomSelectOption } from './CustomSelect';
+
+// Inspector dropdowns reuse the app-wide themed CustomSelect so the popup
+// matches the project's own menus (style, not just color) instead of the
+// unstyleable native <select> list.
+function toSelectOptions(
+  values: ReadonlyArray<string>,
+  current: string,
+  placeholder?: string,
+): CustomSelectOption[] {
+  const opts: CustomSelectOption[] = values.map((v) => ({ value: v, label: v || (placeholder ?? '–') }));
+  if (current && !values.includes(current)) opts.unshift({ value: current, label: current });
+  return opts;
+}
 
 export interface ManualEditDraft {
   text: string;
@@ -517,6 +531,7 @@ const DIRECTION_OPTS = ['', 'row', 'column', 'row-reverse', 'column-reverse'];
 const JUSTIFY_OPTS = ['', 'flex-start', 'center', 'flex-end', 'space-between', 'space-around'];
 const ITEMS_OPTS = ['', 'stretch', 'flex-start', 'center', 'flex-end', 'baseline'];
 const BORDER_STYLE_OPTS = ['', 'solid', 'dashed', 'dotted', 'double', 'none'];
+const WHITESPACE_OPTS = ['', 'normal', 'nowrap'];
 const EDITOR_SWATCH_COLORS = [
   '#000000',
   '#ffffff',
@@ -547,6 +562,7 @@ const COLOR_STYLE_PROPS = new Set<keyof ManualEditStyles>(['color', 'backgroundC
 const SELECT_STYLE_OPTIONS: Partial<Record<keyof ManualEditStyles, ReadonlyArray<string>>> = {
   fontFamily: FONT_OPTS.map((option) => option.value),
   fontWeight: WEIGHT_OPTS,
+  whiteSpace: WHITESPACE_OPTS,
   textAlign: ALIGN_OPTS,
   flexDirection: DIRECTION_OPTS,
   justifyContent: JUSTIFY_OPTS,
@@ -665,6 +681,7 @@ function StyleInspector({
             <UnitRow label="Line" value={styles.lineHeight} onChange={(v) => u('lineHeight', v)} unit="" />
             <UnitRow label="Tracking" value={styles.letterSpacing} onChange={(v) => u('letterSpacing', v)} unit="px" autoUnit />
           </PairRow>
+          <DropdownRow label="Wrap" value={styles.whiteSpace} onChange={(v) => u('whiteSpace', v)} options={WHITESPACE_OPTS} placeholder="auto" />
         </Section>
       ) : null}
 
@@ -773,16 +790,20 @@ function DropdownRow({ label, value, onChange, options, placeholder, disabled }:
   options: ReadonlyArray<string>; placeholder?: string; disabled?: boolean;
 }) {
   return (
-    <label className="cc-row">
+    <div className="cc-row">
       <span className="cc-label">{label}</span>
-      <span className="cc-value cc-select">
-        <select value={value} disabled={disabled} onChange={(e) => onChange(e.currentTarget.value)}>
-          {!options.includes(value) && value ? <option value={value}>{value}</option> : null}
-          {options.map((opt) => <option key={opt || '__'} value={opt}>{opt || (placeholder ?? '–')}</option>)}
-        </select>
-        <em className="cc-chevron">▾</em>
+      <span className="cc-value">
+        <CustomSelect
+          className="cc-select-field"
+          triggerClassName="cc-select-trigger"
+          value={value}
+          options={toSelectOptions(options, value, placeholder)}
+          onChange={onChange}
+          ariaLabel={label}
+          disabled={disabled}
+        />
       </span>
-    </label>
+    </div>
   );
 }
 
@@ -792,21 +813,26 @@ function FontRow({ value, onChange }: {
 }) {
   const normalizedValue = normalizeFontFamilyForSelect(value);
   const customValue = normalizedValue === value ? value : '';
+  const options: CustomSelectOption[] = [
+    ...(customValue && !FONT_OPTS.some((option) => option.value === customValue)
+      ? [{ value: customValue, label: fontFamilyLabel(customValue) }]
+      : []),
+    ...FONT_OPTS.map((option) => ({ value: option.value, label: option.label })),
+  ];
   return (
-    <label className="cc-row">
+    <div className="cc-row">
       <span className="cc-label">Font</span>
-      <span className="cc-value cc-select">
-        <select value={normalizedValue} onChange={(event) => onChange(event.currentTarget.value)}>
-          {customValue && !FONT_OPTS.some((option) => option.value === customValue) ? (
-            <option value={customValue}>{fontFamilyLabel(customValue)}</option>
-          ) : null}
-          {FONT_OPTS.map((option) => (
-            <option key={option.label} value={option.value}>{option.label}</option>
-          ))}
-        </select>
-        <em className="cc-chevron">▾</em>
+      <span className="cc-value">
+        <CustomSelect
+          className="cc-select-field"
+          triggerClassName="cc-select-trigger"
+          value={normalizedValue}
+          options={options}
+          onChange={onChange}
+          ariaLabel="Font"
+        />
       </span>
-    </label>
+    </div>
   );
 }
 

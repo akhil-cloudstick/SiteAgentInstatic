@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { JSDOM } from 'jsdom';
 import {
   applyManualEditPatch,
+  ensureDurableOdId,
   isManualEditFullHtmlDocument,
   readManualEditAttributes,
   readManualEditFields,
@@ -229,11 +230,76 @@ describe('manual edit source patches', () => {
     expect(result.source).toContain('Path target');
   });
 
-  it('rejects text patches for nested markup', () => {
+  it('flattens inline markup when a text element is edited as plain text', () => {
+    // A text-bearing element that only wraps inline markup (e.g. <p><strong>…)
+    // now edits as plain text; its inline children are flattened on an actual
+    // text change (matching the panel classification in edit-mode/bridge.ts).
     const result = applyManualEditPatch(baseSource, { kind: 'set-text', id: 'nested', value: 'Flat text' });
+
+    expect(result.ok).toBe(true);
+    expect(result.source).toContain('>Flat text<');
+    expect(result.source).not.toContain('<strong>Nested</strong>');
+  });
+
+  it('still rejects set-text for elements with block-level children', () => {
+    const blockSource = '<!doctype html><html><body><main><div data-od-id="wrap"><p>Block</p></div></main></body></html>';
+    const result = applyManualEditPatch(blockSource, { kind: 'set-text', id: 'wrap', value: 'x' });
 
     expect(result.ok).toBe(false);
     expect(result.error).toContain('nested markup');
+  });
+
+  it('ensureDurableOdId stamps a durable id onto a synthetic path target', () => {
+    // <p>Generated path text</p> is body>main[0]>child[7] => path-0-7, no id.
+    const result = ensureDurableOdId(baseSource, {
+      elementId: 'path-0-7',
+      selector: '[data-od-id="path-0-7"]',
+      htmlHint: '<p>',
+      text: 'Generated path text',
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.changed).toBe(true);
+    expect(result.id).not.toMatch(/^path-/);
+    expect(result.source).toContain(`data-od-id="${result.id}"`);
+  });
+
+  it('ensureDurableOdId reuses an authored id without rewriting the source', () => {
+    const result = ensureDurableOdId(baseSource, {
+      elementId: 'hero-title',
+      selector: '[data-od-id="hero-title"]',
+      htmlHint: '<h1 data-od-id="hero-title">',
+      text: 'Original title',
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.changed).toBe(false);
+    expect(result.id).toBe('hero-title');
+    expect(result.source).toBe(baseSource);
+  });
+
+  it('ensureDurableOdId fails safe when the resolved tag does not match the hint', () => {
+    const result = ensureDurableOdId(baseSource, {
+      elementId: 'path-0-7', // resolves to a <p>
+      htmlHint: '<h1>', // but the mark claims an <h1>
+      text: 'Generated path text',
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.changed).toBe(false);
+    expect(result.source).toBe(baseSource);
+  });
+
+  it('ensureDurableOdId stamps only the marked one of repeated-class elements', () => {
+    const src = '<!doctype html><html><body><main><h2 class="t">A</h2><h2 class="t">B</h2></main></body></html>';
+    // second <h2> is body>main[0]>child[1] => path-0-1
+    const result = ensureDurableOdId(src, { elementId: 'path-0-1', htmlHint: '<h2 class="t">', text: 'B' });
+
+    expect(result.ok).toBe(true);
+    expect(result.changed).toBe(true);
+    const doc = new JSDOM(result.source).window.document;
+    expect(doc.querySelectorAll('[data-od-id]').length).toBe(1);
+    expect(doc.querySelector(`[data-od-id="${result.id}"]`)?.textContent).toBe('B');
   });
 
   it('writes dynamic brand-kit text targets back to the embedded payload', () => {

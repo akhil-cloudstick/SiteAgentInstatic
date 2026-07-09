@@ -2680,6 +2680,8 @@ export const esES: Dict = {
   'fileViewer.screenshotClipboardDenied': 'El navegador bloqueó el acceso al portapapeles',
   'fileViewer.screenshotPreviewLoading': 'La vista previa aún se está cargando. Inténtalo de nuevo en un momento.',
   'fileViewer.screenshotCaptureFailed': 'No se pudo capturar la vista previa. Inténtalo de nuevo.',
+  'fileViewer.screenshotRenderBlank': 'The preview rendered blank. Wait for it to finish loading, then try again.',
+  'fileViewer.screenshotExternalImages': 'This page uses external images or fonts that block in-browser capture. Open it in the desktop app to capture it.',
   'fileViewer.exportPdf': 'Exportar como PDF',
   'fileViewer.exportPdfAllSlides': 'Exportar como PDF (todas las diapositivas)',
   'fileViewer.exportPptxBusy': 'Espera a que termine el turno actual.',
