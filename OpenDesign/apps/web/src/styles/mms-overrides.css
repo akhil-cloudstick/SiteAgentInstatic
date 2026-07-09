@@ -1,0 +1,81 @@
+/* ============================================================
+   MMS rebrand — hide all Git/GitHub (and open-design social) UI.
+   Client requirement: no git actions anywhere in the product.
+   Loaded LAST in index.css so these rules win.
+   ============================================================ */
+
+/* --- Top bar: GitHub-star + Teams removed in JSX; hide any leftover + the
+       open-design social chips (Discord/Threads/YouTube/LinkedIn). --- */
+[data-testid="entry-workspace-teams"],
+.entry-discord-badge,
+.entry-social-badge,
+
+/* --- Design system: "connect a GitHub repo" access panel --- */
+.ds-github-access-panel,
+
+/* --- Chat: "connect a GitHub repo" card --- */
+.chat-connect-repo,
+
+/* --- Publish a design system to GitHub --- */
+[data-testid="design-system-publish"],
+
+/* --- Contribute / share-to-community (each opens a GitHub PR) --- */
+[data-testid="next-step-share-contribute"],
+[data-testid="plugin-details-contribute"],
+[data-testid^="assistant-plugin-contribute"],
+[data-testid^="assistant-plugin-publish"] {
+  display: none !important;
+}
+
+/* ============================================================
+   MMS — Community catalog is revealed on request (not auto-loaded),
+   so the hundreds of preview-loading cards don't slow the workspace.
+   ============================================================ */
+.community-reveal-gate {
+  max-width: 1180px;
+  margin: 8px auto 0;
+  padding: 20px 24px 28px;
+}
+.community-reveal-gate__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.community-reveal-gate__title {
+  margin: 0;
+  font-family: var(--serif);
+  font-weight: 800;
+  font-size: 20px;
+  color: var(--text);
+}
+.community-reveal-gate__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 38px;
+  padding: 0 18px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: #fff;
+  font-family: var(--sans);
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.22) inset, var(--shadow-xs);
+  transition: background var(--dur-quick) var(--ease-out), filter var(--dur-quick) var(--ease-out);
+}
+.community-reveal-gate__btn:hover {
+  background: var(--accent-hover);
+  filter: brightness(1.02);
+}
+.community-reveal-gate__btn:active {
+  transform: translateY(1px);
+}
+.community-reveal-gate__hint {
+  margin: 10px 0 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}

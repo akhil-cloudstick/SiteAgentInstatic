@@ -1,0 +1,57 @@
+// Loads .env and exposes a typed-ish config object. Node built-ins only.
+import { existsSync, readFileSync, mkdirSync, writeFileSync } from 'node:fs';
+import { randomBytes } from 'node:crypto';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+// project root = three levels up from operator/control-plane/lib/
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
+
+// Load .env if present (Node >= 20.6 ships process.loadEnvFile).
+try {
+  const envFile = resolve(ROOT, '.env');
+  if (typeof process.loadEnvFile === 'function' && existsSync(envFile)) {
+    process.loadEnvFile(envFile);
+  }
+} catch { /* env file optional */ }
+
+const abs = (p) => resolve(ROOT, p);
+
+function loadEncKey() {
+  const fromEnv = (process.env.SETTINGS_ENC_KEY || '').trim();
+  if (fromEnv.length >= 64) return Buffer.from(fromEnv.slice(0, 64), 'hex');
+  const stateDir = abs('operator/control-plane/.state');
+  const keyFile = resolve(stateDir, 'enc.key');
+  if (existsSync(keyFile)) return Buffer.from(readFileSync(keyFile, 'utf8').trim(), 'hex');
+  mkdirSync(stateDir, { recursive: true });
+  const key = randomBytes(32);
+  writeFileSync(keyFile, key.toString('hex'), 'utf8');
+  return key;
+}
+
+const cpPort = Number(process.env.CONTROL_PLANE_PORT || 4400);
+const encKey = loadEncKey();
+
+export const config = {
+  root: ROOT,
+  adminDatabaseUrl: process.env.ADMIN_DATABASE_URL
+    || 'postgres://siteagent_admin:siteagent_admin_pw@127.0.0.1:5432/siteagent_platform',
+  pgHost: process.env.PG_HOST || '127.0.0.1',
+  pgPort: Number(process.env.PG_PORT || 5432),
+  pgDb: process.env.PG_DB || 'siteagent_platform',
+  controlPlanePort: cpPort,
+  publicBaseUrl: process.env.PUBLIC_BASE_URL || `http://127.0.0.1:${cpPort}`,
+  instaticDir: abs(process.env.INSTATIC_DIR || './instatic/vendor'),
+  tenantsDir: abs(process.env.TENANTS_DIR || './tenant-users'),
+  tenantBasePort: Number(process.env.TENANT_BASE_PORT || 3101),
+  // Remote client testing: one tenant editor at a time is published on the spare
+  // Tailscale funnel port so a remote client can log in and edit it. The origin
+  // must match the public funnel URL exactly (Instatic checks it for CSRF + uses
+  // it to decide https/Secure cookies).
+  testFunnelPort: Number(process.env.TEST_FUNNEL_PORT || 10000),
+  testFunnelOrigin: process.env.TEST_FUNNEL_ORIGIN || 'https://siteagent.tailbbb0d2.ts.net:10000',
+  encKey,
+  tokenSecret: (process.env.TOKEN_SECRET || encKey.toString('hex')),
+};
+
+export default config;

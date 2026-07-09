@@ -5,7 +5,7 @@ node_modules/
 .DS_Store
 
 # Per-tenant runtime state (instances, uploads, secrets) — never commit
-tenants/
+tenant-users/
 
 # Local dev working dir + auto-generated master key (secret) at repo root — never commit
 .tmp/
@@ -19,6 +19,24 @@ instatic/vendor/.tmp/
 operator/ui/dist/
 operator/ui/.astro/
 
-# Control-plane local state
+# Control-plane local state (never commit — contains enc.key master key)
 operator/control-plane/.state/
+Insatic/operator/control-plane/.state/
 *.log
+
+# OpenDesign vendored app — install artifacts, local daemon state, secrets
+OpenDesign/node_modules/
+OpenDesign/**/node_modules/
+OpenDesign/node_modules.old_delete/
+OpenDesign/**/dist/
+OpenDesign/apps/web/.next/
+OpenDesign/apps/daemon/dist/
+OpenDesign/**/*.sqlite
+OpenDesign/**/*.sqlite3
+OpenDesign/**/config.toml
+OpenDesign/.tmp/
+OpenDesign/.od/
+OpenDesign/pnpm-install*.log
+OpenDesign/build.log
+OpenDesign/rebuild*.log
+OpenDesign/docker-pull.log

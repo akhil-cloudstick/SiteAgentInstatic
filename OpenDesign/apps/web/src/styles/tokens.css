@@ -1,0 +1,203 @@
+/* ============================================================
+   MMS Design — Map My Shops brand workspace
+   Palette: cream + navy default, Approval-Green accent, charcoal dark.
+   Source of truth: C:\Users\itsinfra\Downloads\MMS Design System
+   ============================================================ */
+:root {
+  /* Surface palette — MMS "cream is the canvas, white cards" model. */
+  --bg: #f8f1df;
+  --bg-app: #f8f1df;
+  --bg-panel: #ffffff;
+  --bg-subtle: #f2ead3;
+  --bg-muted: #ede3cb;
+  /* Subtle fills — WARM tan-alpha (not navy) so hovers/skeletons/pills blend
+     with the cream canvas instead of reading as a cool grey "ink" tint. */
+  --bg-fill-tertiary: rgba(122, 98, 56, 0.06);
+  --bg-fill-secondary: rgba(122, 98, 56, 0.10);
+  --bg-fill: rgba(122, 98, 56, 0.16);
+  --bg-elevated: #ffffff;
+  --border: rgba(8, 42, 56, 0.16);
+  --border-strong: rgba(8, 42, 56, 0.28);
+  --border-soft: rgba(8, 42, 56, 0.10);
+
+  /* Text — MMS navy primary, slate secondary. */
+  --text: #082a38;
+  --text-strong: #082a38;
+  --text-muted: #44515a;
+  --text-soft: rgba(8, 42, 56, 0.55);
+  --text-faint: rgba(8, 42, 56, 0.40);
+
+  /* Accent — MMS Approval Green, the signature CTA. */
+  --accent: #1ba957;
+  --accent-strong: #0e8c45;
+  --accent-soft: #d3f0de;
+  --accent-tint: #eaf7ef;
+  --accent-hover: #0e8c45;
+
+  /* Semantic accent tints used by tool / status pills (MMS cue colors). */
+  --green: #1ba957;
+  --green-bg: #e6f6ec;
+  --green-border: #c2e9cf;
+  --blue: #1b5f77;          /* MMS "info" navy-teal */
+  --blue-bg: #e4f0f4;
+  --blue-border: #c4dee6;
+  --purple: #6c3aa6;        /* not in MMS system — left neutral */
+  --purple-bg: #f3ecf9;
+  --purple-border: #e4d4f1;
+  --red: #c23a25;           /* MMS Cape Red family (darkened for text) */
+  --red-bg: #fdeae6;
+  --red-border: #f5c7bf;
+  --amber: #c24a0e;         /* MMS Action Orange (darkened for text) */
+  --amber-bg: #fff0e6;
+
+  /* Warm navy-cast shadows (MMS never uses black shadows). */
+  --shadow-xs: 0 1px 0 rgba(8, 42, 56, 0.04);
+  --shadow-sm: 0 1px 2px rgba(8, 42, 56, 0.05), 0 1px 3px rgba(8, 42, 56, 0.04);
+  --shadow-md: 0 6px 24px rgba(8, 42, 56, 0.08), 0 2px 6px rgba(8, 42, 56, 0.05);
+  --shadow-lg: 0 24px 60px rgba(8, 42, 56, 0.16), 0 8px 16px rgba(8, 42, 56, 0.08);
+
+  /* Corner-radius scale — matches MMS (6 chips, 8 cards/inputs, 12 surfaces,
+     pill primary buttons). xs/md kept for open-design's internal use. */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius: 8px;
+  --radius-md: 10px;
+  --radius-lg: 12px;
+  --radius-pill: 999px;
+
+  /* Motion — MMS easing/durations (soft ease-out entrances, quick feedback). */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --dur-quick: 120ms;
+  --dur-enter: 200ms;
+  --dur-exit: 140ms;
+
+  /* "Active option" indicator — MMS Action Orange, intentionally distinct from
+     the green accent so a primary CTA and a selected state can coexist. */
+  --selected: #ff6b1a;
+  --selected-soft: rgba(255, 107, 26, 0.16);
+
+  /* Type — MMS families: Nunito (display), Nunito Sans (UI), Roboto Mono. */
+  --serif: 'Nunito', 'Nunito Sans', 'Outfit', system-ui, sans-serif;
+  --sans: 'Nunito Sans', 'Segoe UI', Roboto, 'Noto Sans', 'Helvetica Neue', Arial, sans-serif;
+  --mono: 'Roboto Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+
+  --prose-font-size: 15px;
+  --prose-line-height: 1.75;
+  --code-header-bg: #f2ead3;
+  --code-body-bg: #fbf7ec;
+  --code-font-size: 13px;
+  --code-line-height: 1.65;
+}
+
+/* Dark theme variables — MMS charcoal (never a navy gradient), cream text.
+   Shared between explicit [data-theme="dark"] and the OS media query. */
+[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #172026;
+  --bg-app: #172026;
+  --bg-panel: #1e2a31;
+  --bg-subtle: #1b262d;
+  --bg-muted: #22303a;
+  --bg-fill-tertiary: rgba(248, 241, 223, 0.06);
+  --bg-fill-secondary: rgba(248, 241, 223, 0.10);
+  --bg-fill: rgba(248, 241, 223, 0.16);
+  --bg-elevated: #22303a;
+  --border: rgba(248, 241, 223, 0.14);
+  --border-strong: rgba(248, 241, 223, 0.24);
+  --border-soft: rgba(248, 241, 223, 0.10);
+
+  --text: #f8f1df;
+  --text-strong: #ffffff;
+  --text-muted: #b8b0a0;
+  --text-soft: rgba(248, 241, 223, 0.55);
+  --text-faint: rgba(248, 241, 223, 0.38);
+
+  --accent: #3fd98a;
+  --accent-strong: #4fe89a;
+  --accent-soft: #0f2a18;
+  --accent-tint: #0b1f14;
+  --accent-hover: #4fe89a;
+
+  --green: #3fd98a;
+  --green-bg: #0f2a18;
+  --green-border: #1a4028;
+  --blue: #4a9bb8;
+  --blue-bg: #0e2a33;
+  --blue-border: #1a4653;
+  --purple: #a87dd4;
+  --purple-bg: #1e1030;
+  --purple-border: #321a50;
+  --red: #ff8a6f;
+  --red-bg: #2e120c;
+  --red-border: #4a1d14;
+  --amber: #ff8a4d;
+  --amber-bg: #2e1a0a;
+
+  --shadow-xs: 0 1px 0 rgba(0, 0, 0, 0.2);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3), 0 1px 3px rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 6px 24px rgba(0, 0, 0, 0.4), 0 2px 6px rgba(0, 0, 0, 0.25);
+  --shadow-lg: 0 24px 60px rgba(0, 0, 0, 0.6), 0 8px 16px rgba(0, 0, 0, 0.3);
+
+  --selected: #ff8a4d;
+  --selected-soft: rgba(255, 138, 77, 0.20);
+
+  --code-header-bg: #1e2a31;
+  --code-body-bg: #172026;
+}
+
+/* System mode: follow OS preference when no explicit data-theme is set. */
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme]) {
+    color-scheme: dark;
+    --bg: #172026;
+    --bg-app: #172026;
+    --bg-panel: #1e2a31;
+    --bg-subtle: #1b262d;
+    --bg-muted: #22303a;
+    --bg-fill-tertiary: rgba(248, 241, 223, 0.06);
+    --bg-fill-secondary: rgba(248, 241, 223, 0.10);
+    --bg-fill: rgba(248, 241, 223, 0.16);
+    --bg-elevated: #22303a;
+    --border: rgba(248, 241, 223, 0.14);
+    --border-strong: rgba(248, 241, 223, 0.24);
+    --border-soft: rgba(248, 241, 223, 0.10);
+
+    --text: #f8f1df;
+    --text-strong: #ffffff;
+    --text-muted: #b8b0a0;
+    --text-soft: rgba(248, 241, 223, 0.55);
+    --text-faint: rgba(248, 241, 223, 0.38);
+
+    --accent: #3fd98a;
+    --accent-strong: #4fe89a;
+    --accent-soft: #0f2a18;
+    --accent-tint: #0b1f14;
+    --accent-hover: #4fe89a;
+
+    --green: #3fd98a;
+    --green-bg: #0f2a18;
+    --green-border: #1a4028;
+    --blue: #4a9bb8;
+    --blue-bg: #0e2a33;
+    --blue-border: #1a4653;
+    --purple: #a87dd4;
+    --purple-bg: #1e1030;
+    --purple-border: #321a50;
+    --red: #ff8a6f;
+    --red-bg: #2e120c;
+    --red-border: #4a1d14;
+    --amber: #ff8a4d;
+    --amber-bg: #2e1a0a;
+
+    --shadow-xs: 0 1px 0 rgba(0, 0, 0, 0.2);
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3), 0 1px 3px rgba(0, 0, 0, 0.2);
+    --shadow-md: 0 6px 24px rgba(0, 0, 0, 0.4), 0 2px 6px rgba(0, 0, 0, 0.25);
+    --shadow-lg: 0 24px 60px rgba(0, 0, 0, 0.6), 0 8px 16px rgba(0, 0, 0, 0.3);
+
+    --selected: #ff8a4d;
+    --selected-soft: rgba(255, 138, 77, 0.20);
+
+    --code-header-bg: #1e2a31;
+    --code-body-bg: #172026;
+  }
+}
