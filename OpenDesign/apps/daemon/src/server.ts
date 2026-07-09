@@ -643,6 +643,14 @@ import {
 } from './library-tokens.js';
 import { listLibraryTokenOrigins } from './library-store.js';
 import { apiTokenFromEnv, isApiAuthDisabled, isApiTokenMiddlewareEnabled } from './api-token-auth.js';
+import {
+  tenantSsoEnabled,
+  verifyCpSsoToken,
+  verifySession,
+  signSession,
+  parseCookie,
+  SESSION_MAX_AGE_SEC,
+} from './tenant-sso.js';
 import { createOpenDesignPublicMetadataService } from './services/open-design-public-metadata.js';
 import { execCommandViaLoginShell } from './services/login-shell.js';
 import {
@@ -2313,6 +2321,50 @@ export async function startServer({
   await recoverStaleLiveArtifactRefreshes({ projectsRoot: PROJECTS_DIR }).catch((error) => {
     console.warn('[od] Failed to recover stale live artifact refreshes:', error);
   });
+
+  // ---- Tenant SSO (multi-tenant hub) ----------------------------------------
+  // Per-tenant hosting only (OD_SSO_SECRET set by the control-plane). The hub
+  // redirects the tenant here with a signed hand-off token; we validate it and
+  // set the od_session cookie. A gate then requires that session for the
+  // human-facing surface (SPA + /artifacts + /frames). /api keeps its own
+  // bearer/origin auth. Plain local dev (no OD_SSO_SECRET) is unaffected.
+  app.get('/sso', (req, res) => {
+    const payload = verifyCpSsoToken(String(req.query.token ?? ''));
+    if (!payload) {
+      res
+        .status(401)
+        .type('html')
+        .send('<h1>Sign-in link invalid or expired</h1><p>Return to your hub and open the workspace again.</p>');
+      return;
+    }
+    res.setHeader(
+      'Set-Cookie',
+      `od_session=${signSession(payload.sub)}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${SESSION_MAX_AGE_SEC}`,
+    );
+    res.redirect('/');
+  });
+  if (tenantSsoEnabled()) {
+    app.use((req, res, next) => {
+      const p = req.path;
+      // /api has its own bearer/origin auth; /sso is the entry point; probes stay open.
+      if (
+        p === '/sso' ||
+        p === '/api' ||
+        p.startsWith('/api/') ||
+        p === '/health' ||
+        p === '/ready' ||
+        p === '/version'
+      ) {
+        return next();
+      }
+      if (verifySession(parseCookie(req.headers.cookie, 'od_session'))) return next();
+      res
+        .status(401)
+        .type('html')
+        .send('<h1>Sign in required</h1><p>Open this workspace from your hub.</p>');
+      return undefined;
+    });
+  }
 
   if (fs.existsSync(STATIC_DIR)) {
     app.use(express.static(STATIC_DIR));
