@@ -3,6 +3,7 @@ import { existsSync, readFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { randomBytes } from 'node:crypto';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { tmpdir } from 'node:os';
 
 // repo root = three levels up from Operator/control-plane/lib/ (all abs() paths
 // like Instatic/, Operator/tenant-users/ resolve against it).
@@ -47,6 +48,12 @@ export const config = {
   instaticDir: abs(process.env.INSTATIC_DIR || './Instatic'),
   tenantsDir: abs(process.env.TENANTS_DIR || './Operator/tenant-users'),
   tenantBasePort: Number(process.env.TENANT_BASE_PORT || 3101),
+  // OpenDesign per-tenant daemons. Each gets its own OD_DATA_DIR + port. The data
+  // dir MUST be on LOCAL disk (OpenDesign uses SQLite, which can't run on the SMB
+  // share), so it defaults under the OS temp dir — never under tenant-users/ (S:).
+  openDesignDir: abs('OpenDesign'),
+  odDataBase: process.env.OD_TENANTS_DIR || resolve(tmpdir(), 'siteagent-od'),
+  odBasePort: Number(process.env.OD_BASE_PORT || 7500),
   // Remote client testing: one tenant editor at a time is published on the spare
   // Tailscale funnel port so a remote client can log in and edit it. The origin
   // must match the public funnel URL exactly (Instatic checks it for CSRF + uses

@@ -6,6 +6,7 @@ import { query } from '../registry/db.mjs';
 import * as tenants from '../registry/tenants.mjs';
 import { createInvite } from '../registry/tenantUsers.mjs';
 import * as rt from '../runtime/tenantRuntime.mjs';
+import * as odrt from '../runtime/odRuntime.mjs';
 import { initTenantSite, attachTenantDomain, deleteTenantSite } from '../deployer/deploy.mjs';
 import { encrypt, decrypt, genPassword, genSecretKeyHex } from '../lib/crypto.mjs';
 import { getSettings } from '../registry/settings.mjs';
@@ -48,6 +49,13 @@ async function allocatePort() {
   return Number(rows[0].m) + 1;
 }
 
+// OpenDesign daemon port — a range distinct from Instatic's (tenantBasePort).
+async function allocateOdPort() {
+  const { rows } = await query(
+    'select coalesce(max(od_port), $1 - 1) as m from siteagent_control.tenants', [config.odBasePort]);
+  return Number(rows[0].m) + 1;
+}
+
 // Mint the tenant's Postgres schema + least-privilege role (idempotent).
 async function mintDb(schema, role, dbPassword) {
   // role: create or rotate password
@@ -86,6 +94,7 @@ export async function provisionTenant({ name, ownerEmail, cfProject, customDomai
   const dbPassword = genPassword();
   const secretKey = genSecretKeyHex();
   const port = await allocatePort();
+  const odPort = await allocateOdPort();
   const cf_project = sanitizeCfProject(cfProject) || `siteagent-${slug}`;
   const custom_domain = String(customDomain || '').trim().toLowerCase() || null;
 
@@ -102,6 +111,7 @@ export async function provisionTenant({ name, ownerEmail, cfProject, customDomai
     secret_key_enc: encrypt(secretKey),
     cf_project, custom_domain, last_error: null,
     display_name: String(name || '').trim() || slug,
+    od_port: odPort, od_status: 'stopped',
   });
 
   // Mint the tenant's one-time invite link (the URL the operator shares). Only the
@@ -110,7 +120,7 @@ export async function provisionTenant({ name, ownerEmail, cfProject, customDomai
   const inviteUrl = `${config.publicBaseUrl}/invite/${inviteToken}`;
 
   // Fire-and-forget: never await the saga here (that is what blocked the page).
-  runProvisionSaga({ slug, schema, role, dbPassword, secretKey, port })
+  runProvisionSaga({ slug, schema, role, dbPassword, secretKey, port, odPort })
     .catch((e) => console.error(`[provisioner] saga ${slug} crashed:`, e?.message ?? e));
 
   return {
@@ -131,7 +141,7 @@ export async function createTenantInvite(slug) {
 // The heavy provisioning steps, run in the background. Advances provision_state so
 // the console can show progress; on failure it cleans up and marks the row 'failed'
 // (visible, with last_error) instead of throwing to an HTTP caller that already left.
-async function runProvisionSaga({ slug, schema, role, dbPassword, secretKey, port }) {
+async function runProvisionSaga({ slug, schema, role, dbPassword, secretKey, port, odPort }) {
   try {
     // 1) DB
     await mintDb(schema, role, dbPassword);
@@ -142,6 +152,18 @@ async function runProvisionSaga({ slug, schema, role, dbPassword, secretKey, por
     const healthy = await rt.waitHealthy(port, 60000);
     if (!healthy) throw new Error('Instance did not become healthy in time.');
     await tenants.updateTenant(slug, { provision_state: 'up' });
+
+    // 2b) OpenDesign daemon for this tenant (ALL tiers get OpenDesign). Isolated by
+    //     its own OD_DATA_DIR on local disk + port. Non-fatal: an OD hiccup records
+    //     od_status='failed' but doesn't fail the whole provision.
+    try {
+      odrt.start({ slug, odPort });
+      const odHealthy = await odrt.waitHealthy(odPort, 90000);
+      await tenants.updateTenant(slug, { od_status: odHealthy ? 'running' : 'failed' });
+    } catch (e) {
+      console.error(`[provisioner] OpenDesign start for ${slug} failed (non-fatal):`, e.message);
+      await tenants.updateTenant(slug, { od_status: 'failed' });
+    }
 
     // 3) self-onboard: the tenant creates their site + owner via the share link.
     await tenants.updateTenant(slug, { provision_state: 'seeded' });
@@ -247,6 +269,7 @@ export async function deprovisionTenant(slug, { force = false, deleteCf = false 
   }
 
   rt.stop(slug);
+  odrt.stop(slug); // stop this tenant's OpenDesign daemon too
   await new Promise((r) => setTimeout(r, 1500)); // let connections close
 
   await query(`drop schema if exists ${schema} cascade`);
@@ -259,6 +282,7 @@ export async function deprovisionTenant(slug, { force = false, deleteCf = false 
   end $$;`);
 
   try { rmSync(rt.tenantPaths(slug).dir, { recursive: true, force: true }); } catch { /* ignore */ }
+  try { rmSync(odrt.odPaths(slug).dataDir, { recursive: true, force: true }); } catch { /* ignore */ }
 
   if (row) await tenants.updateTenant(slug, { status: 'removed', provision_state: 'removed' });
   return { slug, removed: true };
@@ -306,6 +330,9 @@ export async function resumeAll() {
   const aiModel = await operatorAiModel();
   for (const r of active) {
     try { rt.start({ ...runtimeParams(r), aiModel }); } catch (e) { console.error(`[provisioner] resume ${r.slug} failed:`, e.message); }
+    if (r.od_port) {
+      try { odrt.start({ slug: r.slug, odPort: r.od_port }); } catch (e) { console.error(`[provisioner] OD resume ${r.slug} failed:`, e.message); }
+    }
   }
   return active.map((r) => r.slug);
 }

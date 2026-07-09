@@ -53,6 +53,9 @@ alter table siteagent_control.tenants add column if not exists display_name text
 -- Plan tier: lite = OpenDesign only (no Instatic provisioned); advanced = OpenDesign + Instatic (two-card hub).
 -- NOT NULL default 'advanced' backfills every existing tenant (incl. akhil) to advanced with no migration.
 alter table siteagent_control.tenants add column if not exists tier text not null default 'advanced';
+-- Per-tenant OpenDesign daemon (its own OD_DATA_DIR + port, spawned by the control-plane).
+alter table siteagent_control.tenants add column if not exists od_port   int;
+alter table siteagent_control.tenants add column if not exists od_status text not null default 'stopped';  -- stopped|running|failed
 
 -- Per-task-type AI model routing + global guidance (managed multi-tenant).
 --   ai_categories: [{ slug, name, description, modelId, isDefault, builtin }]

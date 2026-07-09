@@ -10,6 +10,7 @@ import { deployTenant, hasBakedOutput } from './deployer/deploy.mjs';
 import { handleGateway } from './ai-gateway/gateway.mjs';
 import { signTenantToken, verifyTenantToken } from './lib/crypto.mjs';
 import * as rt from './runtime/tenantRuntime.mjs';
+import * as odrt from './runtime/odRuntime.mjs';
 import { handleHub } from './hub/hub.mjs';
 
 const CORS = {
@@ -37,8 +38,10 @@ function decorate(row) {
   return {
     ...row,
     running: rt.isRunning(row.slug),
+    od_running: odrt.isRunning(row.slug),
     published: hasBakedOutput(row.slug),
     admin_url: row.port ? `http://127.0.0.1:${row.port}/admin` : null,
+    od_url: row.od_port ? `http://127.0.0.1:${row.od_port}` : null,
     ai_base_url: `${config.publicBaseUrl}/ai/${signTenantToken(row.slug)}`,
   };
 }
