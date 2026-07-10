@@ -38,6 +38,9 @@ export function start(tenant) {
     // with this same secret and mints its own session (Phase 3b, OD-side /sso).
     OD_SSO_SECRET: config.tokenSecret,
     OD_TENANT_SLUG: slug,
+    // Advanced tenants: where this tenant's Instatic lives, so "Share to CMS" can
+    // push there. Unset for lite tenants (no Instatic) -> the button is inert.
+    ...(tenant.instaticUrl ? { OD_INSTATIC_URL: tenant.instaticUrl } : {}),
     // Operator-managed AI keys are injected here in Phase 6 (env overrides OD's
     // in-workspace key files, and the in-app BYOK UI is disabled).
     ...(tenant.aiGatewayUrl ? { OD_AI_GATEWAY_URL: tenant.aiGatewayUrl } : {}),

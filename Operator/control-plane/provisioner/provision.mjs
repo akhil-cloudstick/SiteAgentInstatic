@@ -176,7 +176,7 @@ async function runProvisionSaga({ slug, schema, role, dbPassword, secretKey, por
     // on local disk + port. Non-fatal: an OD hiccup records od_status='failed' but
     // doesn't fail the whole provision.
     try {
-      odrt.start({ slug, odPort });
+      odrt.start({ slug, odPort, instaticUrl: advanced ? `http://127.0.0.1:${port}` : undefined });
       const odHealthy = await odrt.waitHealthy(odPort, 90000);
       await tenants.updateTenant(slug, { od_status: odHealthy ? 'running' : 'failed' });
     } catch (e) {
@@ -402,7 +402,8 @@ export async function resumeAll() {
       try { rt.start({ ...runtimeParams(r), aiModel }); } catch (e) { console.error(`[provisioner] resume ${r.slug} failed:`, e.message); }
     }
     if (r.od_port) {
-      try { odrt.start({ slug: r.slug, odPort: r.od_port }); } catch (e) { console.error(`[provisioner] OD resume ${r.slug} failed:`, e.message); }
+      const instaticUrl = r.tier !== 'lite' ? `http://127.0.0.1:${r.port}` : undefined;
+      try { odrt.start({ slug: r.slug, odPort: r.od_port, instaticUrl }); } catch (e) { console.error(`[provisioner] OD resume ${r.slug} failed:`, e.message); }
     }
   }
   return active.map((r) => r.slug);
