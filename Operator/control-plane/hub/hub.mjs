@@ -62,10 +62,16 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => (
 // (server-side) and mints its own session — see Phase 3 (OD) / Phase 4 (Instatic).
 export function ssoUrl(tenant, target) {
   const token = signValue({ sub: tenant.slug, target, kind: 'sso' }, SSO_TTL_SEC);
-  if (target === 'instatic') return `http://127.0.0.1:${tenant.port}/admin/api/cms/sso?token=${encodeURIComponent(token)}`;
-  // OpenDesign: the tenant browses the per-tenant Next.js web port, which proxies
-  // /sso (and /api,/artifacts,/frames) to the daemon so cookies stay same-origin.
-  return `http://127.0.0.1:${tenant.od_web_port}/sso?token=${encodeURIComponent(token)}`;
+  // All hand-offs go through the public gateway origin (funnel :443), not the
+  // tenant's localhost port, so the URLs work for a remote client.
+  if (target === 'instatic') {
+    // Root path -> the gateway's session-routed catch-all forwards it to THIS
+    // tenant's Instatic (the request carries the sa_hub cookie set at login).
+    return `${config.gatewayOrigin}/admin/api/cms/sso?token=${encodeURIComponent(token)}`;
+  }
+  // OpenDesign: /od/<slug>/* -> the tenant's Next.js web (basePath=/od/<slug>),
+  // which proxies /sso (and /api,/artifacts,/frames) to the daemon.
+  return `${config.gatewayOrigin}/od/${tenant.slug}/sso?token=${encodeURIComponent(token)}`;
 }
 
 // ---- page templates ------------------------------------------------------

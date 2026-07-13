@@ -68,6 +68,18 @@ export const config = {
   // it to decide https/Secure cookies).
   testFunnelPort: Number(process.env.TEST_FUNNEL_PORT || 10000),
   testFunnelOrigin: process.env.TEST_FUNNEL_ORIGIN || 'https://siteagent.tailbbb0d2.ts.net:10000',
+  // Single public gateway: ONE Tailscale funnel port fronts the whole flow
+  // (operator + every tenant's OpenDesign + Instatic). Funnel allows only
+  // 443 / 8443 / 10000; 443 gives the cleanest URL (no port). The control plane
+  // reverse-proxies from here to the right per-tenant backend. gatewayOrigin is
+  // the browser-facing origin every backend must trust for CSRF + cookies.
+  gatewayPort: Number(process.env.GATEWAY_PORT || 443),
+  gatewayOrigin: process.env.GATEWAY_ORIGIN || 'https://siteagent.tailbbb0d2.ts.net',
+  // The control-plane opens the funnel itself on boot (once listening) and closes
+  // it on shutdown, so restart = live. Set GATEWAY_FUNNEL=0 to manage it by hand.
+  gatewayFunnelEnabled: process.env.GATEWAY_FUNNEL !== '0',
+  // The Astro operator console (proxied under /operator). `astro dev`/`preview`.
+  operatorConsolePort: Number(process.env.OPERATOR_CONSOLE_PORT || 3000),
   encKey,
   tokenSecret: (process.env.TOKEN_SECRET || encKey.toString('hex')),
 };

@@ -11,6 +11,12 @@ import { fileURLToPath } from 'node:url';
 const DAEMON_PORT = Number(process.env.OD_PORT) || 7456;
 const DAEMON_ORIGIN = `http://127.0.0.1:${DAEMON_PORT}`;
 
+// When run behind the SiteAgent public gateway, each tenant's web is served under
+// /od/<slug>. Next.js prefixes assets, links, and rewrite SOURCES with this base
+// (rewrite destinations to the absolute daemon origin stay unprefixed, so the
+// daemon still receives /api, /sso, … at its root). Empty = served at root.
+const BASE_PATH = (process.env.OD_WEB_BASE_PATH || '').trim().replace(/\/$/, '');
+
 // The regular CLI build still ships as a static export so the `od` daemon can
 // serve a single-process production build. Packaged desktop builds opt into a
 // server runtime with OD_WEB_OUTPUT_MODE=server; in that mode the web sidecar
@@ -158,6 +164,7 @@ function configuredAllowedDevHosts(): string[] {
 const nextConfig: NextConfig = {
   allowedDevOrigins: configuredAllowedDevHosts(),
   outputFileTracingRoot: WORKSPACE_ROOT,
+  ...(BASE_PATH ? { basePath: BASE_PATH } : {}),
   reactStrictMode: true,
   // Emit browser sourcemaps so packaged-runtime exceptions can be symbolicated
   // by PostHog. `tools/pack/src/web-sourcemaps.ts` runs after `next build`

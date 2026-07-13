@@ -43,6 +43,9 @@ export function start(tenant) {
       origin,
       `http://localhost:${odPort}`,
       ...(webPort ? [`http://127.0.0.1:${webPort}`, `http://localhost:${webPort}`] : []),
+      // Public gateway: browser /api calls arrive with the funnel Origin, proxied
+      // through the Next web to this daemon — it must trust that origin for CSRF.
+      config.gatewayOrigin,
     ].join(','),
     // SSO: the control-plane signs a short-lived token; the OD daemon verifies it
     // with this same secret and mints its own session (Phase 3b, OD-side /sso).
@@ -94,7 +97,11 @@ export function start(tenant) {
       ...process.env,
       OD_PORT: String(odPort),
       OD_WEB_PORT: String(webPort),
-      OD_ALLOWED_ORIGINS: `${origin},http://127.0.0.1:${webPort},http://localhost:${webPort}`,
+      OD_ALLOWED_ORIGINS: `${origin},http://127.0.0.1:${webPort},http://localhost:${webPort},${config.gatewayOrigin}`,
+      // Serve the whole app under /od/<slug> so it lives behind the single public
+      // gateway. Next.js prefixes its assets, links, and rewrite sources with this,
+      // and the gateway routes /od/<slug>/* here. next.config reads OD_WEB_BASE_PATH.
+      OD_WEB_BASE_PATH: `/od/${slug}`,
       // Each tenant's Next dev server needs its OWN build dir, or they collide on
       // the shared apps/web `.next` lock ("Another next dev server is already
       // running"). One `.next-<slug>` per tenant keeps them independent.

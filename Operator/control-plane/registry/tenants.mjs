@@ -6,8 +6,12 @@ export async function listTenants() {
     `select t.*,
             d.url        as last_url,
             d.status     as last_deploy_status,
-            d.started_at as last_deploy_at
+            d.started_at as last_deploy_at,
+            tu.status          as hub_status,
+            tu.invite_token_enc,
+            tu.invite_expires_at
        from siteagent_control.tenants t
+       left join siteagent_control.tenant_users tu on tu.tenant_slug = t.slug
        left join lateral (
          select url, status, started_at
            from siteagent_control.deploys

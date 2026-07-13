@@ -2,25 +2,26 @@
 // One row per tenant (the owner's hub account). Only the invite token's keyed hash
 // and the scrypt password hash are ever stored.
 import { query } from './db.mjs';
-import { genInviteToken, hashToken, hashPassword, verifyPassword } from '../lib/crypto.mjs';
-
-const INVITE_TTL_DAYS = 14;
+import { genInviteToken, hashToken, hashPassword, verifyPassword, encrypt } from '../lib/crypto.mjs';
 
 // Create/replace the tenant's hub user and mint a fresh one-time invite token.
-// Returns the RAW token (share it once); only its hash is persisted.
+// Returns the RAW token (share it once); only its hash + an encrypted copy persist.
+// Invite links do NOT expire — they stay valid until accepted (or regenerated),
+// so a link the operator shared can't go stale on its own.
 export async function createInvite(tenantSlug, email) {
   const token = genInviteToken();
   await query(
     `insert into siteagent_control.tenant_users
-       (tenant_slug, email, invite_token_hash, invite_expires_at, status)
-     values ($1,$2,$3, now() + ($4 || ' days')::interval, 'invited')
+       (tenant_slug, email, invite_token_hash, invite_token_enc, invite_expires_at, status)
+     values ($1,$2,$3,$4, null, 'invited')
      on conflict (tenant_slug) do update set
        email = coalesce(excluded.email, siteagent_control.tenant_users.email),
        invite_token_hash = excluded.invite_token_hash,
-       invite_expires_at = excluded.invite_expires_at,
+       invite_token_enc = excluded.invite_token_enc,
+       invite_expires_at = null,
        status = 'invited',
        updated_at = now()`,
-    [tenantSlug, email || null, hashToken(token), String(INVITE_TTL_DAYS)],
+    [tenantSlug, email || null, hashToken(token), encrypt(token)],
   );
   return token;
 }
@@ -44,7 +45,8 @@ export async function acceptInvite(token, password) {
   await query(
     `update siteagent_control.tenant_users
         set password_hash = $2, status = 'active',
-            invite_token_hash = null, invite_expires_at = null, updated_at = now()
+            invite_token_hash = null, invite_token_enc = null,
+            invite_expires_at = null, updated_at = now()
       where id = $1`,
     [user.id, hashPassword(password)],
   );

@@ -43,7 +43,9 @@
     "out/types/**/*.ts",
     "out/dev/types/**/*.ts",
     ".next-akhil/types/**/*.ts",
-    ".next-akhil/dev/types/**/*.ts"
+    ".next-akhil/dev/types/**/*.ts",
+    ".next-adithyan-manoj/types/**/*.ts",
+    ".next-adithyan-manoj/dev/types/**/*.ts"
   ],
   "exclude": [
     "node_modules",

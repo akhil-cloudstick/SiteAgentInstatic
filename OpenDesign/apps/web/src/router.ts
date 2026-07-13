@@ -6,6 +6,28 @@
 import { useSyncExternalStore } from 'react';
 import { LIBRARY_UI_VISIBLE } from './features/libraryUi';
 
+// Behind the SiteAgent public gateway the app is served under /od/<slug>
+// (Next.js basePath). `window.location` carries that prefix but our routes are
+// authored base-less (`/projects`, `/design-systems`), so strip it when READING
+// the location and add it back when WRITING history. Served at the root (local
+// dev, no gateway) BASE_PATH is '' and both helpers are no-ops.
+const BASE_PATH: string = (() => {
+  if (typeof window === 'undefined') return '';
+  const m = window.location.pathname.match(/^\/od\/[a-z0-9-]+/);
+  return m ? m[0] : '';
+})();
+
+function stripBase(pathname: string): string {
+  if (BASE_PATH && (pathname === BASE_PATH || pathname.startsWith(`${BASE_PATH}/`))) {
+    return pathname.slice(BASE_PATH.length) || '/';
+  }
+  return pathname;
+}
+
+function withBase(path: string): string {
+  return BASE_PATH && path.startsWith('/') ? BASE_PATH + path : path;
+}
+
 // Entry-shell sub-views. The home/project landing renders one of three
 // columns and each sub-view now owns a top-level path so the browser
 // back/forward buttons work, deep links are shareable, and per-tab
@@ -188,16 +210,16 @@ function readHistoryIndex(): number {
 
 export function navigate(route: Route, opts: { replace?: boolean } = {}): void {
   const target = buildPath(route);
-  const current = window.location.pathname;
+  const current = stripBase(window.location.pathname);
   if (target === current) return;
   const index = readHistoryIndex();
   // `replace` keeps the current depth (it swaps the entry in place); a push
   // adds one level so the entry we are leaving becomes the "previous layer".
   const nextState: HistoryState = { odIndex: opts.replace ? index : index + 1 };
   if (opts.replace) {
-    window.history.replaceState(nextState, '', target);
+    window.history.replaceState(nextState, '', withBase(target));
   } else {
-    window.history.pushState(nextState, '', target);
+    window.history.pushState(nextState, '', withBase(target));
   }
   queueMicrotask(() => {
     window.dispatchEvent(new PopStateEvent('popstate'));
@@ -222,7 +244,7 @@ let cachedPathname: string | null = null;
 let cachedRoute: Route | null = null;
 
 function getRouteSnapshot(): Route {
-  const pathname = window.location.pathname;
+  const pathname = stripBase(window.location.pathname);
   if (cachedPathname !== pathname || cachedRoute === null) {
     cachedPathname = pathname;
     cachedRoute = parseRoute(pathname);

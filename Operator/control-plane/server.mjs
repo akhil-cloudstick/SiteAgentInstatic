@@ -8,10 +8,12 @@ import * as tenantsRepo from './registry/tenants.mjs';
 import { provisionTenant, deprovisionTenant, startTenant, resumeAll, editTenant, repairTenantCf, pointTestFunnel, createTenantInvite } from './provisioner/provision.mjs';
 import { deployTenant, hasBakedOutput } from './deployer/deploy.mjs';
 import { handleGateway } from './ai-gateway/gateway.mjs';
-import { signTenantToken, verifyTenantToken } from './lib/crypto.mjs';
+import { signTenantToken, verifyTenantToken, decrypt } from './lib/crypto.mjs';
 import * as rt from './runtime/tenantRuntime.mjs';
 import * as odrt from './runtime/odRuntime.mjs';
 import { handleHub } from './hub/hub.mjs';
+import { handleGatewayProxy, handleGatewayUpgrade } from './gateway/proxy.mjs';
+import { openFunnel, closeFunnel } from './gateway/funnel.mjs';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -35,8 +37,20 @@ function readJson(req) {
 
 // Add the live runtime status + gateway token to a tenant row for the UI.
 function decorate(row) {
+  // Hub identity: `hub_activated` once the tenant has set a password. Until then the
+  // console shows the pending invite link — decrypted from the stored token so the
+  // SAME link stays valid across page views (no re-mint that would burn a shared copy).
+  const hubActivated = row.hub_status === 'active';
+  const inviteExpired = row.invite_expires_at && new Date(row.invite_expires_at) <= new Date();
+  let inviteToken = null;
+  if (!hubActivated && !inviteExpired && row.invite_token_enc) {
+    try { inviteToken = decrypt(row.invite_token_enc); } catch { inviteToken = null; }
+  }
   return {
     ...row,
+    invite_token_enc: undefined, // never expose the at-rest blob to the client
+    hub_activated: hubActivated,
+    invite_url: inviteToken ? `${config.gatewayOrigin}/invite/${inviteToken}` : null,
     running: rt.isRunning(row.slug),
     od_running: odrt.isRunning(row.slug),
     published: hasBakedOutput(row.slug),
@@ -167,11 +181,25 @@ const server = http.createServer(async (req, res) => {
       deployTenant(slug).catch((e) => console.error(`[deploy] ${slug} failed:`, e.message));
       return send(res, 202, { accepted: true, slug });
     }
+
+    // Anything the control-plane didn't claim: reverse-proxy it to the right
+    // backend — /od/<slug>/* to that tenant's OpenDesign, everything else to the
+    // current hub session's Instatic (at root). Returns false if nothing matched.
+    if (await handleGatewayProxy(req, res, method, path)) return;
+
+    // A bare visit with no session lands on the tenant sign-in.
+    if (method === 'GET' && path === '/') { res.writeHead(302, { location: '/login' }); return res.end(); }
     send(res, 404, { error: 'not found' });
   } catch (e) {
     console.error('[control-plane]', e.message);
     send(res, 400, { error: e.message });
   }
+});
+
+// WebSocket / upgrade passthrough so Next.js dev HMR and live editor bridges work
+// through the gateway (best-effort; a failed upgrade just closes the socket).
+server.on('upgrade', (req, socket, head) => {
+  handleGatewayUpgrade(req, socket, head).catch(() => socket.destroy());
 });
 
 // --- resilience: a single tenant/child failure must never crash the whole
@@ -188,14 +216,20 @@ process.on('unhandledRejection', (err) => {
 // --- boot ---
 await migrate();
 const resumed = await resumeAll();
-server.listen(config.controlPlanePort, '127.0.0.1', () => {
+server.listen(config.controlPlanePort, '127.0.0.1', async () => {
   console.log(`[control-plane] listening on ${config.publicBaseUrl}`);
   console.log(`[control-plane] resumed instances: ${resumed.length ? resumed.join(', ') : '(none)'}`);
+  console.log(`[gateway] public entry  : ${config.gatewayOrigin}  (funnel :${config.gatewayPort} -> 127.0.0.1:${config.controlPlanePort})`);
+  console.log(`[gateway] tenant sign-in: ${config.gatewayOrigin}/login`);
+  console.log(`[gateway] operator      : ${config.gatewayOrigin}/operator   (open — no login)`);
+  // Open the funnel only now the gated server is up (never point it at ungated code).
+  await openFunnel();
 });
 
 // --- graceful shutdown: stop tenant instances so none are orphaned ---
 function shutdown() {
   console.log('\n[control-plane] shutting down; stopping tenant instances...');
+  closeFunnel().catch(() => {}); // take the public gateway down first
   for (const r of rt.listRunning()) rt.stop(r.slug);
   // Also stop each tenant's OpenDesign (daemon + Next web), or they orphan and
   // keep holding their ports — the next boot's resume would then fail to rebind.

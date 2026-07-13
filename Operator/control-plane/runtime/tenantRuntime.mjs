@@ -55,15 +55,16 @@ export function start(tenant) {
     INSTATIC_SSO_SECRET: config.tokenSecret,
     INSTATIC_TENANT_SLUG: slug,
     PUBLIC_ORIGIN: `http://127.0.0.1:${port}`,
-    // CLIENT-TEST ONLY (see pending.md): trust the public test-funnel origin for
-    // the CSRF check so the ONE tenant currently pointed at the funnel accepts a
-    // remote client login. We use VITE_ALLOWED_ORIGIN (Instatic's dev-allowlist,
-    // read into a static const at module load) rather than PUBLIC_ORIGIN because
-    // running tenants from this mapped network drive makes Bun load
-    // server/auth/security.ts twice — the request-time copy never sees the
-    // configured publicOrigins, but the static DEV_ORIGIN_ALLOWLIST is identical
-    // in both copies. See server/auth/security.ts.
-    VITE_ALLOWED_ORIGIN: config.testFunnelOrigin,
+    // Public gateway: the browser reaches this tenant's Instatic through the
+    // single funnel origin (funnel :443 -> control-plane -> session-routed proxy),
+    // so its state-changing requests carry Origin = gatewayOrigin. Trust it for
+    // the CSRF check. We use VITE_ALLOWED_ORIGIN (Instatic's dev-allowlist, a
+    // static const read at module load) rather than PUBLIC_ORIGIN because running
+    // tenants from this mapped network drive makes Bun load server/auth/security.ts
+    // twice — the request-time copy never sees the configured publicOrigins, but
+    // the static DEV_ORIGIN_ALLOWLIST is identical in both copies. The SSO handler
+    // redirects to a RELATIVE /admin, so no localhost bounce. See security.ts.
+    VITE_ALLOWED_ORIGIN: config.gatewayOrigin,
     // Managed AI: point the tenant's OpenRouter driver at this tenant's signed
     // AI-Gateway URL. This alone enables managed mode (gateway credential
     // auto-provided, provider settings locked). The MODEL is read LIVE from the

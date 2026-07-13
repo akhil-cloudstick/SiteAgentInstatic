@@ -1,5 +1,8 @@
 'use client';
 
+// FIRST import on the client: patch fetch/EventSource to prefix daemon-bound
+// paths with the gateway basePath (/od/<slug>) before any request is made.
+import './gateway-basepath-shim';
 import dynamic from 'next/dynamic';
 import type { ReactNode } from 'react';
 

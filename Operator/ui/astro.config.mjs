@@ -6,6 +6,11 @@ export default defineConfig({
   output: 'server',
   adapter: node({ mode: 'standalone' }),
   server: { port: 3000, host: '127.0.0.1' },
+  // Served behind the single public gateway under /operator (funnel :443 ->
+  // control-plane -> proxy to this Astro server). `base` makes every asset, link,
+  // and form action resolve under that prefix so nothing 404s. Local access is
+  // then http://127.0.0.1:3000/operator.
+  base: '/operator',
   // Astro's CSRF origin check compares a POST's Origin against the request host.
   // Behind the Tailscale funnel the public Origin (…ts.net:8443) differs from the
   // proxied host, so every form POST was rejected with "Cross-site POST form

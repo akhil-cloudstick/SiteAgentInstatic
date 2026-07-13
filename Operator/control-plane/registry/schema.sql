@@ -86,3 +86,8 @@ create table if not exists siteagent_control.tenant_users (
   created_at        timestamptz not null default now(),
   updated_at        timestamptz not null default now()
 );
+-- Invite token, encrypted at rest (AES-256-GCM). The *hash* is what we match on;
+-- this reversible copy only exists so the operator console can show the pending
+-- invite link inline (stable, until accepted) without re-minting on every view.
+-- A raw DB leak still can't replay it — decrypting needs the enc key (.state/enc.key).
+alter table siteagent_control.tenant_users add column if not exists invite_token_enc text;

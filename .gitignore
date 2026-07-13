@@ -10,6 +10,12 @@ tenant-users/
 # Local dev working dir + auto-generated master key (secret) at repo root — never commit
 .tmp/
 
+# Cloudflare Wrangler local cache — never commit
+.wrangler/
+
+# Local throwaway DB introspection scripts with hardcoded creds — never commit
+Instatic/_creds.ts
+
 # Instatic vendored install artifacts (the source is cloned; deps/build are local)
 Instatic/node_modules/
 Instatic/dist/

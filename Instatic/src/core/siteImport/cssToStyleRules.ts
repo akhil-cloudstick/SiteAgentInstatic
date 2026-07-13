@@ -141,8 +141,19 @@ function classifySelector(selector: string): { kind: StyleRuleKind; name: string
  * Get the CSSStyleSheet constructor, falling back to the happy-dom window
  * object in test environments where the constructor is not on globalThis.
  */
+let __sheetCtorLogged = false
 function getSheetConstructor(): typeof CSSStyleSheet | null {
-  if (typeof CSSStyleSheet !== 'undefined') return CSSStyleSheet
+  const bare = typeof CSSStyleSheet !== 'undefined'
+  if (!__sheetCtorLogged) {
+    __sheetCtorLogged = true
+    console.error(
+      '[cssToStyleRules] getSheetConstructor — typeof CSSStyleSheet:',
+      typeof CSSStyleSheet,
+      '| globalThis.CSSStyleSheet:',
+      typeof (globalThis as unknown as { CSSStyleSheet?: unknown }).CSSStyleSheet,
+    )
+  }
+  if (bare) return CSSStyleSheet
   // happy-dom test env: available on globalThis.window
   const w =
     typeof window !== 'undefined'

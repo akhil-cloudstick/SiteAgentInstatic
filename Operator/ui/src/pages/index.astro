@@ -47,7 +47,7 @@ if (Astro.request.method === 'POST') {
       const cf = f.get('deleteCf') ? '?cf=1' : '';
       await fetch(`${CP}/api/tenants/${f.get('slug')}${cf}`, { method: 'DELETE' });
     }
-    if (!error) return Astro.redirect('/');
+    if (!error) return Astro.redirect(import.meta.env.BASE_URL);
   } catch (e) { error = e.message; }
 }
 
@@ -61,14 +61,11 @@ try {
 
 // The tenant "open"/share link is the HUB LOGIN (one login → two cards), NOT the
 // raw Instatic admin — sharing the admin URL would bypass SSO and the two-card
-// hub. CLIENT-TEST ONLY (see pending.md): when this page is reached over the
-// public funnel (…ts.net) it can't link to 127.0.0.1, so it points at /open?slug=…,
-// which publishes that tenant on the public funnel and redirects the client there
-// (one tenant public at a time). The direct Instatic admin URL is still available
-// per-tenant in the Details dialog for operator debugging.
-const viaFunnel = (Astro.request.headers.get('host') || '').includes('.ts.net');
+// hub. Everything now lives behind ONE public gateway origin, so a ROOT-RELATIVE
+// /login works whether the operator opens this console locally or over the funnel
+// (the browser resolves it against the same gateway origin the client will use).
 for (const t of tenants) {
-  t.instance_url = viaFunnel ? `/open?slug=${encodeURIComponent(t.slug)}` : `${CP}/login`;
+  t.instance_url = '/login';
 }
 
 // Friendly progress label + bar percentage per provisioning step.
@@ -153,9 +150,13 @@ const fmtDate = (s) => (s ? new Date(s).toLocaleString() : '—');
                 <span class={'pill ' + (t.status === 'active' ? 'ok' : (t.status === 'failed' ? 'bad' : 'warn'))}>{t.status}</span>
                 {t.status === 'failed' && t.last_error && (<div class="hint" style="margin-top:4px">{t.last_error}</div>)}
               </td>
-              <td>{t.running
-                ? (<div class="row-actions"><a href={t.instance_url} target="_blank" rel="noreferrer">hub login ↗</a><button class="iconbtn copy" type="button" data-copy={t.instance_url} title="Copy the tenant's hub login link (one login → two cards)" aria-label="Copy hub login link"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button></div>)
-                : (<span class="pill warn">stopped</span>)}</td>
+              <td>{t.hub_activated
+                ? (t.running
+                    ? (<div class="row-actions"><a href={t.instance_url} target="_blank" rel="noreferrer">hub login ↗</a><button class="iconbtn copy" type="button" data-copy={t.instance_url} title="Copy the tenant's hub login link (one login → two cards)" aria-label="Copy hub login link"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button></div>)
+                    : (<span class="pill warn">stopped</span>))
+                : (t.invite_url
+                    ? (<div class="row-actions"><a href={t.invite_url} target="_blank" rel="noreferrer" title="One-time link the tenant opens to set their password">invite link ↗</a><button class="iconbtn copy" type="button" data-copy={t.invite_url} title="Copy the one-time invite link to share with the tenant" aria-label="Copy invite link"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button><div class="hint" style="width:100%;margin-top:2px">awaiting password setup</div></div>)
+                    : (<button class="ghost" type="button" onclick={`saInvite('${t.slug}')`} title="Generate a one-time invite link for this tenant to share">Generate invite</button>))}</td>
               <td>{(t.custom_domain || t.pages_url)
                 ? (<a href={t.custom_domain ? `https://${t.custom_domain}` : t.pages_url} target="_blank" rel="noreferrer">{(t.custom_domain || t.pages_url).replace('https://', '')} ↗</a>)
                 : (<span class="hint">not published</span>)}
@@ -165,7 +166,6 @@ const fmtDate = (s) => (s ? new Date(s).toLocaleString() : '—');
                 <div class="row-actions">
                   <button class="ghost" type="button" onclick={`document.getElementById('dlg-${t.slug}').showModal()`}>Details</button>
                   <button class="ghost" type="button" onclick={`document.getElementById('edit-${t.slug}').showModal()`}>Edit</button>
-                  <button class="ghost" type="button" onclick={`saInvite('${t.slug}')`} title="Generate a one-time invite link to share with the tenant">Invite link</button>
                   {!t.running && t.status !== 'provisioning' && (
                     <form method="POST"><input type="hidden" name="intent" value="start" /><input type="hidden" name="slug" value={t.slug} /><button class="ghost" type="submit">Start</button></form>
                   )}
@@ -279,13 +279,20 @@ const fmtDate = (s) => (s ? new Date(s).toLocaleString() : '—');
   </style>
 
   <script is:inline>
-    // Generate a one-time invite link for a tenant and show it to copy/share.
+    // (Re)generate a one-time invite link for a tenant, then reload so the stable
+    // link renders inline in the Instance column (it stays valid until the tenant
+    // sets a password — we never re-mint on view, which is what used to invalidate
+    // an already-shared link). Only shown as a fallback for legacy/expired invites.
     async function saInvite(slug) {
       try {
-        const r = await fetch('http://127.0.0.1:4400/api/tenants/' + slug + '/invite', { method: 'POST' });
+        // Local access hits the control-plane directly on :4400; through the public
+        // gateway the API is same-origin (/api). Pick by hostname.
+        const isLocal = location.hostname === '127.0.0.1' || location.hostname === 'localhost';
+        const apiBase = isLocal ? 'http://127.0.0.1:4400' : '';
+        const r = await fetch(apiBase + '/api/tenants/' + slug + '/invite', { method: 'POST' });
         const j = await r.json();
         if (!r.ok || !j.url) throw new Error(j.error || 'failed');
-        window.prompt('One-time invite link for ' + slug + ' — copy and share it:', j.url);
+        location.reload();
       } catch (e) { alert('Invite failed: ' + e.message); }
     }
     window.saInvite = saInvite;
