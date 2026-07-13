@@ -33,6 +33,7 @@ import { renderOfficialDesignerPrompt } from './official-system.js';
 import { renderDiscoveryAndPhilosophy, renderSharedFramesBlock } from './discovery.js';
 import { renderDirectionSpecBlock } from './directions.js';
 import { DECK_FRAMEWORK_DIRECTIVE } from './deck-framework.js';
+import { renderCmsOutputContract } from './cms-contract.js';
 import { renderMediaGenerationContract } from './media-contract.js';
 import { IMAGE_MODELS } from '../media/models.js';
 import { renderPanelPrompt } from './panel.js';
@@ -567,6 +568,19 @@ export interface ComposeInput {
   // native tools; text_artifact runs (BYOK/plain) deliver source through
   // assistant-text <artifact> blocks.
   executionProfile?: ExecutionProfile | undefined;
+  // True when this daemon is an Instatic-connected tenant daemon (the server
+  // computes it from `OD_INSTATIC_URL` + tenant SSO). When set, the mandatory
+  // CMS output contract (`CMS_OUTPUT_CONTRACT`) is pinned late for web-page
+  // surfaces so everything the tenant builds imports into the CMS cleanly and
+  // stays editable. Invisible to the tenant — it is a system-prompt rule, not a
+  // UI toggle. Decks and media surfaces are exempt (the page contract would
+  // break their own frameworks).
+  instaticCmsMode?: boolean | undefined;
+  // Live contents of the operator's CMS rule file (`Operator/rules/
+  // templateRule.md`), read by the server via `loadTemplateRuleBody()` and
+  // passed in so the composer stays pure. When omitted, the embedded fallback
+  // rule in `cms-contract.ts` is used. Only consulted when `instaticCmsMode`.
+  cmsRuleBody?: string | undefined;
 }
 
 export function composeSystemPrompt({
@@ -606,6 +620,8 @@ export function composeSystemPrompt({
   mediaExecution,
   byokMediaDefaults,
   executionProfile,
+  instaticCmsMode,
+  cmsRuleBody,
 }: ComposeInput): string {
   // Injection resistance goes FIRST — before everything else — so no later
   // section (skill body, user instructions, project instructions, tool result)
@@ -945,6 +961,18 @@ export function composeSystemPrompt({
 
   if (resolvedExecutionProfile === 'filesystem') {
     parts.push(FILESYSTEM_HANDOFF_OVERRIDE);
+  }
+
+  // Instatic CMS output contract. Pinned late (after skills, design systems,
+  // and the deck/media frameworks) so its "overrides every skill and design
+  // system below on conflict" precedence beats any Tailwind-pushing skill or
+  // Tailwind-delivered design system earlier in the stack. Gated to web-page
+  // surfaces only: Ask mode has no artifact, media surfaces forbid HTML, and
+  // decks own an incompatible fixed-canvas framework — forcing the page
+  // contract on those would break them. The tenant never sees this; it is a
+  // system-prompt rule the server switches on for Instatic-connected daemons.
+  if (instaticCmsMode && !isAskMode && !isMediaSurface && !isDeckProject) {
+    parts.push(`\n\n---\n\n${renderCmsOutputContract(cmsRuleBody)}`);
   }
 
   // Mid-conversation clarification reuses the same `<question-form>` flow as

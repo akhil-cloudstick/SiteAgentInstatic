@@ -10,6 +10,7 @@
 import { link, lstat, mkdir, readdir, readFile, realpath, rename, rm, stat, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import JSZip from 'jszip';
+import { normalizeFileMap } from './cms-normalize.js';
 import {
   inferLegacyManifest,
   parsePersistedManifest,
@@ -331,7 +332,35 @@ export async function buildProjectArchive(projectsRoot, projectId, root, metadat
   }
 
   const zip = new JSZip();
+  // Buffer the HTML/CSS pages and run the template-rule normalizer over them
+  // (inline CSS, strip/convert Tailwind, wrap editable text, drop orphan
+  // stylesheets) so the downloaded site complies with the rule. Binary assets
+  // stream straight through. Non-blocking: on any error we fall back to raw.
+  const mtimeByRel = {};
+  const textMap = {};
+  const binaryEntries = [];
   for (const entry of entries) {
+    mtimeByRel[entry.relPath] = entry.mtime;
+    if (/\.(html?|css)$/i.test(entry.relPath)) {
+      textMap[entry.relPath] = { bytes: await readFile(entry.fullPath) };
+    } else {
+      binaryEntries.push(entry);
+    }
+  }
+  let outText = textMap;
+  try {
+    const normalized = await normalizeFileMap(textMap);
+    outText = normalized.files;
+  } catch {
+    // keep raw text files
+  }
+  for (const [relPath, file] of Object.entries(outText)) {
+    zip.file(relPath, Buffer.from(file.bytes), {
+      date: new Date(mtimeByRel[relPath] ?? Date.now()),
+      binary: true,
+    });
+  }
+  for (const entry of binaryEntries) {
     const buf = await readFile(entry.fullPath);
     zip.file(entry.relPath, buf, {
       date: new Date(entry.mtime),

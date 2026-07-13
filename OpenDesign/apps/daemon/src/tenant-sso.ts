@@ -23,6 +23,16 @@ export function tenantSsoEnabled(env: NodeJS.ProcessEnv = process.env): boolean 
   return ssoSecret(env).length > 0;
 }
 
+// Sign a short-lived hand-off token for the tenant's Instatic (target 'instatic').
+// Used by "Share to CMS" to open an Owner session on Instatic before pushing.
+export function signInstaticSsoToken(slug: string, ttlSec = 120): string {
+  const b64 = Buffer.from(
+    JSON.stringify({ sub: slug, target: 'instatic', kind: 'sso', exp: Date.now() + ttlSec * 1000 }),
+    'utf8',
+  ).toString('base64url');
+  return `${b64}.${hmacB64(ssoSecret(), b64)}`;
+}
+
 interface SignedPayload {
   sub: string;
   kind: string;

@@ -63,7 +63,9 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => (
 export function ssoUrl(tenant, target) {
   const token = signValue({ sub: tenant.slug, target, kind: 'sso' }, SSO_TTL_SEC);
   if (target === 'instatic') return `http://127.0.0.1:${tenant.port}/admin/api/cms/sso?token=${encodeURIComponent(token)}`;
-  return `http://127.0.0.1:${tenant.od_port}/sso?token=${encodeURIComponent(token)}`; // od
+  // OpenDesign: the tenant browses the per-tenant Next.js web port, which proxies
+  // /sso (and /api,/artifacts,/frames) to the daemon so cookies stay same-origin.
+  return `http://127.0.0.1:${tenant.od_web_port}/sso?token=${encodeURIComponent(token)}`;
 }
 
 // ---- page templates ------------------------------------------------------

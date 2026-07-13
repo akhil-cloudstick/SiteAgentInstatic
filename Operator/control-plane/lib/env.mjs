@@ -52,8 +52,16 @@ export const config = {
   // dir MUST be on LOCAL disk (OpenDesign uses SQLite, which can't run on the SMB
   // share), so it defaults under the OS temp dir — never under tenant-users/ (S:).
   openDesignDir: abs('OpenDesign'),
+  // The website build rule OD must follow so tenant pages import into Instatic
+  // cleanly. Passed to each Instatic-connected OD daemon as OD_CMS_RULE_FILE;
+  // OD reads it live (cached by mtime), so editing this file updates the rule
+  // OD enforces with no redeploy. Override the path with CMS_RULE_FILE.
+  cmsRuleFile: abs(process.env.CMS_RULE_FILE || './Operator/rules/templateRule.md'),
   odDataBase: process.env.OD_TENANTS_DIR || resolve(tmpdir(), 'siteagent-od'),
   odBasePort: Number(process.env.OD_BASE_PORT || 7500),
+  // Per-tenant OpenDesign web (Next.js dev) port range — the tenant browses here;
+  // it proxies /api,/artifacts,/frames,/sso to the tenant's daemon (odBasePort).
+  odWebBasePort: Number(process.env.OD_WEB_BASE_PORT || 8100),
   // Remote client testing: one tenant editor at a time is published on the spare
   // Tailscale funnel port so a remote client can log in and edit it. The origin
   // must match the public funnel URL exactly (Instatic checks it for CSRF + uses

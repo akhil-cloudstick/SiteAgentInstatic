@@ -56,6 +56,8 @@ alter table siteagent_control.tenants add column if not exists tier text not nul
 -- Per-tenant OpenDesign daemon (its own OD_DATA_DIR + port, spawned by the control-plane).
 alter table siteagent_control.tenants add column if not exists od_port   int;
 alter table siteagent_control.tenants add column if not exists od_status text not null default 'stopped';  -- stopped|running|failed
+-- Per-tenant OpenDesign web (Next.js dev) port — the tenant browses here.
+alter table siteagent_control.tenants add column if not exists od_web_port int;
 
 -- Per-task-type AI model routing + global guidance (managed multi-tenant).
 --   ai_categories: [{ slug, name, description, modelId, isDefault, builtin }]

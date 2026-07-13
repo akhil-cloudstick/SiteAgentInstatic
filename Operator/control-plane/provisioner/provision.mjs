@@ -56,6 +56,13 @@ async function allocateOdPort() {
   return Number(rows[0].m) + 1;
 }
 
+// OpenDesign web (Next.js dev) port — its own range, distinct from daemon ports.
+async function allocateOdWebPort() {
+  const { rows } = await query(
+    'select coalesce(max(od_web_port), $1 - 1) as m from siteagent_control.tenants', [config.odWebBasePort]);
+  return Number(rows[0].m) + 1;
+}
+
 // Mint the tenant's Postgres schema + least-privilege role (idempotent).
 async function mintDb(schema, role, dbPassword) {
   // role: create or rotate password
@@ -95,6 +102,7 @@ export async function provisionTenant({ name, ownerEmail, cfProject, customDomai
   const secretKey = genSecretKeyHex();
   const port = await allocatePort();
   const odPort = await allocateOdPort();
+  const odWebPort = await allocateOdWebPort();
   const cf_project = sanitizeCfProject(cfProject) || `siteagent-${slug}`;
   const custom_domain = String(customDomain || '').trim().toLowerCase() || null;
 
@@ -111,7 +119,7 @@ export async function provisionTenant({ name, ownerEmail, cfProject, customDomai
     secret_key_enc: encrypt(secretKey),
     cf_project, custom_domain, last_error: null,
     display_name: String(name || '').trim() || slug,
-    od_port: odPort, od_status: 'stopped',
+    od_port: odPort, od_web_port: odWebPort, od_status: 'stopped',
   });
 
   // Mint the tenant's one-time invite link (the URL the operator shares). Only the
@@ -120,7 +128,7 @@ export async function provisionTenant({ name, ownerEmail, cfProject, customDomai
   const inviteUrl = `${config.publicBaseUrl}/invite/${inviteToken}`;
 
   // Fire-and-forget: never await the saga here (that is what blocked the page).
-  runProvisionSaga({ slug, schema, role, dbPassword, secretKey, port, odPort, tier: tier === 'lite' ? 'lite' : 'advanced' })
+  runProvisionSaga({ slug, schema, role, dbPassword, secretKey, port, odPort, odWebPort, tier: tier === 'lite' ? 'lite' : 'advanced' })
     .catch((e) => console.error(`[provisioner] saga ${slug} crashed:`, e?.message ?? e));
 
   return {
@@ -168,7 +176,7 @@ async function seedInstaticOwner(slug, port) {
 // The heavy provisioning steps, run in the background. Advances provision_state so
 // the console can show progress; on failure it cleans up and marks the row 'failed'
 // (visible, with last_error) instead of throwing to an HTTP caller that already left.
-async function runProvisionSaga({ slug, schema, role, dbPassword, secretKey, port, odPort, tier }) {
+async function runProvisionSaga({ slug, schema, role, dbPassword, secretKey, port, odPort, odWebPort, tier }) {
   try {
     const advanced = tier !== 'lite';
 
@@ -176,7 +184,7 @@ async function runProvisionSaga({ slug, schema, role, dbPassword, secretKey, por
     // on local disk + port. Non-fatal: an OD hiccup records od_status='failed' but
     // doesn't fail the whole provision.
     try {
-      odrt.start({ slug, odPort, instaticUrl: advanced ? `http://127.0.0.1:${port}` : undefined });
+      odrt.start({ slug, odPort, webPort: odWebPort, instaticUrl: advanced ? `http://127.0.0.1:${port}` : undefined });
       const odHealthy = await odrt.waitHealthy(odPort, 90000);
       await tenants.updateTenant(slug, { od_status: odHealthy ? 'running' : 'failed' });
     } catch (e) {
@@ -403,7 +411,7 @@ export async function resumeAll() {
     }
     if (r.od_port) {
       const instaticUrl = r.tier !== 'lite' ? `http://127.0.0.1:${r.port}` : undefined;
-      try { odrt.start({ slug: r.slug, odPort: r.od_port, instaticUrl }); } catch (e) { console.error(`[provisioner] OD resume ${r.slug} failed:`, e.message); }
+      try { odrt.start({ slug: r.slug, odPort: r.od_port, webPort: r.od_web_port, instaticUrl }); } catch (e) { console.error(`[provisioner] OD resume ${r.slug} failed:`, e.message); }
     }
   }
   return active.map((r) => r.slug);

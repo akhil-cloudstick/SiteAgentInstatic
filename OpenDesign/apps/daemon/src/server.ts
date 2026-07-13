@@ -22,6 +22,8 @@ import {
   composeSystemPrompt,
   resolveExclusiveSurface,
 } from './prompts/system.js';
+import { loadTemplateRuleBody } from './prompts/cms-contract.js';
+import { normalizeSiteFiles } from './cms-normalize.js';
 import { emittedRenderableQuestionForm } from './question-form-detect.js';
 import { resolveProjectRoot } from './project-root.js';
 import {
@@ -650,7 +652,9 @@ import {
   signSession,
   parseCookie,
   SESSION_MAX_AGE_SEC,
+  signInstaticSsoToken,
 } from './tenant-sso.js';
+import { collectSiteFiles } from './od-share-to-cms.js';
 import { createOpenDesignPublicMetadataService } from './services/open-design-public-metadata.js';
 import { execCommandViaLoginShell } from './services/login-shell.js';
 import {
@@ -2789,6 +2793,64 @@ export async function startServer({
     conversations: conversationDeps,
     auth: authDeps,
   });
+  // Share to CMS: push this project's built site into the tenant's Instatic
+  // (server-to-server, authenticated as the Owner via a short-lived SSO session).
+  // Advanced tenants only (OD_INSTATIC_URL set). merge-overwrite -> no duplicate
+  // pages on re-push.
+  app.post('/api/projects/:id/push/instatic', async (req, res) => {
+    try {
+      const instaticUrl = (process.env.OD_INSTATIC_URL ?? '').trim().replace(/\/$/, '');
+      const slug = (process.env.OD_TENANT_SLUG ?? '').trim();
+      if (!instaticUrl || !tenantSsoEnabled()) {
+        return sendApiError(res, 400, 'CMS_NOT_CONNECTED', 'This workspace is not connected to a CMS.');
+      }
+      const project = getProject(db, req.params.id);
+      if (!project) return sendApiError(res, 404, 'PROJECT_NOT_FOUND', 'project not found');
+      const projectRoot = resolveProjectDir(PROJECTS_DIR, req.params.id, project.metadata);
+      const rawFiles = await collectSiteFiles(projectRoot);
+      const hasHtml = Object.keys(rawFiles).some((p) => /\.html?$/i.test(p));
+      if (!hasHtml) return sendApiError(res, 400, 'NO_PAGES', 'No pages to share yet — build a page first.');
+      // Deterministic template-rule normalization so every shared page complies
+      // (inline CSS, strip/convert Tailwind, wrap editable text, drop orphan
+      // stylesheets). Non-blocking: on any normalizer error fall back to the raw
+      // files rather than fail the push.
+      let files: Record<string, { base64: string; mimeType?: string }> = rawFiles;
+      try {
+        const normalized = await normalizeSiteFiles(rawFiles);
+        files = normalized.files;
+        const r = normalized.report;
+        if (r.fails > 0 || r.warns > 0 || r.droppedStylesheets.length > 0) {
+          console.warn(
+            `[share-to-cms] ${slug} normalized: ${r.fails} fail, ${r.warns} warn; ` +
+              `inlined+dropped ${r.droppedStylesheets.length} stylesheet(s); ` +
+              `unconverted utilities: ${r.unconvertedUtilities.join(', ') || 'none'}`,
+          );
+        }
+      } catch (normErr) {
+        console.warn(
+          `[share-to-cms] ${slug} normalize failed, pushing raw: ${normErr instanceof Error ? normErr.message : normErr}`,
+        );
+      }
+      // 1) open an Owner session on the tenant's Instatic
+      const token = signInstaticSsoToken(slug, 120);
+      const ssoRes = await fetch(`${instaticUrl}/admin/api/cms/sso?token=${encodeURIComponent(token)}`, {
+        redirect: 'manual',
+      });
+      const cookie = (ssoRes.headers.get('set-cookie') ?? '').split(';')[0];
+      if (!cookie.includes('=')) return sendApiError(res, 502, 'CMS_SIGNIN_FAILED', 'CMS sign-in failed');
+      // 2) push the site (merge-overwrite -> upsert by page id, no duplicates)
+      const importRes = await fetch(`${instaticUrl}/admin/api/cms/import/site-html?strategy=merge-overwrite`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', cookie },
+        body: JSON.stringify({ files }),
+      });
+      const result = (await importRes.json().catch(() => ({}))) as { error?: string };
+      if (!importRes.ok) return sendApiError(res, 502, 'CMS_IMPORT_FAILED', result?.error || 'CMS import failed');
+      return res.json({ ok: true, redirectUrl: `${instaticUrl}/admin`, result });
+    } catch (caught) {
+      return sendApiError(res, 500, 'PUSH_FAILED', caught instanceof Error ? caught.message : String(caught));
+    }
+  });
   app.post('/api/projects/:id/figma/import', (req, res) => {
     figmaUpload.single('file')(req, res, async (err) => {
       if (err) return sendMulterError(res, err);
@@ -3873,6 +3935,17 @@ export async function startServer({
       }
     }
 
+    // Instatic-connected tenant daemons (OD_INSTATIC_URL set + tenant SSO on,
+    // the same guard the /push/instatic route uses) build pages that get
+    // Shared to the CMS. Switch on the mandatory CMS output contract so every
+    // page the tenant builds imports cleanly and stays editable. Invisible to
+    // the tenant — no UI, no toggle.
+    const instaticCmsMode =
+      !!(process.env.OD_INSTATIC_URL ?? '').trim() && tenantSsoEnabled();
+    // Read the operator's rule file live (OD_CMS_RULE_FILE), so editing
+    // Operator/rules/templateRule.md takes effect on the next page with no
+    // redeploy. Falls back to the embedded rule when the file is unset/missing.
+    const cmsRuleBody = instaticCmsMode ? loadTemplateRuleBody() : undefined;
     const prompt = composeSystemPrompt({
       agentId,
       includeCodexImagegenOverride: false,
@@ -3920,6 +3993,8 @@ export async function startServer({
       ...(pluginBlock ? { pluginBlock } : {}),
       ...(activeStageBlocks ? { activeStageBlocks } : {}),
       userInstructions,
+      instaticCmsMode,
+      cmsRuleBody,
     });
     // The chat handler also needs to know where the active skill lives
     // on disk so it can stage a per-project copy of its side files

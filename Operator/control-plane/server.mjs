@@ -41,7 +41,7 @@ function decorate(row) {
     od_running: odrt.isRunning(row.slug),
     published: hasBakedOutput(row.slug),
     admin_url: row.port ? `http://127.0.0.1:${row.port}/admin` : null,
-    od_url: row.od_port ? `http://127.0.0.1:${row.od_port}` : null,
+    od_url: row.od_web_port ? `http://127.0.0.1:${row.od_web_port}` : null,
     ai_base_url: `${config.publicBaseUrl}/ai/${signTenantToken(row.slug)}`,
   };
 }
@@ -197,6 +197,9 @@ server.listen(config.controlPlanePort, '127.0.0.1', () => {
 function shutdown() {
   console.log('\n[control-plane] shutting down; stopping tenant instances...');
   for (const r of rt.listRunning()) rt.stop(r.slug);
+  // Also stop each tenant's OpenDesign (daemon + Next web), or they orphan and
+  // keep holding their ports — the next boot's resume would then fail to rebind.
+  for (const r of odrt.listRunning()) odrt.stop(r.slug);
   setTimeout(() => process.exit(0), 1200);
 }
 process.on('SIGINT', shutdown);

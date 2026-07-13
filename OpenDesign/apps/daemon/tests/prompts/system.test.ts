@@ -651,3 +651,60 @@ describe('composeSystemPrompt', () => {
     });
   });
 });
+
+describe('composeSystemPrompt — Instatic CMS output contract', () => {
+  const MARKER = 'CMS page output contract';
+
+  it('injects the contract on a web-page surface when instaticCmsMode is set', () => {
+    const prompt = composeSystemPrompt({ instaticCmsMode: true });
+    expect(prompt).toContain(MARKER);
+    expect(prompt).toContain('Never use Tailwind CSS or any utility-first CSS');
+    expect(prompt).toContain('data-sa');
+  });
+
+  it('omits the contract when instaticCmsMode is absent (vanilla OpenDesign)', () => {
+    const prompt = composeSystemPrompt({});
+    expect(prompt).not.toContain(MARKER);
+  });
+
+  it('omits the contract on deck surfaces (they own an incompatible framework)', () => {
+    const prompt = composeSystemPrompt({ instaticCmsMode: true, skillMode: 'deck' });
+    expect(prompt).not.toContain(MARKER);
+  });
+
+  it('omits the contract on media surfaces (HTML output is forbidden there)', () => {
+    for (const skillMode of ['image', 'video', 'audio'] as const) {
+      const prompt = composeSystemPrompt({ instaticCmsMode: true, skillMode });
+      expect(prompt).not.toContain(MARKER);
+    }
+  });
+
+  it('omits the contract in Ask mode (no artifact is produced)', () => {
+    const prompt = composeSystemPrompt({ instaticCmsMode: true, sessionMode: 'chat' });
+    expect(prompt).not.toContain(MARKER);
+  });
+
+  it('pins the contract AFTER a skill body so it overrides Tailwind-pushing skills', () => {
+    const prompt = composeSystemPrompt({
+      instaticCmsMode: true,
+      skillName: 'tailwind-artifact',
+      skillBody: 'Build the page with Tailwind utility classes only.',
+    });
+    expect(prompt).toContain(MARKER);
+    expect(prompt.indexOf(MARKER)).toBeGreaterThan(
+      prompt.indexOf('Build the page with Tailwind utility classes only.'),
+    );
+  });
+
+  it('uses the live rule body (from the operator file) verbatim when provided', () => {
+    const liveRule = '# My custom website rule\n\nUNIQUE_RULE_TOKEN_42: always use serif fonts.';
+    const prompt = composeSystemPrompt({ instaticCmsMode: true, cmsRuleBody: liveRule });
+    expect(prompt).toContain(MARKER); // fixed adapter preamble still present
+    expect(prompt).toContain('UNIQUE_RULE_TOKEN_42'); // operator's live text injected
+  });
+
+  it('falls back to the embedded rule when no live body is supplied', () => {
+    const prompt = composeSystemPrompt({ instaticCmsMode: true });
+    expect(prompt).toContain('Never use Tailwind CSS or any utility-first CSS');
+  });
+});

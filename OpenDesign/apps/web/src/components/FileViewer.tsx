@@ -5264,6 +5264,31 @@ function ReactComponentViewer({
                       <span className="share-menu-icon"><RemixIcon name="file-zip-line" size={15} /></span>
                       <span>{t('fileViewer.exportZip')}</span>
                     </button>
+                    <div className="share-menu-divider" />
+                    <button
+                      type="button"
+                      className="share-menu-item"
+                      role="menuitem"
+                      onClick={async () => {
+                        setShareMenuOpen(false);
+                        try {
+                          const response = await fetch(`/api/projects/${projectId}/push/instatic`, { method: 'POST' });
+                          const payload = (await response.json().catch(() => ({}))) as {
+                            ok?: boolean; redirectUrl?: string; message?: string; error?: string;
+                          };
+                          if (response.ok && payload.ok && payload.redirectUrl) {
+                            window.location.href = payload.redirectUrl;
+                          } else {
+                            console.error('[FileViewer] Share to CMS failed:', payload.message ?? payload.error ?? response.status);
+                          }
+                        } catch (err) {
+                          console.error('[FileViewer] Share to CMS failed:', err);
+                        }
+                      }}
+                    >
+                      <span className="share-menu-icon"><RemixIcon name="send-plane-line" size={15} /></span>
+                      <span>Share to CMS</span>
+                    </button>
                   </div>
                 ) : null}
               </div>
@@ -10536,6 +10561,34 @@ function HtmlViewer({
                           />
                         </span>
                         <span>{socialShareMenuLabel}</span>
+                      </button>
+                      <div className="share-menu-divider" />
+                      <div className="share-menu-section-label" role="presentation">
+                        MMS CMS
+                      </div>
+                      <button
+                        type="button"
+                        className="share-menu-item"
+                        role="menuitem"
+                        onClick={async () => {
+                          setDeployMenuOpen(false);
+                          try {
+                            const response = await fetch(`/api/projects/${projectId}/push/instatic`, { method: 'POST' });
+                            const payload = (await response.json().catch(() => ({}))) as {
+                              ok?: boolean; redirectUrl?: string; message?: string; error?: string;
+                            };
+                            if (response.ok && payload.ok && payload.redirectUrl) {
+                              window.location.href = payload.redirectUrl;
+                            } else {
+                              console.error('[FileViewer] Share to CMS failed:', payload.message ?? payload.error ?? response.status);
+                            }
+                          } catch (err) {
+                            console.error('[FileViewer] Share to CMS failed:', err);
+                          }
+                        }}
+                      >
+                        <span className="share-menu-icon"><RemixIcon name="send-plane-line" size={15} /></span>
+                        <span>Share to CMS</span>
                       </button>
                     </div>
                   ) : null}
