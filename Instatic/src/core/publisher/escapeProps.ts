@@ -105,7 +105,13 @@ export function escapeProps(
       // Note: publishPage() manually escapeHtml()'s faviconUrl because
       // those are not passed to module render() — they go directly into HTML template
       // strings that never pass through a module's safeUrl() call.
-      escaped[key] = isSafeUrl(value) ? value : '#'
+      //
+      // image/media props render into <img>/<video> src (SVG loads in the
+      // browser's secure static mode), so safe data:image/* URIs are allowed —
+      // mirrors the CSP img-src 'self' data: allowance. `url` (href) stays
+      // strict: a data: navigation target can execute SVG script.
+      const allowDataImages = type === 'image' || type === 'media'
+      escaped[key] = isSafeUrl(value, { allowDataImages }) ? value : '#'
     } else {
       // Plain strings, and any prop with no matching schema entry: HTML-escape
       // (the safe default — a prop the schema doesn't describe is never trusted

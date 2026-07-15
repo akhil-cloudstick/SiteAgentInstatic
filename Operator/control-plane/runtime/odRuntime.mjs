@@ -2,7 +2,7 @@
 // (own OD_DATA_DIR + port), mirroring TenantRuntime for Instatic. Isolation is by
 // process + data dir: an OD daemon only ever sees the projects in its own data dir.
 import { spawn } from 'node:child_process';
-import { mkdirSync, createWriteStream, existsSync } from 'node:fs';
+import { mkdirSync, createWriteStream, existsSync, rmSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import config from '../lib/env.mjs';
 import { signTenantToken } from '../lib/crypto.mjs';
@@ -18,6 +18,27 @@ export function odPaths(slug) {
 
 export const isRunning = (slug) => running.has(slug);
 export const listRunning = () => [...running.values()].map((r) => ({ slug: r.slug, port: r.port, pid: r.pid }));
+
+// Newest valid production web build for a tenant. Builds are versioned
+// (`.next-prod-<slug>-<n>`, n = build time in ms) so a rebuild never touches the
+// dir `next start` is serving. Returns the dir NAME (relative to apps/web) or null.
+function newestBuildDir(slug) {
+  const webCwd = resolve(config.openDesignDir, 'apps', 'web');
+  const pfx = `.next-prod-${slug}-`;
+  let best = null;
+  let bestN = -1;
+  let entries = [];
+  try { entries = readdirSync(webCwd); } catch { return null; }
+  for (const name of entries) {
+    if (!name.startsWith(pfx)) continue;
+    const n = Number(name.slice(pfx.length));
+    if (Number.isFinite(n) && n > bestN && existsSync(resolve(webCwd, name, 'BUILD_ID'))) {
+      bestN = n;
+      best = name;
+    }
+  }
+  return best;
+}
 
 // tenant: { slug, odPort, webPort?, instaticUrl? }
 export function start(tenant) {
@@ -51,6 +72,10 @@ export function start(tenant) {
     // with this same secret and mints its own session (Phase 3b, OD-side /sso).
     OD_SSO_SECRET: config.tokenSecret,
     OD_TENANT_SLUG: slug,
+    // Public gateway origin — so "Share to CMS" can hand the BROWSER a reachable CMS
+    // URL (the tenant's Instatic is session-routed at <gatewayOrigin>/admin), not the
+    // daemon's localhost OD_INSTATIC_URL which a remote client can't reach.
+    OD_GATEWAY_ORIGIN: config.gatewayOrigin,
     // Advanced tenants: where this tenant's Instatic lives, so "Share to CMS" can
     // push there. Unset for lite tenants (no Instatic) -> the button is inert.
     ...(tenant.instaticUrl ? { OD_INSTATIC_URL: tenant.instaticUrl } : {}),
@@ -87,12 +112,29 @@ export function start(tenant) {
   daemon.on('exit', (code) => { out.write(`\n[od-runtime] ${slug} daemon exited code=${code} @ ${new Date().toISOString()}\n`); running.delete(slug); });
   daemon.on('error', (err) => { out.write(`\n[od-runtime] ${slug} daemon spawn error: ${err?.message ?? err}\n`); running.delete(slug); });
 
-  // Per-tenant web (Next.js dev). Its next.config proxies /api,/artifacts,/frames,
-  // /sso to OD_PORT (this daemon), so the whole surface is same-origin for cookies.
+  // Per-tenant web. Its next.config proxies /api,/artifacts,/frames,/sso to OD_PORT
+  // (this daemon), so the whole surface is same-origin for cookies. Served PRE-BUILT
+  // via `next start` when a production build exists (fast, like the CMS) — the slow
+  // `next dev` on-demand compiler is only a fallback for tenants not yet built.
   let web = null;
   if (webPort) {
     const webCwd = resolve(config.openDesignDir, 'apps', 'web');
     const nextBin = resolve(config.openDesignDir, 'node_modules', 'next', 'dist', 'bin', 'next');
+    // Builds are VERSIONED (.next-prod-<slug>-<n>): a rebuild always writes a fresh
+    // dir, so it never fights the one `next start` is serving (no rename/lock races
+    // on Windows). Serve the NEWEST valid build; best-effort delete the older ones.
+    const prodDist = newestBuildDir(slug); // dir NAME relative to webCwd, or null
+    const isBuilt = !!prodDist;
+    if (isBuilt) {
+      const pfx = `.next-prod-${slug}-`;
+      try {
+        for (const name of readdirSync(webCwd)) {
+          if (name.startsWith(pfx) && name !== prodDist) {
+            try { rmSync(resolve(webCwd, name), { recursive: true, force: true }); } catch { /* still locked; cleaned next boot */ }
+          }
+        }
+      } catch { /* dir listing failed; ignore */ }
+    }
     const webEnv = {
       ...process.env,
       OD_PORT: String(odPort),
@@ -102,21 +144,25 @@ export function start(tenant) {
       // gateway. Next.js prefixes its assets, links, and rewrite sources with this,
       // and the gateway routes /od/<slug>/* here. next.config reads OD_WEB_BASE_PATH.
       OD_WEB_BASE_PATH: `/od/${slug}`,
-      // Each tenant's Next dev server needs its OWN build dir, or they collide on
-      // the shared apps/web `.next` lock ("Another next dev server is already
-      // running"). One `.next-<slug>` per tenant keeps them independent.
-      OD_WEB_DIST_DIR: `.next-${slug}`,
       // Managed-AI flag the browser can read (NEXT_PUBLIC_*). Groundwork for hiding
       // the "bring your own key" UI — NOT yet wired to actually hide it, because the
       // hide must land together with routing OD's in-browser AI through the gateway
       // (hiding the key box alone would leave the design chat with no key). See the
       // Phase 6 follow-up in docs/CHANGELOG.md.
       NEXT_PUBLIC_OD_MANAGED_AI: '1',
-      WATCHPACK_POLLING: 'true',
-      CHOKIDAR_USEPOLLING: 'true',
+      ...(isBuilt
+        // Pre-built server build: server mode (avoids the export-only Next 16.2.6
+        // bug), its own dist dir, production runtime.
+        ? { OD_WEB_OUTPUT_MODE: 'server', OD_WEB_DIST_DIR: prodDist, NODE_ENV: 'production' }
+        // Dev fallback: own dist dir (avoids the shared `.next` lock) + polling.
+        : { OD_WEB_DIST_DIR: `.next-${slug}`, WATCHPACK_POLLING: 'true', CHOKIDAR_USEPOLLING: 'true' }),
     };
     delete webEnv.SETTINGS_ENC_KEY;
-    web = spawn('node', [nextBin, 'dev', '--turbopack', '--port', String(webPort)], {
+    const webArgs = isBuilt
+      ? [nextBin, 'start', '--port', String(webPort)]
+      : [nextBin, 'dev', '--turbopack', '--port', String(webPort)];
+    out.write(`[od-runtime] ${slug} web: ${isBuilt ? 'PRE-BUILT (next start — fast)' : 'DEV (next dev — build it for speed)'} on :${webPort}\n`);
+    web = spawn('node', webArgs, {
       cwd: webCwd, env: webEnv, shell: isWin, windowsHide: true,
     });
     web.stdout.on('data', (d) => out.write(d));
@@ -128,6 +174,45 @@ export function start(tenant) {
   const rec = { child: daemon, web, port: odPort, webPort, pid: daemon.pid, webPid: web?.pid, slug };
   running.set(slug, rec);
   return rec;
+}
+
+// True once a tenant has any valid production web build (start() serves the newest).
+export function isWebBuilt(slug) {
+  return newestBuildDir(slug) !== null;
+}
+
+// Produce a fast PRODUCTION build of a tenant's web — server mode (avoids the
+// export-only Next 16.2.6 bug), its /od/<slug> basePath, and the tenant's STABLE
+// daemon port baked into the /api rewrite. One-time (~1-2 min on the share);
+// afterwards start() serves it with `next start` instead of the slow `next dev`.
+// Uses a throwaway tsconfig so `next build` doesn't rewrite the committed
+// apps/web/tsconfig.json. Resolves on success, rejects on a non-zero exit.
+export function buildWeb(slug, odPort) {
+  return new Promise((resolvePromise, reject) => {
+    const webCwd = resolve(config.openDesignDir, 'apps', 'web');
+    const nextBin = resolve(config.openDesignDir, 'node_modules', 'next', 'dist', 'bin', 'next');
+    const p = odPaths(slug);
+    mkdirSync(p.dataDir, { recursive: true });
+    const out = createWriteStream(p.log, { flags: 'a' });
+    out.write(`\n[od-runtime] building ${slug} web (production, basePath=/od/${slug}, daemon :${odPort}) @ ${new Date().toISOString()}\n`);
+    const env = {
+      ...process.env,
+      OD_PORT: String(odPort),
+      OD_WEB_BASE_PATH: `/od/${slug}`,
+      OD_WEB_OUTPUT_MODE: 'server',
+      // Build to a fresh VERSIONED dir (…-<ms>) so a rebuild never fights the dir the
+      // running web is serving; start() picks up the newest on the next restart.
+      OD_WEB_DIST_DIR: `.next-prod-${slug}-${Date.now()}`,
+      OD_WEB_TSCONFIG_PATH: 'tsconfig.build.json',
+      NODE_ENV: 'production',
+    };
+    delete env.SETTINGS_ENC_KEY;
+    const child = spawn('node', [nextBin, 'build'], { cwd: webCwd, env, shell: isWin, windowsHide: true });
+    child.stdout.on('data', (d) => out.write(d));
+    child.stderr.on('data', (d) => out.write(d));
+    child.on('exit', (code) => (code === 0 ? resolvePromise() : reject(new Error(`od web build for ${slug} exited code=${code}`))));
+    child.on('error', reject);
+  });
 }
 
 export function stop(slug) {

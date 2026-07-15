@@ -31,6 +31,42 @@ import { ensureServerDomParser } from './siteImport/domPolyfill'
 
 const IMPORT_SITE_HTML_PATH = `${CMS_API_PREFIX}/import/site-html`
 
+const MIME_BY_EXT: Record<string, string> = {
+  svg: 'image/svg+xml',
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  gif: 'image/gif',
+  webp: 'image/webp',
+  avif: 'image/avif',
+}
+
+/**
+ * Inline the design's LOCAL image files as data URIs so they render in the CMS and
+ * on the published site. Designs put assets in `public/` and reference them from the
+ * web root (`<img src="/images/hero.svg">`); nothing in the CMS serves a `/images/*`
+ * route, and SVGs can't be served inline from `/uploads/*` (XSS hardening), so the
+ * safe universal path is a self-contained data URI. We replace EVERY occurrence of
+ * the web-root ref (not just `src="…"`) so JS-built images (`p.image = '/images/x'`)
+ * are covered too. External `http(s)` images pass through untouched; assets over the
+ * size limit are left as-is to avoid bloating the page.
+ */
+function inlineLocalImages(html: string, files: FileMap['files']): string {
+  const MAX_INLINE_BYTES = 512 * 1024
+  let out = html
+  for (const [path, entry] of Object.entries(files)) {
+    const ext = (path.split('.').pop() ?? '').toLowerCase()
+    const mime = entry.mimeType || MIME_BY_EXT[ext]
+    if (!MIME_BY_EXT[ext] || !entry.bytes?.length || entry.bytes.length > MAX_INLINE_BYTES) continue
+    // File `public/images/hero.svg` is referenced from the web root as `/images/hero.svg`.
+    const ref = `/${path.replace(/^public\//, '')}`
+    if (!out.includes(ref)) continue
+    const dataUri = `data:${mime};base64,${Buffer.from(entry.bytes).toString('base64')}`
+    out = out.split(ref).join(dataUri)
+  }
+  return out
+}
+
 const SiteHtmlImportBodySchema = Type.Object({
   files: Type.Record(
     Type.String(),
@@ -60,6 +96,14 @@ export async function handleImportSiteHtmlRoute(
   const files: FileMap['files'] = {}
   for (const [path, entry] of Object.entries(body.files)) {
     files[path] = { bytes: new Uint8Array(Buffer.from(entry.base64, 'base64')), mimeType: entry.mimeType }
+  }
+  // Inline the design's local images (data URIs) into each HTML page BEFORE parsing,
+  // so the imported pages carry their images and render in the CMS + published site.
+  for (const [path, entry] of Object.entries(files)) {
+    if (!/\.html?$/i.test(path)) continue
+    const html = Buffer.from(entry.bytes).toString('utf8')
+    const inlined = inlineLocalImages(html, files)
+    if (inlined !== html) files[path] = { ...entry, bytes: new Uint8Array(Buffer.from(inlined, 'utf8')) }
   }
   const fileMap: FileMap = { files }
 

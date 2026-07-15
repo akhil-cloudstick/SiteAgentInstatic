@@ -3107,6 +3107,43 @@ export function registerProjectFileRoutes(app: Express, ctx: RegisterProjectFile
     res.sendStatus(204);
   });
 
+  // Designs place assets in `public/` and reference them from the web ROOT
+  // (`<img src="/images/hero.svg">`) — correct once published, where `public/` IS
+  // the site root. But the preview loads a design from THIS raw endpoint
+  // (`…/raw/index.html`), so those absolute paths resolve to the SITE root and 404.
+  // Rewrite them to `public/`-relative so they resolve against the raw URL to the
+  // real files — fixing both the URL-load iframe and the srcDoc content the web
+  // fetches from here.
+  const mapWebRootAsset = (p: string): string | null => {
+    if (!p.startsWith('/') || p.startsWith('//')) return null;
+    const rel = p.slice(1);
+    if (/^(public\/|api\/|artifacts\/|frames\/)/u.test(rel)) return null;
+    return `public/${rel}`;
+  };
+  const rewriteWebRootAssets = (html: string): string => {
+    let out = html.replace(/(\bsrc\s*=\s*)(["'])(\/[^"']*)\2/giu, (m, pre, q, p) => {
+      const r = mapWebRootAsset(p);
+      return r ? `${pre}${q}${r}${q}` : m;
+    });
+    out = out.replace(/url\(\s*(["']?)(\/[^"')]+)\1\s*\)/giu, (m, q, p) => {
+      const r = mapWebRootAsset(p);
+      return r ? `url(${q}${r}${q})` : m;
+    });
+    return out;
+  };
+  // Runtime companion for JS-rendered images (data array -> innerHTML): an observer
+  // that makes web-root-absolute `src`s public/-relative at runtime too.
+  const WEB_ROOT_ASSET_BRIDGE =
+    '<script>(function(){' +
+    'function m(u){if(typeof u!=="string"||u.charAt(0)!=="/"||u.charAt(1)==="/")return null;var r=u.slice(1);if(r.indexOf("public/")===0||r.indexOf("api/")===0||r.indexOf("artifacts/")===0||r.indexOf("frames/")===0)return null;return "public/"+r;}' +
+    'function f(e){if(!e||e.nodeType!==1||e.tagName==="A"||!e.getAttribute)return;var v=e.getAttribute("src");if(!v)return;var x=m(v);if(x)e.setAttribute("src",x);}' +
+    'function s(n){try{if(n.nodeType===1)f(n);if(n.querySelectorAll){var l=n.querySelectorAll("img,source,script,video,audio");for(var i=0;i<l.length;i++)f(l[i]);}}catch(e){}}' +
+    'try{new MutationObserver(function(ms){for(var i=0;i<ms.length;i++){var q=ms[i];if(q.type==="attributes")f(q.target);if(q.addedNodes)for(var j=0;j<q.addedNodes.length;j++)s(q.addedNodes[j]);}}).observe(document.documentElement,{childList:true,subtree:true,attributes:true,attributeFilter:["src"]});}catch(e){}' +
+    'if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",function(){s(document);});else s(document);' +
+    '})();</script>';
+  const injectWebRootAssetBridge = (html: string): string =>
+    /<head[^>]*>/iu.test(html) ? html.replace(/<head([^>]*)>/iu, (m) => `${m}${WEB_ROOT_ASSET_BRIDGE}`) : `${WEB_ROOT_ASSET_BRIDGE}${html}`;
+
   app.get(/^\/api\/projects\/([^/]+)\/raw\/(.+)$/u, async (req, res) => {
     try {
       const params = req.params as unknown as { 0?: string; 1?: string };
@@ -3138,6 +3175,12 @@ export function registerProjectFileRoutes(app: Express, ctx: RegisterProjectFile
             projectsRoot: PROJECTS_DIR,
             readProjectFile,
           });
+          // Map web-root asset refs (/images/…) onto the project's public/ folder so
+          // the preview shows the images the published site will. text/html only.
+          if (/^text\/html(?:;|$)/iu.test(file.mime)) {
+            const src = Buffer.isBuffer(transformed) ? transformed.toString('utf8') : transformed;
+            transformed = injectWebRootAssetBridge(rewriteWebRootAssets(src));
+          }
           if (
             (wantsUrlPreviewScrollBridge(req.query.odPreviewBridge) ||
               wantsUrlPreviewSelectionBridge(req.query.odPreviewBridge) ||

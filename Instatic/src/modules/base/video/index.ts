@@ -137,8 +137,11 @@ export const VideoModule: ModuleDefinition<VideoProps> = {
     // own width — keeps the still file lightweight while staying sharp
     // at the rendered size. Falls back to the raw publicPath if no
     // variant ladder is available yet.
+    // Poster renders as an <img>-style still, so allow self-contained
+    // data:image/* URIs (same rule as base.image). The iframe/video src above
+    // stays strict — a data: iframe source is a script vector.
     const posterSrc = pickMediaVariantUrl(posterMedia, videoMedia?.width ?? null)
-      ?? safeUrl(String(props.poster ?? ''))
+      ?? safeUrl(String(props.poster ?? ''), { allowDataImages: true })
 
     const width = videoMedia?.width ?? null
     const height = videoMedia?.height ?? null

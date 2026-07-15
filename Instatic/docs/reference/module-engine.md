@@ -198,7 +198,8 @@ html: { type: 'richtext', label: 'Content', hidden: true }
 
 | control `type`            | escaper at the publisher boundary                          |
 |---------------------------|------------------------------------------------------------|
-| `url` / `image` / `media` | `isSafeUrl` (blocks `javascript:` etc.; passed raw for the module's `safeUrl`) |
+| `url`                     | `isSafeUrl` (blocks `javascript:` / `vbscript:` / `data:`; passed raw for the module's `safeUrl`) |
+| `image` / `media`         | `isSafeUrl` with `allowDataImages` — like `url`, but self-contained `data:image/*` URIs are permitted (they render into `<img>`/`<video>` where SVG runs in the browser's secure static mode; mirrors the CSP `img-src 'self' data:`). The module's `safeUrl` must pass the same option. |
 | `richtext`                | `sanitizeRichtext` (DOMPurify)                             |
 | `svg`                     | `sanitizeSvg` (DOMPurify SVG profile)                      |
 | everything else, or a prop absent from `schema` | `escapeHtml` (safe default)          |
@@ -302,7 +303,8 @@ import { buildMediaSrcset, pickMediaVariantUrl } from '@modules/base/utils/media
 import { safeUrl, escapeHtml } from '@modules/base/utils/escape'
 
 render: (props) => {
-  const src = safeUrl(props.src)
+  // image `src` renders into <img>, so allow self-contained data:image/* URIs
+  const src = safeUrl(props.src, { allowDataImages: true })
   if (!src) return { html: '' }
 
   const media = (props._resolvedMediaByKey as Record<string, RenderResolvedMedia> | undefined)?.src

@@ -13,6 +13,11 @@
  * Lives in its own module so both `rules.ts` (element → text/label props) and
  * `walkAndMap.ts` (bare text nodes) can share it without an import cycle.
  */
-export function normalizeImportedText(raw: string): string {
-  return raw.replace(/\s+/g, ' ').trim()
+export function normalizeImportedText(raw: string, preserveEdges = false): string {
+  const collapsed = raw.replace(/\s+/g, ' ')
+  // Inline phrasing (span/strong/em/…) sits next to other inline content, so a
+  // single leading/trailing space is SIGNIFICANT — trimming it merges words like
+  // "delivery more" + "joyful" → "morejoyful". Keep the edge space for those; block
+  // elements (h1–h6, p, …) still trim, where edge whitespace is insignificant.
+  return preserveEdges ? collapsed : collapsed.trim()
 }

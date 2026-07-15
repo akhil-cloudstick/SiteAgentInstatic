@@ -2569,6 +2569,8 @@ export function fileVersionPreviewOptions(
 ) {
   return {
     deck: sourceLooksLikeExportableDeck(source),
+    // projectRawUrl is already gateway-aware (prefixes /od/<slug>), so the base
+    // href resolves to the tenant's daemon inside the sandboxed preview iframe.
     baseHref: projectRawUrl(projectId, baseDirFor(fileName)),
   };
 }
@@ -5271,17 +5273,23 @@ function ReactComponentViewer({
                       role="menuitem"
                       onClick={async () => {
                         setShareMenuOpen(false);
+                        // Open the CMS tab NOW (on the click) so the browser doesn't popup-block it
+                        // after the async import; point it at the CMS once the push returns. OD stays.
+                        const cmsTab = window.open('about:blank', '_blank');
                         try {
                           const response = await fetch(`/api/projects/${projectId}/push/instatic`, { method: 'POST' });
                           const payload = (await response.json().catch(() => ({}))) as {
                             ok?: boolean; redirectUrl?: string; message?: string; error?: string;
                           };
                           if (response.ok && payload.ok && payload.redirectUrl) {
-                            window.location.href = payload.redirectUrl;
+                            if (cmsTab) cmsTab.location.href = payload.redirectUrl;
+                            else window.open(payload.redirectUrl, '_blank', 'noopener,noreferrer');
                           } else {
+                            cmsTab?.close();
                             console.error('[FileViewer] Share to CMS failed:', payload.message ?? payload.error ?? response.status);
                           }
                         } catch (err) {
+                          cmsTab?.close();
                           console.error('[FileViewer] Share to CMS failed:', err);
                         }
                       }}
@@ -10572,17 +10580,23 @@ function HtmlViewer({
                         role="menuitem"
                         onClick={async () => {
                           setDeployMenuOpen(false);
+                          // Open the CMS tab NOW (on the click) so the browser doesn't popup-block it
+                          // after the async import; point it at the CMS once the push returns. OD stays.
+                          const cmsTab = window.open('about:blank', '_blank');
                           try {
                             const response = await fetch(`/api/projects/${projectId}/push/instatic`, { method: 'POST' });
                             const payload = (await response.json().catch(() => ({}))) as {
                               ok?: boolean; redirectUrl?: string; message?: string; error?: string;
                             };
                             if (response.ok && payload.ok && payload.redirectUrl) {
-                              window.location.href = payload.redirectUrl;
+                              if (cmsTab) cmsTab.location.href = payload.redirectUrl;
+                              else window.open(payload.redirectUrl, '_blank', 'noopener,noreferrer');
                             } else {
+                              cmsTab?.close();
                               console.error('[FileViewer] Share to CMS failed:', payload.message ?? payload.error ?? response.status);
                             }
                           } catch (err) {
+                            cmsTab?.close();
                             console.error('[FileViewer] Share to CMS failed:', err);
                           }
                         }}

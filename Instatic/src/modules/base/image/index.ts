@@ -173,7 +173,10 @@ export const ImageModule: ModuleDefinition<ImageProps> = {
   htmlTag: 'img',
 
   render: (props) => {
-    const src = safeUrl(props.src)
+    // Image src renders into <img> — allow self-contained data:image/* URIs
+    // (e.g. imported SVG illustrations inlined as data URIs). SVG in <img> runs
+    // in the browser's secure static mode, so this is safe here (unlike href).
+    const src = safeUrl(props.src, { allowDataImages: true })
     if (!src) return { html: '' }
     const htmlAttrs = htmlAttributesAttr(props.htmlAttributes)
 

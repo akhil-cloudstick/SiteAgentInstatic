@@ -184,6 +184,14 @@ async function runProvisionSaga({ slug, schema, role, dbPassword, secretKey, por
     // on local disk + port. Non-fatal: an OD hiccup records od_status='failed' but
     // doesn't fail the whole provision.
     try {
+      // Pre-build the web so it serves FAST via `next start` from the first visit
+      // (otherwise the first load falls back to the slow on-demand `next dev`).
+      // Non-fatal: on a build failure start() still runs the dev fallback.
+      try {
+        if (!odrt.isWebBuilt(slug)) await odrt.buildWeb(slug, odPort);
+      } catch (e) {
+        console.error(`[provisioner] OpenDesign web build for ${slug} failed (dev fallback):`, e.message);
+      }
       odrt.start({ slug, odPort, webPort: odWebPort, instaticUrl: advanced ? `http://127.0.0.1:${port}` : undefined });
       const odHealthy = await odrt.waitHealthy(odPort, 90000);
       await tenants.updateTenant(slug, { od_status: odHealthy ? 'running' : 'failed' });

@@ -241,6 +241,71 @@ export function sanitizeTitleInDoc(html: string): string {
   return html.slice(0, titleStart) + openTag + safe + closeTag + html.slice(closingTagEnd + 1);
 }
 
+// Designs place deployable assets in `public/` and reference them from the web
+// ROOT — e.g. <img src="/images/hero.svg"> — which is correct once published (where
+// `public/` IS the site root). The in-editor preview instead serves project files
+// through the raw endpoint (see fileVersionPreviewOptions' baseHref), under which
+// `public/` is a real subfolder. So rewrite site-absolute asset refs to be
+// `public/`-relative; the injected <base href> then resolves them to the actual
+// files. Leaves full/protocol-relative URLs, data:/blob:, daemon paths, and refs
+// already rooted at public/ untouched.
+function toPublicRootedAssetPath(p: string): string | null {
+  if (!p.startsWith('/') || p.startsWith('//')) return null; // relative or protocol-relative
+  const rel = p.slice(1);
+  if (
+    rel === '' ||
+    rel.startsWith('public/') ||
+    rel.startsWith('api/') ||
+    rel.startsWith('artifacts/') ||
+    rel.startsWith('frames/')
+  ) {
+    return null; // already correct, or a daemon path — leave as-is
+  }
+  return `public/${rel}`;
+}
+
+function mapPublicRootAssets(html: string): string {
+  // src="/..." / src='/...'  (img, script, source, video, audio, iframe, …)
+  let out = html.replace(/(\bsrc\s*=\s*)(["'])(\/[^"']*)\2/gi, (m, pre, q, path) => {
+    const mapped = toPublicRootedAssetPath(path);
+    return mapped ? `${pre}${q}${mapped}${q}` : m;
+  });
+  // url(/...) / url("/...") / url('/...')  in inline CSS + style="" attributes
+  out = out.replace(/url\(\s*(["']?)(\/[^"')]+)\1\s*\)/gi, (m, q, path) => {
+    const mapped = toPublicRootedAssetPath(path);
+    return mapped ? `url(${q}${mapped}${q})` : m;
+  });
+  return out;
+}
+
+// Runtime companion to mapPublicRootAssets. Designs frequently build image grids in
+// JavaScript (a data array -> innerHTML), so those <img src="/images/…"> are set at
+// RUNTIME and can't be caught by the static string rewrite above. This injected
+// observer catches every element with a web-root-absolute `src` — static or
+// JS-added — and makes it public/-relative, so the <base href> resolves it to the
+// project's files. Rewritten (relative) srcs are ignored on re-observation, so it
+// never loops. No-op for src values that are already relative, protocol-relative,
+// full URLs, or daemon paths.
+function injectAssetRewriteBridge(html: string): string {
+  const bridge =
+    '<script>(function(){' +
+    'function mapSrc(u){' +
+    "if(typeof u!=='string'||u.charAt(0)!=='/'||u.charAt(1)==='/')return null;" +
+    'var rel=u.slice(1);' +
+    "if(rel.indexOf('public/')===0||rel.indexOf('api/')===0||rel.indexOf('artifacts/')===0||rel.indexOf('frames/')===0)return null;" +
+    "return 'public/'+rel;}" +
+    'function fix(el){' +
+    "if(!el||el.nodeType!==1||el.tagName==='A'||!el.getAttribute)return;" +
+    "var v=el.getAttribute('src');if(!v)return;var m=mapSrc(v);if(m)el.setAttribute('src',m);}" +
+    'function scan(n){try{if(n.nodeType===1)fix(n);if(n.querySelectorAll){var l=n.querySelectorAll("img,source,script,video,audio");for(var i=0;i<l.length;i++)fix(l[i]);}}catch(e){}}' +
+    'try{new MutationObserver(function(ms){for(var i=0;i<ms.length;i++){var m=ms[i];if(m.type==="attributes")fix(m.target);if(m.addedNodes)for(var j=0;j<m.addedNodes.length;j++)scan(m.addedNodes[j]);}}).observe(document.documentElement,{childList:true,subtree:true,attributes:true,attributeFilter:["src"]});}catch(e){}' +
+    'if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",function(){scan(document);});else scan(document);' +
+    '})();</script>';
+  return /<head[^>]*>/i.test(html)
+    ? html.replace(/<head([^>]*)>/i, (m) => `${m}${bridge}`)
+    : bridge + html;
+}
+
 export function buildSrcdoc(
   html: string,
   options: SrcdocOptions = {}
@@ -264,8 +329,13 @@ export function buildSrcdoc(
   const withSafeTitle = sanitizeTitleInDoc(wrapped);
   const withOdIds = annotateMissingOdIds(withSafeTitle);
   const withSourcePaths = options.editBridge ? annotateManualEditSourcePaths(withOdIds) : withOdIds;
-  const withBase = options.baseHref ? injectBaseHref(withSourcePaths, options.baseHref) : withSourcePaths;
-  const withShim = injectSandboxShim(withBase);
+  // Map web-root asset refs (/images/…) onto the project's public/ folder so the
+  // preview shows the same images the published site will.
+  const withPublicAssets = mapPublicRootAssets(withSourcePaths);
+  const withBase = options.baseHref ? injectBaseHref(withPublicAssets, options.baseHref) : withPublicAssets;
+  // Catch JS-rendered <img src="/…"> at runtime too (see injectAssetRewriteBridge).
+  const withAssetRewrite = injectAssetRewriteBridge(withBase);
+  const withShim = injectSandboxShim(withAssetRewrite);
   const withFocusGuard = options.previewFocusGuard ? injectPreviewFocusGuard(withShim) : withShim;
   const withDeck = options.deck ? injectDeckBridge(withFocusGuard, options.initialSlideIndex) : withFocusGuard;
   // Comment + Inspect share an element-selection bridge: both pick a

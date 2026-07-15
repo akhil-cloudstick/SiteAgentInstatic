@@ -49,11 +49,39 @@ function rewriteLocation(headers, prefix) {
   return { ...headers, location: prefix + loc };
 }
 
+// The OpenDesign SPA emits ABSOLUTE URLs (/api, /artifacts, /frames, /sso, public
+// assets) with no /od/<slug> basePath — Next.js only prefixes its own <Link> and
+// _next assets, not raw fetch/EventSource/<img>/<iframe>/css url(). Those requests
+// arrive base-less at the gateway root. But every one carries a Referer of the OD
+// page that issued it, so we can recover the tenant + restore the prefix here —
+// covering ALL request types at once, with zero app-side patching.
+function odSlugFromReferer(req) {
+  const ref = req.headers.referer || req.headers.referrer;
+  if (!ref) return null;
+  try {
+    const m = new URL(ref).pathname.match(/^\/od\/([a-z0-9-]+)(?=\/|$)/);
+    return m ? m[1] : null;
+  } catch {
+    return null;
+  }
+}
+
+// Paths owned by the OD DAEMON (not the Next web): its HTTP API, SSO entry, and
+// artifact/frame static serving. The Next web only proxies these to the daemon in
+// DEV mode — a pre-built (production) web does NOT — so the gateway must send them
+// straight to the daemon itself, which works identically in dev and pre-built mode.
+function isDaemonPath(p) {
+  return p === '/api' || p.startsWith('/api/')
+    || p === '/sso' || p.startsWith('/sso?') || p.startsWith('/sso/')
+    || p.startsWith('/artifacts/') || p.startsWith('/frames/');
+}
+
 // Forward a Node req/res pair to a 127.0.0.1 backend, streaming both ways.
 // The backend binds localhost, so we present a local Host but forward the real
 // scheme/host so it can build correct absolute URLs and set Secure cookies.
+// `rewritePath` overrides the upstream path (used to restore the OD basePath).
 function forward(req, res, target) {
-  const { port, prefix } = target;
+  const { port, prefix, rewritePath } = target;
   const headers = { ...req.headers };
   headers.host = `127.0.0.1:${port}`;
   headers['x-forwarded-proto'] = 'https';
@@ -61,7 +89,7 @@ function forward(req, res, target) {
   headers['x-forwarded-for'] = req.socket?.remoteAddress || '';
 
   const upstream = http.request(
-    { host: '127.0.0.1', port, method: req.method, path: req.url, headers },
+    { host: '127.0.0.1', port, method: req.method, path: rewritePath || req.url, headers },
     (up) => {
       res.writeHead(up.statusCode || 502, rewriteLocation(up.headers, prefix));
       up.pipe(res);
@@ -81,12 +109,36 @@ async function resolveBackend(req, path) {
   if (path === '/operator' || path.startsWith('/operator/')) {
     return { port: config.operatorConsolePort, kind: 'operator' };
   }
-  const od = path.match(/^\/od\/([a-z0-9-]+)(?=\/|$)/);
+  // Explicit /od/<slug>/... — daemon-owned paths (/api,/sso,/artifacts,/frames) go
+  // STRAIGHT to the daemon with the prefix stripped (works in dev AND pre-built,
+  // unlike Next's dev-only proxy); everything else (SPA + _next assets + public)
+  // goes to the Next web.
+  const od = path.match(/^\/od\/([a-z0-9-]+)(?:\/|$)/);
   if (od) {
-    const t = await getTenant(od[1]);
-    return t?.od_web_port
-      ? { port: t.od_web_port, kind: 'od', prefix: `/od/${od[1]}` }
-      : { notFound: 'unknown OpenDesign tenant' };
+    const slug = od[1];
+    const prefix = `/od/${slug}`;
+    const t = await getTenant(slug);
+    if (!t?.od_web_port) return { notFound: 'unknown OpenDesign tenant' };
+    const restPath = path.slice(prefix.length) || '/';
+    if (t.od_port && isDaemonPath(restPath)) {
+      return { port: t.od_port, kind: 'od-daemon', prefix, rewritePath: req.url.slice(prefix.length) || '/' };
+    }
+    return { port: t.od_web_port, kind: 'od', prefix };
+  }
+  // Base-less SUB-RESOURCE request FROM an OD page (its absolute /api, /artifacts,
+  // asset URLs). Recover the tenant from the Referer: daemon paths -> the daemon
+  // as-is; asset paths -> the OD web with the /od/<slug> prefix restored. Exclude
+  // top-level document navigations (Sec-Fetch-Dest: document) — clicking from OD
+  // back to /hub or /login must still reach the control-plane, not get pushed to OD.
+  const odRef = odSlugFromReferer(req);
+  if (odRef && req.headers['sec-fetch-dest'] !== 'document') {
+    const t = await getTenant(odRef);
+    if (t?.od_web_port) {
+      if (t.od_port && isDaemonPath(path)) {
+        return { port: t.od_port, kind: 'od-daemon', prefix: `/od/${odRef}`, rewritePath: req.url };
+      }
+      return { port: t.od_web_port, kind: 'od', prefix: `/od/${odRef}`, rewritePath: `/od/${odRef}${req.url}` };
+    }
   }
   const slug = sessionSlug(req);
   if (slug) {

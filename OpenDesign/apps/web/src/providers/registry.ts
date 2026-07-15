@@ -2075,6 +2075,17 @@ export async function uploadProjectFiles(
 // Stable URL that serves a project file with its original mime — for
 // thumbnails in the staged-attachment chips and for any preview iframe
 // that needs to point at the live file (not a srcDoc).
+// Behind the SiteAgent gateway the app is served under /od/<slug>. Raw-file URLs
+// are used both as preview `<base href>` values (resolved by a sandboxed, opaque-
+// origin iframe that carries no Referer) and as fetch targets, so they MUST include
+// the /od/<slug> prefix to reach the tenant's daemon through the gateway. Served at
+// the root (local dev) this is a no-op.
+function withGatewayBasePath(path: string): string {
+  if (typeof window === 'undefined' || !path.startsWith('/')) return path;
+  const m = window.location.pathname.match(/^\/od\/[a-z0-9-]+/);
+  return m ? m[0] + path : path;
+}
+
 export function projectRawUrl(projectId: string, filePath: string): string {
   // Encode each path segment individually so a slash inside the file
   // path stays a path separator, not %2F.
@@ -2082,7 +2093,7 @@ export function projectRawUrl(projectId: string, filePath: string): string {
     .split('/')
     .map((seg) => encodeURIComponent(seg))
     .join('/');
-  return `/api/projects/${encodeURIComponent(projectId)}/raw/${safePath}`;
+  return withGatewayBasePath(`/api/projects/${encodeURIComponent(projectId)}/raw/${safePath}`);
 }
 
 export function designSystemStaticUrl(designSystemId: string, filePath: string): string {

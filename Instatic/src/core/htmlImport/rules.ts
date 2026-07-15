@@ -160,10 +160,16 @@ export const HTML_TO_MODULE_RULES: ImportRule[] = [
             moduleId: 'base.container',
             props: { tag: 'custom', customTag: el.tagName.toLowerCase() },
           }
-        : {
-            moduleId: 'base.text',
-            props: { text: normalizeImportedText(el.textContent ?? ''), tag: el.tagName.toLowerCase() },
-          },
+        : (() => {
+            const tag = el.tagName.toLowerCase()
+            // Inline phrasing keeps its edge spaces so adjacent inline runs don't
+            // merge (e.g. "delivery more " + "joyful"); block tags trim.
+            const inline = tag === 'span' || tag === 'small' || tag === 'strong' || tag === 'em'
+            return {
+              moduleId: 'base.text',
+              props: { text: normalizeImportedText(el.textContent ?? '', inline), tag },
+            }
+          })(),
     recurse: hasElementChild,
   },
 

@@ -2846,7 +2846,16 @@ export async function startServer({
       });
       const result = (await importRes.json().catch(() => ({}))) as { error?: string };
       if (!importRes.ok) return sendApiError(res, 502, 'CMS_IMPORT_FAILED', result?.error || 'CMS import failed');
-      return res.json({ ok: true, redirectUrl: `${instaticUrl}/admin`, result });
+      // Send the BROWSER to the CMS through a fresh SSO hand-off so it lands already
+      // logged in. Use the PUBLIC gateway origin (the tenant's Instatic is session-
+      // routed at <gatewayOrigin>/admin) when set — a remote client cannot reach the
+      // daemon's localhost OD_INSTATIC_URL. Falls back to the local URL for plain dev.
+      const gatewayOrigin = (process.env.OD_GATEWAY_ORIGIN ?? '').trim().replace(/\/$/, '');
+      const cmsBase = gatewayOrigin || instaticUrl;
+      const browserToken = signInstaticSsoToken(slug, 120);
+      // Land on the CMS SITE editor (the imported page), not the dashboard.
+      const redirectUrl = `${cmsBase}/admin/api/cms/sso?token=${encodeURIComponent(browserToken)}&redirect=${encodeURIComponent('/admin/site')}`;
+      return res.json({ ok: true, redirectUrl, result });
     } catch (caught) {
       return sendApiError(res, 500, 'PUSH_FAILED', caught instanceof Error ? caught.message : String(caught));
     }

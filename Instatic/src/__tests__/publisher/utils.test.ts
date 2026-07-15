@@ -106,9 +106,26 @@ describe('isSafeUrl', () => {
     expect(isSafeUrl('vbscript:MsgBox(1)')).toBe(false)
   })
 
-  it('blocks data: URIs', () => {
+  it('blocks data: URIs by default (no allowDataImages)', () => {
     expect(isSafeUrl('data:text/html,<script>alert(1)</script>')).toBe(false)
     expect(isSafeUrl('data:image/png;base64,abc')).toBe(false)
+    expect(isSafeUrl('data:image/svg+xml;base64,abc')).toBe(false)
+  })
+
+  it('with allowDataImages, permits safe data:image/* (img/media src only)', () => {
+    expect(isSafeUrl('data:image/png;base64,abc', { allowDataImages: true })).toBe(true)
+    expect(isSafeUrl('data:image/jpeg;base64,abc', { allowDataImages: true })).toBe(true)
+    expect(isSafeUrl('data:image/webp;base64,abc', { allowDataImages: true })).toBe(true)
+    // SVG in <img> renders in the browser's secure static mode (no scripts).
+    expect(isSafeUrl('data:image/svg+xml;base64,abc', { allowDataImages: true })).toBe(true)
+    expect(isSafeUrl('data:image/svg+xml,%3Csvg%3E%3C/svg%3E', { allowDataImages: true })).toBe(true)
+  })
+
+  it('allowDataImages does NOT relax script schemes or non-image data:', () => {
+    expect(isSafeUrl('data:text/html,<script>alert(1)</script>', { allowDataImages: true })).toBe(false)
+    expect(isSafeUrl('data:application/javascript,alert(1)', { allowDataImages: true })).toBe(false)
+    expect(isSafeUrl('javascript:alert(1)', { allowDataImages: true })).toBe(false)
+    expect(isSafeUrl('vbscript:MsgBox(1)', { allowDataImages: true })).toBe(false)
   })
 })
 
@@ -127,6 +144,13 @@ describe('safeUrl', () => {
 
   it('returns # for data: URI', () => {
     expect(safeUrl('data:text/html,<b>hi</b>')).toBe('#')
+  })
+
+  it('with allowDataImages, returns the escaped data:image/* URI', () => {
+    expect(safeUrl('data:image/svg+xml;base64,PHN2Zz48L3N2Zz4=', { allowDataImages: true }))
+      .toBe('data:image/svg+xml;base64,PHN2Zz48L3N2Zz4=')
+    // non-image data: still collapses to '#' even with the flag
+    expect(safeUrl('data:text/html,<b>hi</b>', { allowDataImages: true })).toBe('#')
   })
 
   it('handles null/undefined gracefully (coalesces to empty string, returns safe empty)', () => {

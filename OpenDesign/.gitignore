@@ -98,3 +98,4 @@ growth/**
 # Agent long-running task memory
 .task/
 deploy/agent-bins/
+apps/web/tsconfig.build.json

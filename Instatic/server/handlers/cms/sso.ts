@@ -64,8 +64,16 @@ export async function handleSsoRoutes(req: Request, db: DbClient): Promise<Respo
     ...requestAuditContext(req),
   })
 
+  // Optional post-sign-in landing page (e.g. Share-to-CMS lands on the site editor).
+  // Restricted to in-app /admin paths so this can't be turned into an open redirect.
+  const requested = url.searchParams.get('redirect') ?? ''
+  const dest =
+    requested.startsWith('/admin') && !requested.startsWith('//') && !requested.includes('..')
+      ? requested
+      : '/admin'
+
   return setCookieHeader(
-    new Response(null, { status: 302, headers: { location: '/admin' } }),
+    new Response(null, { status: 302, headers: { location: dest } }),
     sessionCookie(req, token, expiresAt),
   )
 }
