@@ -133,11 +133,11 @@ function makeFakeDb() {
       return { rows: [], rowCount: 0 }
     }
 
-    // createMediaAsset — values[0..8] = id, filename, mimeType, sizeBytes,
+    // createMediaAsset — values[0..9] = id, filename, mimeType, sizeBytes,
     // storagePath, publicPath, uploadedByUserId, storageAdapterId,
-    // externallyHosted. The fake DB router matches before importMediaAsset
-    // because importMediaAsset's column list is much longer.
-    if (normalized.includes('insert into media_assets') && values.length === 9) {
+    // externallyHosted, contentHash. The fake DB router matches before
+    // importMediaAsset because importMediaAsset's column list is much longer.
+    if (normalized.includes('insert into media_assets') && values.length === 10) {
       const row = mediaRow({
         id: values[0],
         filename: values[1],
@@ -148,6 +148,8 @@ function makeFakeDb() {
         uploaded_by_user_id: values[6],
         storage_adapter_id: values[7],
         externally_hosted: values[8],
+        // values[9] = content_hash — server-internal, absent from the read
+        // projection, so the hydrated row doesn't carry it.
         created_at: new Date('2026-01-03').toISOString(),
       })
       media.push(row)

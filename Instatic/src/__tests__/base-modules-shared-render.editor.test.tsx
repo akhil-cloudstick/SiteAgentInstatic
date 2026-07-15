@@ -73,6 +73,22 @@ describe('ButtonEditor canvas DOM matches resolveButtonAnchor', () => {
     const blank = renderEditor(ButtonModule, { href: 'https://e.com', target: '_blank', label: 'Go' })
     expect(blank.container.querySelector('a')?.getAttribute('rel')).toBe(anchorRel('_blank'))
   })
+
+  it('renders child nodes (icon <svg>) when present, falls back to label only when empty (== publisher)', () => {
+    // Icon-only button (e.g. imported nav search/cart): its <svg> child must
+    // render, NOT the "Button" placeholder — this was the "ButtonButtonButton" bug.
+    const withChildren = renderEditor(
+      ButtonModule,
+      { href: '', label: '' },
+      { children: React.createElement('svg', { 'data-testid': 'icon' }) },
+    )
+    expect(withChildren.container.querySelector('button svg')).not.toBeNull()
+    expect(withChildren.container.textContent).not.toContain('Button')
+
+    // A childless button still falls back to its text label.
+    const withoutChildren = renderEditor(ButtonModule, { href: '', label: 'Sign up' })
+    expect(withoutChildren.container.querySelector('button')?.textContent).toBe('Sign up')
+  })
 })
 
 describe('ListEditor canvas DOM matches parseItems', () => {

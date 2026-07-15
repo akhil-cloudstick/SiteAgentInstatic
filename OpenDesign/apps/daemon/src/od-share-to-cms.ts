@@ -1,9 +1,18 @@
 // Share to CMS — collect a project's shareable static site files.
 //
 // Walks a project's on-disk tree and returns the HTML/CSS/JS/image/font files as
-// { "<relPath>": { base64, mimeType } }, the shape the Instatic
+// { "<webPath>": { base64, mimeType } }, the shape the Instatic
 // /admin/api/cms/import/site-html endpoint expects. Dot-dirs (.file-versions,
 // .od-skills) and non-site files (.md, .json, artifacts) are skipped.
+//
+// Keys are WEB-ROOT paths, not on-disk paths: the project's `public/` directory
+// IS the published web root (an `<img src="/images/hero.svg">` resolves to
+// `public/images/hero.svg` on disk), so the `public/` prefix is stripped here.
+// This makes the FileMap mirror a built static-site root exactly — the same
+// shape Instatic's manual "Import Site" wizard consumes — so a template-compliant
+// web-root reference (`/images/x`) resolves to its file (`images/x`). Without
+// this, the importer looks up `images/x` and misses the `public/images/x` key,
+// and the image never uploads.
 import { promises as fsp } from 'node:fs';
 import nodePath from 'node:path';
 
@@ -52,9 +61,14 @@ export async function collectSiteFiles(projectRoot: string): Promise<Record<stri
       }
       const mimeType = SITE_EXT[nodePath.extname(entry.name).toLowerCase()];
       if (!mimeType) continue; // skip .md / .json / .artifact.json / plan.md, etc.
+      // Map the on-disk path to its published web-root path: `public/` is the
+      // web root, so its contents live at the root (`public/images/x` → `images/x`).
+      // A same-named root file wins over a public/ duplicate (first write kept).
+      const webPath = relPath.startsWith('public/') ? relPath.slice('public/'.length) : relPath;
+      if (out[webPath]) continue;
       try {
         const bytes = await fsp.readFile(abs);
-        out[relPath] = { base64: bytes.toString('base64'), mimeType };
+        out[webPath] = { base64: bytes.toString('base64'), mimeType };
       } catch {
         // unreadable file — skip rather than fail the whole push
       }

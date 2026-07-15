@@ -21,50 +21,66 @@ import { getDraftSite } from '../../repositories/site'
 import { listDataTables } from '../../repositories/data/tables'
 import { listDataRows } from '../../repositories/data/rows'
 import { pageFromRow } from '@core/data/pageFromRow'
-import { buildImportPlan } from '@core/siteImport'
-import type { FileMap } from '@core/siteImport'
+import { buildImportPlan, applyAssetRewrites } from '@core/siteImport'
+import type { FileMap, ImportPlan } from '@core/siteImport'
 import type { SiteDocument } from '@core/page-tree'
 import { CMS_API_PREFIX, type CmsHandlerOptions } from './shared'
 import { handleImportRoute } from './import'
 import { applyPlanToBundle } from './siteImport/applyPlan'
 import { ensureServerDomParser } from './siteImport/domPolyfill'
+import { acceptUploadedMedia, EXTENSION_FOR_MIME } from './mediaUpload'
+import { installGoogleFont } from '../../fonts/googleFontsInstaller'
+import type { FontEntry } from '@core/fonts'
 
 const IMPORT_SITE_HTML_PATH = `${CMS_API_PREFIX}/import/site-html`
 
-const MIME_BY_EXT: Record<string, string> = {
-  svg: 'image/svg+xml',
-  png: 'image/png',
-  jpg: 'image/jpeg',
-  jpeg: 'image/jpeg',
-  gif: 'image/gif',
-  webp: 'image/webp',
-  avif: 'image/avif',
-}
+/** Every MIME the CMS media library accepts (images, video, web fonts). */
+const MEDIA_IMPORT_MIMES = Object.keys(EXTENSION_FOR_MIME) as Array<keyof typeof EXTENSION_FOR_MIME>
+const MAX_IMPORT_ASSET_BYTES = 50 * 1024 * 1024
 
 /**
- * Inline the design's LOCAL image files as data URIs so they render in the CMS and
- * on the published site. Designs put assets in `public/` and reference them from the
- * web root (`<img src="/images/hero.svg">`); nothing in the CMS serves a `/images/*`
- * route, and SVGs can't be served inline from `/uploads/*` (XSS hardening), so the
- * safe universal path is a self-contained data URI. We replace EVERY occurrence of
- * the web-root ref (not just `src="…"`) so JS-built images (`p.image = '/images/x'`)
- * are covered too. External `http(s)` images pass through untouched; assets over the
- * size limit are left as-is to avoid bloating the page.
+ * Upload every asset the plan references into the CMS media library and return a
+ * `sourcePath → /uploads/… URL` rewrite map. This is the headless equivalent of
+ * the browser wizard's `uploadPlanAssets` (`src/core/siteImport/commitPlan.ts`):
+ * it runs each asset through the same server media-commit path the Media tab uses
+ * (`acceptUploadedMedia` — magic-byte MIME sniff, SVG sanitise, responsive
+ * variants), so imported images/SVGs/fonts land in the library as first-class,
+ * reusable assets. `applyAssetRewrites` then swaps the plan's FileMap-key URLs for
+ * the returned `/uploads/…` paths. A single failed asset is skipped (its reference
+ * stays unrewritten) so one bad file never aborts the whole import.
  */
-function inlineLocalImages(html: string, files: FileMap['files']): string {
-  const MAX_INLINE_BYTES = 512 * 1024
-  let out = html
-  for (const [path, entry] of Object.entries(files)) {
-    const ext = (path.split('.').pop() ?? '').toLowerCase()
-    const mime = entry.mimeType || MIME_BY_EXT[ext]
-    if (!MIME_BY_EXT[ext] || !entry.bytes?.length || entry.bytes.length > MAX_INLINE_BYTES) continue
-    // File `public/images/hero.svg` is referenced from the web root as `/images/hero.svg`.
-    const ref = `/${path.replace(/^public\//, '')}`
-    if (!out.includes(ref)) continue
-    const dataUri = `data:${mime};base64,${Buffer.from(entry.bytes).toString('base64')}`
-    out = out.split(ref).join(dataUri)
+async function uploadImportedAssets(
+  db: DbClient,
+  plan: ImportPlan,
+  uploadedByUserId: string,
+): Promise<Record<string, string>> {
+  const rewriteMap: Record<string, string> = {}
+  for (const asset of plan.assets) {
+    try {
+      const name = asset.sourcePath.split('/').pop() || 'asset'
+      // bytes come from the FileMap (plain ArrayBuffer-backed) — the cast satisfies
+      // the BlobPart constraint, which excludes SharedArrayBuffer.
+      const file = new File([asset.bytes.slice().buffer as ArrayBuffer], name, { type: asset.mimeType })
+      const result = await acceptUploadedMedia(db, {
+        file,
+        maxBytes: MAX_IMPORT_ASSET_BYTES,
+        allowedMimes: MEDIA_IMPORT_MIMES,
+        role: 'original',
+        uploadedByUserId,
+        // Reuse a byte-identical asset already in the library instead of cloning
+        // it — this is what makes re-pushing the same project idempotent for
+        // media (no more N-copies-per-push accumulation).
+        dedupeByContentHash: true,
+        oversizedMessage: `Asset ${asset.sourcePath} exceeds the 50 MB limit`,
+        unsupportedMessage: `Asset ${asset.sourcePath} has an unsupported type (${asset.mimeType})`,
+      })
+      if (result instanceof Response) continue // policy failure → leave the ref unrewritten
+      rewriteMap[asset.sourcePath] = result.publicPath
+    } catch {
+      // network / storage blip — skip this asset, keep importing the rest
+    }
   }
-  return out
+  return rewriteMap
 }
 
 const SiteHtmlImportBodySchema = Type.Object({
@@ -97,14 +113,6 @@ export async function handleImportSiteHtmlRoute(
   for (const [path, entry] of Object.entries(body.files)) {
     files[path] = { bytes: new Uint8Array(Buffer.from(entry.base64, 'base64')), mimeType: entry.mimeType }
   }
-  // Inline the design's local images (data URIs) into each HTML page BEFORE parsing,
-  // so the imported pages carry their images and render in the CMS + published site.
-  for (const [path, entry] of Object.entries(files)) {
-    if (!/\.html?$/i.test(path)) continue
-    const html = Buffer.from(entry.bytes).toString('utf8')
-    const inlined = inlineLocalImages(html, files)
-    if (inlined !== html) files[path] = { ...entry, bytes: new Uint8Array(Buffer.from(inlined, 'utf8')) }
-  }
   const fileMap: FileMap = { files }
 
   // Assemble currentSite (shell + pages) so conflict detection can match imported
@@ -122,11 +130,37 @@ export async function handleImportSiteHtmlRoute(
   ensureServerDomParser() // parseHtml uses the global DOMParser — install happy-dom's on the server
   const plan = buildImportPlan({ fileMap, currentSite })
 
+  // Upload every referenced asset into the CMS media library, then rewrite the
+  // plan's FileMap-key URLs to the returned /uploads/ paths — the same two-step
+  // the browser "Import Site" wizard runs. Images/SVGs/fonts become first-class
+  // library assets (no more data-URI inlining or `public/`-prefix corruption).
+  const rewriteMap = await uploadImportedAssets(db, plan, user.id)
+  const rewrittenPlan = applyAssetRewrites(plan, rewriteMap)
+
+  // Self-host the design's Google fonts (under /uploads/fonts) so typography
+  // matches the source — same as the browser wizard's `installGoogleFont` step.
+  // The installer fails closed to its bundled snapshot; a family it doesn't ship
+  // (or a download blip) is skipped and falls back — it never aborts the import.
+  const installedGoogleFonts: FontEntry[] = []
+  if (options.uploadsDir && rewrittenPlan.googleFonts.length > 0) {
+    for (const font of rewrittenPlan.googleFonts) {
+      try {
+        installedGoogleFonts.push(await installGoogleFont(font, options.uploadsDir))
+      } catch {
+        // family not in the snapshot / download failed — skip; the CSS falls back
+      }
+    }
+  }
+
   const tables = await listDataTables(db)
   const pagesTable = tables.find((t) => t.id === 'pages')
   if (!pagesTable) return jsonResponse({ error: 'pages system table missing' }, { status: 500 })
 
-  const bundle = applyPlanToBundle(plan, currentSite, pagesTable)
+  // Rebuild each imported page into Instatic's native editable node tree — the
+  // same result as the manual "Import Site" wizard: every heading/image/button
+  // becomes a real, editable canvas node, and the page renders faithfully. Media
+  // is already uploaded, fonts self-hosted, page scripts committed page-scoped.
+  const bundle = applyPlanToBundle(rewrittenPlan, currentSite, pagesTable, installedGoogleFonts)
 
   // Apply through the existing bundle importer (atomic, upsert-by-id) by forwarding
   // the Owner session. Force merge-overwrite (the no-duplicate mode).

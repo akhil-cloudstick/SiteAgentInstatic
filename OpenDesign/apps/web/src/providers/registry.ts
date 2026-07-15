@@ -1640,6 +1640,23 @@ export function projectFileUrl(projectId: string, name: string): string {
   return projectRawUrl(projectId, name);
 }
 
+/**
+ * Raw project-file bytes endpoint — returns the file EXACTLY as stored on disk,
+ * with NO serve-time transforms. `projectFileUrl`/`projectRawUrl` route through
+ * the preview `/raw/` endpoint, which (for HTML) injects the asset-rewrite bridge
+ * `<script>` and rewrites `/x`→`public/x`. That is correct for the preview iframe
+ * but MUST NOT be read back as an editable source: a manual edit would save the
+ * transformed string, permanently baking the bridge + `public/` paths into the
+ * file. Editor-source and attachment reads use this untransformed endpoint.
+ */
+export function projectFileSourceUrl(projectId: string, name: string): string {
+  const safePath = name
+    .split('/')
+    .map((seg) => encodeURIComponent(seg))
+    .join('/');
+  return `/api/projects/${encodeURIComponent(projectId)}/files/${safePath}`;
+}
+
 export interface ProjectFilePreviewSection {
   title: string;
   lines: string[];
@@ -1671,7 +1688,10 @@ export async function fetchProjectFileText(
   name: string,
   options?: { cache?: RequestCache; cacheBustKey?: string | number },
 ): Promise<string | null> {
-  const url = projectFileUrl(projectId, name);
+  // Read the UNTRANSFORMED source bytes, never the preview `/raw/` output — see
+  // projectFileSourceUrl. This keeps the editor's edit-source (and AI attachment
+  // reads) free of the injected asset bridge + `public/` path rewrites.
+  const url = projectFileSourceUrl(projectId, name);
   const cacheBustKey = options?.cacheBustKey;
   const requestUrl =
     cacheBustKey == null

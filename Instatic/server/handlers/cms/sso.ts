@@ -45,7 +45,11 @@ export async function handleSsoRoutes(req: Request, db: DbClient): Promise<Respo
   }
 
   // Mint an Owner session (same primitives the login handler uses). The hub has
-  // already authenticated the tenant, so MFA is marked satisfied.
+  // already strongly authenticated the tenant, so BOTH MFA and step-up are marked
+  // satisfied for the session lifetime. Without the step-up grant, step-up-gated
+  // actions (Publish, destructive ops) would prompt for a local CMS password the
+  // SSO user doesn't have — the hub is the identity provider, so re-auth here is
+  // both redundant and impossible.
   const token = createSessionToken()
   const expiresAt = sessionExpiry()
   await createSession(db, {
@@ -53,6 +57,7 @@ export async function handleSsoRoutes(req: Request, db: DbClient): Promise<Respo
     userId: owner.id,
     expiresAt,
     mfaPassedAt: new Date(),
+    stepUpExpiresAt: expiresAt,
     ...requestAuditContext(req),
   })
   await createAuditEvent(db, {

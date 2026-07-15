@@ -28,6 +28,12 @@ interface CreateMediaAssetInput {
   storageAdapterId: string
   /** True when this row's bytes are stored outside the host's uploads dir. */
   externallyHosted: boolean
+  /**
+   * SHA-256 (lowercase hex) of the stored bytes, for content-addressed dedup.
+   * Optional — a row without it (older rows, bundle imports) simply never
+   * matches `findLiveMediaAssetByContentHash`.
+   */
+  contentHash?: string | null
 }
 
 export interface UpdateMediaAssetMetadataInput {
@@ -102,6 +108,7 @@ export async function createMediaAsset(
     uploaded_by_user_id: input.uploadedByUserId,
     storage_adapter_id: input.storageAdapterId,
     externally_hosted: input.externallyHosted,
+    content_hash: input.contentHash ?? null,
   }
   const params = MEDIA_ASSET_INSERT_COLUMNS.map((column) => valuesByColumn[column])
   const placeholders = MEDIA_ASSET_INSERT_COLUMNS.map((_, i) => placeholder(db.dialect, i + 1)).join(', ')
@@ -123,6 +130,32 @@ export async function getMediaAsset(
      from media_assets
      where id = ${placeholder(db.dialect, 1)}`,
     [id],
+  )
+  if (rows.length === 0) return null
+  const assets = await hydrateAssets(db, rows)
+  return assets[0] ?? null
+}
+
+/**
+ * Find a LIVE (non-trashed) media asset whose stored bytes hash to
+ * `contentHash`. Used by the import pipeline to reuse an already-uploaded,
+ * byte-identical asset instead of cloning it on every re-push. Deleted assets
+ * are excluded (a re-push should resurrect content into a fresh row, not a
+ * trashed one). Oldest-first so the canonical original wins when duplicates
+ * predate the dedup column. Returns null for an empty/absent hash.
+ */
+export async function findLiveMediaAssetByContentHash(
+  db: DbClient,
+  contentHash: string,
+): Promise<MediaAsset | null> {
+  if (!contentHash) return null
+  const { rows } = await db.unsafe<MediaAssetRow>(
+    `select ${MEDIA_ASSET_COLUMNS}
+     from media_assets
+     where content_hash = ${placeholder(db.dialect, 1)} and deleted_at is null
+     order by created_at asc
+     limit 1`,
+    [contentHash],
   )
   if (rows.length === 0) return null
   const assets = await hydrateAssets(db, rows)

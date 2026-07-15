@@ -19,10 +19,12 @@
  * handler that uploads media MUST go through `acceptUploadedMedia`.
  */
 import { basename } from 'node:path'
+import { createHash } from 'node:crypto'
 import { nanoid } from 'nanoid'
 import type { DbClient } from '../../db/client'
 import {
   createMediaAsset,
+  findLiveMediaAssetByContentHash,
   getMediaAsset,
   getMediaAssetStoragePath,
   getMediaAssetVariants,
@@ -214,6 +216,16 @@ interface AcceptUploadInput {
   oversizedMessage: string
   /** Error message when the sniffed MIME isn't in `allowedMimes`. */
   unsupportedMessage: string
+  /**
+   * Content-addressed reuse. When true, if a LIVE media asset already holds
+   * byte-identical content, return it instead of creating a duplicate row (and
+   * skip the storage write entirely). Opt-in: the SITE IMPORT path sets it so a
+   * re-push reuses assets instead of cloning them. Left OFF for interactive
+   * uploads (a user may want a distinct copy) and for AVATARS (each user owns a
+   * separately-replaceable asset — deduping would make one replace mutate two
+   * users' avatars).
+   */
+  dedupeByContentHash?: boolean
 }
 
 interface ValidatedUpload {
@@ -277,6 +289,20 @@ export async function acceptUploadedMedia(
   const validated = await validateUploadedMedia(input)
   if (validated instanceof Response) return validated
 
+  // Content hash over the FINAL stored bytes (post SVG-sanitise), so a re-import
+  // of the same source deterministically re-matches. Only LIBRARY assets
+  // (`role === 'original'`) join the dedup pool — persisting a hash for avatars
+  // would let an import reuse a user's avatar row, and a later avatar replace
+  // (same id, new bytes) would then silently change the imported page's image.
+  const isDedupeEligible = input.role === 'original'
+  const contentHash = isDedupeEligible
+    ? createHash('sha256').update(validated.bytes).digest('hex')
+    : null
+  if (input.dedupeByContentHash && contentHash) {
+    const existing = await findLiveMediaAssetByContentHash(db, contentHash)
+    if (existing) return existing // reuse: no second storage write, no duplicate row
+  }
+
   // Server-chosen extension on the on-disk filename so the static handler's
   // extension→Content-Type lookup can only ever yield the verified inert
   // MIME we just sniffed. Client-supplied extension is dropped.
@@ -308,6 +334,7 @@ export async function acceptUploadedMedia(
     uploadedByUserId: input.uploadedByUserId,
     storageAdapterId: dispatched.storageAdapterId,
     externallyHosted: dispatched.externallyHosted,
+    contentHash,
   })
 
   // Responsive pipeline (docs/features/media.md). Raster-only for v1:

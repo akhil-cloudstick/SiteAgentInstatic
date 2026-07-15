@@ -87,6 +87,12 @@ These common patterns were tested end-to-end (build → import → publish → d
 - **Icon buttons** — `<button><svg>…</svg></button>` (hamburger, close, chevrons). The inline `<svg>` and its `<line>`/`<path>`/`<circle>` children are preserved.
 - **`line-height`** — buttons/cards/badges that rely on the browser default (`normal`) keep their exact height; the CMS does not force an opinionated `1.5`.
 
+### Avoid — these lose fidelity on import
+
+- **`@layer`** — the importer drops `@layer` (and `@import` / `@page` / `@namespace`) rules. `@layer` changes cascade order, so a page relying on it can look different after import. Write plain, source-ordered CSS instead.
+- **`public/`-prefixed or runtime-rewritten asset paths** — always reference assets at the **web root**: `<img src="/images/hero.svg">`, `url(/images/bg.svg)`. Never write `src="public/images/…"`, never rely on a runtime `<script>` that rewrites `src` attributes. Files live in `public/`; the `/…` form resolves to them automatically on both the built site and the CMS import.
+- **Images built by JavaScript at runtime** (`el.src = '/images/x'` in a `<script>`) — the importer only sees the static DOM, so JS-injected images are not uploaded to the CMS media library and won't resolve on the published page. Put every meaningful image in real static `<img>` markup (mark it `data-sa="image:…"`); use JS only for behaviour, not for creating the primary images.
+
 The tenant edits all of the above inside Instatic and re-publishes with the same result.
 
 ---

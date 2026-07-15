@@ -359,8 +359,9 @@ describe('fetchProjectFileText', () => {
       }),
     ).resolves.toBe('<svg />');
 
+    // Source reads use the untransformed /files/ endpoint, not the preview /raw/.
     expect(fetchMock).toHaveBeenCalledWith(
-      '/api/projects/project-1/raw/diagram.svg?cacheBust=1710000000-2',
+      '/api/projects/project-1/files/diagram.svg?cacheBust=1710000000-2',
       { cache: 'no-store' },
     );
   });
@@ -378,7 +379,7 @@ describe('fetchProjectFileText', () => {
         projectId: 'project-1',
         status: 404,
         statusText: 'Not Found',
-        url: '/api/projects/project-1/raw/missing.svg',
+        url: '/api/projects/project-1/files/missing.svg',
       }),
     );
   });
@@ -398,7 +399,7 @@ describe('fetchProjectFileText', () => {
         error,
         name: 'diagram.svg',
         projectId: 'project-1',
-        url: '/api/projects/project-1/raw/diagram.svg',
+        url: '/api/projects/project-1/files/diagram.svg',
       }),
     );
   });

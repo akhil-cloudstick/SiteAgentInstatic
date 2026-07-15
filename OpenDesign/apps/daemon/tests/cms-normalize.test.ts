@@ -59,6 +59,35 @@ describe('cms-normalize — normalizeHtmlForCms', () => {
   });
 });
 
+describe('cms-normalize — serve-time artifact cleanup', () => {
+  const bridge =
+    '<script>(function(){function m(u){if(u.indexOf("public/")===0)return null;return "public/"+u;}' +
+    'new MutationObserver(function(){}).observe(document.documentElement,{attributeFilter:["src"]});})();</script>';
+
+  it('strips the injected asset-rewrite bridge <script>', async () => {
+    const { html: out } = await normalizeHtmlForCms(`<head>${bridge}</head><body>x</body>`, 'index.html', noReader);
+    expect(out).not.toContain('MutationObserver');
+    expect(out).not.toContain('attributeFilter');
+  });
+
+  it('reverts public/-prefixed img src and CSS url() refs to web-root form', async () => {
+    const html =
+      '<style>.h{background:url(public/images/bg.svg)}</style><img src="public/images/hero.svg" alt="h">';
+    const { html: out } = await normalizeHtmlForCms(html, 'index.html', noReader);
+    expect(out).toContain('src="/images/hero.svg"');
+    expect(out).not.toContain('src="public/');
+    expect(out).toContain('url(/images/bg.svg)');
+    expect(out).not.toMatch(/url\(\s*['"]?public\//);
+  });
+
+  it('leaves a clean, template-compliant page untouched (no false positives)', async () => {
+    const html = '<img src="/images/hero.svg" alt="h"><script>console.log("nav")</script>';
+    const { html: out } = await normalizeHtmlForCms(html, 'index.html', noReader);
+    expect(out).toContain('src="/images/hero.svg"');
+    expect(out).toContain('console.log("nav")'); // authored page script is not the bridge — kept
+  });
+});
+
 describe('cms-normalize — normalizeSiteFiles', () => {
   it('inlines a local stylesheet and drops it from the map', async () => {
     const html =

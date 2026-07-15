@@ -8,17 +8,19 @@
  * nodes are reconciled to real registry class ids (unknown names auto-create
  * bare classes), and parsed CSS rules merge into the shell's style-rule registry.
  *
- * Scope: pages + style rules (the styling that lives in classes/ambient CSS) +
- * colour tokens (committed into the shell's framework so imported `var(--x)`
- * references keep resolving) + page scripts (committed as SiteFiles + runtime
- * entries so menu/nav interactivity survives). Image asset upload, custom
- * @font-face / Google fonts, and cross-page Visual Components are the remaining
- * follow-ups, additive on top of this.
+ * Scope: pages + style rules (classes/ambient CSS) + reusable conditions (custom
+ * @media/@container/@supports queries, so responsive overrides survive publish) +
+ * colour tokens + custom @font-face fonts + `--font-*` tokens + page scripts. Media
+ * assets are uploaded into the library and the plan URL-rewritten by the handler
+ * BEFORE this runs (see `importSiteHtml.ts`), so imported `src`/`url()` values are
+ * already final /uploads/ paths here. Google-font self-hosting and cross-page
+ * Visual Component dedup are the remaining follow-ups, additive on top of this.
  */
 import { nanoid } from 'nanoid'
 import { createNode } from '@core/page-tree'
-import type { Page, PageNode, SiteDocument } from '@core/page-tree'
+import type { ConditionDef, Page, PageNode, SiteDocument } from '@core/page-tree'
 import type { ImportPlan } from '@core/siteImport'
+import { rewriteInternalLinks } from '@core/siteImport'
 import type { SiteBundle } from '@core/data/bundleSchema'
 import type { DataRow, DataTable } from '@core/data/schemas'
 import { pageToCells } from '@core/data/pageFromRow'
@@ -125,6 +127,39 @@ export function commitImportedFonts(
 }
 
 /**
+ * Merge already-installed Google font entries into `settings.fonts.items` so the
+ * published `@font-face` self-hosts them from `/uploads/fonts/…` (typography
+ * matches the source design). Mirrors the browser wizard's `addInstalledFontEntries`
+ * (importedFonts.ts): dedupe by id, then by (family, source); re-point any font
+ * token bound to a replaced family id. Call BEFORE `commitImportedFontTokens` so
+ * a `--font-*` token can bind to the newly-committed family. Keep in sync.
+ */
+export function commitInstalledFonts(
+  settings: SiteDocument['settings'],
+  entries: FontEntry[],
+): void {
+  if (entries.length === 0) return
+  settings.fonts ??= { items: [] }
+  const lib = settings.fonts
+  for (const entry of entries) {
+    const familyLower = entry.family.toLowerCase()
+    const sameIdIndex = lib.items.findIndex((f) => f.id === entry.id)
+    const sameFamilyIndex = lib.items.findIndex(
+      (f) => f.family.toLowerCase() === familyLower && f.source === entry.source,
+    )
+    const idx = sameIdIndex >= 0 ? sameIdIndex : sameFamilyIndex
+    const previousId = idx >= 0 ? lib.items[idx]!.id : null
+    if (idx >= 0) lib.items[idx] = entry
+    else lib.items.push(entry)
+    if (previousId && previousId !== entry.id) {
+      for (const token of lib.tokens ?? []) {
+        if (token.familyId === previousId) token.familyId = entry.id
+      }
+    }
+  }
+}
+
+/**
  * Commit imported `--font-*` root variables into `settings.fonts.tokens` so
  * every `var(--font-…)` in the imported CSS keeps resolving on publish. Mirrors
  * the browser wizard's `addImportedFontTokens` (importedFonts.ts). Binds a
@@ -158,6 +193,31 @@ export function commitImportedFontTokens(
       updatedAt: now,
     }
     fontTokens.push(token)
+  }
+}
+
+/**
+ * Merge imported reusable conditions (custom `@media` / `@container` / `@supports`
+ * queries that DON'T line up with a configured site breakpoint) into
+ * `settings.conditions`, deduped by id. Imported style rules reference these via
+ * their `contextStyles` keys, so they MUST be committed or the publisher's CSS
+ * emitter silently drops every override under an unregistered condition
+ * (`classCss.ts` skips unknown context keys) — i.e. responsive layout vanishes.
+ *
+ * Mirrors the browser wizard's `tx.addConditions` (helpers.ts). Committed BEFORE
+ * style rules so every `contextStyles` key resolves.
+ */
+export function commitImportedConditions(
+  shell: { conditions?: ConditionDef[] },
+  conditions: ConditionDef[] | undefined,
+): void {
+  if (!conditions || conditions.length === 0) return
+  shell.conditions ??= []
+  const existing = new Set(shell.conditions.map((c) => c.id))
+  for (const def of conditions) {
+    if (existing.has(def.id)) continue
+    existing.add(def.id)
+    shell.conditions.push(def)
   }
 }
 
@@ -242,11 +302,17 @@ export function applyPlanToBundle(
   plan: ImportPlan,
   currentSite: SiteDocument,
   pagesTable: DataTable,
+  installedGoogleFonts: FontEntry[] = [],
 ): SiteBundle {
   // Clone the shell (drop the SiteDocument-only collections) so the source stays
   // untouched until the atomic import commits.
   const { pages: _p, visualComponents: _vc, layouts: _l, ...shell } = structuredClone(currentSite)
   void _p; void _vc; void _l
+
+  // Commit reusable conditions FIRST so every style-rule `contextStyles` key
+  // (custom @media/@container/@supports) resolves on publish — otherwise the
+  // publisher drops those overrides and the page loses its responsive layout.
+  commitImportedConditions(shell, plan.conditions)
 
   const byName = indexStyleRulesByName(shell.styleRules)
   // Register parsed CSS class/ambient rules FIRST, then resolve node class tokens.
@@ -258,20 +324,28 @@ export function applyPlanToBundle(
   // is enough — no separate token API call needed.
   commitImportedColorTokens(shell.settings, plan.colors)
 
-  // Commit fonts: custom @font-face families first (so a font token can bind its
-  // familyId), then the `--font-*` root variables so `var(--font-…)` resolves.
+  // Commit fonts: custom @font-face families + self-hosted Google fonts first (so
+  // a font token can bind its familyId), then the `--font-*` root variables so
+  // `var(--font-…)` resolves.
   commitImportedFonts(shell.settings, plan.fonts)
+  commitInstalledFonts(shell.settings, installedGoogleFonts)
   commitImportedFontTokens(shell.settings, plan.fontTokens)
 
   // slug conflict → reuse the existing page id (upsert, no duplicate on re-push).
   const existingIdBySource = new Map<string, string>()
   for (const c of plan.conflicts.pages) existingIdBySource.set(c.source, c.existingPageId)
 
-  const nowIso = new Date().toISOString()
-  const rows: DataRow[] = []
-  // source HTML path → committed page id, so page-scoped scripts bind correctly.
+  // Pre-mint every page id BEFORE processing so intra-site `<a href="about.html">`
+  // links can be rewritten to `cms:page:<id>` references (survive slug renames).
   const pageIdBySource = new Map<string, string>()
   for (const pagePlan of plan.pages) {
+    pageIdBySource.set(pagePlan.source, existingIdBySource.get(pagePlan.source) ?? nanoid())
+  }
+  const linkedPages = rewriteInternalLinks(plan.pages, pageIdBySource)
+
+  const nowIso = new Date().toISOString()
+  const rows: DataRow[] = []
+  for (const pagePlan of linkedPages) {
     const fragment = pagePlan.nodeFragment
     for (const node of Object.values(fragment.nodes)) {
       if (node.classIds?.length) node.classIds = linkImportedClassNames(node.classIds, shell.styleRules, byName)
@@ -283,8 +357,7 @@ export function applyPlanToBundle(
       body.classIds = linkImportedClassNames(fragment.body.classIds, shell.styleRules, byName)
     }
     const nodes: Record<string, PageNode> = { ...fragment.nodes, [body.id]: body }
-    const id = existingIdBySource.get(pagePlan.source) ?? nanoid()
-    pageIdBySource.set(pagePlan.source, id)
+    const id = pageIdBySource.get(pagePlan.source)!
     const page: Page = { id, title: pagePlan.title, slug: pagePlan.slug, nodes, rootNodeId: body.id }
     rows.push(newRow(id, pagePlan.slug, pageToCells(page), nowIso))
   }

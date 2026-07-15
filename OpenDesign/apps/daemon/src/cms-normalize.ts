@@ -272,6 +272,37 @@ function convertUtilityClasses($: CheerioRoot): string[] {
 }
 
 /**
+ * Strip serve-time artifacts that OpenDesign's preview `/raw/` endpoint injects
+ * and that can get saved back into a project file: the `MutationObserver`
+ * asset-rewrite bridge `<script>`, and `public/`-prefixed asset `src`s (the
+ * preview rewrites `/x` → `public/x`). Restores the canonical web-root form
+ * (`/images/x`) so the CMS importer resolves each asset to its file. A no-op on
+ * a clean, template-compliant page — this is a safety net for already-polluted
+ * pages; the real fix is loading the editor source untransformed.
+ */
+function stripServeTimeArtifacts($: CheerioRoot): void {
+  // 1. Remove the injected asset-rewrite bridge script (inline, no src). Its
+  //    fingerprint — MutationObserver + attributeFilter + the `public/` rewrite —
+  //    is specific enough that no authored page script matches.
+  $('script:not([src])').each((_i, el) => {
+    const code = $(el).text()
+    if (code.includes('MutationObserver') && code.includes('attributeFilter') && code.includes('public/')) {
+      $(el).remove()
+    }
+  })
+  // 2. Revert `public/`-prefixed src attributes to their web-root form.
+  $('[src]').each((_i, el) => {
+    const src = ($(el) as unknown as { attr(name: string): string | undefined }).attr('src') ?? ''
+    if (src.startsWith('public/')) $(el).attr('src', `/${src.slice('public/'.length)}`)
+  })
+}
+
+/** Revert `url(public/…)` CSS refs (inline `style` + `<style>`) to web-root form. */
+function normalizeWebRootCssUrls(html: string): string {
+  return html.replace(/url\(\s*(['"]?)public\//gi, 'url($1/')
+}
+
+/**
  * Wrap bare text runs that sit next to an inline element inside a heading or
  * paragraph, so every part stays an editable Text node in the CMS.
  */
@@ -323,9 +354,11 @@ export async function normalizeHtmlForCms(
   const doctype = out.match(/^\s*<!doctype[^>]*>/i)?.[0] ?? '';
 
   const $ = load(out);
+  stripServeTimeArtifacts($);
   const unconverted = convertUtilityClasses($);
   wrapBareText($);
   let result = $.html();
+  result = normalizeWebRootCssUrls(result);
   if (doctype && !/^\s*<!doctype/i.test(result)) result = `${doctype}\n${result}`;
 
   const findings = checkPageCompliance(result);

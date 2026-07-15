@@ -1118,4 +1118,17 @@ export const sqliteMigrations: Migration[] = [
         add column model_id text;
     `,
   },
+  {
+    id: '020_media_content_hash',
+    sql: `
+      -- Content-addressed dedup for imported media (see the Postgres twin for
+      -- the rationale). SQLite has no ADD COLUMN IF NOT EXISTS; the migration
+      -- runner applies each id exactly once, so a bare ADD COLUMN is safe.
+      alter table media_assets
+        add column content_hash text;
+
+      create index if not exists media_assets_content_hash_idx
+        on media_assets (content_hash);
+    `,
+  },
 ]

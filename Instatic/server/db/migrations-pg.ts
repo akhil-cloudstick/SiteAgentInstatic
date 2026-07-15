@@ -1060,4 +1060,21 @@ export const pgMigrations: Migration[] = [
         add column model_id text;
     `,
   },
+  {
+    id: '020_media_content_hash',
+    sql: `
+      -- Content-addressed dedup for imported media. Share-to-CMS re-uploads a
+      -- project's assets on every push; without a content key each push cloned
+      -- the whole set (N pushes → N copies of every image). The import path now
+      -- reuses a live asset whose stored bytes hash to the same value instead
+      -- of inserting a duplicate. Nullable: only rows written through the upload
+      -- pipeline carry a hash; older rows and bundle-imported rows stay NULL and
+      -- simply don't participate in dedup.
+      alter table media_assets
+        add column if not exists content_hash text;
+
+      create index if not exists media_assets_content_hash_idx
+        on media_assets (content_hash);
+    `,
+  },
 ]

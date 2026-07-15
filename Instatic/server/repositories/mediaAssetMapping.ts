@@ -50,6 +50,11 @@ export const MEDIA_ASSET_INSERT_COLUMNS = [
   'uploaded_by_user_id',
   'storage_adapter_id',
   'externally_hosted',
+  // content_hash — SHA-256 of the stored bytes, written by the upload pipeline
+  // for content-addressed dedup. Like storage_path it is a server-internal
+  // handle: deliberately ABSENT from MEDIA_ASSET_COLUMNS (never exposed on the
+  // hydrated MediaAsset); the dedup lookup matches it in a WHERE clause only.
+  'content_hash',
 ] as const
 
 export interface MediaAssetRow {
