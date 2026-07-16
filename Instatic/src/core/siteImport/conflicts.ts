@@ -594,6 +594,38 @@ function rewriteStyleBagVarRefs<T extends Record<string, unknown>>(
   return changed ? (out as T) : bag
 }
 
+/**
+ * Force every conflict to resolve as `overwrite`, so a re-import silently
+ * replaces existing content instead of prompting Rename/Skip/Overwrite/Custom
+ * per conflict — the tenant never sees the conflicts step at all.
+ *
+ * One guard: a `PageConflict` with `existingPageId === ''` is an intra-batch
+ * collision (two files in THIS import resolve to the same slug) — there is no
+ * existing page to overwrite yet, so that one case keeps its `auto-rename`
+ * default instead. Every other conflict kind always has a real target id.
+ */
+export function forceOverwriteResolutions(conflicts: {
+  pages: PageConflict[]
+  rules: RuleConflict[]
+  tokens: TokenConflict[]
+  crossSheetClasses: CrossSheetClassConflict[]
+}): {
+  pages: PageConflict[]
+  rules: RuleConflict[]
+  tokens: TokenConflict[]
+  crossSheetClasses: CrossSheetClassConflict[]
+} {
+  const overwrite: ConflictResolution = { action: 'overwrite' }
+  return {
+    pages: conflicts.pages.map((c) =>
+      c.existingPageId === '' ? c : { ...c, defaultResolution: overwrite },
+    ),
+    rules: conflicts.rules.map((c) => ({ ...c, defaultResolution: overwrite })),
+    tokens: conflicts.tokens.map((c) => ({ ...c, defaultResolution: overwrite })),
+    crossSheetClasses: conflicts.crossSheetClasses.map((c) => ({ ...c, defaultResolution: overwrite })),
+  }
+}
+
 // Matches `var(--name` (optional leading whitespace), capturing the bare
 // custom-property name. The fallback/closing-paren tail is left untouched.
 const VAR_REF_RE = /var\(\s*--([A-Za-z0-9_-]+)/g

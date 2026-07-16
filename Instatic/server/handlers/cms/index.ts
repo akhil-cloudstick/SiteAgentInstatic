@@ -55,7 +55,7 @@ import { handleExportRoute } from './export'
 import { handleImportPreviewRoute } from './importPreview'
 import { handleImportArchiveRoute } from './importArchive'
 import { handleImportRoute } from './import'
-import { handleImportSiteHtmlRoute } from './importSiteHtml'
+import { handleImportSiteHtmlRoute, handleStagedImportFetchRoute } from './importSiteHtml'
 
 export type { CmsHandlerOptions } from './shared'
 
@@ -117,7 +117,8 @@ export async function handleCmsRequest(
     ?? (await handleExportRoute(req, db, options))
     ?? (await handleImportPreviewRoute(req, db))
     ?? (await handleImportArchiveRoute(req, db, options))
-    ?? (await handleImportSiteHtmlRoute(req, db, options))
+    ?? (await handleImportSiteHtmlRoute(req, db))
+    ?? (await handleStagedImportFetchRoute(req, db))
     ?? (await handleImportRoute(req, db, options))
 
   return response ?? jsonResponse({ error: 'Not found' }, { status: 404 })

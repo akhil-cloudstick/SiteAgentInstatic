@@ -77,6 +77,7 @@ This is exactly what Instatic imports as **color tokens** and **style rules**.
 - Give every section and element a **semantic class name** (`.hero`, `.navbar`, `.card`, `.footer-links`) — Instatic imports these as **style rules** the tenant can edit.
 - Write all CSS in `<style>` blocks inside the `.astro` files or in a global `.css` file imported by the layout.
 - CSS animations (`@keyframes`, `transition`, `animation`) are fully supported — write them in plain CSS.
+- **Give colors as `#hex`, `rgb()`, or `var(--token)` — not as a bare `oklch()`/`lab()`/`lch()`/`color-mix()` inside a `background` (or other) shorthand.** Modern color functions inside a shorthand can be dropped by the CSS parser on import, so the element loses its color. If you want an `oklch` value, either put it on a `:root` token and reference it (`background: var(--avatar-sky)`), or use the longhand (`background-color: oklch(...)`) — both survive. Example that keeps its color: `.tag.sky { background: var(--tone-sky); }` with `:root { --tone-sky: #cfe8ff; }`.
 
 ### Verified to import pixel-exact
 
@@ -92,6 +93,7 @@ These common patterns were tested end-to-end (build → import → publish → d
 - **`@layer`** — the importer drops `@layer` (and `@import` / `@page` / `@namespace`) rules. `@layer` changes cascade order, so a page relying on it can look different after import. Write plain, source-ordered CSS instead.
 - **`public/`-prefixed or runtime-rewritten asset paths** — always reference assets at the **web root**: `<img src="/images/hero.svg">`, `url(/images/bg.svg)`. Never write `src="public/images/…"`, never rely on a runtime `<script>` that rewrites `src` attributes. Files live in `public/`; the `/…` form resolves to them automatically on both the built site and the CMS import.
 - **Images built by JavaScript at runtime** (`el.src = '/images/x'` in a `<script>`) — the importer only sees the static DOM, so JS-injected images are not uploaded to the CMS media library and won't resolve on the published page. Put every meaningful image in real static `<img>` markup (mark it `data-sa="image:…"`); use JS only for behaviour, not for creating the primary images.
+- **Any content built by JavaScript at runtime** — product lists, cards, pricing tables, testimonials, or any visible text/markup inserted via `innerHTML`, `appendChild`, or a template string assigned into the page (not just images). The importer only sees the static DOM as delivered; a `<script>` that renders content after load produces a page the importer can't see into at all — that section is dropped, not partially imported. **All visible content must exist as real, static HTML in the page source.** `<script>` is for **behaviour only** on markup that's already there (menu toggles, tab switching, the nav active-state pattern above) — never for constructing or inserting the content itself.
 
 The tenant edits all of the above inside Instatic and re-publishes with the same result.
 
@@ -187,6 +189,43 @@ import gsap from 'gsap';
 ```
 
 Small custom JS (menu toggles, counters, scroll effects) can be written directly in `<script>` blocks in the HTML.
+
+### JS media swaps — read the URL from the DOM, never hardcode `/images/…`
+
+On import, static `<img src="/images/x.svg">` paths are rewritten to the CMS `/uploads/…` path, but
+the importer **does not rewrite URLs inside `<script>` text**. So a swap/gallery script that assigns
+a hardcoded path (`el.src = '/images/product.svg'`, or `{ image: '/images/product.svg' }` in a data
+array) will **404 after import** — the `/images/…` path doesn't exist on the CMS/published site.
+
+Instead, put every image in real static `<img>` markup (so it uploads and gets rewritten), and have
+the swap read the URL from an existing element's already-served `src`:
+
+**Wrong — hardcoded path in JS (breaks after import):**
+```js
+var data = [{ id: 'cube', image: '/images/product-cube.svg' }];
+function activate(id) {
+  var p = data.find(function (x) { return x.id === id; });
+  document.getElementById('featured').src = p.image;   // 404 on the CMS/published site
+}
+```
+
+**Correct — copy the src from the clicked item's own `<img>` (already rewritten to /uploads/):**
+```html
+<button class="row" data-id="cube"><img class="thumb" src="/images/product-cube.svg" alt="Cube"></button>
+```
+```js
+function activate(id) {
+  var row = document.querySelector('.row[data-id="' + id + '"]');
+  var thumb = row && row.querySelector('.thumb');
+  if (thumb) {
+    document.getElementById('featured').src = thumb.src;   // resolves to /uploads/… after import
+    document.getElementById('featured').alt = thumb.alt;
+  }
+}
+```
+
+Keep text data (names, prices, descriptions) in JS if you like — only **asset paths** must not be
+hardcoded in JS.
 
 ---
 
@@ -437,7 +476,7 @@ The tenant can then edit content, restyle, change colors, add pages, and publish
 - [ ] All fonts referenced via `--font-*` CSS custom properties in `:root`
 - [ ] All JS libraries loaded from CDN `<script>` tags — not npm packages
 - [ ] All images in `public/` as plain `<img src="/...">` tags
-- [ ] All pages have real HTML content — no JavaScript-rendered blank pages
+- [ ] All pages have real HTML content — no JavaScript-rendered blank pages, and no individual sections (product lists, cards, dynamic text) rendered by JS either — every visible section is static HTML in the source
 - [ ] **No bare text next to an inline element** — in any heading/sentence where part is wrapped (color/bold/link), every run is wrapped in its own `<span>` so all parts are editable
 - [ ] `data-sa` markers on all headings, paragraphs, and images the tenant will edit
 - [ ] `npm run build` runs without errors

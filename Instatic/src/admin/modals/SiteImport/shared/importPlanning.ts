@@ -22,6 +22,7 @@ import {
   PathTraversalError,
 } from '@core/siteImport'
 import type { SiteDocument } from '@core/page-tree'
+import { cloneSiteRuntimeConfig, DEFAULT_SITE_RUNTIME } from '@core/site-runtime'
 import { cmsAdapter } from '@core/persistence/cms'
 import { requestCmsSiteReload } from '@admin/state/adminEvents'
 import { useEditorStore } from '@site/store/store'
@@ -181,6 +182,36 @@ export async function ensureCurrentSiteForStaticImport(): Promise<SiteDocument> 
   }
 
   return useEditorStore.getState().createSite('My Site')
+}
+
+/**
+ * Blank a site's imported DESIGN surface, returning a fresh copy for `loadSite`.
+ * Share to CMS loads this before planning so a re-share is an EXACT match to the
+ * OD project instead of accumulating stale fonts / style rules / pages from a
+ * previous share (`OD is the source of truth`). Doing it BEFORE the plan is
+ * built (rather than inside the commit) is what keeps it correct: the class-name
+ * index `mutateAllPagesAndSite` builds is then derived from the empty registry,
+ * so imported nodes never link to a just-deleted rule id, and the plan itself
+ * sees no conflicts (every page/rule imports as a fresh add).
+ *
+ * Cleared: pages, Visual Components, layouts, style rules, files, runtime
+ * scripts, imported conditions, and the font/colour token registries
+ * (`settings.framework`/`settings.fonts` → undefined; the import re-initialises
+ * them). Preserved: identity + non-design settings (name, breakpoints,
+ * metaTitle, faviconUrl, language, shortcuts).
+ */
+export function blankImportedDesign(site: SiteDocument): SiteDocument {
+  return {
+    ...site,
+    pages: [],
+    visualComponents: [],
+    layouts: [],
+    styleRules: {},
+    files: [],
+    runtime: cloneSiteRuntimeConfig(DEFAULT_SITE_RUNTIME),
+    ...(site.conditions ? { conditions: [] } : {}),
+    settings: { ...site.settings, framework: undefined, fonts: undefined },
+  }
 }
 
 /** Persist the freshly-imported draft site and broadcast a reload. */

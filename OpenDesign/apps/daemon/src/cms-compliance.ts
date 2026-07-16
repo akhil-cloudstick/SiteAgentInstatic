@@ -138,6 +138,64 @@ export function checkPageCompliance(html: string): ComplianceFinding[] {
   }
   add('No bare text beside inline element', bareHits ? 'warn' : 'pass', bareHits ? `${bareHits} block(s) mix a wrapped span with loose text` : undefined);
 
+  // 9) No content built by JavaScript at runtime. A <script> without `src`
+  // that writes innerHTML/insertAdjacentHTML/outerHTML renders visible
+  // content (product lists, cards, dynamic text) after load — the importer
+  // only sees the static DOM as delivered, so that content is invisible to
+  // it and dropped entirely, not partially imported. Behavioural scripts
+  // (menu toggles, the nav active-state pattern) use classList/setAttribute
+  // and don't match this.
+  const inlineScripts = [...html.matchAll(/<script(?![^>]*\bsrc\s*=)[^>]*>([\s\S]*?)<\/script>/gi)]
+    .map((m) => m[1] ?? '');
+  const CONTENT_INJECTION_RE = /\.innerHTML\s*\+?=|\.insertAdjacentHTML\s*\(|\.outerHTML\s*=/;
+  const injectsContent = inlineScripts.some((s) => CONTENT_INJECTION_RE.test(s));
+  add(
+    'No content built by JavaScript',
+    injectsContent ? 'fail' : 'pass',
+    injectsContent
+      ? 'Inline <script> writes innerHTML/insertAdjacentHTML/outerHTML — visible content must be static HTML, not JS-rendered (see templateRule.md)'
+      : undefined,
+  );
+
+  // 10) No hardcoded asset paths in JavaScript. On import, static `<img src>`
+  // paths are rewritten to the CMS `/uploads/...` path, but the importer never
+  // rewrites URLs inside `<script>` text — so a swap/gallery script that
+  // assigns a hardcoded `/images/x.svg` to `.src` 404s after import. Any image
+  // swap must read the URL from an existing DOM element's already-served `src`
+  // instead. Matches a real asset FILE path literal (with extension), so text
+  // data and behaviour scripts don't false-trip.
+  const JS_ASSET_PATH_RE = /['"`]\/(?:images|assets|img|media|static)\/[^'"`]*\.(?:svg|png|jpe?g|webp|gif|avif)/i;
+  const hardcodedAssetInJs = inlineScripts.some((s) => JS_ASSET_PATH_RE.test(s));
+  add(
+    'No asset paths hardcoded in JavaScript',
+    hardcodedAssetInJs ? 'fail' : 'pass',
+    hardcodedAssetInJs
+      ? 'Inline <script> hardcodes an image path (e.g. /images/x.svg) — it 404s after import (paths are rewritten to /uploads/). Read image URLs from an existing DOM <img> src instead (see templateRule.md)'
+      : undefined,
+  );
+
+  // 11) No bare modern color function inside a color-bearing shorthand. The
+  // importer reads styles back through the browser CSSOM; a modern color
+  // function (oklch/oklab/lab/lch/color-mix) inside a `background`/`border`/
+  // `outline`/`column-rule` SHORTHAND is dropped during shorthand
+  // normalization, so the element loses its color on import (e.g. hero avatar
+  // backgrounds vanish). The longhand (`background-color: …`) and `:root` var
+  // tokens (`background: var(--token)`) survive. Scans <style> CSS and inline
+  // `style="…"` attributes; deliberately does NOT flag the longhand or `color:`
+  // (those import correctly).
+  const inlineStyleValues = [...html.matchAll(/style\s*=\s*"([^"]*)"/gi)].map((m) => m[1] ?? '');
+  const colorScanCss = [styleBlocks, ...inlineStyleValues].join('\n;\n');
+  const MODERN_COLOR_IN_SHORTHAND_RE =
+    /(?:^|[;{])\s*(?:background|border(?:-(?:top|right|bottom|left))?|outline|column-rule)\s*:\s*[^;{}]*\b(?:oklch|oklab|lab|lch|color-mix)\s*\(/i;
+  const shorthandColorHit = MODERN_COLOR_IN_SHORTHAND_RE.exec(colorScanCss);
+  add(
+    'No modern color function in a shorthand',
+    shorthandColorHit ? 'fail' : 'pass',
+    shorthandColorHit
+      ? `Modern color function in a shorthand is dropped on import (color lost): ${firstLine(shorthandColorHit[0])} — use a :root var token (background: var(--token)) or the longhand (background-color: …) instead (see templateRule.md)`
+      : undefined,
+  );
+
   return findings;
 }
 

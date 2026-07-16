@@ -163,6 +163,31 @@ export async function findLiveMediaAssetByContentHash(
 }
 
 /**
+ * Find ANY media asset (live OR trashed) whose stored bytes hash to
+ * `contentHash`. Unlike `findLiveMediaAssetByContentHash`, this also matches a
+ * soft-deleted row so the import pipeline can REVIVE it instead of leaving a
+ * dead row behind and minting a duplicate. Same oldest-first tiebreak.
+ * Returns null for an empty/absent hash.
+ */
+export async function findMediaAssetByContentHashIncludingTrashed(
+  db: DbClient,
+  contentHash: string,
+): Promise<MediaAsset | null> {
+  if (!contentHash) return null
+  const { rows } = await db.unsafe<MediaAssetRow>(
+    `select ${MEDIA_ASSET_COLUMNS}
+     from media_assets
+     where content_hash = ${placeholder(db.dialect, 1)}
+     order by created_at asc
+     limit 1`,
+    [contentHash],
+  )
+  if (rows.length === 0) return null
+  const assets = await hydrateAssets(db, rows)
+  return assets[0] ?? null
+}
+
+/**
  * List every media asset (active or in-trash, never both). The repo intentionally
  * returns the full set and lets the handler apply additional filters (folder /
  * type / search / tag / sort / pagination) in JS — cross-dialect dynamic SQL

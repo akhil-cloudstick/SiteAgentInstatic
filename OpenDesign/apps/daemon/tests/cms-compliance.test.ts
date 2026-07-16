@@ -57,6 +57,34 @@ describe('cms-compliance — checkPageCompliance', () => {
     expect(findingFor(html, ':root tokens').status).toBe('pass');
   });
 
+  it('fails on a hardcoded image path inside an inline <script> (swap script)', () => {
+    const html =
+      '<script>var d=[{image:"/images/product-cube.svg"}];document.getElementById("f").src=d[0].image;</script>';
+    expect(findingFor(html, 'hardcoded in JavaScript').status).toBe('fail');
+  });
+
+  it('passes when a swap script reads src from the DOM (no hardcoded path)', () => {
+    const html =
+      '<script>var t=row.querySelector(".thumb");document.getElementById("f").src=t.src;</script>';
+    expect(findingFor(html, 'hardcoded in JavaScript').status).toBe('pass');
+  });
+
+  it('fails on a modern color function inside a background shorthand', () => {
+    const html = '<style>.avatar.sky{background:oklch(70% 0.15 230)}</style>';
+    expect(findingFor(html, 'modern color function').status).toBe('fail');
+  });
+
+  it('fails on color-mix inside a shorthand in an inline style attribute', () => {
+    const html = '<span class="avatar" style="background: color-mix(in srgb, #f00, #fff 40%)">SM</span>';
+    expect(findingFor(html, 'modern color function').status).toBe('fail');
+  });
+
+  it('passes the compliant forms: longhand, :root var token, and plain color', () => {
+    const html =
+      '<style>:root{--tone-sky:#cfe8ff}.a{background-color:oklch(70% 0.15 230)}.b{background:var(--tone-sky)}.c{color:oklch(20% 0.04 80)}</style>';
+    expect(findingFor(html, 'modern color function').status).toBe('pass');
+  });
+
   it('summarizes fail/warn counts', () => {
     const html = '<div class="mb-4"><head><link rel="stylesheet" href="a.css"></head></div>';
     const s = summarizeCompliance(checkPageCompliance(html));

@@ -145,7 +145,10 @@ export function createSiteImportAdapter(opts: AdapterCallbacks): SiteImportAdapt
       // TypeScript's BlobPart constraint excludes SharedArrayBuffer; the cast is safe.
       const blobData: ArrayBuffer = bytes.slice().buffer as ArrayBuffer
       const file = new File([blobData], basename(path), { type: mimeType })
-      const asset = await uploadCmsMediaAsset(file)
+      // Content-hash dedup: a re-import (manual re-run or Share to CMS
+      // re-share) reuses an existing byte-identical asset instead of cloning
+      // it — see `acceptUploadedMedia`'s `dedupeByContentHash` doc.
+      const asset = await uploadCmsMediaAsset(file, { dedupeByContentHash: true })
 
       // Place the asset under a folder that mirrors its source bundle path.
       // Folder creation happens lazily here so a flat bundle (every asset at

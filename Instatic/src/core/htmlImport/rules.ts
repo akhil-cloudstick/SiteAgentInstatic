@@ -342,8 +342,10 @@ export const HTML_TO_MODULE_RULES: ImportRule[] = [
     },
   },
 
-  // btn-classed anchors → base.button (prop `label`). LEAF — base.button
-  // cannot have children, so a btn wrapping an icon keeps only its label.
+  // btn-classed anchors → base.button (prop `label`). base.button renders
+  // children when present (else falls back to `label`), so recurse into
+  // element children (an icon / inline `<svg>`) exactly like the plain
+  // `<button>` rule below, so a btn wrapping an icon keeps its glyph.
   {
     match: 'a.btn',
     map: (el) => ({
@@ -354,6 +356,7 @@ export const HTML_TO_MODULE_RULES: ImportRule[] = [
         target: el.getAttribute('target') ?? '_self',
       },
     }),
+    recurse: hasElementChild,
   },
 
   // Plain anchors → base.link (prop `text`). Recurse ONLY when the anchor wraps

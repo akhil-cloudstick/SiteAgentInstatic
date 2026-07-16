@@ -134,11 +134,21 @@ export async function listCmsMediaAssets(
 
 export async function uploadCmsMediaAsset(
   file: File,
-  options: ClientBase = {},
+  options: ClientBase & {
+    /**
+     * Content-addressed reuse: set by the site-import wizard so a re-import
+     * (manual or Share to CMS) reuses a byte-identical existing asset instead
+     * of cloning it. Left unset for plain interactive uploads (media
+     * workspace drag-drop) — a user dragging in the same file twice may want
+     * two distinct rows. See `acceptUploadedMedia`'s `dedupeByContentHash`.
+     */
+    dedupeByContentHash?: boolean
+  } = {},
 ): Promise<CmsMediaAsset> {
   const { fetchImpl, basePath } = resolveClient(options)
   const body = new FormData()
   body.set('file', file)
+  if (options.dedupeByContentHash) body.set('dedupe', '1')
 
   const res = await fetchImpl(`${basePath}/media`, {
     method: 'POST',

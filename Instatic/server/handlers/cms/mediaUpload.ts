@@ -24,11 +24,12 @@ import { nanoid } from 'nanoid'
 import type { DbClient } from '../../db/client'
 import {
   createMediaAsset,
-  findLiveMediaAssetByContentHash,
+  findMediaAssetByContentHashIncludingTrashed,
   getMediaAsset,
   getMediaAssetStoragePath,
   getMediaAssetVariants,
   replaceMediaAssetBinary,
+  restoreMediaAsset,
   setMediaAssetVariants,
 } from '../../repositories/media'
 import { badRequest, jsonResponse } from '../../http'
@@ -197,6 +198,26 @@ export async function readUploadedFile(req: Request): Promise<File | null> {
   return file instanceof File ? file : null
 }
 
+/**
+ * Like `readUploadedFile`, but also reads the `dedupe` form field the
+ * site-import wizard sets when uploading assets as part of an import commit
+ * (see `acceptUploadedMedia`'s `dedupeByContentHash`). Kept as a separate
+ * function (rather than changing `readUploadedFile`'s return shape) so plain
+ * interactive callers — avatar upload, asset replace — are unaffected. A
+ * `Request` body can only be parsed once, so create-asset call sites that
+ * need the flag must use this instead of `readUploadedFile`.
+ */
+export async function readUploadedFileForCreate(
+  req: Request,
+): Promise<{ file: File | null; dedupeByContentHash: boolean }> {
+  const body = await req.formData()
+  const file = body.get('file')
+  return {
+    file: file instanceof File ? file : null,
+    dedupeByContentHash: body.get('dedupe') === '1',
+  }
+}
+
 interface AcceptUploadInput {
   /** Pre-extracted `File` from the multipart body. */
   file: File
@@ -299,8 +320,17 @@ export async function acceptUploadedMedia(
     ? createHash('sha256').update(validated.bytes).digest('hex')
     : null
   if (input.dedupeByContentHash && contentHash) {
-    const existing = await findLiveMediaAssetByContentHash(db, contentHash)
-    if (existing) return existing // reuse: no second storage write, no duplicate row
+    const existing = await findMediaAssetByContentHashIncludingTrashed(db, contentHash)
+    if (existing && !existing.deletedAt) {
+      return existing // reuse: no second storage write, no duplicate row
+    }
+    if (existing && existing.deletedAt) {
+      // Byte-identical match was previously trashed — revive it instead of
+      // leaving a dead row behind and minting a fresh one. Without this, a
+      // trash-then-reshare cycle would duplicate forever.
+      const revived = await restoreMediaAsset(db, existing.id)
+      if (revived) return revived
+    }
   }
 
   // Server-chosen extension on the on-disk filename so the static handler's

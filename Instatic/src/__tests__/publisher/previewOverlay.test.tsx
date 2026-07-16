@@ -171,6 +171,12 @@ describe('PreviewOverlay — DOM rendering', () => {
     expect(closeBtn).toBeDefined()
   })
 
+  it('renders an "Open live" button (escape hatch to the interactive served page)', () => {
+    openPreviewWithSite()
+    render(<PreviewOverlay />)
+    expect(screen.getByLabelText('Open live page in a new tab')).toBeDefined()
+  })
+
   it('clicking the close button closes the overlay (sets previewOpen=false)', () => {
     openPreviewWithSite()
     render(<PreviewOverlay />)
@@ -223,9 +229,16 @@ describe('PreviewOverlay — source enforcement', () => {
     expect(overlaySrc).toContain('data-testid="preview-iframe"')
   })
 
-  it('iframe uses sandbox="" (fully sandboxed — maximum security)', () => {
-    // sandbox="" with no value applies all restrictions (no scripts, no navigation, etc.)
-    expect(overlaySrc).toContain('sandbox=""')
+  it('iframe uses sandbox="allow-same-origin" without allow-scripts (assets load, scripts stay disabled)', () => {
+    // Same-origin is required so the `sa_hub` session cookie is sent and the
+    // gateway can route `/uploads/…` assets to the tenant (opaque origin 404s).
+    // Crucially NO `allow-scripts`: content stays inert, so same-origin grants
+    // it nothing executable.
+    expect(overlaySrc).toContain('sandbox="allow-same-origin"')
+    // No sandbox attribute may grant scripts (allow-scripts + allow-same-origin
+    // would let content escape the sandbox). Scoped to the attribute so prose
+    // mentioning "allow-scripts" in comments doesn't trip it.
+    expect(overlaySrc).not.toMatch(/sandbox="[^"]*allow-scripts/)
   })
 
   it('handles Escape key to close (Guideline #225)', () => {
@@ -260,6 +273,27 @@ describe('PreviewOverlay — source enforcement', () => {
 
   it('calls publishPage() to generate iframe content', () => {
     expect(overlaySrc).toContain('publishPage(')
+  })
+
+  it('forces eager image loading (native lazy never fires in the sandboxed srcDoc)', () => {
+    // Below-the-fold `loading="lazy"` images never load in the opaque-origin,
+    // script-less preview iframe; the preview is a static snapshot, so it must
+    // rewrite lazy → eager. See preparePreviewHtml.
+    expect(overlaySrc).toContain('lazy')
+    expect(overlaySrc).toContain('loading="eager"')
+  })
+
+  it('injects a <base href> so root-relative /uploads/ assets resolve', () => {
+    expect(overlaySrc).toContain('<base href=')
+    expect(overlaySrc).toContain('window.location.origin')
+  })
+
+  it('offers an "Open live" action that opens the served page in a new tab', () => {
+    // The static preview can't run scripts; the escape hatch is opening the
+    // live page (same-origin top-level tab) where interactions run natively.
+    expect(overlaySrc).toContain('Open live')
+    expect(overlaySrc).toContain("window.open(liveTarget, '_blank', 'noopener,noreferrer')")
+    expect(overlaySrc).toContain('activeLivePath')
   })
 })
 

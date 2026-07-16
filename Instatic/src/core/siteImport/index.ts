@@ -51,7 +51,7 @@ export { extractRootColorTokens, isCssColorValue } from './colorTokens'
 
 // ── Phase 2 — conflict detection + resolution ─────────────────────────────────
 
-export { detectConflicts, applyConflictResolutions } from './conflicts'
+export { detectConflicts, applyConflictResolutions, forceOverwriteResolutions } from './conflicts'
 
 
 // ── Phase 2 — adapter interfaces ─────────────────────────────────────────────

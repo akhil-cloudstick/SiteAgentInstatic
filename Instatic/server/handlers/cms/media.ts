@@ -57,6 +57,7 @@ import {
   acceptReplacementMedia,
   acceptUploadedMedia,
   readUploadedFile,
+  readUploadedFileForCreate,
 } from './mediaUpload'
 import { removeVariantFiles } from './mediaVariants'
 import { dispatchDelete } from './mediaUploadDispatch'
@@ -150,7 +151,12 @@ async function handleUploadMedia(req: Request, db: DbClient): Promise<Response> 
   const user = await requireCapability(req, db, 'media.write')
   if (user instanceof Response) return user
 
-  const file = await readUploadedFile(req)
+  // The site-import wizard (manual and Share to CMS both run through this same
+  // endpoint — see createSiteImportAdapter.ts) sets `dedupe=1` so a re-import
+  // reuses byte-identical existing assets instead of cloning them. Plain
+  // interactive uploads (drag-drop into the media workspace) leave it unset —
+  // a user dragging in the same file twice may want two distinct rows.
+  const { file, dedupeByContentHash } = await readUploadedFileForCreate(req)
   if (!file) return badRequest('Missing file')
 
   const result = await acceptUploadedMedia(db, {
@@ -161,6 +167,7 @@ async function handleUploadMedia(req: Request, db: DbClient): Promise<Response> 
     uploadedByUserId: user.id,
     oversizedMessage: 'File exceeds the 50 MB hard limit',
     unsupportedMessage: 'Only JPEG, PNG, GIF, WebP, SVG, MP4, WebM, and web font (WOFF, WOFF2, TTF, OTF) files can be uploaded',
+    dedupeByContentHash,
   })
   if (result instanceof Response) return result
   return jsonResponse({ asset: result }, { status: 201 })

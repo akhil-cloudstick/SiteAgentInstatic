@@ -15,6 +15,7 @@
 // and the image never uploads.
 import { promises as fsp } from 'node:fs';
 import nodePath from 'node:path';
+import { isIgnoredProjectDirName } from './project-ignored-dirs.js';
 
 const SITE_EXT: Record<string, string> = {
   '.html': 'text/html',
@@ -56,6 +57,11 @@ export async function collectSiteFiles(projectRoot: string): Promise<Record<stri
       const abs = nodePath.join(dir, entry.name);
       const relPath = rel ? `${rel}/${entry.name}` : entry.name;
       if (entry.isDirectory()) {
+        // Skip generated/build/dep trees (dist, build, node_modules, .cache, …)
+        // so a project with an Astro/bundler build output doesn't emit
+        // byte-different variant copies of the same source images alongside
+        // the originals — mirrors the archive helper (projects.ts).
+        if (isIgnoredProjectDirName(entry.name)) continue;
         await walk(abs, relPath);
         continue;
       }

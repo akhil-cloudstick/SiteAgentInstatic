@@ -24,6 +24,7 @@ import {
 } from './prompts/system.js';
 import { loadTemplateRuleBody } from './prompts/cms-contract.js';
 import { normalizeSiteFiles } from './cms-normalize.js';
+import { checkPageCompliance } from './cms-compliance.js';
 import { emittedRenderableQuestionForm } from './question-form-detect.js';
 import { resolveProjectRoot } from './project-root.js';
 import {
@@ -2403,11 +2404,18 @@ export async function startServer({
     readAppConfig,
   });
   const { analyticsService } = telemetry;
+  // Share-to-CMS templateRule compliance gate: the real implementation needs
+  // `startChatRun`, which is defined further down (it closures over `design`
+  // itself) — this mutable forward-ref lets `createChatRunService` receive a
+  // stable callback now while the actual logic is assigned once
+  // `startChatRun` exists. See `runCmsComplianceGate` below.
+  let onCmsComplianceRunSucceeded = null;
   const design = {
     runs: createChatRunService({
       createSseResponse,
       createSseErrorPayload,
       runsLogDir: path.join(RUNTIME_DATA_DIR, 'runs'),
+      onRunSucceeded: (run) => onCmsComplianceRunSucceeded?.(run),
     }),
     analytics: analyticsService,
     getAppVersion: () => telemetry.getCachedAppVersion()?.version ?? '0.0.0',
@@ -2812,8 +2820,11 @@ export async function startServer({
       if (!hasHtml) return sendApiError(res, 400, 'NO_PAGES', 'No pages to share yet — build a page first.');
       // Deterministic template-rule normalization so every shared page complies
       // (inline CSS, strip/convert Tailwind, wrap editable text, drop orphan
-      // stylesheets). Non-blocking: on any normalizer error fall back to the raw
-      // files rather than fail the push.
+      // stylesheets). Auto-fixing is non-blocking (falls back to raw files on
+      // a normalizer error), but the COMPLIANCE RESULT is a hard gate below —
+      // safety net for pages built before the templateRule compliance gate
+      // existed, or hand-edited after an AI build reintroduced a violation.
+      // Nothing non-compliant reaches Instatic through this door.
       let files: Record<string, { base64: string; mimeType?: string }> = rawFiles;
       try {
         const normalized = await normalizeSiteFiles(rawFiles);
@@ -2824,6 +2835,22 @@ export async function startServer({
             `[share-to-cms] ${slug} normalized: ${r.fails} fail, ${r.warns} warn; ` +
               `inlined+dropped ${r.droppedStylesheets.length} stylesheet(s); ` +
               `unconverted utilities: ${r.unconvertedUtilities.join(', ') || 'none'}`,
+          );
+        }
+        if (r.fails > 0) {
+          const detail = Object.entries(r.pages)
+            .map(([page, findings]) => {
+              const fails = findings.filter((f) => f.status === 'fail');
+              if (fails.length === 0) return null;
+              return `${page}: ${fails.map((f) => `${f.rule}${f.detail ? ` — ${f.detail}` : ''}`).join('; ')}`;
+            })
+            .filter(Boolean)
+            .join(' | ');
+          return sendApiError(
+            res,
+            422,
+            'CMS_COMPLIANCE_FAILED',
+            `This project violates the CMS output rule and can't be shared until fixed: ${detail}`,
           );
         }
       } catch (normErr) {
@@ -2838,24 +2865,31 @@ export async function startServer({
       });
       const cookie = (ssoRes.headers.get('set-cookie') ?? '').split(';')[0];
       if (!cookie.includes('=')) return sendApiError(res, 502, 'CMS_SIGNIN_FAILED', 'CMS sign-in failed');
-      // 2) push the site (merge-overwrite -> upsert by page id, no duplicates)
-      const importRes = await fetch(`${instaticUrl}/admin/api/cms/import/site-html?strategy=merge-overwrite`, {
+      // 2) stage the site for the tenant's own BROWSER to import — no server-side
+      // commit here. The browser runs the exact same "Import Site" wizard a manual
+      // drag-drop import uses (buildImportPlan + commitImportPlan against the live
+      // editor store), so Share to CMS can never drift from what manual import does.
+      const stageRes = await fetch(`${instaticUrl}/admin/api/cms/import/site-html`, {
         method: 'POST',
         headers: { 'content-type': 'application/json', cookie },
         body: JSON.stringify({ files }),
       });
-      const result = (await importRes.json().catch(() => ({}))) as { error?: string };
-      if (!importRes.ok) return sendApiError(res, 502, 'CMS_IMPORT_FAILED', result?.error || 'CMS import failed');
+      const staged = (await stageRes.json().catch(() => ({}))) as { token?: string; error?: string };
+      if (!stageRes.ok || !staged.token) {
+        return sendApiError(res, 502, 'CMS_IMPORT_FAILED', staged?.error || 'CMS import failed');
+      }
       // Send the BROWSER to the CMS through a fresh SSO hand-off so it lands already
-      // logged in. Use the PUBLIC gateway origin (the tenant's Instatic is session-
-      // routed at <gatewayOrigin>/admin) when set — a remote client cannot reach the
-      // daemon's localhost OD_INSTATIC_URL. Falls back to the local URL for plain dev.
+      // logged in, with the Import Site wizard open on Review import (pre-loaded from
+      // the staged FileMap via `importToken`). Use the PUBLIC gateway origin (the
+      // tenant's Instatic is session-routed at <gatewayOrigin>/admin) when set — a
+      // remote client cannot reach the daemon's localhost OD_INSTATIC_URL. Falls back
+      // to the local URL for plain dev.
       const gatewayOrigin = (process.env.OD_GATEWAY_ORIGIN ?? '').trim().replace(/\/$/, '');
       const cmsBase = gatewayOrigin || instaticUrl;
       const browserToken = signInstaticSsoToken(slug, 120);
-      // Land on the CMS SITE editor (the imported page), not the dashboard.
-      const redirectUrl = `${cmsBase}/admin/api/cms/sso?token=${encodeURIComponent(browserToken)}&redirect=${encodeURIComponent('/admin/site')}`;
-      return res.json({ ok: true, redirectUrl, result });
+      const siteImportPath = `/admin/site?importToken=${encodeURIComponent(staged.token)}`;
+      const redirectUrl = `${cmsBase}/admin/api/cms/sso?token=${encodeURIComponent(browserToken)}&redirect=${encodeURIComponent(siteImportPath)}`;
+      return res.json({ ok: true, redirectUrl });
     } catch (caught) {
       return sendApiError(res, 500, 'PUSH_FAILED', caught instanceof Error ? caught.message : String(caught));
     }
@@ -7521,6 +7555,127 @@ export async function startServer({
       }
     }
   };
+
+  // ── Share-to-CMS templateRule compliance gate ─────────────────────────────
+  // Fired (fire-and-forget, via runs.ts's onRunSucceeded hook) after every
+  // chat run succeeds on an Instatic-connected tenant daemon. Re-checks the
+  // project's actual on-disk pages against templateRule.md — the same check
+  // Share to CMS runs at export (see normalizeSiteFiles/checkPageCompliance)
+  // — and, on a violation, sends the model a concrete correction as a new
+  // turn in the SAME conversation and lets it fix it. Bounded by
+  // OD_CMS_COMPLIANCE_MAX_ATTEMPTS so a stubborn violation surfaces in the
+  // logs instead of looping forever; never throws (runs.ts swallows errors
+  // from this hook regardless, but every await here is also try/caught so a
+  // failure never leaves a half-finished correction run dangling).
+  const CMS_COMPLIANCE_MAX_ATTEMPTS = Math.max(1, Number(process.env.OD_CMS_COMPLIANCE_MAX_ATTEMPTS) || 3);
+
+  async function collectCmsComplianceViolations(projectRoot) {
+    const files = await collectSiteFiles(projectRoot);
+    const violations = [];
+    for (const [filePath, entry] of Object.entries(files)) {
+      if (!/\.html?$/i.test(filePath)) continue;
+      const html = Buffer.from(entry.base64, 'base64').toString('utf8');
+      const fails = checkPageCompliance(html).filter((f) => f.status === 'fail');
+      if (fails.length > 0) violations.push({ path: filePath, fails });
+    }
+    return violations;
+  }
+
+  async function runCmsComplianceGate(sourceRun) {
+    try {
+      // A correction run's own success would otherwise re-trigger this gate
+      // on itself — the marker set below breaks that recursion.
+      if (sourceRun.cmsComplianceCorrection) return;
+      const instaticCmsMode = !!(process.env.OD_INSTATIC_URL ?? '').trim() && tenantSsoEnabled();
+      if (!instaticCmsMode) return;
+      const { projectId, conversationId, agentId } = sourceRun;
+      if (!projectId || !conversationId || !agentId) return;
+
+      const project = getProject(db, projectId);
+      if (!project) return;
+      const projectRoot = resolveProjectDir(PROJECTS_DIR, projectId, project.metadata);
+
+      for (let attempt = 1; attempt <= CMS_COMPLIANCE_MAX_ATTEMPTS; attempt++) {
+        let violations;
+        try {
+          violations = await collectCmsComplianceViolations(projectRoot);
+        } catch (err) {
+          console.error(
+            `[cms-compliance] project ${projectId}: failed to read pages for compliance check:`,
+            err instanceof Error ? err.message : err,
+          );
+          return;
+        }
+        if (violations.length === 0) return; // compliant
+
+        const summary = violations
+          .map((v) => `- ${v.path}: ${v.fails.map((f) => `${f.rule}${f.detail ? ` — ${f.detail}` : ''}`).join('; ')}`)
+          .join('\n');
+
+        if (attempt === CMS_COMPLIANCE_MAX_ATTEMPTS) {
+          // Out of attempts — surface it loudly and stop. Never ship a
+          // silently-partial compliance pass.
+          console.error(
+            `[cms-compliance] project ${projectId} still violates templateRule.md after ${CMS_COMPLIANCE_MAX_ATTEMPTS} attempt(s):\n${summary}`,
+          );
+          return;
+        }
+
+        const correctionMessage = [
+          '[Automated compliance check] The page(s) you just built violate the required CMS output contract (templateRule.md) and will not import correctly. Fix EVERY violation below IN PLACE in the actual project files before finishing — do not ask, do not explain, just fix them:',
+          summary,
+        ].join('\n');
+
+        const now = Date.now();
+        const correctionAssistantMessageId = `cms-compliance-${randomUUID()}`;
+        const correctionRun = design.runs.create({
+          projectId,
+          conversationId,
+          assistantMessageId: correctionAssistantMessageId,
+          clientRequestId: `cms-compliance-${randomUUID()}`,
+          agentId,
+        });
+        correctionRun.cmsComplianceCorrection = true;
+
+        upsertMessage(db, conversationId, {
+          id: `cms-compliance-user-${randomUUID()}`,
+          role: 'user',
+          content: correctionMessage,
+        });
+        upsertMessage(db, conversationId, {
+          id: correctionAssistantMessageId,
+          role: 'assistant',
+          content: '',
+          agentId,
+          agentName: getAgentDef(agentId)?.name ?? agentId,
+          runId: correctionRun.id,
+          runStatus: 'queued',
+          startedAt: now,
+        });
+
+        try {
+          design.runs.start(correctionRun, () => startChatRun({
+            agentId,
+            projectId,
+            conversationId,
+            assistantMessageId: correctionAssistantMessageId,
+            message: correctionMessage,
+          }, correctionRun));
+          await design.runs.wait(correctionRun);
+        } catch (err) {
+          console.error(
+            `[cms-compliance] project ${projectId}: correction turn failed:`,
+            err instanceof Error ? err.message : err,
+          );
+          return;
+        }
+        // Loop: re-check on the next iteration.
+      }
+    } catch (err) {
+      console.error('[cms-compliance] gate failed:', err instanceof Error ? err.message : err);
+    }
+  }
+  onCmsComplianceRunSucceeded = (run) => { void runCmsComplianceGate(run); };
 
   orbitService.setRunHandler(async ({
     trigger,

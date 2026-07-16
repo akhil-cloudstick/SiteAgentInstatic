@@ -38,6 +38,17 @@ interface AdminUiState {
   closeSiteImport: () => void
 
   /**
+   * A FileMap staged by an external caller (Share to CMS) waiting for
+   * `SiteImportModal` to pick it up on open, skipping the drop step and
+   * landing straight on "Review import" — see `useStagedSiteImportHandoff`.
+   * `null` once consumed or when no staged import is pending.
+   */
+  pendingSiteImportFileMap: { files: Record<string, { base64: string; mimeType?: string }> } | null
+  setPendingSiteImportFileMap: (
+    fileMap: { files: Record<string, { base64: string; mimeType?: string }> } | null,
+  ) => void
+
+  /**
    * Global Site Export modal. `null` = closed. The optional context narrows the
    * initial selection — the Data workspace passes the active table (and, for
    * "Export selected", the checked row ids); Spotlight opens it with no context
@@ -134,6 +145,9 @@ export const useAdminUi = create<AdminUiState>((set) => ({
   siteImportOpen: false,
   openSiteImport: () => set({ siteImportOpen: true }),
   closeSiteImport: () => set({ siteImportOpen: false }),
+
+  pendingSiteImportFileMap: null,
+  setPendingSiteImportFileMap: (fileMap) => set({ pendingSiteImportFileMap: fileMap }),
 
   siteExport: null,
   openSiteExport: (context) => set({

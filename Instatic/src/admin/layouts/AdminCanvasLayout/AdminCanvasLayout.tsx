@@ -43,6 +43,7 @@ import { PublishButton } from '@admin/pages/site/toolbar/PublishButton'
 import { useEditorSelectPreference } from '@admin/pages/site/preferences/editorPreferences'
 import { usePersistence } from '@admin/pages/site/hooks/usePersistence'
 import { useSiteEditorUrlSync } from '@admin/pages/site/hooks/useSiteEditorUrlSync'
+import { useStagedSiteImportHandoff } from '@admin/pages/site/hooks/useStagedSiteImportHandoff'
 import { useEditorLayoutPersistence } from '@admin/pages/site/hooks/useEditorLayoutPersistence'
 import { useEditorStore } from '@admin/pages/site/store/store'
 import { cmsAdapter } from '@core/persistence/cms'
@@ -171,6 +172,9 @@ export function AdminCanvasLayout() {
     enabled: true,
     loaded: persistence.saveStatus.state !== 'loading',
   })
+  // Share to CMS hand-off: pick up a staged FileMap from `?importToken=…` and
+  // open the Import Site wizard pre-loaded on Review import.
+  useStagedSiteImportHandoff({ enabled: true })
   useEditorLayoutPersistence()
   useInstalledEditorPlugins(pluginBackgroundWorkEnabled)
   // Mount the SSE bridge ONCE per admin tab — gives toasts on plugin

@@ -38,6 +38,13 @@ export function createChatRunService({
   // external coding agent can `tail` the file in its own shell during
   // a long OD generation, instead of polling blindly and giving up.
   runsLogDir = null,
+  // Optional fire-and-forget hook invoked after a run finishes with
+  // status === 'succeeded' (see `finish` below). Runs generically for every
+  // run regardless of caller — used by the CMS templateRule compliance gate
+  // (server.ts), but this module has no CMS-specific knowledge. Must never
+  // throw back into `finish()` and never delays/alters the synchronous
+  // finalization above it.
+  onRunSucceeded = null,
 }) {
   const runs = new Map();
 
@@ -214,6 +221,13 @@ export function createChatRunService({
     // Any event emitted after this point must not lazily re-open the log.
     run.eventsLogClosed = true;
     scheduleCleanup(run);
+    if (status === 'succeeded' && typeof onRunSucceeded === 'function') {
+      // Fire-and-forget, deferred to a fresh microtask so it can never affect
+      // the synchronous finalization above (SSE/waiter close, cleanup).
+      Promise.resolve().then(() => onRunSucceeded(run)).catch((err) => {
+        console.error('[runs] onRunSucceeded hook failed:', err instanceof Error ? err.message : err);
+      });
+    }
   };
 
   const fail = (run, code, message, init = {}) => {

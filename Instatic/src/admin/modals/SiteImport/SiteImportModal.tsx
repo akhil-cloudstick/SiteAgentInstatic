@@ -26,7 +26,7 @@
 // modules itself rather than rely on the site editor's chunk having loaded.
 // This rides the modal's own lazy chunk; it adds nothing to the shell bundle.
 import '@modules/base'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { nanoid } from 'nanoid'
 import { Dialog } from '@ui/components/Dialog'
 import { pushToast } from '@ui/components/Toast'
@@ -34,6 +34,7 @@ import {
   ingestInput,
   buildImportPlan,
   commitImportPlan,
+  forceOverwriteResolutions,
   type FileMap,
   type ImportPlan,
   type ImportResult,
@@ -46,7 +47,6 @@ import { DropStep } from './steps/DropStep'
 import { AnalyzeStep } from './steps/AnalyzeStep'
 import { CmsBundleAnalyzeStep } from './steps/CmsBundleAnalyzeStep'
 import { CmsBundleConflictsStep } from './steps/CmsBundleConflictsStep'
-import { ConflictsStep } from './steps/ConflictsStep'
 import { ImportStep } from './steps/ImportStep'
 import { SiteImportFooter } from './SiteImportFooter'
 import { makeInitialRunProgress, type RunProgress } from './shared/importProgress'
@@ -69,6 +69,7 @@ import {
   buildResolvedPlan,
   describeIngestError,
   ensureCurrentSiteForStaticImport,
+  blankImportedDesign,
   saveImportedDraftSite,
 } from './shared/importPlanning'
 import styles from './SiteImportModal.module.css'
@@ -89,6 +90,14 @@ export type { ImportSelection }
 
 interface SiteImportModalProps {
   onCmsBundleImportComplete?: () => void
+}
+
+/** Browser-safe base64 -> bytes (no Buffer polyfill assumed). */
+function base64ToBytes(base64: string): Uint8Array {
+  const binary = atob(base64)
+  const bytes = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+  return bytes
 }
 
 // ---------------------------------------------------------------------------
@@ -121,10 +130,6 @@ export function SiteImportModal({ onCmsBundleImportComplete }: SiteImportModalPr
   const [fileMap, setFileMap] = useState<FileMap | null>(null)
   const [plan, setPlan] = useState<ImportPlan | null>(null)
   const [selection, setSelection] = useState<ImportSelection | null>(null)
-  const [pageResolutions, setPageResolutions] = useState<Map<string, ConflictResolution>>(new Map())
-  const [ruleResolutions, setRuleResolutions] = useState<Map<string, ConflictResolution>>(new Map())
-  const [tokenResolutions, setTokenResolutions] = useState<Map<string, ConflictResolution>>(new Map())
-  const [crossSheetResolutions, setCrossSheetResolutions] = useState<Map<string, ConflictResolution>>(new Map())
   const [cmsRowResolutions, setCmsRowResolutions] = useState<Map<string, ConflictResolution>>(new Map())
   const [stylesheetModes, setStylesheetModes] = useState<Record<string, StylesheetImportMode>>({})
   const [pageSlugOverrides, setPageSlugOverrides] = useState<Map<string, string>>(new Map())
@@ -224,22 +229,53 @@ export function SiteImportModal({ onCmsBundleImportComplete }: SiteImportModalPr
     setFileMap(map)
     setPlan(importPlan)
     setSelection(makeDefaultSelection(importPlan))
-    setPageResolutions(
-      new Map(importPlan.conflicts.pages.map((c) => [c.source, c.defaultResolution])),
-    )
-    setRuleResolutions(
-      new Map(importPlan.conflicts.rules.map((c) => [c.desiredName, c.defaultResolution])),
-    )
-    setTokenResolutions(
-      new Map(importPlan.conflicts.tokens.map((c) => [tokenConflictKey(c), c.defaultResolution])),
-    )
-    setCrossSheetResolutions(
-      new Map(importPlan.conflicts.crossSheetClasses.map((c) => [crossSheetConflictKey(c), c.defaultResolution])),
-    )
+    // Conflict resolutions are computed fresh (forced to Overwrite) in
+    // handleAnalyzeNext right before the run — no need to seed per-conflict
+    // state here since the conflicts step never renders for this track.
     setPageSlugOverrides(new Map())
     setBusy(false)
     setStep('analyze')
   }
+
+  // ── Staged Share-to-CMS hand-off ────────────────────────────────────────────
+  // A FileMap staged by an external caller (see useStagedSiteImportHandoff)
+  // waiting to be picked up. Skips the drop step entirely — runs the exact
+  // same finalizePlan a manual drag-drop uses, landing on Review import. The
+  // modal is always freshly mounted on open (see the header comment), so a
+  // one-shot ref guard (mirroring useSiteEditorUrlSync's pattern) is enough.
+  const pendingFileMap = useAdminUi((s) => s.pendingSiteImportFileMap)
+  const setPendingSiteImportFileMap = useAdminUi((s) => s.setPendingSiteImportFileMap)
+  const consumedPendingImportRef = useRef(false)
+  useEffect(() => {
+    if (consumedPendingImportRef.current) return
+    if (!pendingFileMap) return
+    consumedPendingImportRef.current = true
+    setPendingSiteImportFileMap(null)
+    const files: FileMap['files'] = {}
+    for (const [path, entry] of Object.entries(pendingFileMap.files)) {
+      files[path] = { bytes: base64ToBytes(entry.base64), mimeType: entry.mimeType }
+    }
+    setBusy(true)
+    setErrorMsg(null)
+    void (async () => {
+      try {
+        // Share to CMS = REPLACE the design: blank the current site's design
+        // BEFORE planning so a re-share is an exact match to the OD project (no
+        // accumulated stale fonts/rules) and the import sees no conflicts. A
+        // manual drag-drop import does NOT do this — it merges. Done here (not
+        // inside the commit) so the class-name index is rebuilt from the empty
+        // registry. loadSite only touches the store; the DB is untouched until
+        // the import actually commits + saves, so a failed import loses nothing.
+        const current = await ensureCurrentSiteForStaticImport()
+        useEditorStore.getState().loadSite(blankImportedDesign(current))
+        await finalizePlan({ files })
+      } catch (err) {
+        console.error('[SiteImportModal] staged import failed:', err)
+        setErrorMsg(describeIngestError(err))
+        setBusy(false)
+      }
+    })()
+  }, [pendingFileMap, setPendingSiteImportFileMap])
 
   // Re-analyse with a changed per-stylesheet import mode. The plan rebuild is
   // synchronous and pure, so flipping a sheet between "editable rules" and
@@ -267,19 +303,20 @@ export function SiteImportModal({ onCmsBundleImportComplete }: SiteImportModalPr
     }
 
     const filtered = filterPlanBySelection(planWithSlugs, selection)
-    const hasConflicts =
-      filtered.conflicts.pages.length > 0 ||
-      filtered.conflicts.rules.length > 0 ||
-      filtered.conflicts.tokens.length > 0 ||
-      filtered.conflicts.crossSheetClasses.length > 0
 
-    if (hasConflicts) {
-      setPlan(filtered)
-      setStep('conflicts')
-    } else {
-      setPlan(filtered)
-      void kickOffRun(filtered, pageResolutions, ruleResolutions, tokenResolutions)
-    }
+    // Conflicts always resolve as Overwrite, internally — a tenant never sees
+    // Rename/Skip/Overwrite/Custom, so the `conflicts` step is unreachable for
+    // this (static-file) import track. The CMS-bundle track's own conflicts
+    // screen (`handleCmsAnalyzeNext` / `CmsBundleConflictsStep`) is a separate
+    // import mode and is unaffected.
+    const forced = forceOverwriteResolutions(filtered.conflicts)
+    const pageResMap = new Map(forced.pages.map((c) => [c.source, c.defaultResolution]))
+    const ruleResMap = new Map(forced.rules.map((c) => [c.desiredName, c.defaultResolution]))
+    const tokenResMap = new Map(forced.tokens.map((c) => [tokenConflictKey(c), c.defaultResolution]))
+    const crossSheetResMap = new Map(forced.crossSheetClasses.map((c) => [crossSheetConflictKey(c), c.defaultResolution]))
+
+    setPlan(filtered)
+    void kickOffRun(filtered, pageResMap, ruleResMap, tokenResMap, crossSheetResMap)
   }
 
   function handleCmsAnalyzeNext() {
@@ -300,20 +337,19 @@ export function SiteImportModal({ onCmsBundleImportComplete }: SiteImportModalPr
     void kickOffCmsRun(cmsBundleState.selection)
   }
 
+  // Only the CMS-bundle track still reaches the `conflicts` step — the
+  // static-file track's own conflicts always resolve automatically in
+  // `handleAnalyzeNext` (forceOverwriteResolutions) and never render it.
   function handleConflictsImport() {
-    if (cmsBundleState?.preview) {
-      const finalSelection = withCmsConflictResolutions(
-        cmsBundleState.selection,
-        cmsBundleState.bundle,
-        cmsBundleState.preview.rowConflicts ?? [],
-        cmsRowResolutions,
-      )
-      setCmsSelection(finalSelection)
-      void kickOffCmsRun(finalSelection)
-      return
-    }
-    if (!plan) return
-    void kickOffRun(plan, pageResolutions, ruleResolutions, tokenResolutions)
+    if (!cmsBundleState?.preview) return
+    const finalSelection = withCmsConflictResolutions(
+      cmsBundleState.selection,
+      cmsBundleState.bundle,
+      cmsBundleState.preview.rowConflicts ?? [],
+      cmsRowResolutions,
+    )
+    setCmsSelection(finalSelection)
+    void kickOffCmsRun(finalSelection)
   }
 
   function handleCmsChooseDifferentFile() {
@@ -338,8 +374,9 @@ export function SiteImportModal({ onCmsBundleImportComplete }: SiteImportModalPr
     pageResMap: Map<string, ConflictResolution>,
     ruleResMap: Map<string, ConflictResolution>,
     tokenResMap: Map<string, ConflictResolution>,
+    crossSheetResMap: Map<string, ConflictResolution>,
   ) {
-    const resolvedPlan = buildResolvedPlan(planToRun, pageResMap, ruleResMap, tokenResMap, crossSheetResolutions)
+    const resolvedPlan = buildResolvedPlan(planToRun, pageResMap, ruleResMap, tokenResMap, crossSheetResMap)
 
     // Totals come from the plan being committed. Media is the only genuinely
     // incremental phase (per-asset uploads); everything else lands in one atomic
@@ -621,44 +658,6 @@ export function SiteImportModal({ onCmsBundleImportComplete }: SiteImportModalPr
             resolutions={cmsRowResolutions}
             onResolutionChange={(key, resolution) => {
               setCmsRowResolutions((prev) => {
-                const next = new Map(prev)
-                next.set(key, resolution)
-                return next
-              })
-            }}
-          />
-        )}
-
-        {step === 'conflicts' && !cmsBundleState && plan && (
-          <ConflictsStep
-            plan={plan}
-            pageResolutions={pageResolutions}
-            ruleResolutions={ruleResolutions}
-            tokenResolutions={tokenResolutions}
-            onPageResolutionChange={(source, resolution) => {
-              setPageResolutions((prev) => {
-                const next = new Map(prev)
-                next.set(source, resolution)
-                return next
-              })
-            }}
-            onRuleResolutionChange={(desiredName, resolution) => {
-              setRuleResolutions((prev) => {
-                const next = new Map(prev)
-                next.set(desiredName, resolution)
-                return next
-              })
-            }}
-            onTokenResolutionChange={(key, resolution) => {
-              setTokenResolutions((prev) => {
-                const next = new Map(prev)
-                next.set(key, resolution)
-                return next
-              })
-            }}
-            crossSheetResolutions={crossSheetResolutions}
-            onCrossSheetResolutionChange={(key, resolution) => {
-              setCrossSheetResolutions((prev) => {
                 const next = new Map(prev)
                 next.set(key, resolution)
                 return next
