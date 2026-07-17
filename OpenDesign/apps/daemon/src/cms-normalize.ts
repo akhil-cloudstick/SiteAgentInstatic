@@ -302,6 +302,79 @@ function normalizeWebRootCssUrls(html: string): string {
   return html.replace(/url\(\s*(['"]?)public\//gi, 'url($1/')
 }
 
+/** True when a declaration block is a full-viewport opaque overlay (a JS-dismissed loading screen). */
+function isOverlayDecls(d: string): boolean {
+  if (!/position\s*:\s*(?:fixed|absolute)/.test(d)) return false;
+  const fullViewport =
+    /inset\s*:\s*0/.test(d) ||
+    (/width\s*:\s*100vw/.test(d) && /height\s*:\s*100vh/.test(d)) ||
+    (/top\s*:\s*0/.test(d) &&
+      /left\s*:\s*0/.test(d) &&
+      (/right\s*:\s*0/.test(d) || /width\s*:\s*100(?:vw|%)/.test(d)) &&
+      (/bottom\s*:\s*0/.test(d) || /height\s*:\s*100(?:vh|%)/.test(d)));
+  if (!fullViewport) return false;
+  if (!/z-index\s*:\s*\d/.test(d)) return false;
+  const bg = d.match(/background(?:-color)?\s*:\s*([^;]+)/);
+  return !!bg && !/transparent|rgba\([^)]*,\s*0(?:\.0+)?\s*\)/.test(bg[1] ?? '');
+}
+
+/**
+ * Make a page's content visible with CSS alone — for the CMS-bound copy ONLY.
+ * The Instatic importer strips every `<script>` from the editing canvas, so any
+ * content hidden until JS runs (a JS-dismissed loading overlay, or `opacity:0`
+ * content revealed by a JS-toggled class / entrance animation) renders BLANK in
+ * the canvas even though it shows on the published site. This injects a small
+ * override `<style>` so the settled, visible state is the DEFAULT:
+ *   • a full-viewport opaque loading overlay → `display:none` (it's already
+ *     purely a loading flourish; the real content sits underneath);
+ *   • in-flow `opacity:0` / `visibility:hidden` content → forced visible.
+ * Skips interaction states (`:hover/:focus/:active/:checked/:target`), stacked
+ * `position:absolute|fixed` layers (carousel slides, hover overlays — forcing
+ * those visible would stack them), and `@keyframes` internals. OD's own source
+ * is untouched, so the OD preview keeps its JS loading + scroll animations.
+ */
+function makeVisibleWithoutJs(html: string): string {
+  const styleBlocks = [...html.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/gi)].map((m) => m[1] ?? '').join('\n');
+  if (!styleBlocks.trim()) return html;
+  // Strip comments (so a `/* … */` doesn't bleed into a captured selector), then
+  // drop @keyframes so their internal `0%{opacity:0}` isn't treated as a base rule.
+  const css = styleBlocks
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/@keyframes[^{]*\{(?:[^{}]*\{[^{}]*\}\s*)*\}/gi, '');
+  const overrides: string[] = [];
+  const seen = new Set<string>();
+
+  for (const m of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    const selector = (m[1] ?? '').trim();
+    const decls = (m[2] ?? '').toLowerCase();
+    if (!selector || selector.startsWith('@')) continue; // skip @media/@supports headers
+
+    if (isOverlayDecls(decls)) {
+      if (seen.has(`o:${selector}`)) continue;
+      seen.add(`o:${selector}`);
+      overrides.push(`${selector}{display:none !important;}`);
+      continue;
+    }
+
+    const hidden =
+      /(?:^|;)\s*opacity\s*:\s*0(?:\.0+)?\s*(?:;|!|$)/.test(decls) ||
+      /(?:^|;)\s*visibility\s*:\s*hidden/.test(decls);
+    if (!hidden) continue;
+    if (/:hover|:focus|:active|:checked|:target/i.test(selector)) continue; // interaction state
+    if (/position\s*:\s*(?:absolute|fixed)/.test(decls)) continue; // stacked slide / overlay
+    if (seen.has(`r:${selector}`)) continue;
+    seen.add(`r:${selector}`);
+    const resetTransform = /(?:^|;)\s*transform\s*:/.test(decls) ? 'transform:none !important;' : '';
+    overrides.push(`${selector}{opacity:1 !important;visibility:visible !important;${resetTransform}}`);
+  }
+
+  if (!overrides.length) return html;
+  const style = `<style data-od-cms-visible="1">/* OD: content visible without JS for CMS import */\n${overrides.join('\n')}\n</style>`;
+  if (/<\/head>/i.test(html)) return html.replace(/<\/head>/i, `${style}</head>`);
+  if (/<\/body>/i.test(html)) return html.replace(/<\/body>/i, `${style}</body>`);
+  return html + style;
+}
+
 /**
  * Wrap bare text runs that sit next to an inline element inside a heading or
  * paragraph, so every part stays an editable Text node in the CMS.
@@ -359,6 +432,9 @@ export async function normalizeHtmlForCms(
   wrapBareText($);
   let result = $.html();
   result = normalizeWebRootCssUrls(result);
+  // Make the CMS-bound copy visible without JS (the importer strips scripts from
+  // the editing canvas). OD's source is untouched — this only affects the share.
+  result = makeVisibleWithoutJs(result);
   if (doctype && !/^\s*<!doctype/i.test(result)) result = `${doctype}\n${result}`;
 
   const findings = checkPageCompliance(result);

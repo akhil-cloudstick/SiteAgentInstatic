@@ -69,6 +69,7 @@ A Share-to-CMS result must be **identical to a manual Import-Site of the same pr
 
 ## Where the pieces live
 
+- **[`docs/od-cms-compliance.md`](./od-cms-compliance.md)** — the core compliance logic (veg-kitchen: OD only builds what the CMS can import), the researched accept/block matrix, and the **future-failure playbook** (diagnose adherence-gap vs coverage-gap → fix → test). Read it before touching templateRule / the CMS contract / the gate.
 - **`Operator/rules/templateRule.md`** — the build rule OD must obey (derived from the importer).
 - **`Operator/rules/check-template-rule.mjs`** — standalone compliance checker (CLI).
 - **`OpenDesign/apps/daemon/src/cms-compliance.ts`** — the same checks, run at OD's export boundary

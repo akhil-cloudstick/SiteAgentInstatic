@@ -85,6 +85,24 @@ describe('cms-compliance — checkPageCompliance', () => {
     expect(findingFor(html, 'modern color function').status).toBe('pass');
   });
 
+  it('fails on @layer (the whole block is dropped on import)', () => {
+    const html = '<style>@layer base { .a{color:red} }</style>';
+    expect(findingFor(html, '@layer').status).toBe('fail');
+  });
+
+  it('fails on an unsupported image format (avif/ico/…)', () => {
+    expect(findingFor('<img src="/images/hero.avif" alt="x">', 'unsupported image').status).toBe('fail');
+  });
+
+  it('passes a supported image format (webp)', () => {
+    expect(findingFor('<img src="/images/hero.webp" alt="x">', 'unsupported image').status).toBe('pass');
+  });
+
+  it('no longer emits a data-sa marker finding (rule retired — importer ignores data-sa)', () => {
+    const html = '<h1>hi</h1><p>x</p><img src="/a.jpg">';
+    expect(checkPageCompliance(html).some((f) => f.rule.includes('data-sa'))).toBe(false);
+  });
+
   it('summarizes fail/warn counts', () => {
     const html = '<div class="mb-4"><head><link rel="stylesheet" href="a.css"></head></div>';
     const s = summarizeCompliance(checkPageCompliance(html));

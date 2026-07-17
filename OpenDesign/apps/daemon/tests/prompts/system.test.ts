@@ -658,8 +658,8 @@ describe('composeSystemPrompt — Instatic CMS output contract', () => {
   it('injects the contract on a web-page surface when instaticCmsMode is set', () => {
     const prompt = composeSystemPrompt({ instaticCmsMode: true });
     expect(prompt).toContain(MARKER);
-    expect(prompt).toContain('Never use Tailwind CSS or any utility-first CSS');
-    expect(prompt).toContain('data-sa');
+    expect(prompt).toContain('ZERO utility / Tailwind classes');
+    expect(prompt).toContain('REAL STATIC HTML');
   });
 
   it('omits the contract when instaticCmsMode is absent (vanilla OpenDesign)', () => {

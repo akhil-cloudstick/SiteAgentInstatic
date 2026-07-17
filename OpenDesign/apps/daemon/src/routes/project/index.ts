@@ -52,6 +52,7 @@ import {
 } from '../../project-locations.js';
 import { auditDesignSystemPackage } from '../../tools-connectors-cli.js';
 import { parseOrchestratorWorkspace } from '../../workspace-contract.js';
+import { materializeImages } from '../../cms-image-materialize.js';
 import { registerProjectConversationRoutes } from './conversations.js';
 
 export interface RegisterProjectRoutesDeps extends RouteDeps<'db' | 'design' | 'http' | 'paths' | 'projectStore' | 'projectFiles' | 'conversations' | 'templates' | 'status' | 'events' | 'ids' | 'telemetry' | 'appConfig' | 'agents' | 'validation'> {}
@@ -3178,7 +3179,17 @@ export function registerProjectFileRoutes(app: Express, ctx: RegisterProjectFile
           // Map web-root asset refs (/images/…) onto the project's public/ folder so
           // the preview shows the images the published site will. text/html only.
           if (/^text\/html(?:;|$)/iu.test(file.mime)) {
-            const src = Buffer.isBuffer(transformed) ? transformed.toString('utf8') : transformed;
+            let src = Buffer.isBuffer(transformed) ? transformed.toString('utf8') : transformed;
+            // Materialize any missing/external images into public/images so the
+            // canvas actually shows them (and the Design panel populates) — a
+            // build that emitted `<img src="/images/x.jpg">` for files that were
+            // never written no longer renders broken. Idempotent + best-effort.
+            try {
+              const projectRoot = resolveProjectDir(PROJECTS_DIR, projectId, project?.metadata);
+              src = (await materializeImages(projectRoot, src)).html;
+            } catch {
+              /* serve as-is if materialization fails */
+            }
             transformed = injectWebRootAssetBridge(rewriteWebRootAssets(src));
           }
           if (

@@ -135,7 +135,12 @@ export type ChatAnalyticsEntryFrom =
   | 'next_step'
   // A turn that submits answers to an inline `<question-form>` clarification
   // (the question still being clarified, not a fresh create/edit intent).
-  | 'question_answer';
+  | 'question_answer'
+  // A turn started by the "Fix it" button on the Share-to-CMS block dialog: the
+  // page failed the CMS compliance gate and the tenant asked the agent to make
+  // it importable. Isolating it measures how often the gate's self-heal loop
+  // fires and succeeds.
+  | 'cms_fix';
 
 export type ChatAnalyticsLengthBucket =
   | '0'

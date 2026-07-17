@@ -20,6 +20,7 @@ export type PromptTelemetrySectionKind =
   | 'clientSystemPrompt'
   | 'echoGuard'
   | 'userRequest'
+  | 'cmsFixInstruction'
   | 'skillPrompt'
   | 'designSystemPrompt'
   | 'pluginStagePrompt'

@@ -50,6 +50,22 @@ export function isUtilityClass(token: string): boolean {
 
 const firstLine = (s: string) => s.replace(/\s+/g, ' ').trim().slice(0, 100);
 
+/** True when a declaration block is a full-viewport opaque overlay (a JS-dismissed loading screen). */
+function isOverlayCss(d: string): boolean {
+  if (!/position\s*:\s*(?:fixed|absolute)/.test(d)) return false;
+  const fullViewport =
+    /inset\s*:\s*0/.test(d) ||
+    (/width\s*:\s*100vw/.test(d) && /height\s*:\s*100vh/.test(d)) ||
+    (/top\s*:\s*0/.test(d) &&
+      /left\s*:\s*0/.test(d) &&
+      (/right\s*:\s*0/.test(d) || /width\s*:\s*100(?:vw|%)/.test(d)) &&
+      (/bottom\s*:\s*0/.test(d) || /height\s*:\s*100(?:vh|%)/.test(d)));
+  if (!fullViewport) return false;
+  if (!/z-index\s*:\s*\d/.test(d)) return false;
+  const bg = d.match(/background(?:-color)?\s*:\s*([^;]+)/);
+  return !!bg && !/transparent|rgba\([^)]*,\s*0(?:\.0+)?\s*\)/.test(bg[1] ?? '');
+}
+
 /**
  * Check a single page's HTML against the template rule. Deterministic and
  * side-effect free.
@@ -122,11 +138,10 @@ export function checkPageCompliance(html: string): ComplianceFinding[] {
   );
   add('No hashed/build asset imports', hashed ? 'fail' : 'pass', hashed ? firstLine(hashed[0] ?? '') : undefined);
 
-  // 7) data-sa editable markers on content.
-  const saCount = (html.match(/\bdata-sa\s*=/gi) || []).length;
-  const contentEls = (html.match(/<(h[1-6]|p|img)\b/gi) || []).length;
-  if (saCount === 0 && contentEls > 2) add('data-sa editable markers', 'warn', `0 data-sa on ${contentEls} content elements`);
-  else add('data-sa editable markers', saCount > 0 ? 'pass' : 'warn', saCount > 0 ? `${saCount} markers` : 'no content');
+  // 7) (retired) `data-sa` markers — the Instatic importer does not read a
+  // `data-sa` attribute anywhere; editability comes from the element type
+  // (a real <h1>/<p>/<img> becomes an editable block automatically). The old
+  // marker rule enforced a no-op convention, so it was removed.
 
   // 8) No bare text beside an inline element (best-effort heuristic).
   let bareHits = 0;
@@ -195,6 +210,69 @@ export function checkPageCompliance(html: string): ComplianceFinding[] {
       ? `Modern color function in a shorthand is dropped on import (color lost): ${firstLine(shorthandColorHit[0])} — use a :root var token (background: var(--token)) or the longhand (background-color: …) instead (see templateRule.md)`
       : undefined,
   );
+
+  // 12) No @layer / @page / @namespace. The importer drops the ENTIRE @layer
+  // block (and @page/@namespace), so every rule inside is silently lost — a page
+  // that relies on @layer (e.g. compiled Tailwind v4) looks different or blank
+  // after import.
+  const droppedAtRule = /@(?:layer|page|namespace)\b/i.exec(styleBlocks);
+  add(
+    'No @layer / @page / @namespace',
+    droppedAtRule ? 'fail' : 'pass',
+    droppedAtRule
+      ? `${firstLine(droppedAtRule[0])} is dropped on import — all rules inside a @layer are lost. Write plain, source-ordered CSS (see templateRule.md)`
+      : undefined,
+  );
+
+  // 13) No unsupported image formats. The importer uploads jpg/png/webp/gif/svg
+  // (+ mp4/webm) only; an <img>/<source> pointing at avif/ico/bmp/tiff/heic is
+  // not captured and renders broken on the published page.
+  const BAD_IMAGE_FMT_RE = /<(?:img|source)\b[^>]*\b(?:src|srcset)\s*=\s*["'][^"']*\.(?:avif|ico|bmp|tiff?|heic)\b/i;
+  const badImageFmt = BAD_IMAGE_FMT_RE.exec(html);
+  add(
+    'No unsupported image formats',
+    badImageFmt ? 'fail' : 'pass',
+    badImageFmt
+      ? `Image uses a format the importer can't upload (avif/ico/bmp/tiff/heic): ${firstLine(badImageFmt[0])} — use jpg/png/webp/gif/svg (see templateRule.md)`
+      : undefined,
+  );
+
+  // 14) Content visible without JavaScript. The importer strips every <script>
+  // from the editing canvas, so content hidden until JS runs — a full-viewport
+  // opaque loading overlay, or in-flow opacity:0/visibility:hidden content
+  // revealed by a JS-toggled class — renders BLANK in the canvas (fine only on
+  // the published site). The share transform (cms-normalize.makeVisibleWithoutJs)
+  // normally injects a `data-od-cms-visible` override that neutralizes this;
+  // this rule is the net (warn) for anything still hidden after that, and it
+  // surfaces the raw pattern when the checker runs on an un-transformed page.
+  {
+    const overrideBlock = html.match(/<style[^>]*data-od-cms-visible[^>]*>([\s\S]*?)<\/style>/i)?.[1] ?? '';
+    const cssNoKf = styleBlocks
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/@keyframes[^{]*\{(?:[^{}]*\{[^{}]*\}\s*)*\}/gi, '');
+    const stillHidden: string[] = [];
+    for (const rm of cssNoKf.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+      const sel = (rm[1] ?? '').trim();
+      const d = (rm[2] ?? '').toLowerCase();
+      if (!sel || sel.startsWith('@')) continue;
+      const overlay = isOverlayCss(d);
+      const revealHidden =
+        !overlay &&
+        (/(?:^|;)\s*opacity\s*:\s*0(?:\.0+)?\s*(?:;|!|$)/.test(d) || /(?:^|;)\s*visibility\s*:\s*hidden/.test(d)) &&
+        !/:hover|:focus|:active|:checked|:target/i.test(sel) &&
+        !/position\s*:\s*(?:absolute|fixed)/.test(d);
+      if (!overlay && !revealHidden) continue;
+      if (overrideBlock.includes(`${sel}{`)) continue; // neutralized by the share transform
+      stillHidden.push(sel);
+    }
+    add(
+      'Content visible without JavaScript',
+      stillHidden.length ? 'warn' : 'pass',
+      stillHidden.length
+        ? `Hidden until JS runs → blank in the CMS canvas: ${[...new Set(stillHidden)].slice(0, 5).join(', ')} — content must be visible with CSS alone (see templateRule.md)`
+        : undefined,
+    );
+  }
 
   return findings;
 }

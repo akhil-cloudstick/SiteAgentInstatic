@@ -1,483 +1,234 @@
-# SiteAgent — Website Build Rule
+# SiteAgent — Website Build Rule (exactly what Instatic's "Import Site" accepts)
 
-This rule is for **anyone rebuilding a website** so the finished project imports into **Instatic** correctly — with all styles, colors, animations, and pages intact — and the tenant gets full editing capability inside Instatic (editor shows the correct design, publish to Cloudflare looks exactly the same).
+This is the authoritative contract for building a website so it imports into **Instatic** perfectly — every style, color, font, animation, image, and page intact — and stays **fully editable** for the tenant (the editor shows the correct design; publishing to Cloudflare looks identical).
 
----
-
-## What the output must be
-
-A **project folder** with a standard static build inside it (e.g. `dist/`).
-
-The tenant selects that folder in Instatic → **Ctrl + K → Import Site → select folder**.  
-Everything must work from that single action. No manual steps after.
+Build to this rule and a page imports pixel-perfect with no manual fixes. Break it and the importer silently drops or blanks part of the page.
 
 ---
 
-## Framework
+## The one thing to understand first (why these rules exist)
 
-Use **Astro** with `output: 'static'`.
+**Instatic's importer reads your HTML like a text file — it NEVER runs your JavaScript.** It walks the static HTML you delivered and turns each element into an **editable block** (a heading, an image, a text run, a button…). Then it reads your CSS into **editable style rules and color/font tokens**.
+
+Two consequences drive everything below:
+
+1. **All visible content must already exist as real, static HTML in the page source.** If JavaScript builds content after the page loads (a gallery, a product list, cards), the importer sees an empty container → that content imports **blank**.
+2. **Styles must be plain CSS the importer can read.** Utility frameworks, `@layer`, and modern color functions in shorthands are silently dropped.
+
+> **Compliance is about the TECHNIQUE, not the feature.** Animations, 3D effects, loading spinners, filterable galleries, carousels, tabs — **all of these are welcome**. You just build them with a *compliant technique* (CSS + behavioral JavaScript acting on already-present static markup), never with JavaScript that *generates content*. Never refuse a request because it "sounds like JS"; figure out the compliant way to build it and do that.
 
 ---
 
-## CSS — the most important rule
+## ❌ These break the import — never output them
 
-### Do NOT use Tailwind CSS or any utility-first CSS framework
+Each item: why it breaks, and the ✅ compliant way instead.
 
-Tailwind generates utility classes like `.bg-gray-900`, `.text-white`, `.flex`, `.mt-4`.  
-Instatic cannot import or understand these. The styles will be lost after import.
+### 1. Content built by JavaScript at runtime — THE #1 rule
+Galleries, product/blog lists, cards, pricing tables, testimonials, menus of items — any visible markup inserted by JS (`innerHTML`, `insertAdjacentHTML`, `document.createElement`, template strings, or a framework hydrating a root). The importer never runs JS, so it sees nothing → the section imports **blank**.
 
-### Use plain CSS with semantic classes and CSS custom properties
-
-Write CSS the traditional way — one meaningful class per component, colors as CSS variables.  
-This is exactly what Instatic imports as **color tokens** and **style rules**.
-
-**Wrong — Tailwind (styles lost after import):**
 ```html
-<div class="bg-gray-900 text-white min-h-screen flex flex-col items-center px-6 py-20">
+<!-- ❌ WRONG — imports blank (the <div> is empty in the HTML) -->
+<div id="gallery"></div>
+<script>
+  const items = [{img:'/images/a.jpg'}, {img:'/images/b.jpg'}];
+  items.forEach(i => gallery.innerHTML += `<img src="${i.img}">`);
+</script>
+```
+```html
+<!-- ✅ CORRECT — every item is real static HTML -->
+<div class="gallery">
+  <img class="shot" src="/images/a.jpg" alt="Mountain trip">
+  <img class="shot" src="/images/b.jpg" alt="Coast trip">
+</div>
+```
+Write **every** item out as static HTML. (Filtering/sorting is still fine — see the effect cookbook — as long as the items themselves are in the HTML.)
+
+### 2. Tailwind / utility-first CSS
+Utility classes (`mb-4`, `flex`, `bg-gray-900`, `text-5xl`, variants like `md:flex`/`hover:…`), the Tailwind CDN `<script>`, and `@apply`. The class names survive on the element but **the styles are lost** — Instatic can't import utility classes as editable rules.
+
+```html
+<!-- ❌ WRONG — styles lost -->
+<div class="bg-gray-900 text-white flex px-6 py-20">
   <h1 class="text-5xl font-bold text-red-500 mb-4">Welcome</h1>
 </div>
 ```
-
-**Correct — plain CSS (styles preserved in Instatic):**
 ```html
-<div class="page-wrapper">
-  <h1 class="hero-title">Welcome</h1>
-</div>
-
+<!-- ✅ CORRECT — semantic classes + plain CSS -->
+<section class="hero"><h1 class="hero-title">Welcome</h1></section>
 <style>
-  :root {
-    --color-bg:      #0D0D0D;
-    --color-surface: #141414;
-    --color-text:    #ffffff;
-    --color-accent:  #FF3B30;
-  }
-
-  .page-wrapper {
-    background: var(--color-bg);
-    color: var(--color-text);
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 80px 24px;
-  }
-
-  .hero-title {
-    font-size: 3rem;
-    font-weight: 800;
-    color: var(--color-accent);
-    margin-bottom: 16px;
-  }
+  :root { --color-bg:#0d0d0d; --color-text:#fff; --color-accent:#ff3b30; }
+  .hero { background: var(--color-bg); color: var(--color-text); display:flex; padding: 80px 24px; }
+  .hero-title { font-size: 3rem; font-weight: 800; color: var(--color-accent); }
 </style>
 ```
 
-### CSS rules
+### 3. `@layer` (and `@import` / `@page` / `@namespace`)
+The importer **drops the entire `@layer` block** — everything inside is lost (this is also why compiled Tailwind v4 output vanishes). Conditional/external `@import`, `@page`, and `@namespace` are dropped too. Write plain, source-ordered CSS.
 
-- Define all brand colors as **CSS custom properties** in `:root` — Instatic imports these as **color tokens** (the tenant can change the brand color in one place and it updates everywhere).
-- Give every section and element a **semantic class name** (`.hero`, `.navbar`, `.card`, `.footer-links`) — Instatic imports these as **style rules** the tenant can edit.
-- Write all CSS in `<style>` blocks inside the `.astro` files or in a global `.css` file imported by the layout.
-- CSS animations (`@keyframes`, `transition`, `animation`) are fully supported — write them in plain CSS.
-- **Give colors as `#hex`, `rgb()`, or `var(--token)` — not as a bare `oklch()`/`lab()`/`lch()`/`color-mix()` inside a `background` (or other) shorthand.** Modern color functions inside a shorthand can be dropped by the CSS parser on import, so the element loses its color. If you want an `oklch` value, either put it on a `:root` token and reference it (`background: var(--avatar-sky)`), or use the longhand (`background-color: oklch(...)`) — both survive. Example that keeps its color: `.tag.sky { background: var(--tone-sky); }` with `:root { --tone-sky: #cfe8ff; }`.
-
-### Verified to import pixel-exact
-
-These common patterns were tested end-to-end (build → import → publish → diff against the original) and reproduce faithfully — use them freely:
-
-- **Responsive breakpoints** — `@media (min-width: …)` / `(max-width: …)` overrides. Minified output (`@media(min-width:1024px)`, no space) imports correctly, and the widest matching breakpoint wins on the published page just like in the browser.
-- **Sticky headers/sidebars** — `position: sticky; top: 0`. The published `<body>` grows with content, so a sticky element stays stuck for the whole scroll (not just one screen).
-- **Icon buttons** — `<button><svg>…</svg></button>` (hamburger, close, chevrons). The inline `<svg>` and its `<line>`/`<path>`/`<circle>` children are preserved.
-- **`line-height`** — buttons/cards/badges that rely on the browser default (`normal`) keep their exact height; the CMS does not force an opinionated `1.5`.
-
-### Avoid — these lose fidelity on import
-
-- **`@layer`** — the importer drops `@layer` (and `@import` / `@page` / `@namespace`) rules. `@layer` changes cascade order, so a page relying on it can look different after import. Write plain, source-ordered CSS instead.
-- **`public/`-prefixed or runtime-rewritten asset paths** — always reference assets at the **web root**: `<img src="/images/hero.svg">`, `url(/images/bg.svg)`. Never write `src="public/images/…"`, never rely on a runtime `<script>` that rewrites `src` attributes. Files live in `public/`; the `/…` form resolves to them automatically on both the built site and the CMS import.
-- **Images built by JavaScript at runtime** (`el.src = '/images/x'` in a `<script>`) — the importer only sees the static DOM, so JS-injected images are not uploaded to the CMS media library and won't resolve on the published page. Put every meaningful image in real static `<img>` markup (mark it `data-sa="image:…"`); use JS only for behaviour, not for creating the primary images.
-- **Any content built by JavaScript at runtime** — product lists, cards, pricing tables, testimonials, or any visible text/markup inserted via `innerHTML`, `appendChild`, or a template string assigned into the page (not just images). The importer only sees the static DOM as delivered; a `<script>` that renders content after load produces a page the importer can't see into at all — that section is dropped, not partially imported. **All visible content must exist as real, static HTML in the page source.** `<script>` is for **behaviour only** on markup that's already there (menu toggles, tab switching, the nav active-state pattern above) — never for constructing or inserting the content itself.
-
-The tenant edits all of the above inside Instatic and re-publishes with the same result.
-
----
-
-## Required `astro.config.mjs`
-
-```js
-import { defineConfig } from 'astro/config';
-
-export default defineConfig({
-  output: 'static',
-  vite: {
-    build: {
-      assetsInlineLimit: 1048576,  // puts all CSS inside the HTML as <style> blocks
-      cssCodeSplit: false,
-    },
-  },
-});
-```
-
----
-
-## Fonts
-
-### Google Fonts — use a `<link>` tag in the layout `<head>`
-
-Instatic automatically detects Google Fonts CDN links and **self-hosts the font files** inside the CMS — no external CDN dependency in the published site.
-
-```astro
-<!-- src/layouts/Layout.astro -->
-<head>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link
-    href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
-    rel="stylesheet"
-  />
-</head>
-```
-
-Then reference the font via a CSS custom property so Instatic imports it as an editable font token:
+### 4. Modern color functions inside a CSS *shorthand*
+`oklch()`, `oklab()`, `lab()`, `lch()`, `color-mix()`, `color()` used **bare inside a shorthand** (`background:`, `border:`, `font:`) make the CSS parser drop the **whole declaration** — the element loses that color, silently.
 
 ```css
-:root {
-  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
-}
-
-body {
-  font-family: var(--font-sans);
-}
+/* ❌ WRONG — the whole background is dropped */
+.avatar { background: color-mix(in srgb, #f00, #fff 40%); }
+.tag    { background: oklch(70% 0.15 230); }
 ```
-
-**Rules:**
-- Use the `fonts.googleapis.com/css2` URL format — this is the only Google Fonts URL format Instatic can parse and self-host.
-- Always define the font via a `--font-*` CSS custom property in `:root`. Instatic imports these as **font tokens** the tenant can change in the Typography panel.
-- Include all weights you use in the URL (`wght@400;500;600;700;800`) so the published site has them available.
-
-### Self-hosted font files — put them in `public/fonts/`
-
-If you have `.woff2` / `.ttf` font files, Instatic imports them automatically too:
-
 ```css
-@font-face {
-  font-family: "MyFont";
-  src: url("/fonts/myfont-400.woff2") format("woff2");
-  font-weight: 400;
-}
-
-:root {
-  --font-body: "MyFont", sans-serif;
-}
+/* ✅ CORRECT — use a :root token, or the longhand (both survive) */
+:root { --tone-sky: #cfe8ff; }
+.avatar { background: var(--tone-sky); }
+.tag    { background-color: oklch(70% 0.15 230); }   /* longhand is fine */
 ```
+`#hex`, `rgb()`, `hsl()`, and `var(--token)` are always safe anywhere.
 
-### Do NOT use
+### 5. External stylesheets & wrong-source fonts
+- ❌ External `<link rel="stylesheet">` to a CDN (only local stylesheets and Google Fonts links are read). Put your CSS in an inline `<style>`.
+- ❌ `@fontsource` npm packages, non-Google font CDNs (Adobe/Typekit/Bunny/Fontshare), the **v1** Google Fonts URL (`/css?family=`), `gstatic` links, `.eot` fonts, and `local()`-only `@font-face`. → see **Fonts** for the ✅ ways.
 
-- **`@fontsource` npm packages** — these end up bundled in separate Vite chunks, not in the HTML, and are lost on import.
-- **Other font CDNs** (Adobe Fonts, Bunny Fonts, Typekit) — only `fonts.googleapis.com/css2` links are auto-installed. Other CDN links are dropped.
-- **`font-family` hardcoded directly on elements** — always use a `var(--font-*)` token so the font is editable in Instatic.
+### 6. Build-tool artifacts & SPA hydration roots
+❌ `/_astro/…`, hashed `/assets/name-<hash>.js` chunks, ESM `import` of assets, and `<div id="root"></div>` + a client bundle. These render nothing at import (no JS is run) → blank page, and the bundle fails to process. Deliver server-rendered/static HTML.
 
----
+### 7. Unsupported / unreachable images
+- ❌ Formats the importer can't upload: **avif, ico, bmp, tiff, heic** → the `<img>` breaks. Use **jpg, png, webp, gif, svg** (video: mp4/webm).
+- ✅ **Real photos are saved in for you.** Point `<img src>` at a **local `/images/name.jpg`** (give it a descriptive name + `alt`) OR a **real royalty-free photo URL** — OD downloads/creates the actual file under the site's `public/images/` and rewrites the ref before publish, so a referenced image is never a dead link. (Behind the scenes it captures the URL, or fetches a real photo for a bare local path, or writes an SVG placeholder if offline.)
+- ❌ Still avoid: `data:` URIs and any path with a **`?query` or `#fragment`** (`/images/x.jpg?v=2`) → not uploaded.
 
-## JavaScript and animations
-
-Load all JS libraries (GSAP, AOS, Swiper, Alpine.js, etc.) from a **CDN `<script>` tag** in the HTML — not installed via npm.
+### 8. Asset paths hardcoded inside `<script>` text
+On import, HTML `src`/`srcset`/`href` and CSS `url()` are rewritten to the CMS `/uploads/…` path — but **URLs inside `<script>` text are NOT**. A hardcoded `/images/x.svg` in JS **404s** after import. Read the URL from an element's already-served `src` instead.
 
 ```html
-<!-- Correct — comes with the HTML on import -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js" defer></script>
-
-<!-- Wrong — ends up in a separate _astro/*.js file that won't import -->
-import gsap from 'gsap';
+<!-- ✅ swap reads the URL from the clicked item's own <img> (already rewritten to /uploads/) -->
+<button class="row" data-id="cube"><img class="thumb" src="/images/cube.svg" alt="Cube"></button>
+<img id="featured" src="/images/cube.svg" alt="">
+<script>
+  document.querySelectorAll('.row').forEach(function (row) {
+    row.addEventListener('click', function () {
+      var t = row.querySelector('.thumb');
+      var f = document.getElementById('featured');
+      f.src = t.src; f.alt = t.alt;      // resolves to /uploads/… after import
+    });
+  });
+</script>
 ```
 
-Small custom JS (menu toggles, counters, scroll effects) can be written directly in `<script>` blocks in the HTML.
+### 9. Inline event handlers
+❌ `onclick="…"` / any `on*=` attribute is stripped on import. Attach behavior with `addEventListener` in a `<script>` instead.
 
-### JS media swaps — read the URL from the DOM, never hardcode `/images/…`
-
-On import, static `<img src="/images/x.svg">` paths are rewritten to the CMS `/uploads/…` path, but
-the importer **does not rewrite URLs inside `<script>` text**. So a swap/gallery script that assigns
-a hardcoded path (`el.src = '/images/product.svg'`, or `{ image: '/images/product.svg' }` in a data
-array) will **404 after import** — the `/images/…` path doesn't exist on the CMS/published site.
-
-Instead, put every image in real static `<img>` markup (so it uploads and gets rewritten), and have
-the swap read the URL from an existing element's already-served `src`:
-
-**Wrong — hardcoded path in JS (breaks after import):**
-```js
-var data = [{ id: 'cube', image: '/images/product-cube.svg' }];
-function activate(id) {
-  var p = data.find(function (x) { return x.id === id; });
-  document.getElementById('featured').src = p.image;   // 404 on the CMS/published site
-}
-```
-
-**Correct — copy the src from the clicked item's own `<img>` (already rewritten to /uploads/):**
-```html
-<button class="row" data-id="cube"><img class="thumb" src="/images/product-cube.svg" alt="Cube"></button>
-```
-```js
-function activate(id) {
-  var row = document.querySelector('.row[data-id="' + id + '"]');
-  var thumb = row && row.querySelector('.thumb');
-  if (thumb) {
-    document.getElementById('featured').src = thumb.src;   // resolves to /uploads/… after import
-    document.getElementById('featured').alt = thumb.alt;
-  }
-}
-```
-
-Keep text data (names, prices, descriptions) in JS if you like — only **asset paths** must not be
-hardcoded in JS.
-
----
-
-## Images and media
-
-Put all images in the `public/` folder. Reference them with plain `<img>` tags.
+### 10. Content hidden until JavaScript runs
+The importer strips your `<script>`s from the **editing canvas**, so any content that only becomes visible once JS runs is **blank** there (it appears only on the published site). ❌ A full-screen loading overlay that a script removes; ❌ `opacity:0`/`visibility:hidden` content revealed only by a JS-added class (e.g. `IntersectionObserver` scroll reveals), or a hero whose words start `opacity:0`. Make the visible state the **default** and let CSS animate it in.
 
 ```html
-<!-- Correct -->
-<img src="/images/hero.jpg" alt="Hero" />
-<img src="/images/logo.svg" alt="Logo" />
-
-<!-- Wrong — Astro hashes the file and breaks the path after import -->
-import heroImg from './hero.jpg';
-<Image src={heroImg} />
-```
-
-### Changing an image later — rebuild from this rule, do not swap it in the editor
-
-Images placed in `public/` are **baked into the build**, so they import into Instatic
-and publish to Cloudflare correctly — the image file travels with the site.
-
-To **change** an image after import, replace the file in `public/` (keep the same path)
-and **rebuild + re-import using this rule**. That keeps the new image inside the
-deployed bundle, so it shows on the live Cloudflare site.
-
-Do **not** rely on uploading/replacing an image directly from the Instatic editor's
-media library for a template-built site: that image is stored on the editing server
-and is **not part of the built bundle**, so it can appear in the editor preview but
-not on the published Cloudflare page. The source-of-truth for a template site is the
-`public/` folder — change it there and rebuild.
-
----
-
-## Editable text — wrap every text run in its own element
-
-Instatic makes an element editable by turning it into a **Text node**. The rule it
-follows on import:
-
-- A heading/paragraph that contains **only text** → becomes **one editable Text node**. ✅
-- A heading/paragraph that also contains a **child element** (e.g. a `<span>` to color
-  part of it) → becomes a **Container**. The child element stays editable, but any
-  **bare text sitting loose next to it** becomes a "no-wrapper" text node that has no
-  clickable box on the canvas — so the tenant **cannot select or edit it**. ❌
-
-This is the #1 cause of "I can edit the colored word but not the rest of the sentence."
-
-### The rule: never leave bare text next to an inline element
-
-If any part of a heading/sentence is wrapped (for color, bold, a link, etc.), then
-**every** part must be wrapped in its own element too.
-
-**Wrong — bare white text next to a colored `<span>` (white text not editable):**
-```html
-<h1>
-  Powering the AI era with
-  <span class="accent">high-density compute</span>
-  built to last.
-</h1>
-```
-
-**Correct — every run wrapped, so all parts are editable:**
-```html
-<h1>
-  <span>Powering the AI era with </span>
-  <span class="accent">high-density compute</span>
-  <span> built to last.</span>
-</h1>
-
-<style>
-  .accent { color: var(--color-accent); }
-</style>
-```
-
-**Also correct — if no part needs its own color/style, use plain text (one editable node):**
-```html
-<h1>Powering the AI era built to last.</h1>
-```
-
-**Rules:**
-- Keep the spaces inside the spans (`"Powering the AI era with "`) so words don't run together.
-- This applies to any element that mixes text with an inline child: `<h1>`–`<h6>`, `<p>`,
-  `<span>`, `<strong>`, `<em>`, list items, buttons, links with partial styling.
-- If you only need one accent color for the whole line, put the color on the heading
-  itself (no inner span) — then it stays a single editable Text node.
-
----
-
-## Mark editable content with `data-sa`
-
-Add a `data-sa` attribute to every piece of text or image the tenant will want to change.
-
-```html
-<h1 data-sa="text:hero.heading">Your headline here</h1>
-<p  data-sa="text:hero.subheading">A short description.</p>
-<img data-sa="image:hero.photo" src="/images/hero.jpg" alt="Hero" />
-```
-
-**Rules:**
-- Format: `text:section.field` for text, `image:section.field` for images
-- All lowercase: `hero.heading`, `about.body`, `services.card1.title`
-- Unique per page — never reuse the same key on the same page
-- Never rename a key once set
-
----
-
-## Pages
-
-Each `.astro` file in `src/pages/` becomes one HTML page:
-
-```
-src/pages/
-  index.astro       →  homepage
-  about.astro       →  /about
-  services.astro    →  /services
-  contact.astro     →  /contact
+<!-- ❌ WRONG — blank in the editor until JS adds .is-visible -->
+<style>.reveal{opacity:0;transform:translateY(20px)} .reveal.is-visible{opacity:1;transform:none}</style>
+<!-- ✅ RIGHT — visible by default; CSS animates it in on load (no JS needed) -->
+<style>.reveal{animation:fadeUp .6s ease both} @keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:none}}</style>
 ```
 
 ---
 
-## Shared sections (nav, footer)
+## ✅ What imports perfectly (use freely)
 
-Use Astro components so nav and footer are identical across all pages:
+**CSS**
+- One or more inline `<style>` blocks (in `<head>` or `<body>`) → editable **style rules**.
+- Inline `style="…"` on an element → kept on that element.
+- `:root { --name: <color> }` → editable **color token** (any name). `#hex`/`rgb()`/`hsl()`/`var()` colors.
+- `@media` (site breakpoints become responsive overrides; other queries become reusable conditions), `@supports`, `@container`, `@keyframes`.
+- `transition`, `animation`, `transform`, `position: sticky`, `display:grid`/`flex`, gradients, `url()` backgrounds, pseudo-classes/elements, `:has()`.
 
-```astro
-<!-- src/components/Nav.astro -->
-<nav class="navbar">
-  <img data-sa="image:nav.logo" src="/images/logo.svg" alt="Logo" />
-</nav>
+**Selectors — style each component with a single semantic class.** Only a **single bare class** (`.hero`) becomes an editable/bindable rule the tenant can tweak per element. Compound/descendant/pseudo/element selectors (`.hero .title`, `h1`, `a:hover`) still apply visually but import as **ambient** (global) rules — not per-node editable. Prefer one meaningful class per component.
 
-<style>
-  .navbar {
-    position: sticky;
-    top: 0;
-    background: var(--color-surface);
-    padding: 16px 24px;
-  }
-</style>
-```
+**HTML content** — real semantic elements each become an editable block: `h1`–`h6`, `p`, `a`, `img`, `button`, `ul/ol/li`, `section/div/article/main/header/footer/nav/aside`, inline `svg` (icons), forms & inputs, tables. `id`, `data-*`, `aria-*`, and `role` are preserved (so behavioral scripts keep working).
 
-Instatic detects nav, header, and footer sections that are structurally
-identical across pages and automatically promotes them to a single shared
-Visual Component on import. Operators can edit once and all pages update.
+**Behavioral JavaScript survives and re-runs on the published page.** Use it freely for *behavior on markup that already exists*: menu toggles, tabs, accordions, carousels, nav active-state, counters, image swaps that read from the DOM. Use `classList` / `setAttribute` / `aria-*` / `addEventListener`. Prefer plain (classic) `<script>` over ES modules. Load libraries (GSAP, Swiper, Alpine…) from a **CDN `<script>`**, never npm.
+
+**Structure** — each `.html` file is a page (`index.html` → home `/`). Identical top-level `<nav>`/`<header>`/`<footer>` across pages are auto-promoted to one shared, edit-once component. (For active-state, set it at runtime — see below — don't bake a different class into each page.)
 
 ---
 
-## Nav active state — use JavaScript
+## Build any effect the compliant way (cookbook)
 
-**Do NOT use Astro's build-time path detection** (`Astro.url.pathname`) to
-add an active class to the current nav link. Astro bakes a different active
-item into every page's HTML. When Instatic deduplicates the shared nav it
-cannot use 6 conflicting versions — it strips the baked-in active classes.
+Whatever the tenant asks — in whatever words — build it like this. **Effects are never blocked; only content-generating JS is.**
 
-Use a `<script>` block inside `Nav.astro` instead. It reads the real URL at
-runtime and always highlights the correct link:
+| Tenant asks for… | Build it with… |
+|---|---|
+| animation, motion, "make it move", loading / buffering spinner | CSS `@keyframes` + `transition`/`animation` |
+| 3D, tilt, parallax, hover effects | CSS `transform` / `perspective` (+ behavioral JS that only updates the *style* of existing elements) |
+| filterable / sortable gallery, tabs, accordion, carousel, slider | ALL items as **static HTML**, then show/switch with CSS (`:has()`, `:target`, scroll-snap) or behavioral JS (`classList` on existing markup). Never build the items in JS. |
+| counters, progress bars, "count up" | behavioral JS updating the **text/attributes of existing elements** |
+| modal, dropdown, mobile menu | static markup + behavioral JS toggling a class |
+| image swap / lightbox | static `<img>`s; swap by reading another element's `src` (never a hardcoded path) |
 
-```astro
-<!-- src/components/Nav.astro -->
-<nav class="navbar">
-  <a class="nav-link" href="/">Home</a>
-  <a class="nav-link" href="/services">Services</a>
-  <a class="nav-link" href="/about">About</a>
-  <a class="nav-link" href="/contact">Contact</a>
-</nav>
+If a request *genuinely* can't be done inside these limits, build the **closest compliant version** and briefly tell the tenant what you adjusted and why — never ship the broken version, and never refuse just because a prompt mentioned "js" or "animation."
 
+---
+
+## Colors, fonts, images, editability — details
+
+### Colors → `:root` tokens
+Define every brand color as a `:root` custom property and use it via `var(--…)`. Instatic imports these as editable **color tokens** (change once, updates everywhere). Keep raw hex out of the rules where you can.
+
+### Fonts
+- **Google Fonts:** a `<link href="https://fonts.googleapis.com/css2?family=…&display=swap" rel="stylesheet">` (the **`/css2`** format only) — Instatic self-hosts it. Include every weight you use.
+- **Self-hosted:** `@font-face` pointing at a bundled `.woff2` (or woff/ttf/otf).
+- Reference fonts through a **`--font-*`** `:root` token (`--font-sans: "Inter", system-ui, sans-serif;` then `font-family: var(--font-sans)`) → editable **font token**. The token name must start with `--font-` and the value must be a quoted family / stack / include a generic keyword.
+- ❌ Not: `@fontsource`, other font CDNs, the v1 `/css?family=` URL, `.eot`, `local()`-only faces, or a `font-family` for a family you never actually installed (it silently falls back).
+
+### Images
+- Use real `<img src="/images/x.jpg" alt="…">` (and `srcset`) for anything the tenant should see or swap → editable **Image block**, uploaded to `/uploads/…`. Byte-identical images are de-duplicated on re-share (no duplicate uploads).
+- `background-image: url(/images/x.jpg)` works and is self-hosted, but is **not** an editable image (no alt, no media picker). Use it for decorative backgrounds; use `<img>` for content.
+- Allowed: **jpg, png, webp, gif, svg** (+ mp4/webm), at a clean web-root path (`/images/…`) with **no** `?query`/`#fragment`, not `data:`. A **real photo URL is fine** — OD saves it into `public/images/` and rewrites the ref before publish (see ❌ §7).
+
+### Editability is automatic — no marker attribute needed
+Instatic makes an element editable **by its type** — write a real `<h1>`, `<p>`, `<img>`, `<button>`, and it becomes an editable block automatically. **You do NOT need a `data-sa` (or any) marker attribute** — the importer doesn't use one; clean semantic HTML is enough.
+
+**But wrap every text run.** If part of a heading/sentence is wrapped in an inline element (for color/bold/a link), wrap **every** part in its own element too — otherwise the loose text next to it isn't selectable in the editor.
+
+```html
+<!-- ❌ the plain white text isn't editable -->
+<h1>Powering the AI era with <span class="accent">high-density compute</span> built to last.</h1>
+<!-- ✅ every run wrapped (keep the spaces) -->
+<h1><span>Powering the AI era with </span><span class="accent">high-density compute</span><span> built to last.</span></h1>
+```
+If the whole line uses one accent color, put the color on the heading itself (no inner span) so it stays a single editable node.
+
+### Shared nav / footer + active state
+Keep `<nav>`/`<header>`/`<footer>` structurally identical across pages (they get promoted to one shared component). Set the nav active state at **runtime** with a small script (read `location.pathname`, toggle a class + `aria-current`), and scope component scripts to a **wrapper class**, not `getElementById` (so a shared component works on every page).
+
+```html
 <script>
 (function () {
   var p = location.pathname.replace(/\/$/, '') || '/';
   document.querySelectorAll('.nav-link').forEach(function (a) {
     var on = (a.getAttribute('href').replace(/\/$/, '') || '/') === p;
     a.classList.toggle('nav-link-active', on);
-    if (on) a.setAttribute('aria-current', 'page');
-    else     a.removeAttribute('aria-current');
+    if (on) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
   });
 })();
 </script>
-
-<style>
-  .nav-link-active {
-    /* active style here */
-  }
-  /* OR use the standard attribute — both work: */
-  a[aria-current="page"] {
-    font-weight: 700;
-  }
-</style>
 ```
 
-Instatic also injects `aria-current="page"` server-side on the matching link
-when publishing, so screen readers and CSS `[aria-current="page"]` selectors
-work even without JavaScript.
+### Page `<head>`
+Only `<title>` is read on import; favicon, meta description/OG, canonical, preload, and theme-color are ignored by the importer (set those in the CMS/publish settings, not relied on from the source).
 
 ---
 
-## Component scripts — scope to a wrapper class, not `getElementById`
+## If a tenant asks for something that can't import
 
-Scripts for interactive components (hamburger menus, accordions, tabs,
-dropdowns) must target a **wrapper class**, not a hard-coded element ID.
-When the component is shared across pages, `getElementById` only finds it on
-the page where the ID was first defined.
-
-**Wrong — breaks when the component is reused on other pages:**
-```js
-document.getElementById('menu-btn').addEventListener('click', function () {
-  document.getElementById('mobile-menu').classList.toggle('open');
-});
-```
-
-**Correct — works on every page the component appears on:**
-```js
-document.querySelectorAll('.navbar').forEach(function (nav) {
-  nav.querySelector('.menu-btn').addEventListener('click', function () {
-    nav.classList.toggle('open');
-  });
-});
-```
+Don't block their workflow and don't lecture them. Figure out the compliant way (see the cookbook), build **that**, and add one short, plain-language line about what you adjusted — e.g. *"I built the gallery as static images so it works in your site editor; live filtering runs with CSS."* Only if it truly can't be done, say so simply and offer the closest thing that can.
 
 ---
 
-## Build and hand over
+## Quick checklist
 
-```bash
-npm run build
-```
-
-Hand the person the **`dist/` folder**.
-
-They open their Instatic → **Ctrl + K → Import Site → select the `dist/` folder → Continue → Import**.
-
-The site appears with:
-- Correct colors (imported as color tokens — editable)
-- Correct styles (imported as style rules — editable)
-- All pages
-- All images
-
-The tenant can then edit content, restyle, change colors, add pages, and publish to Cloudflare — all inside Instatic.
-
----
-
-## Checklist
-
-- [ ] `output: 'static'` in `astro.config.mjs`
-- [ ] `assetsInlineLimit: 1048576` and `cssCodeSplit: false` in vite build config
-- [ ] **No Tailwind CSS** — plain CSS only
-- [ ] All brand colors defined as CSS custom properties in `:root`
-- [ ] Every section/component has a semantic class name (`.hero`, `.navbar`, `.card`)
-- [ ] **Fonts loaded via Google Fonts `<link>` tag** (fonts.googleapis.com/css2) OR self-hosted `.woff2` files in `public/fonts/` — no `@fontsource` npm packages, no other font CDNs
-- [ ] All fonts referenced via `--font-*` CSS custom properties in `:root`
-- [ ] All JS libraries loaded from CDN `<script>` tags — not npm packages
-- [ ] All images in `public/` as plain `<img src="/...">` tags
-- [ ] All pages have real HTML content — no JavaScript-rendered blank pages, and no individual sections (product lists, cards, dynamic text) rendered by JS either — every visible section is static HTML in the source
-- [ ] **No bare text next to an inline element** — in any heading/sentence where part is wrapped (color/bold/link), every run is wrapped in its own `<span>` so all parts are editable
-- [ ] `data-sa` markers on all headings, paragraphs, and images the tenant will edit
-- [ ] `npm run build` runs without errors
-- [ ] `dist/` folder exists with `.html` files
+- [ ] All visible content is **real static HTML** — nothing built by JS (`innerHTML`, lists, cards, galleries all written out).
+- [ ] **No Tailwind/utility classes**, no `@apply`, no Tailwind CDN. Plain CSS, one semantic class per component.
+- [ ] No `@layer` / `@import` / `@page` / `@namespace`.
+- [ ] All CSS in inline `<style>`; brand colors as `:root` tokens; fonts as `--font-*` tokens.
+- [ ] No modern color function (`oklch/color-mix/…`) bare inside a `background`/`border`/`font` **shorthand** — use a `var(--token)` or the longhand.
+- [ ] Fonts via Google **`/css2`** `<link>` or self-hosted `@font-face` — no `@fontsource`, no other CDNs.
+- [ ] Images are real `<img>` in **jpg/png/webp/gif/svg** (no avif/ico, no `data:`/`?query`) — a local `/images/…` path or a real photo URL (OD saves the file in).
+- [ ] **Every section is visible with CSS alone** — no JS-dismissed loading overlay, no `opacity:0`/`visibility:hidden` content revealed only by a JS-added class.
+- [ ] No hashed/`_astro` imports, no SPA hydration root.
+- [ ] JavaScript is **behavior only** on existing markup (menus, tabs, swaps); no `on*=` inline handlers; no asset paths hardcoded in script text.
+- [ ] No bare text beside an inline element — every run wrapped so all parts are editable.
+- [ ] Effects (animation/3D/filters/carousels) built with CSS + behavioral JS, never content-generating JS.

@@ -28,6 +28,8 @@ export interface RunContextSelection {
   mcpServerIds?: string[];
   connectorIds?: string[];
   workspaceItems?: WorkspaceContextItem[];
+  /** Model-only instruction text appended to the request, never shown as the user's chat message (Share-to-CMS "Fix it"). */
+  agentInstruction?: string;
 }
 
 type MetadataContextRef = {
@@ -101,17 +103,21 @@ export function normalizeRunContextSelection(value: unknown): RunContextSelectio
     }
     return out;
   };
+  const agentInstruction = cleanString(value.agentInstruction, 4000);
   return {
     skillIds: stringList(value.skillIds),
     pluginIds: stringList(value.pluginIds),
     mcpServerIds: stringList(value.mcpServerIds),
     connectorIds: stringList(value.connectorIds),
     workspaceItems: normalizeWorkspaceContextItems(value.workspaceItems),
+    ...(agentInstruction ? { agentInstruction } : {}),
   };
 }
 
 export function mergeRunContextSelections(...contexts: unknown[]): RunContextSelection {
-  const merged: Required<RunContextSelection> = {
+  // Only the id-list fields + workspaceItems are merged; `agentInstruction` is a
+  // per-request model-only field (read directly at compose time, not merged).
+  const merged: Required<Omit<RunContextSelection, 'agentInstruction'>> = {
     skillIds: [],
     pluginIds: [],
     mcpServerIds: [],

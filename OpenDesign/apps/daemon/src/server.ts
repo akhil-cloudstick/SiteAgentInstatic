@@ -656,6 +656,7 @@ import {
   signInstaticSsoToken,
 } from './tenant-sso.js';
 import { collectSiteFiles } from './od-share-to-cms.js';
+import { materializeProjectImages } from './cms-image-materialize.js';
 import { createOpenDesignPublicMetadataService } from './services/open-design-public-metadata.js';
 import { execCommandViaLoginShell } from './services/login-shell.js';
 import {
@@ -2815,6 +2816,16 @@ export async function startServer({
       const project = getProject(db, req.params.id);
       if (!project) return sendApiError(res, 404, 'PROJECT_NOT_FOUND', 'project not found');
       const projectRoot = resolveProjectDir(PROJECTS_DIR, req.params.id, project.metadata);
+      // Guarantee every referenced image is a real local file under public/images
+      // (capture external URLs, fetch a real photo for a missing local ref, else
+      // an SVG placeholder) so the CMS import carries real bytes — never a
+      // broken /images/ link. Rewrites are persisted to source (permanent capture).
+      try {
+        const mat = await materializeProjectImages(projectRoot);
+        if (mat.created.length) console.warn(`[share-to-cms] ${slug} materialized ${mat.created.length} image(s)`);
+      } catch (err) {
+        console.warn(`[share-to-cms] ${slug} image materialize skipped:`, err);
+      }
       const rawFiles = await collectSiteFiles(projectRoot);
       const hasHtml = Object.keys(rawFiles).some((p) => /\.html?$/i.test(p));
       if (!hasHtml) return sendApiError(res, 400, 'NO_PAGES', 'No pages to share yet — build a page first.');
@@ -4360,6 +4371,15 @@ export async function startServer({
         ? getProject(db, projectId)
         : null;
     const runContextPrompt = renderRunContextPrompt(context, projectRecord?.metadata);
+    // Hidden "Fix it" instruction (Share-to-CMS): appended to the model's request
+    // but NEVER shown as the tenant's chat message — that stays a short reassuring
+    // line. Carried on context.agentInstruction (see RunContextSelection).
+    const cmsFixInstruction =
+      context && typeof context === 'object' &&
+      typeof (context as { agentInstruction?: unknown }).agentInstruction === 'string'
+        ? (context as { agentInstruction: string }).agentInstruction.trim().slice(0, 4000)
+        : '';
+    const cmsFixHint = cmsFixInstruction ? `\n\n${cmsFixInstruction}` : '';
     const linkedDirs = (() => {
       if (!Array.isArray(projectRecord?.metadata?.linkedDirs)) return [];
       const v = validateLinkedDirs(projectRecord.metadata.linkedDirs);
@@ -4851,7 +4871,7 @@ export async function startServer({
             : formOverride
               ? `# Instructions\n\n${formOverride}${ECHO_GUARD}\n\n---\n`
               : '',
-      `# User request\n\n${userRequestPrompt}${attachmentHint}${commentHint}`,
+      `# User request\n\n${userRequestPrompt}${attachmentHint}${commentHint}${cmsFixHint}`,
       promptImagePaths.length
         ? `\n\n${promptImagePaths.map((p) => `@${p}`).join(' ')}`
         : '',
@@ -4871,6 +4891,7 @@ export async function startServer({
         { kind: 'clientSystemPrompt', content: clientInstructionPrompt },
         { kind: 'echoGuard', content: ECHO_GUARD },
         { kind: 'userRequest', content: userRequestPrompt },
+        { kind: 'cmsFixInstruction', content: cmsFixHint },
         { kind: 'skillPrompt', content: promptTelemetryParts?.skillPrompt },
         {
           kind: 'designSystemPrompt',

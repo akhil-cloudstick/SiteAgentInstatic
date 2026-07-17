@@ -1182,6 +1182,8 @@ interface Props {
   onSavePreviewComment?: (target: PreviewCommentTarget, note: string, attachAfterSave: boolean, images?: File[]) => Promise<PreviewComment | null>;
   onRemovePreviewComment?: (commentId: string) => Promise<void>;
   onSendBoardCommentAttachments?: (attachments: ChatCommentAttachment[], images?: File[]) => Promise<boolean | void> | boolean | void;
+  /** Inject a prompt into the OD chat and start a run (used by the "Fix it" button on the CMS block dialog). */
+  onFixItPrompt?: (msg: { visible: string; instruction: string }) => void;
   onFileSaved?: () => Promise<void> | void;
   onBrandExtractionStopRequest?: () => void;
   // Open `openName` as a tab (focusing it) and close `closeName` in one
@@ -1201,6 +1203,167 @@ interface Props {
   slideNavRequest?: { slideIndex: number; nonce: number } | null;
 }
 
+/**
+ * Share a project's built site to the Instatic CMS. Opens a tab on the click
+ * (popup-blocker safe), POSTs to the daemon, and redirects the tab to the import
+ * wizard on success. On a block (e.g. the compliance gate) it closes the blank
+ * tab and reports the reason via `setBlockReason` so the caller can show a
+ * `CmsBlockedDialog` (Cancel / Fix it). Module-level so every viewer with a Share button
+ * reuses it (previously this lived in one viewer's closure, which broke the
+ * Share button in the other viewer — `shareToCms is not defined`).
+ */
+async function pushProjectToCms(
+  projectId: string,
+  setBlockReason: (reason: string | null) => void,
+): Promise<void> {
+  const cmsTab = window.open('about:blank', '_blank');
+  try {
+    const response = await fetch(`/api/projects/${projectId}/push/instatic`, { method: 'POST' });
+    const payload = (await response.json().catch(() => ({}))) as {
+      ok?: boolean;
+      redirectUrl?: string;
+      message?: string;
+      error?: string | { code?: string; message?: string };
+    };
+    if (response.ok && payload.ok && payload.redirectUrl) {
+      if (cmsTab) cmsTab.location.href = payload.redirectUrl;
+      else window.open(payload.redirectUrl, '_blank', 'noopener,noreferrer');
+      return;
+    }
+    cmsTab?.close();
+    const errMsg = typeof payload.error === 'string' ? payload.error : payload.error?.message;
+    const raw = (payload.message ?? errMsg ?? '').toString().trim();
+    const reason = raw.replace(/\s*\(see templateRule\.md\)/gi, '');
+    console.error('[FileViewer] Share to CMS failed:', raw || response.status);
+    setBlockReason(reason || "Your site editor couldn’t import this page.");
+  } catch (err) {
+    cmsTab?.close();
+    console.error('[FileViewer] Share to CMS failed:', err);
+    setBlockReason("Couldn’t reach your site editor. Please try again.");
+  }
+}
+
+/** The message the tenant SEES in chat when they click "Fix it" (short, reassuring, no jargon). */
+function buildFixVisibleMessage(): string {
+  return (
+    'Fix the technical parts of this page so it imports into my site editor. ' +
+    'Keep the design, layout, and content exactly as they look now — don’t change the look.'
+  );
+}
+
+/**
+ * The detailed instruction the AGENT receives (tenant never sees it — sent via
+ * the hidden `context.agentInstruction` channel). Leads with hard directives so
+ * the fix is SURGICAL (no rebuild/redesign), then the specific compliance
+ * failures reformatted into clean per-page bullets. The AI already carries
+ * templateRule in its system prompt.
+ */
+function buildFixInstruction(reason: string | null): string {
+  const directives =
+    'You are fixing this page ONLY so it imports into the site editor (Instatic CMS). ' +
+    'Do NOT rebuild, redesign, or regenerate it — keep it visually identical (same design, layout, text, ' +
+    'colours, spacing, images); change only the technique. After your fix these must hold: ' +
+    '(1) all content is visible with CSS alone — nothing hidden until JavaScript runs (no JS-dismissed ' +
+    'loading overlay, no opacity:0 content revealed only by a JS-added class); ' +
+    '(2) every image is a real <img> with a working local /images/… path; ' +
+    '(3) the page still looks exactly the same. Follow the website build rule.';
+  const detail = (reason ?? '')
+    .replace(/\s*\(see templateRule\.md\)/gi, '')
+    .replace(/^\s*This project violates[^:]*:\s*/i, '')
+    .split(/\s*\|\s*/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .map((s) => `• ${s}`)
+    .join('\n');
+  return detail ? `${directives}\n\nThe site editor reported these issues to fix:\n${detail}` : directives;
+}
+
+/**
+ * The "can’t share to CMS" dialog (reason + Cancel / Fix it). Rendered via a
+ * portal by any viewer with a Share button; `reason===null` hides it. "Fix it"
+ * calls `onFix`, which drops a fixing prompt into the OD chat and starts a run;
+ * "Cancel" just closes. (No "Back to OpenDesign" — the tenant is already in OD.)
+ */
+function CmsBlockedDialog({
+  reason,
+  onClose,
+  onFix,
+}: {
+  reason: string | null;
+  onClose: () => void;
+  onFix?: () => void;
+}): ReactNode {
+  if (reason === null) return null;
+  return createPortal(
+    <div
+      className="modal-backdrop viewer-modal-backdrop"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Can’t share to CMS yet"
+      onClick={onClose}
+      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          maxWidth: 460,
+          width: '90%',
+          background: 'var(--surface-1, #1b1b1b)',
+          color: 'var(--text-1, #ededed)',
+          border: '1px solid rgba(255,255,255,0.08)',
+          borderRadius: 12,
+          padding: 24,
+          boxShadow: '0 12px 48px rgba(0,0,0,0.45)',
+        }}
+      >
+        <h2 style={{ margin: '0 0 10px', fontSize: 18, fontWeight: 700 }}>
+          Your design looks great — one quick fix
+        </h2>
+        <p style={{ margin: '0 0 20px', lineHeight: 1.5, opacity: 0.9 }}>
+          This page just needs a few technical tweaks before it can go into your site editor.
+          Click <strong>Fix it</strong> and OpenDesign will handle them without changing how anything
+          looks — then Share to CMS again.
+        </p>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              padding: '8px 16px',
+              borderRadius: 8,
+              border: '1px solid rgba(255,255,255,0.18)',
+              cursor: 'pointer',
+              background: 'transparent',
+              color: 'var(--text-1, #ededed)',
+              fontWeight: 600,
+            }}
+          >
+            Cancel
+          </button>
+          {onFix ? (
+            <button
+              type="button"
+              onClick={onFix}
+              style={{
+                padding: '8px 16px',
+                borderRadius: 8,
+                border: 'none',
+                cursor: 'pointer',
+                background: 'var(--accent, #4c8bf5)',
+                color: '#fff',
+                fontWeight: 600,
+              }}
+            >
+              Fix it
+            </button>
+          ) : null}
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
 export function FileViewer({
   projectId,
   projectKind,
@@ -1215,6 +1378,7 @@ export function FileViewer({
   onSavePreviewComment,
   onRemovePreviewComment,
   onSendBoardCommentAttachments,
+  onFixItPrompt,
   onFileSaved,
   onBrandExtractionStopRequest,
   onOpenFileReplacing,
@@ -1260,6 +1424,7 @@ export function FileViewer({
         onSavePreviewComment={onSavePreviewComment}
         onRemovePreviewComment={onRemovePreviewComment}
         onSendBoardCommentAttachments={onSendBoardCommentAttachments}
+        onFixItPrompt={onFixItPrompt}
         onFileSaved={onFileSaved}
         onBrandExtractionStopRequest={onBrandExtractionStopRequest}
         commentPortalId={commentPortalId}
@@ -1276,6 +1441,7 @@ export function FileViewer({
         projectId={projectId}
         file={file}
         onOpenFileReplacing={onOpenFileReplacing}
+        onFixItPrompt={onFixItPrompt}
       />
     );
   }
@@ -5062,10 +5228,12 @@ function ReactComponentViewer({
   projectId,
   file,
   onOpenFileReplacing,
+  onFixItPrompt,
 }: {
   projectId: string;
   file: ProjectFile;
   onOpenFileReplacing?: (openName: string, closeName: string) => void;
+  onFixItPrompt?: (msg: { visible: string; instruction: string }) => void;
 }) {
   const t = useT();
   const [mode, setMode] = useState<'preview' | 'source'>('preview');
@@ -5079,6 +5247,14 @@ function ReactComponentViewer({
   // multi-file React prototype, which has no standalone preview. Issue #2744.
   const [moduleEntries, setModuleEntries] = useState<string[] | null>(null);
   const isModule = (moduleEntries?.length ?? 0) > 0;
+
+  // Share-to-CMS: opens a tab on the click (popup-blocker safe) and redirects it
+  // to the Instatic import wizard on success. If the CMS compliance gate blocks
+  // the page (422), we DON'T just close a blank tab — we show a plain-language
+  // dialog explaining why, with a "Back to OpenDesign" button. Menu-agnostic so
+  // both share buttons can reuse it (each closes its own menu first).
+  const [cmsBlockReason, setCmsBlockReason] = useState<string | null>(null);
+  const shareToCms = () => pushProjectToCms(projectId, setCmsBlockReason);
 
   useEffect(() => {
     setSource(null);
@@ -5172,6 +5348,21 @@ function ReactComponentViewer({
 
   return (
     <div className="viewer react-component-viewer">
+      <CmsBlockedDialog
+        reason={cmsBlockReason}
+        onClose={() => setCmsBlockReason(null)}
+        onFix={
+          onFixItPrompt
+            ? () => {
+                onFixItPrompt({
+                  visible: buildFixVisibleMessage(),
+                  instruction: buildFixInstruction(cmsBlockReason),
+                });
+                setCmsBlockReason(null);
+              }
+            : undefined
+        }
+      />
       <div className="viewer-toolbar">
         <div className="viewer-toolbar-left">
           <button
@@ -5271,27 +5462,9 @@ function ReactComponentViewer({
                       type="button"
                       className="share-menu-item"
                       role="menuitem"
-                      onClick={async () => {
+                      onClick={() => {
                         setShareMenuOpen(false);
-                        // Open the CMS tab NOW (on the click) so the browser doesn't popup-block it
-                        // after the async import; point it at the CMS once the push returns. OD stays.
-                        const cmsTab = window.open('about:blank', '_blank');
-                        try {
-                          const response = await fetch(`/api/projects/${projectId}/push/instatic`, { method: 'POST' });
-                          const payload = (await response.json().catch(() => ({}))) as {
-                            ok?: boolean; redirectUrl?: string; message?: string; error?: string;
-                          };
-                          if (response.ok && payload.ok && payload.redirectUrl) {
-                            if (cmsTab) cmsTab.location.href = payload.redirectUrl;
-                            else window.open(payload.redirectUrl, '_blank', 'noopener,noreferrer');
-                          } else {
-                            cmsTab?.close();
-                            console.error('[FileViewer] Share to CMS failed:', payload.message ?? payload.error ?? response.status);
-                          }
-                        } catch (err) {
-                          cmsTab?.close();
-                          console.error('[FileViewer] Share to CMS failed:', err);
-                        }
+                        void shareToCms();
                       }}
                     >
                       <span className="share-menu-icon"><RemixIcon name="send-plane-line" size={15} /></span>
@@ -5433,6 +5606,7 @@ function HtmlViewer({
   onSavePreviewComment,
   onRemovePreviewComment,
   onSendBoardCommentAttachments,
+  onFixItPrompt,
   onFileSaved,
   onBrandExtractionStopRequest,
   commentPortalId,
@@ -5454,6 +5628,8 @@ function HtmlViewer({
   onSavePreviewComment?: (target: PreviewCommentTarget, note: string, attachAfterSave: boolean, images?: File[]) => Promise<PreviewComment | null>;
   onRemovePreviewComment?: (commentId: string) => Promise<void>;
   onSendBoardCommentAttachments?: (attachments: ChatCommentAttachment[], images?: File[]) => Promise<boolean | void> | boolean | void;
+  /** Inject a prompt into the OD chat and start a run (used by the "Fix it" button on the CMS block dialog). */
+  onFixItPrompt?: (msg: { visible: string; instruction: string }) => void;
   onFileSaved?: () => Promise<void> | void;
   onBrandExtractionStopRequest?: () => void;
   commentPortalId?: string;
@@ -5703,6 +5879,8 @@ function HtmlViewer({
   const zoomMenuRef = useRef<HTMLDivElement | null>(null);
   const [presentMenuOpen, setPresentMenuOpen] = useState(false);
   const [deployMenuOpen, setDeployMenuOpen] = useState(false);
+  // Share-to-CMS block reason for this viewer's "Back to OpenDesign" dialog.
+  const [cmsBlockReason, setCmsBlockReason] = useState<string | null>(null);
   const [downloadMenuOpen, setDownloadMenuOpen] = useState(false);
   // False when closed; otherwise records which entry opened the modal so the
   // surface_view impression can carry entry_from.
@@ -9963,6 +10141,21 @@ function HtmlViewer({
 
   return (
     <div className={`viewer html-viewer${inTabPresent ? ' is-tab-present' : ''}`}>
+      <CmsBlockedDialog
+        reason={cmsBlockReason}
+        onClose={() => setCmsBlockReason(null)}
+        onFix={
+          onFixItPrompt
+            ? () => {
+                onFixItPrompt({
+                  visible: buildFixVisibleMessage(),
+                  instruction: buildFixInstruction(cmsBlockReason),
+                });
+                setCmsBlockReason(null);
+              }
+            : undefined
+        }
+      />
       <div className="viewer-toolbar">
         <div className="viewer-toolbar-left">
           <button
@@ -10578,27 +10771,9 @@ function HtmlViewer({
                         type="button"
                         className="share-menu-item"
                         role="menuitem"
-                        onClick={async () => {
+                        onClick={() => {
                           setDeployMenuOpen(false);
-                          // Open the CMS tab NOW (on the click) so the browser doesn't popup-block it
-                          // after the async import; point it at the CMS once the push returns. OD stays.
-                          const cmsTab = window.open('about:blank', '_blank');
-                          try {
-                            const response = await fetch(`/api/projects/${projectId}/push/instatic`, { method: 'POST' });
-                            const payload = (await response.json().catch(() => ({}))) as {
-                              ok?: boolean; redirectUrl?: string; message?: string; error?: string;
-                            };
-                            if (response.ok && payload.ok && payload.redirectUrl) {
-                              if (cmsTab) cmsTab.location.href = payload.redirectUrl;
-                              else window.open(payload.redirectUrl, '_blank', 'noopener,noreferrer');
-                            } else {
-                              cmsTab?.close();
-                              console.error('[FileViewer] Share to CMS failed:', payload.message ?? payload.error ?? response.status);
-                            }
-                          } catch (err) {
-                            cmsTab?.close();
-                            console.error('[FileViewer] Share to CMS failed:', err);
-                          }
+                          void pushProjectToCms(projectId, setCmsBlockReason);
                         }}
                       >
                         <span className="share-menu-icon"><RemixIcon name="send-plane-line" size={15} /></span>

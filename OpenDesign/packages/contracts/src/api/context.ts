@@ -4,6 +4,15 @@ export interface RunContextSelection {
   mcpServerIds?: string[];
   connectorIds?: string[];
   workspaceItems?: WorkspaceContextItem[];
+  /**
+   * Extra instruction text appended to the model's request but NOT shown in the
+   * chat as the user's message. OD chat has no hidden/system field, so this is
+   * the one channel for "tenant sees a short line; the agent gets more detail".
+   * Used by the Share-to-CMS "Fix it" button: the visible bubble stays a short,
+   * reassuring sentence while the agent privately receives the exact compliance
+   * failures + fix directives. Keep it short and self-contained.
+   */
+  agentInstruction?: string;
 }
 
 export type WorkspaceContextKind =

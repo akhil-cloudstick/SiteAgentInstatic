@@ -176,6 +176,7 @@ interface Props {
   onSavePreviewComment?: (target: PreviewCommentTarget, note: string, attachAfterSave: boolean, images?: File[]) => Promise<PreviewComment | null>;
   onRemovePreviewComment?: (commentId: string) => Promise<void>;
   onSendBoardCommentAttachments?: (attachments: ChatCommentAttachment[], images?: File[]) => Promise<boolean | void> | boolean | void;
+  onFixItPrompt?: (msg: { visible: string; instruction: string }) => void;
   onBrandExtractionStopRequest?: () => void;
   onRequestBrowserUsePrompt?: (prompt: string) => void;
   onPluginFolderAgentAction?: (
@@ -554,6 +555,7 @@ export function FileWorkspace({
   onSavePreviewComment,
   onRemovePreviewComment,
   onSendBoardCommentAttachments,
+  onFixItPrompt,
   onBrandExtractionStopRequest,
   onRequestBrowserUsePrompt,
   onPluginFolderAgentAction,
@@ -2947,6 +2949,7 @@ export function FileWorkspace({
             onSavePreviewComment={onSavePreviewComment}
             onRemovePreviewComment={onRemovePreviewComment}
             onSendBoardCommentAttachments={onSendBoardCommentAttachments}
+            onFixItPrompt={onFixItPrompt}
             onBrandExtractionStopRequest={
               activeFile.name === 'brand.html' ? onBrandExtractionStopRequest : undefined
             }

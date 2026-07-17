@@ -6102,6 +6102,22 @@ export function ProjectView({
     },
     [handleSend, project.id, currentConversationQueueDisabled],
   );
+  // "Fix it" on the Share-to-CMS block dialog: the tenant sees a short reassuring
+  // message (`visible`) in the chat, while the agent privately receives the full
+  // compliance detail + fix directives (`instruction`) via the hidden
+  // `context.agentInstruction` channel — OD chat has no separate system field.
+  // The agent (which also carries templateRule.md in its prompt) makes the page
+  // importable without changing the look; the tenant then re-shares. If the agent
+  // is mid-run, handleSend queues it — normal composer behavior.
+  const handleFixItPrompt = useCallback(
+    (msg: { visible: string; instruction: string }) => {
+      void handleSend(msg.visible, [], [], {
+        entryFrom: 'cms_fix',
+        context: { agentInstruction: msg.instruction },
+      });
+    },
+    [handleSend],
+  );
   const commentQueueOnSend = currentConversationBusy && !currentConversationQueueDisabled;
 
   const handleContinueRemainingTasks = useCallback(
@@ -8293,6 +8309,7 @@ export function ProjectView({
           onSavePreviewComment={savePreviewComment}
           onRemovePreviewComment={removePreviewComment}
           onSendBoardCommentAttachments={handleSendBoardCommentAttachments}
+          onFixItPrompt={handleFixItPrompt}
           onBrandExtractionStopRequest={projectIsProgrammaticBrandExtraction ? handleStop : undefined}
           onRequestBrowserUsePrompt={handleBrowserUsePrompt}
           onPluginFolderAgentAction={handlePluginFolderAgentAction}
