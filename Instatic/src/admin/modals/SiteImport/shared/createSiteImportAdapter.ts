@@ -184,6 +184,7 @@ export function createSiteImportAdapter(opts: AdapterCallbacks): SiteImportAdapt
           addScripts: (scripts) => helpers.addScripts(scripts),
           addStylesheets: (stylesheets) => helpers.addStylesheets(stylesheets),
           createVisualComponent: (input) => helpers.createVisualComponent(input),
+          upsertEverywhereTemplate: (input) => helpers.upsertEverywhereTemplate(input),
         }
         recipe(tx)
         return true

@@ -25,6 +25,7 @@ import {
 import { loadTemplateRuleBody } from './prompts/cms-contract.js';
 import { normalizeSiteFiles } from './cms-normalize.js';
 import { checkPageCompliance } from './cms-compliance.js';
+import { checkCrossPageChromeConsistency } from './cms-consistency.js';
 import { emittedRenderableQuestionForm } from './question-form-detect.js';
 import { resolveProjectRoot } from './project-root.js';
 import {
@@ -731,6 +732,10 @@ const DESIGN_SYSTEMS_DIR = resolveDaemonResourceDir(
   'design-systems',
   path.join(PROJECT_ROOT, 'design-systems'),
 );
+// The shipped design system used as the last-resort brand in Instatic tenant
+// mode, so a tenant page is never built with "no design system" (which lets
+// every page free-style off-brand). Matches the `design-systems/default` slug.
+const MANDATORY_TENANT_DESIGN_SYSTEM_FALLBACK_ID = 'default';
 // Renderable templates pulled out of `skills/` by the skills/design-templates
 // split (PR #955) so the EntryView Templates tab gets the large rendering
 // catalogue and Settings → Skills only carries functional skills the agent
@@ -3546,15 +3551,35 @@ export async function startServer({
     }
     const effectiveSkillId =
       typeof skillId === 'string' && skillId ? skillId : project?.skillId;
-    const designSystemSelection = resolveEffectiveDesignSystemSelection({
+    // In Instatic tenant mode the design system is MANDATORY and authoritative
+    // on every page: the whole site must stay on one brand, even for a page
+    // added weeks after the first ones. So we never inject "nothing" here —
+    // an existing project whose row has designSystemId=null still falls back to
+    // the app default (and, below, to the shipped default as a last resort).
+    // In vanilla OD a null project selection is a deliberate "No design system"
+    // choice and is respected (allowAppDefault stays project===null).
+    const instaticTenantMode =
+      !!(process.env.OD_INSTATIC_URL ?? '').trim() && tenantSsoEnabled();
+    let designSystemSelection = resolveEffectiveDesignSystemSelection({
       requestDesignSystemId: designSystemId,
       pluginDesignSystemId,
       projectDesignSystemId: project?.designSystemId,
       appDefaultDesignSystemId: appConfigForPrompt?.designSystemId,
       // A project row with designSystemId=null can mean the user picked
-      // "No design system"; do not reapply the global default behind their back.
-      allowAppDefault: project === null,
+      // "No design system"; do not reapply the global default behind their back
+      // — except in tenant mode, where a bound brand is non-negotiable.
+      allowAppDefault: project === null || instaticTenantMode,
     });
+    // Last-resort guarantee: in tenant mode, if neither the project nor the
+    // operator's app config named a brand, fall back to the shipped "default"
+    // design system rather than letting the page free-style off-brand. The
+    // tenant's own bound design system still wins via the priority order above.
+    if (instaticTenantMode && !designSystemSelection.id) {
+      designSystemSelection = {
+        id: MANDATORY_TENANT_DESIGN_SYSTEM_FALLBACK_ID,
+        source: 'app-default',
+      };
+    }
     const effectiveDesignSystemId = designSystemSelection.id;
     const metadata = project?.metadata;
     let allSkillsPromise: ReturnType<typeof listAllSkillLikeEntries> | null = null;
@@ -7593,11 +7618,23 @@ export async function startServer({
   async function collectCmsComplianceViolations(projectRoot) {
     const files = await collectSiteFiles(projectRoot);
     const violations = [];
+    const pages = [];
     for (const [filePath, entry] of Object.entries(files)) {
       if (!/\.html?$/i.test(filePath)) continue;
       const html = Buffer.from(entry.base64, 'base64').toString('utf8');
+      pages.push({ path: filePath, html });
       const fails = checkPageCompliance(html).filter((f) => f.status === 'fail');
       if (fails.length > 0) violations.push({ path: filePath, fails });
+    }
+    // Cross-page brand/layout consistency: a page whose header/nav/footer drifts
+    // from the canonical page reads as "not part of this site". Fold each drift
+    // into the same correction loop as a compliance fail so the agent fixes it
+    // in place (strict, no-compromise consistency — even for a page added later).
+    for (const c of checkCrossPageChromeConsistency(pages)) {
+      violations.push({
+        path: c.path,
+        fails: [{ rule: `consistent ${c.part} across pages`, status: 'fail', detail: c.detail }],
+      });
     }
     return violations;
   }
@@ -7643,7 +7680,7 @@ export async function startServer({
         }
 
         const correctionMessage = [
-          '[Automated compliance check] The page(s) you just built violate the required CMS output contract (templateRule.md) and will not import correctly. Fix EVERY violation below IN PLACE in the actual project files before finishing — do not ask, do not explain, just fix them:',
+          '[Automated compliance check] The page(s) you just built break the required CMS output contract (templateRule.md) and/or the site\'s brand/layout consistency (every page must share the same header/nav/footer so it reads as one website). Fix EVERY item below IN PLACE in the actual project files before finishing — reuse the existing shared chrome verbatim; do not ask, do not explain, just fix them:',
           summary,
         ].join('\n');
 

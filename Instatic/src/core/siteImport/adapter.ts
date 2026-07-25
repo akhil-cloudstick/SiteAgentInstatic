@@ -232,4 +232,28 @@ export interface SiteImportTransaction {
    * @returns The new VisualComponent's id.
    */
   createVisualComponent(input: { name: string; nodeFragment: ImportFragment }): string
+
+  /**
+   * Create — or overwrite in place — the site's single `everywhere` page
+   * template: a page whose `base.body` holds the shared chrome around one
+   * `base.outlet` (typically `[Shared Header ref, base.outlet, Shared Footer
+   * ref]`). Because an `everywhere` template wraps every other page and entry
+   * through the template chain, a page a tenant creates later in the CMS
+   * inherits the shared header/footer with no manual rebuild.
+   *
+   * `nodeFragment` follows the same shape/linking rules as `addPage`
+   * (`rootIds` are grafted under a fresh `base.body`; class names on
+   * `classIds` are reconciled to registry ids) and MUST contain exactly one
+   * `base.outlet`. On re-import the existing everywhere template is rebuilt in
+   * place — Open Design owns the shared chrome — so a re-share never stacks
+   * duplicate layouts. `priority` defaults to 0.
+   *
+   * @returns The everywhere template page's id.
+   */
+  upsertEverywhereTemplate(input: {
+    title: string
+    slug: string
+    nodeFragment: ImportFragment
+    priority?: number
+  }): string
 }

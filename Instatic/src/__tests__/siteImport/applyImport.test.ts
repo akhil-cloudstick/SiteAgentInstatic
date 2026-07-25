@@ -50,6 +50,8 @@ interface MockTxOp {
     | 'overwriteColorTokens'
     | 'addScripts'
     | 'addStylesheets'
+    | 'createVisualComponent'
+    | 'upsertEverywhereTemplate'
   args: unknown
   id: string
 }
@@ -153,6 +155,16 @@ function makeMockAdapter(opts?: {
         addScripts(scripts) {
           ops.push({ type: 'addScripts', args: { scripts }, id: '' })
           return scripts.map((s) => ({ id: nextId(), path: s.path }))
+        },
+        createVisualComponent(input) {
+          const id = nextId()
+          ops.push({ type: 'createVisualComponent', args: input, id })
+          return id
+        },
+        upsertEverywhereTemplate(input) {
+          const id = nextId()
+          ops.push({ type: 'upsertEverywhereTemplate', args: input, id })
+          return id
         },
       }
       recipe(tx)
@@ -611,6 +623,109 @@ describe('commitImportPlan — happy path', () => {
     await commitImportPlan(plan, adapter)
     const addRuleOps = adapter.ops.filter((o) => o.type === 'addStyleRule')
     expect(addRuleOps.length).toBeGreaterThan(0)
+  })
+
+  it('promotes a shared header/footer into one everywhere layout and strips them from pages', async () => {
+    const encoder = new TextEncoder()
+    const header = '<header><a href="/">Home</a><a href="/about">About</a></header>'
+    const footer = '<footer><p>© Acme</p></footer>'
+    const page = (body: string) =>
+      `<!doctype html><html><body>${header}<main>${body}</main>${footer}</body></html>`
+    const plan = buildImportPlan({
+      fileMap: {
+        files: {
+          'index.html': { bytes: encoder.encode(page('<h1>Home</h1>')), mimeType: 'text/html' },
+          'about.html': { bytes: encoder.encode(page('<h1>About</h1>')), mimeType: 'text/html' },
+        },
+      },
+      currentSite: makeEmptySiteDocument(),
+    })
+    const adapter = makeMockAdapter()
+    await commitImportPlan(plan, adapter)
+
+    // Shared header + footer each become a VisualComponent.
+    const vcOps = adapter.ops.filter((o) => o.type === 'createVisualComponent')
+    expect(vcOps.length).toBeGreaterThanOrEqual(2)
+
+    // Exactly one everywhere layout template, with a single outlet and one ref
+    // per shared section.
+    const tplOps = adapter.ops.filter((o) => o.type === 'upsertEverywhereTemplate')
+    expect(tplOps).toHaveLength(1)
+    const fragment = (tplOps[0]!.args as {
+      nodeFragment: { nodes: Record<string, { moduleId: string }>; rootIds: string[] }
+    }).nodeFragment
+    const byModule = (m: string) =>
+      Object.values(fragment.nodes).filter((n) => n.moduleId === m).length
+    expect(byModule('base.outlet')).toBe(1)
+    expect(byModule('base.visual-component-ref')).toBe(2)
+
+    // Committed content pages no longer carry a top-level header/footer — the
+    // layout supplies it via the outlet, so new CMS pages inherit it too.
+    const addPageOps = adapter.ops.filter((o) => o.type === 'addPage')
+    expect(addPageOps.length).toBe(2)
+    for (const op of addPageOps) {
+      const nf = (op.args as {
+        nodeFragment: { nodes: Record<string, { props?: { tag?: string } }>; rootIds: string[] }
+      }).nodeFragment
+      const rootTags = nf.rootIds.map((id) => nf.nodes[id]?.props?.tag)
+      expect(rootTags).not.toContain('header')
+      expect(rootTags).not.toContain('footer')
+    }
+  })
+
+  it('rewrites shared-header internal links to cms:page refs (no raw .html hrefs that 404)', async () => {
+    const encoder = new TextEncoder()
+    const header = '<header><nav><a href="index.html">Home</a><a href="shop.html">Shop</a></nav></header>'
+    const page = (body: string) =>
+      `<!doctype html><html><body>${header}<main>${body}</main><footer><p>f</p></footer></body></html>`
+    const plan = buildImportPlan({
+      fileMap: {
+        files: {
+          'index.html': { bytes: encoder.encode(page('<h1>Home</h1>')), mimeType: 'text/html' },
+          'shop.html': { bytes: encoder.encode(page('<h1>Shop</h1>')), mimeType: 'text/html' },
+        },
+      },
+      currentSite: makeEmptySiteDocument(),
+    })
+    const adapter = makeMockAdapter()
+    await commitImportPlan(plan, adapter)
+    const headerVc = adapter.ops.find(
+      (o) => o.type === 'createVisualComponent' && (o.args as { name: string }).name === 'Shared Header',
+    )
+    expect(headerVc).toBeDefined()
+    const nodes = (headerVc!.args as {
+      nodeFragment: { nodes: Record<string, { moduleId: string; props?: { href?: string } }> }
+    }).nodeFragment.nodes
+    const hrefs = Object.values(nodes)
+      .filter((n) => n.moduleId === 'base.link')
+      .map((n) => n.props?.href)
+    expect(hrefs.length).toBeGreaterThan(0)
+    for (const href of hrefs) {
+      expect(href).not.toMatch(/\.html/) // no raw filename that 404s
+      expect(href).toMatch(/^cms:page:/) // durable, route-resolving ref
+    }
+  })
+
+  it('treats same-page vs cross-page anchor links as one shared header (still one template)', async () => {
+    const encoder = new TextEncoder()
+    // index links to "shop.html#mugs"; shop links to the same target as "#mugs".
+    // These point at the same place, so the header must be recognised as shared.
+    const page = (mugsHref: string, body: string) =>
+      `<!doctype html><html><body><header><nav><a href="${mugsHref}">Mugs</a></nav></header>` +
+      `<main>${body}</main><footer><p>same footer</p></footer></body></html>`
+    const plan = buildImportPlan({
+      fileMap: {
+        files: {
+          'index.html': { bytes: encoder.encode(page('shop.html#mugs', '<h1>Home</h1>')), mimeType: 'text/html' },
+          'shop.html': { bytes: encoder.encode(page('#mugs', '<h1>Shop</h1>')), mimeType: 'text/html' },
+        },
+      },
+      currentSite: makeEmptySiteDocument(),
+    })
+    const adapter = makeMockAdapter()
+    await commitImportPlan(plan, adapter)
+    const tplOps = adapter.ops.filter((o) => o.type === 'upsertEverywhereTemplate')
+    expect(tplOps).toHaveLength(1)
   })
 
   it('commits linked scripts with resolved page scope', async () => {

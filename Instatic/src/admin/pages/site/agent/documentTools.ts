@@ -110,7 +110,7 @@ export function describeDocumentId(store: EditorStore, id: string): string | nul
 export function runReadDocument(input: ReadDocumentInput, store: EditorStore): AiToolOutput {
   const resolved = resolveAgentDocument(store, input.document)
   if (!resolved) {
-    return aiToolError('Document not found. Call list_documents and pass one of its document refs.')
+    return documentNotFoundError(store)
   }
   const rendered = renderAgentDocument(resolved.page, store.site!, registry, { part: input.part })
   return aiToolOk({
@@ -125,7 +125,7 @@ export function runReadDocument(input: ReadDocumentInput, store: EditorStore): A
 export function runOpenDocument(input: OpenDocumentInput, store: EditorStore): AiToolOutput {
   const resolved = resolveAgentDocument(store, input.document)
   if (!resolved) {
-    return aiToolError('Document not found. Call list_documents and pass one of its document refs.')
+    return documentNotFoundError(store)
   }
   const document = resolved.descriptor.document
   if (document.type === 'visualComponent') {
@@ -136,6 +136,15 @@ export function runOpenDocument(input: OpenDocumentInput, store: EditorStore): A
   return aiToolOk({ document })
 }
 
+/**
+ * Resolve a document the agent asked for, tolerantly. A tenant prompt like
+ * "add an About link to the nav bar" makes the model reach for the shared
+ * header, but it often passes the human NAME ("Shared Header") or the wrong
+ * `type` instead of the exact `{type,id}` ref. Rather than dead-end, we match
+ * in three widening steps: exact ref → same id (any type) → by title/name. So
+ * the model reliably lands on the right document instead of failing with
+ * "document not found".
+ */
 function resolveAgentDocument(
   store: EditorStore,
   requested: AgentDocumentRef | undefined,
@@ -145,24 +154,52 @@ function resolveAgentDocument(
   const activePageId = store.activePageId
   if (!site || !current || !activePageId) return null
 
-  const document = requested ?? current
+  const target = requested ?? current
   const descriptors = describeAgentDocuments(site, activePageId, current)
+  const wantedName = String(target.id).trim().toLowerCase()
 
+  const descriptor =
+    // 1. Exact ref match (type + id).
+    descriptors.find((item) => documentRefEquals(item.document, target)) ??
+    // 2. Same id, any type (the model guessed the wrong `type`).
+    descriptors.find((item) => item.document.id === target.id) ??
+    // 3. By title/name (the model passed a human name, e.g. "Shared Header").
+    descriptors.find((item) => item.title.trim().toLowerCase() === wantedName)
+  if (!descriptor) return null
+
+  return materializeResolvedDocument(site, descriptor)
+}
+
+function materializeResolvedDocument(
+  site: EditorStore['site'],
+  descriptor: AgentDocumentDescriptor,
+): ResolvedAgentDocument | null {
+  if (!site) return null
+  const { document } = descriptor
   if (document.type === 'visualComponent') {
     const vc = site.visualComponents?.find((component) => component.id === document.id)
-    if (!vc) return null
-    const descriptor = descriptors.find((item) => documentRefEquals(item.document, {
-      type: 'visualComponent',
-      id: vc.id,
-    }))
-    if (!descriptor) return null
-    return { descriptor, page: flattenVCToVirtualPage(vc) }
+    return vc ? { descriptor, page: flattenVCToVirtualPage(vc) } : null
   }
-
   const page = site.pages.find((candidate) => candidate.id === document.id)
-  if (!page) return null
-  const actualRef = documentRefForPage(page)
-  const descriptor = descriptors.find((item) => documentRefEquals(item.document, actualRef))
-  if (!descriptor) return null
-  return { descriptor, page }
+  return page ? { descriptor, page } : null
+}
+
+/**
+ * "Document not found" but self-correcting: list every real document (title +
+ * exact ref) so the model can immediately retry with a valid ref instead of
+ * guessing again. Falls back to the plain hint when the site isn't loaded.
+ */
+function documentNotFoundError(store: EditorStore): AiToolOutput {
+  const site = store.site
+  const current = currentAgentDocument(store)
+  const activePageId = store.activePageId
+  if (!site || !current || !activePageId) {
+    return aiToolError('Document not found. Call list_documents and pass one of its document refs.')
+  }
+  const available = describeAgentDocuments(site, activePageId, current)
+    .map((d) => `"${d.title}" → { type: "${d.document.type}", id: "${d.document.id}" }`)
+    .join('; ')
+  return aiToolError(
+    `Document not found. Available documents: ${available}. Retry site_read_document/site_open_document with one of these exact document refs (the shared nav/footer live in the visualComponent documents).`,
+  )
 }

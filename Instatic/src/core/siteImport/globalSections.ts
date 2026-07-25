@@ -59,7 +59,7 @@ export function detectGlobalSections(pagePlans: PagePlan[]): GlobalSectionCandid
       if (!GLOBAL_SECTION_TAGS.has(tag)) continue
 
       const { fragment, hasActiveLinks } = extractNormalizedSection(rootId, plan.nodeFragment)
-      const hash = hashFragment(fragment)
+      const hash = hashFragment(fragment, plan.source)
       const key = `${tag}:${hash}`
 
       const existing = byKey.get(key)
@@ -129,23 +129,48 @@ function extractNormalizedSection(
  * Hash a normalised sub-fragment by recursively serialising its tree
  * structure. Node IDs are replaced by subtree position, so two structurally
  * identical trees with different IDs hash to the same value.
+ *
+ * `pageSource` is the page the section came from; it canonicalises same-page
+ * anchor links (see `canonicalizeLinkProps`) so a nav whose links are
+ * context-scoped per page still hashes identically across pages.
  */
-function hashFragment(fragment: ImportFragment): string {
+function hashFragment(fragment: ImportFragment, pageSource: string): string {
   const rootId = fragment.rootIds[0]
   if (!rootId) return ''
-  const serialized = serializeTree(rootId, fragment.nodes)
+  const serialized = serializeTree(rootId, fragment.nodes, pageSource)
   return djb2(JSON.stringify(serialized))
 }
 
-function serializeTree(nodeId: string, nodes: Record<string, PageNode>): unknown {
+function serializeTree(nodeId: string, nodes: Record<string, PageNode>, pageSource: string): unknown {
   const node = nodes[nodeId]
   if (!node) return null
   return {
     m: node.moduleId,
-    p: stableStringify(node.props),
+    p: stableStringify(canonicalizeLinkProps(node, pageSource)),
     c: [...node.classIds].sort(),
-    ch: (node.children ?? []).map((id) => serializeTree(id, nodes)),
+    ch: (node.children ?? []).map((id) => serializeTree(id, nodes, pageSource)),
   }
+}
+
+/**
+ * A same-page anchor link (`href="#mugs"` baked into shop.html) points at the
+ * same target as the cross-page form other pages use to reach it
+ * (`href="shop.html#mugs"`). SSGs emit whichever is shorter per page, so an
+ * otherwise-identical shared nav/footer would hash differently page-to-page and
+ * never be recognised as one shared section. Canonicalise the same-page form to
+ * the cross-page form for hashing only (the stored fragment is untouched).
+ */
+function canonicalizeLinkProps(node: PageNode, pageSource: string): Record<string, unknown> {
+  const href = node.props?.href
+  if (
+    node.moduleId === 'base.link' &&
+    typeof href === 'string' &&
+    href.length > 1 &&
+    href.startsWith('#')
+  ) {
+    return { ...node.props, href: `${pageSource}${href}` }
+  }
+  return node.props
 }
 
 function stableStringify(obj: Record<string, unknown>): string {

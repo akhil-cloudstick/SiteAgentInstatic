@@ -25,7 +25,7 @@ import type { FontEntry } from '@core/fonts'
 import type { PageNode } from '@core/page-tree'
 import type { ImportFragment } from '@core/htmlImport'
 import { applyAssetRewrites } from './applyAssetRewrites'
-import { rewriteInternalLinks } from './linkRewrite'
+import { rewriteInternalLinks, rewriteFragmentInternalLinks } from './linkRewrite'
 import type {
   GlobalSectionCandidate,
   ImportColorToken,
@@ -122,10 +122,11 @@ export async function commitImportPlan(
     // Style rules before pages so pages that auto-create class links can
     // reference newly-imported rules.
     commitStyleRules(tx, rewrittenPlan, ruleConflictsByName, results)
-    // Global sections: create VisualComponents and replace per-page section
-    // nodes with base.visual-component-ref BEFORE commitPages so every page
-    // commits its final (mutated) node tree.
-    commitGlobalSections(tx, globalSections, linkedPages, activeScriptPageSources)
+    // Global sections: promote shared nav/header/footer into ONE everywhere
+    // layout template and strip them from each page BEFORE commitPages, so
+    // every page commits only its body content and inherits the shared chrome
+    // through the template's outlet (new CMS pages inherit it too).
+    commitGlobalSections(tx, globalSections, linkedPages, activeScriptPageSources, pageIdBySource)
     commitPages(tx, linkedPages, pageConflictsBySource, pageIdBySource, results)
     commitPageScopedFiles(tx, rewrittenPlan, pageIdBySource, results)
     // Active-state script: injected once per page that had a shared nav with
@@ -443,28 +444,29 @@ function isMediaUrl(src: string): boolean {
 // ---------------------------------------------------------------------------
 
 /**
- * For each cross-page global section candidate:
- *  1. Create a VisualComponent from the normalised representative fragment.
- *  2. For every page that contains the section, replace the section's root
- *     node in the page's nodeFragment with a `base.visual-component-ref`
- *     pointing to the new VC.
+ * Promote cross-page global sections into ONE shared `everywhere` layout:
+ *  1. Create a VisualComponent from each candidate's normalised representative
+ *     fragment (edit-once-updates-all).
+ *  2. Build a single `everywhere` page-template whose base.body holds the
+ *     shared chrome around one `base.outlet` — header/nav above the outlet,
+ *     footer below — and upsert it (re-share overwrites it in place).
+ *  3. STRIP each shared section from the individual pages, leaving only their
+ *     body content; the template supplies the chrome via the outlet, so a page
+ *     the tenant adds later in the CMS inherits the same header/footer.
  *
- * Mutations happen in-place on `linkedPages` BEFORE `commitPages` writes them,
- * so each page commits its already-deduped tree.
- *
- * Collects page sources that need the active-state script into `activeScriptPageSources`.
+ * Page mutations happen in-place on `linkedPages` BEFORE `commitPages` writes
+ * them. Collects the page sources that need the runtime active-state script
+ * into `activeScriptPageSources` — with a shared nav in the everywhere layout,
+ * that is every rendered page.
  */
 function commitGlobalSections(
   tx: SiteImportTransaction,
   globalSections: GlobalSectionCandidate[],
   linkedPages: ImportPlan['pages'],
   activeScriptPageSources: Set<string>,
+  pageIdBySource: ReadonlyMap<string, string>,
 ): void {
   if (globalSections.length === 0) return
-
-  // Build a fast source→page lookup so we can mutate the right nodeFragment.
-  const pageBySource = new Map<string, ImportPlan['pages'][number]>()
-  for (const page of linkedPages) pageBySource.set(page.source, page)
 
   const SECTION_NAMES: Record<string, string> = {
     nav: 'Shared Nav',
@@ -472,62 +474,128 @@ function commitGlobalSections(
     footer: 'Shared Footer',
   }
 
+  // 1. Promote each section to a VisualComponent. Rewrite its internal links to
+  //    durable cms:page refs first (relative to the page it came from) so the
+  //    shared nav/footer resolve to CMS routes (/shop) instead of shipping raw
+  //    `shop.html` hrefs that 404 on the published site.
+  const vcIdBySection = new Map<GlobalSectionCandidate, string>()
   for (const section of globalSections) {
     const name = SECTION_NAMES[section.tag] ?? `Shared ${section.tag}`
-    const vcId = tx.createVisualComponent({
-      name,
-      nodeFragment: section.representativeFragment,
-    })
+    const source = section.pageSources[0]
+    const nodeFragment = source
+      ? rewriteFragmentInternalLinks(section.representativeFragment, source, pageIdBySource)
+      : section.representativeFragment
+    vcIdBySection.set(section, tx.createVisualComponent({ name, nodeFragment }))
+  }
 
+  // 2. Build + upsert the single everywhere layout.
+  tx.upsertEverywhereTemplate({
+    title: 'Site Layout',
+    slug: 'site-layout',
+    nodeFragment: buildEverywhereTemplateFragment(globalSections, vcIdBySection, linkedPages),
+  })
+
+  // 3. Strip the shared sections from every page (their chrome now lives in the
+  //    layout). A shared nav with baked active state means every rendered page
+  //    needs the runtime active-state script.
+  const pageBySource = new Map<string, ImportPlan['pages'][number]>()
+  for (const page of linkedPages) pageBySource.set(page.source, page)
+  for (const section of globalSections) {
     for (const pageSource of section.pageSources) {
       const page = pageBySource.get(pageSource)
       if (!page) continue
-
       const sectionRootId = section.rootIdByPageSource[pageSource]
       if (!sectionRootId) continue
-
-      replaceSectionWithVCRef(page.nodeFragment, sectionRootId, vcId)
-
-      if (section.hasActiveLinks) {
-        activeScriptPageSources.add(pageSource)
-      }
+      stripSection(page.nodeFragment, sectionRootId)
     }
+  }
+  if (globalSections.some((s) => s.hasActiveLinks)) {
+    for (const page of linkedPages) activeScriptPageSources.add(page.source)
   }
 }
 
 /**
- * Replace a section's root node in `nodeFragment` with a
- * `base.visual-component-ref` pointing to `vcId`. Removes the section subtree
- * from the nodes map and adds the ref node with a fresh id.
- *
- * Mutates `nodeFragment` in-place (it is already a detached copy at this
- * point — `rewriteInternalLinks` produced it from the plan pages).
+ * Assemble the everywhere layout's node fragment: a shared-chrome VC ref per
+ * detected section arranged around a single `base.outlet`. Sections are ordered
+ * by their position in a canonical page (the page carrying the most shared
+ * sections) so headers/navs land above the outlet and footers below it.
  */
-function replaceSectionWithVCRef(
-  nodeFragment: ImportFragment,
-  sectionRootId: string,
-  vcId: string,
-): void {
-  const vcRefId = nanoid()
+function buildEverywhereTemplateFragment(
+  globalSections: GlobalSectionCandidate[],
+  vcIdBySection: Map<GlobalSectionCandidate, string>,
+  linkedPages: ImportPlan['pages'],
+): ImportFragment {
+  // Canonical page = the source appearing in the most sections' pageSources.
+  const sourceScore = new Map<string, number>()
+  for (const section of globalSections)
+    for (const src of section.pageSources)
+      sourceScore.set(src, (sourceScore.get(src) ?? 0) + 1)
+  let canonicalSource: string | undefined
+  let best = -1
+  for (const page of linkedPages) {
+    const score = sourceScore.get(page.source) ?? 0
+    if (score > best) {
+      best = score
+      canonicalSource = page.source
+    }
+  }
+  const canonicalPage = linkedPages.find((p) => p.source === canonicalSource)
 
-  // Insert the VC ref node (cast to PageNode — the ImportFragment stores PageNodes
-  // and base.visual-component-ref is a valid module for the page tree).
-  const parentId: string | null = (nodeFragment.nodes[sectionRootId] as PageNode | undefined)?.parentId ?? null
-  nodeFragment.nodes[vcRefId] = {
-    id: vcRefId,
-    moduleId: 'base.visual-component-ref',
-    props: { componentId: vcId },
+  const positionInCanonical = (section: GlobalSectionCandidate): number => {
+    if (!canonicalPage || canonicalSource === undefined) return Number.MAX_SAFE_INTEGER
+    const rootId = section.rootIdByPageSource[canonicalSource]
+    if (!rootId) return Number.MAX_SAFE_INTEGER
+    const idx = canonicalPage.nodeFragment.rootIds.indexOf(rootId)
+    return idx === -1 ? Number.MAX_SAFE_INTEGER : idx
+  }
+
+  const withPos = globalSections.map((section) => ({ section, pos: positionInCanonical(section) }))
+  const top = withPos.filter((e) => e.section.tag !== 'footer').sort((a, b) => a.pos - b.pos)
+  const bottom = withPos.filter((e) => e.section.tag === 'footer').sort((a, b) => a.pos - b.pos)
+
+  const nodes: Record<string, PageNode> = {}
+  const rootIds: string[] = []
+  const pushRef = (section: GlobalSectionCandidate): void => {
+    const vcId = vcIdBySection.get(section)
+    if (!vcId) return
+    const refId = nanoid()
+    nodes[refId] = {
+      id: refId,
+      moduleId: 'base.visual-component-ref',
+      props: { componentId: vcId },
+      children: [],
+      classIds: [],
+      parentId: null,
+      breakpointOverrides: {},
+    } as unknown as PageNode
+    rootIds.push(refId)
+  }
+
+  for (const e of top) pushRef(e.section)
+  const outletId = nanoid()
+  nodes[outletId] = {
+    id: outletId,
+    moduleId: 'base.outlet',
+    props: {},
     children: [],
     classIds: [],
-    parentId,
+    parentId: null,
     breakpointOverrides: {},
   } as unknown as PageNode
+  rootIds.push(outletId)
+  for (const e of bottom) pushRef(e.section)
 
-  // Swap the section root id for the VC ref id in rootIds.
+  return { nodes, rootIds }
+}
+
+/**
+ * Remove a shared section (root + subtree) from a page's node fragment in
+ * place. `rewriteInternalLinks` already produced a detached copy, so this is
+ * safe to mutate.
+ */
+function stripSection(nodeFragment: ImportFragment, sectionRootId: string): void {
   const idx = nodeFragment.rootIds.indexOf(sectionRootId)
-  if (idx !== -1) nodeFragment.rootIds[idx] = vcRefId
-
-  // Remove the section subtree.
+  if (idx !== -1) nodeFragment.rootIds.splice(idx, 1)
   removeSubtree(nodeFragment.nodes, sectionRootId)
 }
 

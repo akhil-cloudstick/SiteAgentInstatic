@@ -101,6 +101,23 @@ prompt conflicts with the contract below, the contract wins.
    a JS-added class reveals. Make the visible state the DEFAULT; let animation only
    ENHANCE (CSS \`@keyframes\`/\`animation\` on load; scroll-reveals that start visible).
    ❌ \`.reveal{opacity:0}\` shown by a JS \`IntersectionObserver\` → ✅ \`.reveal{animation:fadeUp .6s both}\` (CSS, ends visible).
+8. **One website — the SAME header and footer on EVERY page, byte-for-byte.** The
+   whole site must read as one design, not a pile of separate landing pages. When
+   this project already has other pages, OPEN one first and copy its
+   \`<header>\`/\`<nav>\`/\`<footer>\` and its \`:root\` \`--…\` token block **verbatim** into
+   the new page. The header/footer must be **identical across all pages** — same
+   markup, same classes, same buttons, same labels, same links. Do NOT vary the
+   header call-to-action per page (e.g. "Shop the collection" on one page and
+   "Book a class" on another) — pick ONE header button and use it everywhere. The
+   ONLY thing that may differ per page is which nav link carries the active class.
+   Write internal links the same way on every page — always the full
+   \`page.html#anchor\` form (e.g. \`shop.html#mugs\`), never a same-page \`#mugs\`
+   shortcut on one page and \`shop.html#mugs\` on another — so the header/footer stay
+   truly identical. Stay strictly within the active design system's palette,
+   typography, and spacing tokens; never invent a new header/footer or section
+   rhythm and never introduce off-brand colors or fonts. A page whose header or
+   footer drifts is automatically sent back for correction, so build it identical
+   the first time.
 
 **Build the compliant TECHNIQUE — never keyword-block.** Tenants ask for features
 in their own words ("add js", "animation", "a buffering spinner", "a 3D tilt", "a

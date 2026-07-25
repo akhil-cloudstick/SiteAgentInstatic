@@ -11,7 +11,7 @@
 import { nanoid } from 'nanoid'
 import type { StoreApi } from 'zustand'
 import type { FrameworkColorToken } from '@core/framework-schema'
-import type { NodeTree, PageNode, StyleRule, SiteDocument } from '@core/page-tree'
+import type { NodeTree, Page, PageNode, PageTemplateConfig, StyleRule, SiteDocument } from '@core/page-tree'
 import { addPage, createNode, reconcileSiteExplorerInPlace, reindexNodeParents } from '@core/page-tree'
 import type { VisualComponent, VCNode } from '@core/visualComponents'
 import { syncAllVCRefSlotInstances, allTreeNodeMaps } from '../vcSlotReconcile'
@@ -459,6 +459,46 @@ export function buildSiteHelpers(
           }
           page.nodes[page.rootNodeId]!.children = [...nodeFragment.rootIds]
           reindexNodeParents(page.nodes)
+          didMutate = true
+          return page.id
+        },
+
+        upsertEverywhereTemplate({ title, slug, nodeFragment, priority = 0 }: { title: string; slug: string; nodeFragment: ImportFragment; priority?: number }): string {
+          // The site's single `everywhere` layout: a page whose base.body holds
+          // [Shared Header ref, base.outlet, Shared Footer ref]. It wraps every
+          // other page/entry through the template chain, so a page created later
+          // in the CMS inherits the shared chrome + brand automatically. A
+          // re-import (Share-to-CMS re-share) OVERWRITES the existing everywhere
+          // template in place — OD owns the shared chrome — instead of stacking
+          // duplicate layouts.
+          const template: PageTemplateConfig = { enabled: true, target: { kind: 'everywhere' }, priority }
+          const graft = (page: Page): void => {
+            for (const [id, node] of Object.entries(nodeFragment.nodes)) {
+              page.nodes[id] = {
+                ...node,
+                classIds: linkImportedClassNames(node.classIds, site.styleRules, byName),
+              }
+            }
+            page.nodes[page.rootNodeId]!.children = [...nodeFragment.rootIds]
+            page.template = template
+            reindexNodeParents(page.nodes)
+          }
+          const existing = site.pages.find(
+            (p) => p.template?.enabled === true && p.template.target.kind === 'everywhere',
+          )
+          if (existing) {
+            // Rebuild the layout from the fresh chrome, keeping only the base.body
+            // root and dropping the previous share's header/footer nodes.
+            const bodyId = existing.rootNodeId
+            const body = existing.nodes[bodyId]!
+            existing.nodes = { [bodyId]: { ...body, children: [] } }
+            existing.title = title
+            graft(existing)
+            didMutate = true
+            return existing.id
+          }
+          const page = addPage(site as SiteDocument, title, slug)
+          graft(page)
           didMutate = true
           return page.id
         },

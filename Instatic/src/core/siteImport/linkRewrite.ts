@@ -19,6 +19,7 @@
 
 import { makePageRef } from '@core/page-tree'
 import type { PageNode } from '@core/page-tree'
+import type { ImportFragment } from '@core/htmlImport'
 import type { PagePlan } from './types'
 import { resolveHref } from './htmlPagePlan'
 
@@ -36,24 +37,40 @@ export function rewriteInternalLinks(
   if (pageIdBySource.size === 0) return pages
 
   return pages.map((plan) => {
-    let touched = false
-    const nodes: Record<string, PageNode> = {}
-
-    for (const [id, node] of Object.entries(plan.nodeFragment.nodes)) {
-      const href = node.props?.href
-      const ref =
-        typeof href === 'string' ? hrefToPageRef(href, plan.source, pageIdBySource) : null
-      if (ref === null) {
-        nodes[id] = node
-        continue
-      }
-      touched = true
-      nodes[id] = { ...node, props: { ...node.props, href: ref } }
-    }
-
-    if (!touched) return plan
-    return { ...plan, nodeFragment: { ...plan.nodeFragment, nodes } }
+    const nodeFragment = rewriteFragmentInternalLinks(plan.nodeFragment, plan.source, pageIdBySource)
+    return nodeFragment === plan.nodeFragment ? plan : { ...plan, nodeFragment }
   })
+}
+
+/**
+ * Rewrite the internal `<a href>` links inside a single import fragment into
+ * durable `cms:page:<id>` references, relative to `source` (the page the
+ * fragment came from). Used both per-page and for the shared nav/header/footer
+ * VisualComponents promoted from global sections — without this a shared nav
+ * keeps raw `shop.html` hrefs that 404 on the published site (CMS routes are
+ * slugs like `/shop`, not `.html` files). Returns the same fragment reference
+ * unchanged when nothing was rewritten.
+ */
+export function rewriteFragmentInternalLinks(
+  fragment: ImportFragment,
+  source: string,
+  pageIdBySource: ReadonlyMap<string, string>,
+): ImportFragment {
+  if (pageIdBySource.size === 0) return fragment
+
+  let touched = false
+  const nodes: Record<string, PageNode> = {}
+  for (const [id, node] of Object.entries(fragment.nodes)) {
+    const href = node.props?.href
+    const ref = typeof href === 'string' ? hrefToPageRef(href, source, pageIdBySource) : null
+    if (ref === null) {
+      nodes[id] = node
+      continue
+    }
+    touched = true
+    nodes[id] = { ...node, props: { ...node.props, href: ref } }
+  }
+  return touched ? { ...fragment, nodes } : fragment
 }
 
 /**
