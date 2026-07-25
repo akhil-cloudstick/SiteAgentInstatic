@@ -1,0 +1,51 @@
+[
+  {
+    "name": "operator-console",
+    "url": "http://127.0.0.1:3000/operator",
+    "status": "ok",
+    "note": "HTTP 200 -> http://127.0.0.1:3000/operator",
+    "title": "Tenants · Site Agent"
+  },
+  {
+    "name": "control-plane-root",
+    "url": "http://127.0.0.1:4400/",
+    "status": "ok",
+    "note": "HTTP 200 -> http://127.0.0.1:4400/login",
+    "title": "Sign in"
+  },
+  {
+    "name": "project-plan-board",
+    "url": "http://127.0.0.1:8091/",
+    "status": "ok",
+    "note": "HTTP 200 -> http://127.0.0.1:8091/",
+    "title": "SiteAgent — Project Plan"
+  },
+  {
+    "name": "tenant-instatic-admin",
+    "url": "http://127.0.0.1:3117/admin",
+    "status": "ok",
+    "note": "HTTP 200 -> http://127.0.0.1:3117/admin/dashboard",
+    "title": "Site Agent"
+  },
+  {
+    "name": "tenant-instatic-root",
+    "url": "http://127.0.0.1:3117/",
+    "status": "ok",
+    "note": "HTTP 404 -> http://127.0.0.1:3117/",
+    "title": ""
+  },
+  {
+    "name": "tenant-opendesign-web",
+    "url": "http://127.0.0.1:8100/",
+    "status": "FAILED",
+    "note": "page.goto: Timeout 25000ms exceeded.",
+    "title": "MMS Design — Map My Shops"
+  },
+  {
+    "name": "tenant-od-projects",
+    "url": "http://127.0.0.1:8100/projects",
+    "status": "FAILED",
+    "note": "page.goto: Timeout 25000ms exceeded.",
+    "title": "MMS Design — Map My Shops"
+  }
+]

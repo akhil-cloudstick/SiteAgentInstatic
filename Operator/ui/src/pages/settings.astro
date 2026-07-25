@@ -2,6 +2,11 @@
 import Layout from '../layouts/Layout.astro';
 const CP = 'http://127.0.0.1:4400';
 let error = '';
+// Normalise BASE_URL to exactly one trailing slash so save-redirects land on
+// `/operator/settings`, not `/operatorsettings` (which escapes the operator and
+// 404s through the gateway).
+const rawBase = import.meta.env.BASE_URL;
+const baseUrl = rawBase.endsWith('/') ? rawBase : `${rawBase}/`;
 
 if (Astro.request.method === 'POST') {
   const f = await Astro.request.formData();
@@ -24,7 +29,7 @@ if (Astro.request.method === 'POST') {
         try { msg = (await r.json()).error || msg; } catch {}
         throw new Error(msg);
       }
-      return Astro.redirect('/settings?saved=guidance');
+      return Astro.redirect(`${baseUrl}settings?saved=guidance`);
     } catch (e) { error = e.message; }
   } else {
     let payload = {};
@@ -53,7 +58,7 @@ if (Astro.request.method === 'POST') {
         try { msg = (await r.json()).error || msg; } catch {}
         throw new Error(msg);
       }
-      return Astro.redirect(`/settings?saved=${section === 'cloudflare' ? 'cloudflare' : 'ai'}`);
+      return Astro.redirect(`${baseUrl}settings?saved=${section === 'cloudflare' ? 'cloudflare' : 'ai'}`);
     } catch (e) { error = e.message; }
   }
 }

@@ -1,0 +1,937 @@
+﻿OpenDesign\apps\daemon\src\prompts\cms-contract.ts:5: * "Website Build Rule" (`Operator/rules/templateRule.md`). The operator edits
+OpenDesign\apps\daemon\src\prompts\cms-contract.ts:8: * by the control plane as `OD_CMS_RULE_FILE`; `loadTemplateRuleBody()` reads it
+OpenDesign\apps\daemon\src\prompts\cms-contract.ts:22: * contract. Keep the fallback roughly in step with `templateRule.md`, but the
+OpenDesign\apps\daemon\src\prompts\cms-contract.ts:151: * the OD-native distillation of `templateRule.md`; the file on disk is the
+OpenDesign\apps\daemon\src\prompts\cms-contract.ts:240: export function renderCmsOutputContract(ruleBody?: string): string {
+OpenDesign\apps\daemon\src\prompts\cms-contract.ts:251: * Read the operator's CMS rule file (path from `OD_CMS_RULE_FILE`), cached by
+OpenDesign\apps\daemon\src\prompts\cms-contract.ts:257: export function loadTemplateRuleBody(): string | undefined {
+OpenDesign\apps\daemon\src\prompts\cms-contract.ts:258: const rulePath = (process.env.OD_CMS_RULE_FILE ?? '').trim();
+OpenDesign\apps\daemon\src\prompts\system.ts:36: import { renderCmsOutputContract } from './cms-contract.js';
+OpenDesign\apps\daemon\src\prompts\system.ts:572: // computes it from `OD_INSTATIC_URL` + tenant SSO). When set, the mandatory
+OpenDesign\apps\daemon\src\prompts\system.ts:580: // templateRule.md`), read by the server via `loadTemplateRuleBody()` and
+OpenDesign\apps\daemon\src\prompts\system.ts:975: parts.push(`\n\n---\n\n${renderCmsOutputContract(cmsRuleBody)}`);
+OpenDesign\apps\daemon\src\routes\project\index.ts:55: import { materializeImages } from '../../cms-image-materialize.js';
+OpenDesign\apps\daemon\src\runtimes\chat-run-context.ts:32: agentInstruction?: string;
+OpenDesign\apps\daemon\src\runtimes\chat-run-context.ts:106: const agentInstruction = cleanString(value.agentInstruction, 4000);
+OpenDesign\apps\daemon\src\runtimes\chat-run-context.ts:113: ...(agentInstruction ? { agentInstruction } : {}),
+OpenDesign\apps\daemon\src\runtimes\chat-run-context.ts:118: // Only the id-list fields + workspaceItems are merged; `agentInstruction` is a
+OpenDesign\apps\daemon\src\runtimes\chat-run-context.ts:120: const merged: Required<Omit<RunContextSelection, 'agentInstruction'>> = {
+OpenDesign\apps\daemon\src\runtimes\runs.ts:43: // run regardless of caller — used by the CMS templateRule compliance gate
+OpenDesign\apps\daemon\src\sidecar\server.ts:16: type MintImportTokenResult,
+OpenDesign\apps\daemon\src\sidecar\server.ts:33: signDesktopImportToken,
+OpenDesign\apps\daemon\src\sidecar\server.ts:95: export function mintImportTokenForCli(baseDir: string): MintImportTokenResult {
+OpenDesign\apps\daemon\src\sidecar\server.ts:118: token: signDesktopImportToken(secret, baseDir, { nonce, exp: expiresAt }),
+OpenDesign\apps\daemon\src\sidecar\server.ts:221: return mintImportTokenForCli(request.input.baseDir);
+OpenDesign\apps\daemon\src\cli.ts:5702: const importToken = await mintCliImportToken(baseDir);
+OpenDesign\apps\daemon\src\cli.ts:5703: if (importToken != null) {
+OpenDesign\apps\daemon\src\cli.ts:5704: headers['x-od-desktop-import-token'] = importToken;
+OpenDesign\apps\daemon\src\cli.ts:5888: const importToken = await mintCliImportToken(importBaseDir);
+OpenDesign\apps\daemon\src\cli.ts:5889: if (importToken != null) {
+OpenDesign\apps\daemon\src\cli.ts:5890: headers['x-od-desktop-import-token'] = importToken;
+OpenDesign\apps\daemon\src\cli.ts:6626: async function mintCliImportToken(baseDir) {
+OpenDesign\apps\daemon\src\cms-compliance.ts:5: // deterministic normalizer (cms-normalize.ts) to REPORT anything that could not
+OpenDesign\apps\daemon\src\cms-compliance.ts:171: ? 'Inline <script> writes innerHTML/insertAdjacentHTML/outerHTML — visible content must be static HTML, not JS-rendered (see templateRule.md)'
+OpenDesign\apps\daemon\src\cms-compliance.ts:188: ? 'Inline <script> hardcodes an image path (e.g. /images/x.svg) — it 404s after import (paths are rewritten to /uploads/). Read image URLs from an existing DOM <img> src instead (see templateRule.md)'
+OpenDesign\apps\daemon\src\cms-compliance.ts:210: ? `Modern color function in a shorthand is dropped on import (color lost): ${firstLine(shorthandColorHit[0])} — use a :root var token (background: var(--token)) or the longhand (background-color: …) instead (see templateRule.md)`
+OpenDesign\apps\daemon\src\cms-compliance.ts:223: ? `${firstLine(droppedAtRule[0])} is dropped on import — all rules inside a @layer are lost. Write plain, source-ordered CSS (see templateRule.md)`
+OpenDesign\apps\daemon\src\cms-compliance.ts:236: ? `Image uses a format the importer can't upload (avif/ico/bmp/tiff/heic): ${firstLine(badImageFmt[0])} — use jpg/png/webp/gif/svg (see templateRule.md)`
+OpenDesign\apps\daemon\src\cms-compliance.ts:244: // the published site). The share transform (cms-normalize.makeVisibleWithoutJs)
+OpenDesign\apps\daemon\src\cms-compliance.ts:272: ? `Hidden until JS runs → blank in the CMS canvas: ${[...new Set(stillHidden)].slice(0, 5).join(', ')} — content must be visible with CSS alone (see templateRule.md)`
+OpenDesign\apps\daemon\src\cms-image-materialize.ts:19: // (the load-bearing invariant: `od-share-to-cms.ts` strips `public/` from both
+OpenDesign\apps\daemon\src\cms-image-materialize.ts:291: export async function materializeProjectImages(projectRoot: string): Promise<{ created: string[] }> {
+OpenDesign\apps\daemon\src\cms-normalize.ts:20: // It then runs the compliance checker (cms-compliance.ts) on the result and
+OpenDesign\apps\daemon\src\cms-normalize.ts:31: import { checkPageCompliance, isUtilityClass, type ComplianceFinding } from './cms-compliance.js';
+OpenDesign\apps\daemon\src\cms-normalize.ts:336: function makeVisibleWithoutJs(html: string): string {
+OpenDesign\apps\daemon\src\cms-normalize.ts:437: result = makeVisibleWithoutJs(result);
+OpenDesign\apps\daemon\src\desktop-auth.ts:48: export function signDesktopImportToken(
+OpenDesign\apps\daemon\src\desktop-auth.ts:59: export type DesktopImportTokenVerification =
+OpenDesign\apps\daemon\src\desktop-auth.ts:63: export function verifyDesktopImportToken(
+OpenDesign\apps\daemon\src\desktop-auth.ts:69: ): DesktopImportTokenVerification {
+OpenDesign\apps\daemon\src\import-export-routes.ts:39: verifyDesktopImportToken,
+OpenDesign\apps\daemon\src\import-export-routes.ts:154: const verification = verifyDesktopImportToken(
+OpenDesign\apps\daemon\src\import-export-routes.ts:276: const verification = verifyDesktopImportToken(
+OpenDesign\apps\daemon\src\od-share-to-cms.ts:5: // /admin/api/cms/import/site-html endpoint expects. Dot-dirs (.file-versions,
+OpenDesign\apps\daemon\src\projects.ts:13: import { normalizeFileMap } from './cms-normalize.js';
+OpenDesign\apps\daemon\src\server.ts:25: import { loadTemplateRuleBody } from './prompts/cms-contract.js';
+OpenDesign\apps\daemon\src\server.ts:26: import { normalizeSiteFiles } from './cms-normalize.js';
+OpenDesign\apps\daemon\src\server.ts:27: import { checkPageCompliance } from './cms-compliance.js';
+OpenDesign\apps\daemon\src\server.ts:214: signDesktopImportToken,
+OpenDesign\apps\daemon\src\server.ts:215: verifyDesktopImportToken,
+OpenDesign\apps\daemon\src\server.ts:223: signDesktopImportToken,
+OpenDesign\apps\daemon\src\server.ts:224: verifyDesktopImportToken,
+OpenDesign\apps\daemon\src\server.ts:658: import { collectSiteFiles } from './od-share-to-cms.js';
+OpenDesign\apps\daemon\src\server.ts:659: import { materializeProjectImages } from './cms-image-materialize.js';
+OpenDesign\apps\daemon\src\server.ts:2332: // Per-tenant hosting only (OD_SSO_SECRET set by the control-plane). The hub
+OpenDesign\apps\daemon\src\server.ts:2336: // bearer/origin auth. Plain local dev (no OD_SSO_SECRET) is unaffected.
+OpenDesign\apps\daemon\src\server.ts:2408: // Share-to-CMS templateRule compliance gate: the real implementation needs
+OpenDesign\apps\daemon\src\server.ts:2738: verifyDesktopImportToken,
+OpenDesign\apps\daemon\src\server.ts:2807: // Advanced tenants only (OD_INSTATIC_URL set). merge-overwrite -> no duplicate
+OpenDesign\apps\daemon\src\server.ts:2809: app.post('/api/projects/:id/push/instatic', async (req, res) => {
+OpenDesign\apps\daemon\src\server.ts:2811: const instaticUrl = (process.env.OD_INSTATIC_URL ?? '').trim().replace(/\/$/, '');
+OpenDesign\apps\daemon\src\server.ts:2812: const slug = (process.env.OD_TENANT_SLUG ?? '').trim();
+OpenDesign\apps\daemon\src\server.ts:2824: const mat = await materializeProjectImages(projectRoot);
+OpenDesign\apps\daemon\src\server.ts:2836: // safety net for pages built before the templateRule compliance gate
+OpenDesign\apps\daemon\src\server.ts:2863: 'CMS_COMPLIANCE_FAILED',
+OpenDesign\apps\daemon\src\server.ts:2881: // drag-drop import uses (buildImportPlan + commitImportPlan against the live
+OpenDesign\apps\daemon\src\server.ts:2883: const stageRes = await fetch(`${instaticUrl}/admin/api/cms/import/site-html`, {
+OpenDesign\apps\daemon\src\server.ts:2894: // the staged FileMap via `importToken`). Use the PUBLIC gateway origin (the
+OpenDesign\apps\daemon\src\server.ts:2896: // remote client cannot reach the daemon's localhost OD_INSTATIC_URL. Falls back
+OpenDesign\apps\daemon\src\server.ts:2901: const siteImportPath = `/admin/site?importToken=${encodeURIComponent(staged.token)}`;
+OpenDesign\apps\daemon\src\server.ts:3992: // Instatic-connected tenant daemons (OD_INSTATIC_URL set + tenant SSO on,
+OpenDesign\apps\daemon\src\server.ts:3993: // the same guard the /push/instatic route uses) build pages that get
+OpenDesign\apps\daemon\src\server.ts:3998: !!(process.env.OD_INSTATIC_URL ?? '').trim() && tenantSsoEnabled();
+OpenDesign\apps\daemon\src\server.ts:3999: // Read the operator's rule file live (OD_CMS_RULE_FILE), so editing
+OpenDesign\apps\daemon\src\server.ts:4000: // Operator/rules/templateRule.md takes effect on the next page with no
+OpenDesign\apps\daemon\src\server.ts:4002: const cmsRuleBody = instaticCmsMode ? loadTemplateRuleBody() : undefined;
+OpenDesign\apps\daemon\src\server.ts:4376: // line. Carried on context.agentInstruction (see RunContextSelection).
+OpenDesign\apps\daemon\src\server.ts:4379: typeof (context as { agentInstruction?: unknown }).agentInstruction === 'string'
+OpenDesign\apps\daemon\src\server.ts:4380: ? (context as { agentInstruction: string }).agentInstruction.trim().slice(0, 4000)
+OpenDesign\apps\daemon\src\server.ts:7580: // ── Share-to-CMS templateRule compliance gate ─────────────────────────────
+OpenDesign\apps\daemon\src\server.ts:7583: // project's actual on-disk pages against templateRule.md — the same check
+OpenDesign\apps\daemon\src\server.ts:7610: const instaticCmsMode = !!(process.env.OD_INSTATIC_URL ?? '').trim() && tenantSsoEnabled();
+OpenDesign\apps\daemon\src\server.ts:7625: `[cms-compliance] project ${projectId}: failed to read pages for compliance check:`,
+OpenDesign\apps\daemon\src\server.ts:7640: `[cms-compliance] project ${projectId} still violates templateRule.md after ${CMS_COMPLIANCE_MAX_ATTEMPTS} attempt(s):\n${summary}`,
+OpenDesign\apps\daemon\src\server.ts:7646: '[Automated compliance check] The page(s) you just built violate the required CMS output contract (templateRule.md) and will not import correctly. Fix EVERY violation below IN PLACE in the actual project files before finishing — do not ask, do not explain, just fix them:',
+OpenDesign\apps\daemon\src\server.ts:7651: const correctionAssistantMessageId = `cms-compliance-${randomUUID()}`;
+OpenDesign\apps\daemon\src\server.ts:7656: clientRequestId: `cms-compliance-${randomUUID()}`,
+OpenDesign\apps\daemon\src\server.ts:7662: id: `cms-compliance-user-${randomUUID()}`,
+OpenDesign\apps\daemon\src\server.ts:7688: `[cms-compliance] project ${projectId}: correction turn failed:`,
+OpenDesign\apps\daemon\src\server.ts:7696: console.error('[cms-compliance] gate failed:', err instanceof Error ? err.message : err);
+OpenDesign\apps\daemon\src\tenant-sso.ts:4: // OD_SSO_SECRET (a shared HMAC secret) and OD_TENANT_SLUG. In that mode the
+OpenDesign\apps\daemon\src\tenant-sso.ts:8: // bearer/origin auth (untouched). Plain local dev (no OD_SSO_SECRET) is unaffected.
+OpenDesign\apps\daemon\src\tenant-sso.ts:19: return (env.OD_SSO_SECRET ?? '').trim();
+OpenDesign\apps\daemon\src\tenant-sso.ts:80: const slug = (process.env.OD_TENANT_SLUG ?? '').trim();
+OpenDesign\apps\web\src\components\FileViewer.tsx:1221: const response = await fetch(`/api/projects/${projectId}/push/instatic`, { method: 'POST' });
+OpenDesign\apps\web\src\components\FileViewer.tsx:1236: const reason = raw.replace(/\s*\(see templateRule\.md\)/gi, '');
+OpenDesign\apps\web\src\components\FileViewer.tsx:1256: * the hidden `context.agentInstruction` channel). Leads with hard directives so
+OpenDesign\apps\web\src\components\FileViewer.tsx:1259: * templateRule in its system prompt.
+OpenDesign\apps\web\src\components\FileViewer.tsx:1271: .replace(/\s*\(see templateRule\.md\)/gi, '')
+OpenDesign\apps\web\src\components\ProjectView.tsx:6108: // `context.agentInstruction` channel — OD chat has no separate system field.
+OpenDesign\apps\web\src\components\ProjectView.tsx:6109: // The agent (which also carries templateRule.md in its prompt) makes the page
+OpenDesign\apps\web\src\components\ProjectView.tsx:6116: context: { agentInstruction: msg.instruction },
+OpenDesign\apps\web\src\providers\registry.ts:2241: desktopImportToken?: string,
+OpenDesign\apps\web\src\providers\registry.ts:2244: if (desktopImportToken) {
+OpenDesign\apps\web\src\providers\registry.ts:2245: headers['x-od-desktop-import-token'] = desktopImportToken;
+Instatic\server\ai\handlers\chat.ts:507: visualComponents: [],
+Instatic\server\ai\mcp\tools\styleTools.ts:98: const doc: SiteDocument = { ...site, pages: [], visualComponents: [], layouts: [] }
+Instatic\server\ai\tools\site\systemPrompt.ts:61: - Editable documents are pages, templates, and visual components. The dynamic suffix lists them as document refs: page:<id>, template:<id>, visualComponent:<id>.
+Instatic\server\ai\tools\site\systemPrompt.ts:63: - REUSING an existing shared component: when the user asks to use "the same" nav/header/footer (or any block) that ALREADY exists as a visual component — shown in the Documents line as visualComponent:<id> (e.g. a "Shared Header" / "Shared Footer") — place a LIVE reference to it with site_insert_component_ref({ parentId, componentId:<id> }). Do NOT read that component and re-insert its HTML with site_insert_html: that produces a DISCONNECTED COPY that will NOT update when the shared component is later edited, which defeats the purpose of "the same" header/footer. So for a new page that should share the site's chrome, insert the header component ref first, then the page's own content, then the footer component ref last — never rebuild the nav/footer markup inline when a shared component for it exists.
+Instatic\server\ai\tools\site\writeTools.ts:141: 'Place a LIVE reference to an existing shared visual component (a shared header/nav/footer, or any reusable block) on the active page, under `parentId` at optional 0-based `index`. `componentId` is the id from a `visualComponent:<id>` entry in the Documents line (or site_list_documents). This is how you REUSE shared chrome: the page shows a reference, so later edits to the component propagate to every page that references it. Do NOT read a shared component and re-insert its HTML with site_insert_html — that makes a disconnected copy that never updates. Any slot children the component declares are materialized automatically. Success data: `nodeId` (the reference node). To build a page that reuses the site\'s existing header + footer, insert those two component refs (header first, footer last) and put the page-specific content between them.',
+Instatic\server\ai\managed.ts:11: *   - `INSTATIC_AI_GATEWAY_URL` — OpenRouter-compatible base URL carrying the
+Instatic\server\ai\managed.ts:21: * When `INSTATIC_AI_GATEWAY_URL` is absent this module is inert and standalone
+Instatic\server\ai\managed.ts:48: return process.env.INSTATIC_AI_GATEWAY_URL?.trim() || null
+Instatic\server\auth\tenantSso.ts:5: * INSTATIC_SSO_SECRET (a shared HMAC secret) and INSTATIC_TENANT_SLUG. The hub
+Instatic\server\auth\tenantSso.ts:26: return (process.env.INSTATIC_SSO_SECRET ?? '').trim()
+Instatic\server\handlers\cms\plugins\install.ts:237: // granted `visualComponents.register`, importing the pack is what they
+Instatic\server\handlers\cms\plugins\pack.ts:7: * granted `visualComponents.register`, importing the pack is what they
+Instatic\server\handlers\cms\plugins\pack.ts:32: import { visualComponentToCells } from '../../../../src/core/data/componentFromRow'
+Instatic\server\handlers\cms\plugins\pack.ts:34: import { vcSlugFromName } from '@core/visualComponents'
+Instatic\server\handlers\cms\plugins\pack.ts:42: visualComponents: { id: string; name: string }[]
+Instatic\server\handlers\cms\plugins\pack.ts:47: replaced: { visualComponents: string[]; pages: string[]; classes: string[]; layouts: string[] }
+Instatic\server\handlers\cms\plugins\pack.ts:80: const { visualComponentFromRow } = await import('../../../../src/core/data/componentFromRow')
+Instatic\server\handlers\cms\plugins\pack.ts:82: const vc = visualComponentFromRow(r)
+Instatic\server\handlers\cms\plugins\pack.ts:92: visualComponents: existingVCs,
+Instatic\server\handlers\cms\plugins\pack.ts:98: // Extract shell (strip pages, visualComponents, and layouts) and save
+Instatic\server\handlers\cms\plugins\pack.ts:99: const { pages: packPages, visualComponents: _vcs, layouts: _layouts, ...nextShell } = nextSiteDoc
+Instatic\server\handlers\cms\plugins\pack.ts:115: for (const vc of pack.visualComponents) {
+Instatic\server\handlers\cms\plugins\pack.ts:116: const cells = visualComponentToCells(vc)
+Instatic\server\handlers\cms\plugins\pack.ts:144: installedVisualComponents: pack.visualComponents.length,
+Instatic\server\handlers\cms\plugins\pack.ts:148: replacedVisualComponents: replaced.visualComponents,
+Instatic\server\handlers\cms\plugins\pack.ts:157: visualComponents: pack.visualComponents.map((vc) => ({ id: vc.id, name: vc.name })),
+Instatic\server\handlers\cms\plugins\pack.ts:181: if (!plugin.grantedPermissions.includes('visualComponents.register')) return null
+Instatic\server\handlers\cms\plugins\pack.ts:220: if (!plugin.grantedPermissions.includes('visualComponents.register')) {
+Instatic\server\handlers\cms\plugins\pack.ts:221: return badRequest(`Plugin "${pluginId}" requires the visualComponents.register permission to install a pack`)
+Instatic\server\handlers\cms\siteImport\stagedImports.ts:11: * `/admin/site?importToken=<token>`; the admin app fetches it ONCE
+Instatic\server\handlers\cms\components.ts:6: *                                   adapter converts these to VisualComponent[]
+Instatic\server\handlers\cms\components.ts:7: *                                   via visualComponentFromRow + validateVisualComponents.
+Instatic\server\handlers\cms\components.ts:17: *                                   roster (see validateVisualComponentsForPartialWrite).
+Instatic\server\handlers\cms\components.ts:26: * The GET response returns raw DataRow objects (not VisualComponent objects) so
+Instatic\server\handlers\cms\components.ts:27: * the client adapter can reconstruct VCs via visualComponentFromRow without a
+Instatic\server\handlers\cms\components.ts:29: * validateVisualComponents immediately after conversion.
+Instatic\server\handlers\cms\components.ts:35: import { visualComponentToCells, visualComponentFromRow } from '../../../src/core/data/componentFromRow'
+Instatic\server\handlers\cms\components.ts:36: import { SiteValidationError, validateVisualComponentsForPartialWrite } from '@core/persistence/validate'
+Instatic\server\handlers\cms\components.ts:37: import { VisualComponentSchema, vcSlugFromName, type VisualComponent } from '@core/visualComponents'
+Instatic\server\handlers\cms\components.ts:67: changedComponents: Type.Array(VisualComponentSchema),
+Instatic\server\handlers\cms\components.ts:84: const vc = visualComponentFromRow(r)
+Instatic\server\handlers\cms\components.ts:103: let components: VisualComponent[]
+Instatic\server\handlers\cms\components.ts:105: components = validateVisualComponentsForPartialWrite(body.changedComponents, existingVCs, componentIds)
+Instatic\server\handlers\cms\components.ts:124: cells: visualComponentToCells(vc),
+Instatic\server\handlers\cms\import.ts:4: *   POST /admin/api/cms/import[?strategy=replace|merge-add|merge-overwrite]
+Instatic\server\handlers\cms\import.ts:13: *   merge-overwrite           — upsert rows/tables: add missing, update existing.
+Instatic\server\handlers\cms\import.ts:113: { error: 'Invalid strategy — must be replace, merge-add, or merge-overwrite' },
+Instatic\server\handlers\cms\import.ts:138: // even when the import strategy is merge-overwrite.
+Instatic\server\handlers\cms\import.ts:299: // merge-overwrite: upsert rows/tables; update existing with bundle values.
+Instatic\server\handlers\cms\importArchive.ts:331: { error: 'Invalid strategy — must be replace, merge-add, or merge-overwrite' },
+Instatic\server\handlers\cms\importSiteHtml.ts:4: *   POST /admin/api/cms/import/site-html
+Instatic\server\handlers\cms\importSiteHtml.ts:8: *   GET  /admin/api/cms/import/staged/:token
+Instatic\server\handlers\cms\importSiteHtml.ts:15: * `redirect=/admin/site?importToken=<token>`) to fetch it and run it through
+Instatic\server\handlers\cms\importSiteHtml.ts:17: * import uses (`buildImportPlan` + `commitImportPlan` against the live
+Instatic\server\handlers\cms\importSiteHtml.ts:19: * there is no `buildImportPlan`/commit call in this file: staging is the
+Instatic\server\handlers\cms\importSiteHtml.ts:21: * design and `siteImport/stagedImports.ts` for the handoff store.
+Instatic\server\handlers\cms\importSiteHtml.ts:31: import { stageFileMap, takeStagedFileMap } from './siteImport/stagedImports'
+Instatic\server\handlers\cms\importSiteHtml.ts:33: const IMPORT_SITE_HTML_PATH = `${CMS_API_PREFIX}/import/site-html`
+Instatic\server\handlers\cms\importSiteHtml.ts:34: const STAGED_IMPORT_PREFIX = `${CMS_API_PREFIX}/import/staged/`
+Instatic\server\handlers\cms\importSiteHtml.ts:46: /** POST /admin/api/cms/import/site-html — stage a FileMap, return its token. */
+Instatic\server\handlers\cms\importSiteHtml.ts:69: /** GET /admin/api/cms/import/staged/:token — single-use fetch for the browser wizard. */
+Instatic\server\handlers\cms\pages.ts:39: import { visualComponentFromRow } from '../../../src/core/data/componentFromRow'
+Instatic\server\handlers\cms\pages.ts:96: const visualComponents = vcRows.flatMap((r) => {
+Instatic\server\handlers\cms\pages.ts:97: const vc = visualComponentFromRow(r)
+Instatic\server\handlers\cms\pages.ts:115: pages = validatePagesForPartialSave(body.changedPages, visualComponents, keptSlugs)
+Instatic\server\handlers\cms\publish.ts:59: const deployWebhook = process.env.INSTATIC_DEPLOY_WEBHOOK?.trim()
+Instatic\server\handlers\cms\runtime.ts:24: import { validateSite, validatePages, validateVisualComponents, SiteValidationError } from '@core/persistence/validate'
+Instatic\server\handlers\cms\runtime.ts:31: parseVisualComponent,
+Instatic\server\handlers\cms\runtime.ts:34: } from '@core/visualComponents'
+Instatic\server\handlers\cms\runtime.ts:59: * `site.visualComponents` so the publisher can render the VC tree through the
+Instatic\server\handlers\cms\runtime.ts:69: const vc = site.visualComponents.find((candidate) => candidate.id === vcId)
+Instatic\server\handlers\cms\runtime.ts:163: // Parse each component separately so validateVisualComponents can run.
+Instatic\server\handlers\cms\runtime.ts:165: const rawVCs = Array.isArray(body.site.visualComponents) ? body.site.visualComponents : []
+Instatic\server\handlers\cms\runtime.ts:167: const vc = parseVisualComponent(raw)
+Instatic\server\handlers\cms\runtime.ts:170: const visualComponents = validateVisualComponents(parsedVCs)
+Instatic\server\handlers\cms\runtime.ts:174: const pages = validatePages(shell, rawPages, visualComponents, {
+Instatic\server\handlers\cms\runtime.ts:178: const site: SiteDocument = { ...shell, pages, visualComponents, layouts: [] }
+Instatic\server\handlers\cms\sso.ts:7: * INSTATIC_SSO_SECRET. The tenant's hub redirects here with a short-lived signed
+Instatic\server\plugins\pack.ts:11: *      (`parseVisualComponent`, `parsePageNode` traversal, etc.).
+Instatic\server\plugins\pack.ts:30: import { parseVisualComponent } from '@core/visualComponents'
+Instatic\server\plugins\pack.ts:31: import type { VisualComponent } from '@core/visualComponents'
+Instatic\server\plugins\pack.ts:41: visualComponents: VisualComponent[]
+Instatic\server\plugins\pack.ts:51: visualComponents: string[]
+Instatic\server\plugins\pack.ts:66: visualComponents: Type.Optional(Type.Array(Type.Unknown())),
+Instatic\server\plugins\pack.ts:94: const visualComponents: VisualComponent[] = []
+Instatic\server\plugins\pack.ts:95: for (const rawVc of parsed.value.visualComponents ?? []) {
+Instatic\server\plugins\pack.ts:96: const vc = parseVisualComponent(rawVc)
+Instatic\server\plugins\pack.ts:100: visualComponents.push(vc)
+Instatic\server\plugins\pack.ts:166: return { visualComponents, pages, classes, layouts }
+Instatic\server\plugins\pack.ts:198: visualComponents: [],
+Instatic\server\plugins\pack.ts:206: for (const vc of pack.visualComponents) {
+Instatic\server\plugins\pack.ts:207: if (site.visualComponents.some((v) => v.id === vc.id)) {
+Instatic\server\plugins\pack.ts:208: replaced.visualComponents.push(vc.id)
+Instatic\server\publish\renderTreeWalk.ts:2: import { selectVisualComponentById } from '@core/page-tree'
+Instatic\server\publish\renderTreeWalk.ts:37: const vc = selectVisualComponentById(site, componentId)
+Instatic\server\repositories\data\rows\import.ts:5: *   upsertDataRow         — id-preserving upsert (merge-overwrite / replace)
+Instatic\server\repositories\data\rows\import.ts:28: * the `merge-overwrite` and `replace` import strategies.
+Instatic\server\repositories\data\tables.ts:13: *   insertDataTableIfAbsent  — insert only if id absent; used by merge-add / merge-overwrite
+Instatic\server\repositories\data\tables.ts:256: * the `merge-add` and `merge-overwrite` import strategies.
+Instatic\server\repositories\publish.ts:33: import { visualComponentFromRow } from '../../src/core/data/componentFromRow'
+Instatic\server\repositories\publish.ts:34: import { validateVisualComponents } from '../../src/core/persistence/validate'
+Instatic\server\repositories\publish.ts:158: const visualComponents = validateVisualComponents(
+Instatic\server\repositories\publish.ts:159: vcRows.flatMap((r) => { const vc = visualComponentFromRow(r); return vc ? [vc] : [] })
+Instatic\server\repositories\publish.ts:164: visualComponents,
+Instatic\src\core\ai\documentRefs.ts:51: for (const vc of site.visualComponents ?? []) {
+Instatic\src\core\ai\documentRefs.ts:52: const document: AgentDocumentRef = { type: 'visualComponent', id: vc.id }
+Instatic\src\core\ai\readSurface.ts:328: for (const vc of site.visualComponents ?? []) {
+Instatic\src\core\ai\toolSchemas.ts:44: type: Type.Literal('visualComponent'),
+Instatic\src\core\ai\toolSchemas.ts:85: // visual component (a `visualComponent:<id>` document) on the active page,
+Instatic\src\core\data\bundleSchema.ts:28: *   - merge-overwrite — upsert rows/tables; overwrite existing content with bundle
+Instatic\src\core\data\bundleSchema.ts:151: *   merge-overwrite — upsert: add missing, update existing with bundle values
+Instatic\src\core\data\bundleSchema.ts:156: Type.Literal('merge-overwrite'),
+Instatic\src\core\data\bundleSchema.ts:285: /** Rows in the bundle whose id already exists locally (would be overwritten by merge-overwrite). */
+Instatic\src\core\data\componentFromRow.ts:2: * Bidirectional adapter between `VisualComponent` (in-memory type) and
+Instatic\src\core\data\componentFromRow.ts:6: * The `components` system table fields map to VisualComponent fields as follows:
+Instatic\src\core\data\componentFromRow.ts:15: * `breakpoints` was dropped from VisualComponentSchema in the Step 4 refactor:
+Instatic\src\core\data\componentFromRow.ts:21: import { parseVisualComponent, vcSlugFromName, type VisualComponent } from '@core/visualComponents'
+Instatic\src\core\data\componentFromRow.ts:24: // DataRow → VisualComponent
+Instatic\src\core\data\componentFromRow.ts:28: * Reconstruct a `VisualComponent` from a `DataRow` (table_id = 'components').
+Instatic\src\core\data\componentFromRow.ts:30: * Uses `parseVisualComponent` internally so all tolerance logic (missing
+Instatic\src\core\data\componentFromRow.ts:34: export function visualComponentFromRow(row: DataRow): VisualComponent | null {
+Instatic\src\core\data\componentFromRow.ts:37: // Build the raw VC shape that parseVisualComponent expects.
+Instatic\src\core\data\componentFromRow.ts:53: return parseVisualComponent(rawVC)
+Instatic\src\core\data\componentFromRow.ts:57: // VisualComponent → DataRowCells
+Instatic\src\core\data\componentFromRow.ts:61: * Convert a `VisualComponent` to the `DataRowCells` shape for storage in
+Instatic\src\core\data\componentFromRow.ts:69: export function visualComponentToCells(vc: VisualComponent): DataRowCells {
+Instatic\src\core\framework\changeImpact.ts:40: kind: 'visualComponent'
+Instatic\src\core\framework\changeImpact.ts:64: *   - Visual-component assignments come from each VisualComponent's
+Instatic\src\core\framework\changeImpact.ts:106: for (const vc of beforeSite.visualComponents) {
+Instatic\src\core\framework\changeImpact.ts:114: kind: 'visualComponent',
+Instatic\src\core\framework\changeImpact.ts:131: kind: 'visualComponent',
+Instatic\src\core\module-engine\dependencies.ts:23: visualComponents: ReadonlyArray<{ tree: { nodes: Record<string, BaseNode> } }>
+Instatic\src\core\module-engine\dependencies.ts:107: for (const component of site.visualComponents) {
+Instatic\src\core\page-tree\baseNode.ts:6: * `visualComponents/schemas.ts` can import this base without pulling in the
+Instatic\src\core\page-tree\baseNode.ts:8: * `page-tree/types ↔ visualComponents/{types,schemas}`.
+Instatic\src\core\page-tree\baseNode.ts:36: // `VCNodeSchema` (in `src/core/visualComponents/schemas.ts`) is a direct
+Instatic\src\core\page-tree\baseNode.ts:136: * visualComponents/schemas) instead of relying on schema-level transforms.
+Instatic\src\core\page-tree\baseNode.ts:162: // on top; `parseVCNode` (in visualComponents/schemas) uses it as-is, converting
+Instatic\src\core\page-tree\index.ts:182: selectVisualComponentById,
+Instatic\src\core\page-tree\nodeDisplayName.ts:27: import type { VisualComponent } from '@core/visual-components-schema'
+Instatic\src\core\page-tree\nodeDisplayName.ts:34: visualComponents: ReadonlyArray<VisualComponent> | undefined,
+Instatic\src\core\page-tree\nodeDisplayName.ts:40: if (typeof componentId === 'string' && componentId.length > 0 && visualComponents) {
+Instatic\src\core\page-tree\nodeDisplayName.ts:41: const vc = visualComponents.find((v) => v.id === componentId)
+Instatic\src\core\page-tree\scopedClassClone.ts:15: * `clipboardSlice.pasteNode` and `visualComponentsSlice.clonePageSubtreeToFlatNodes`
+Instatic\src\core\page-tree\siteDocument.ts:11: * the full `SiteDocument` (shell + pages + visualComponents + layouts) on
+Instatic\src\core\page-tree\siteDocument.ts:44: import { type VisualComponent } from '@core/visual-components-schema'
+Instatic\src\core\page-tree\siteDocument.ts:58: // scans for the schema declaration below and asserts no visualComponents key
+Instatic\src\core\page-tree\siteDocument.ts:104: visualComponents: VisualComponent[]
+Instatic\src\core\page-tree\siteDocument.ts:166: *   - VCs: via `visualComponentFromRow` + `validateVisualComponents` in
+Instatic\src\core\page-tree\siteExplorer.ts:6: import type { VisualComponent } from '@core/visual-components-schema'
+Instatic\src\core\page-tree\siteExplorer.ts:73: visualComponents: readonly VisualComponent[]
+Instatic\src\core\page-tree\siteExplorer.ts:228: components: reconcileSection(base.components, sources.visualComponents.map((component) => component.id)),
+Instatic\src\core\page-tree\siteSelectors.ts:5: * detecting dynamic subtrees. This builds a `vcId → VisualComponent` map once
+Instatic\src\core\page-tree\siteSelectors.ts:6: * per `site.visualComponents` array reference and caches it in a module-level
+Instatic\src\core\page-tree\siteSelectors.ts:11: import type { VisualComponent } from '@core/visual-components-schema'
+Instatic\src\core\page-tree\siteSelectors.ts:17: const _vcsByIdCache = new WeakMap<readonly VisualComponent[], Map<string, VisualComponent>>()
+Instatic\src\core\page-tree\siteSelectors.ts:27: const EMPTY_VC_MAP: ReadonlyMap<string, VisualComponent> = new Map()
+Instatic\src\core\page-tree\siteSelectors.ts:30: * Return a `Map<vcId, VisualComponent>` for the given site. Memoised on the
+Instatic\src\core\page-tree\siteSelectors.ts:31: * `site.visualComponents` array reference. When the site has no VCs
+Instatic\src\core\page-tree\siteSelectors.ts:35: function selectVisualComponentsById(
+Instatic\src\core\page-tree\siteSelectors.ts:37: ): ReadonlyMap<string, VisualComponent> {
+Instatic\src\core\page-tree\siteSelectors.ts:38: const vcs = site.visualComponents
+Instatic\src\core\page-tree\siteSelectors.ts:48: export function selectVisualComponentById(
+Instatic\src\core\page-tree\siteSelectors.ts:51: ): VisualComponent | undefined {
+Instatic\src\core\page-tree\siteSelectors.ts:52: return selectVisualComponentsById(site).get(componentId)
+Instatic\src\core\page-tree\subtreeRemoval.ts:11: *   - slot-sync's delete op (visualComponents/slotSync) — `unlinkParent: false`
+Instatic\src\core\page-tree\treeSchema.ts:17: * A `VisualComponent` HAS a `NodeTree` exposed as `vc.tree`. A slot fill is
+Instatic\src\core\persistence\cms.ts:6: import { validateSite, validatePages, validateVisualComponents } from './validate'
+Instatic\src\core\persistence\cms.ts:9: import { visualComponentFromRow } from '@core/data/componentFromRow'
+Instatic\src\core\persistence\cms.ts:11: import type { VisualComponent } from '@core/visualComponents'
+Instatic\src\core\persistence\cms.ts:49: const { pages, visualComponents, layouts, ...shell } = site
+Instatic\src\core\persistence\cms.ts:56: ? visualComponents.filter((vc) => dirty.componentIds.has(vc.id))
+Instatic\src\core\persistence\cms.ts:57: : visualComponents
+Instatic\src\core\persistence\cms.ts:73: componentIds: visualComponents.map((vc) => vc.id),
+Instatic\src\core\persistence\cms.ts:113: *      visualComponentFromRow, validated by validateVisualComponents)
+Instatic\src\core\persistence\cms.ts:161: // Convert DataRow[] → VisualComponent[] → validate
+Instatic\src\core\persistence\cms.ts:164: const vc = visualComponentFromRow(row)
+Instatic\src\core\persistence\cms.ts:167: const visualComponents: VisualComponent[] = validateVisualComponents(rawVCs)
+Instatic\src\core\persistence\cms.ts:183: const pages = validatePages(shell, rawPages, visualComponents, {
+Instatic\src\core\persistence\cms.ts:188: const site: SiteDocument = { ...shell, pages, visualComponents, layouts }
+Instatic\src\core\persistence\cmsTransfer.ts:189: *   - `merge-overwrite` — upsert: add missing, overwrite existing with bundle values
+Instatic\src\core\persistence\responseSchemas.ts:248: * converting through visualComponentFromRow + validateVisualComponents.
+Instatic\src\core\persistence\responseSchemas.ts:317: visualComponents: Type.Array(Type.Object({ id: Type.String(), name: Type.String() })),
+Instatic\src\core\persistence\responseSchemas.ts:323: visualComponents: Type.Array(Type.String()),
+Instatic\src\core\persistence\validate.ts:2: * validateSite / validatePages / validateVisualComponents — Constraint #230:
+Instatic\src\core\persistence\validate.ts:14: * `validateVisualComponents(rawVCs): VisualComponent[]`
+Instatic\src\core\persistence\validate.ts:15: *   Parses each raw VC via `parseVisualComponent`, then runs VC-specific rules:
+Instatic\src\core\persistence\validate.ts:21: * `validatePages(shell, rawPages, visualComponents?): Page[]`
+Instatic\src\core\persistence\validate.ts:27: *     4. VC slot sync (uses visualComponents for context)
+Instatic\src\core\persistence\validate.ts:34: import type { VisualComponent } from '@core/visualComponents'
+Instatic\src\core\persistence\validate.ts:37: parseVisualComponent,
+Instatic\src\core\persistence\validate.ts:43: } from '@core/visualComponents'
+Instatic\src\core\persistence\validate.ts:92: * `validateVisualComponents`. The adapter assembles the full `SiteDocument`
+Instatic\src\core\persistence\validate.ts:98: * const vcs   = validateVisualComponents(rawVcRows)
+Instatic\src\core\persistence\validate.ts:100: * store.loadSite({ ...shell, pages, visualComponents: vcs })
+Instatic\src\core\persistence\validate.ts:116: * Uses `visualComponents` for VC slot-sync and dangling-ref checks. Pass the
+Instatic\src\core\persistence\validate.ts:117: * result of `validateVisualComponents` here for full context; omit (or pass [])
+Instatic\src\core\persistence\validate.ts:136: * (ISS-016). Defaults to the surviving `visualComponents` ids (correct for the
+Instatic\src\core\persistence\validate.ts:145: visualComponents: VisualComponent[] = [],
+Instatic\src\core\persistence\validate.ts:164: syncVCSlotInstancesInTrees(pages.map((p) => p.nodes as Record<string, BaseNode>), visualComponents)
+Instatic\src\core\persistence\validate.ts:165: const knownVcIds = storedVcIds ?? new Set(visualComponents.map((vc) => vc.id))
+Instatic\src\core\persistence\validate.ts:182: visualComponents: VisualComponent[],
+Instatic\src\core\persistence\validate.ts:213: syncVCSlotInstancesInTrees(pages.map((p) => p.nodes as Record<string, BaseNode>), visualComponents)
+Instatic\src\core\persistence\validate.ts:214: stripDanglingVCRefsInPages(pages, new Set(visualComponents.map((vc) => vc.id)))
+Instatic\src\core\persistence\validate.ts:231: export function validateVisualComponentsForPartialWrite(
+Instatic\src\core\persistence\validate.ts:233: existing: VisualComponent[],
+Instatic\src\core\persistence\validate.ts:235: ): VisualComponent[] {
+Instatic\src\core\persistence\validate.ts:236: const parsed: VisualComponent[] = []
+Instatic\src\core\persistence\validate.ts:238: const vc = parseVisualComponent(rawChangedVCs[i])
+Instatic\src\core\persistence\validate.ts:240: throw new SiteValidationError('invalid Visual Component', `site.visualComponents[${i}]`)
+Instatic\src\core\persistence\validate.ts:243: assertValidNodeTree(vc.tree, `site.visualComponents[${i}].tree`)
+Instatic\src\core\persistence\validate.ts:245: throw siteValidationErrorFromTreeInvariant(err, `site.visualComponents[${i}].tree`)
+Instatic\src\core\persistence\validate.ts:251: const merged: VisualComponent[] = [
+Instatic\src\core\persistence\validate.ts:263: * Parse and validate an array of raw VisualComponent objects (loaded via
+Instatic\src\core\persistence\validate.ts:264: * `visualComponentFromRow` from `data_rows where table_id = 'components'`).
+Instatic\src\core\persistence\validate.ts:267: *   1. Parse each via `parseVisualComponent` — silently drops malformed entries.
+Instatic\src\core\persistence\validate.ts:273: * Returns the validated `VisualComponent[]` ready to assemble into a
+Instatic\src\core\persistence\validate.ts:276: export function validateVisualComponents(rawVCs: unknown[]): VisualComponent[] {
+Instatic\src\core\persistence\validate.ts:278: const parsed: VisualComponent[] = rawVCs.flatMap((item) => {
+Instatic\src\core\persistence\validate.ts:279: const vc = parseVisualComponent(item)
+Instatic\src\core\persistence\validate.ts:282: assertValidNodeTree(vc.tree, 'site.visualComponents[].tree')
+Instatic\src\core\persistence\validate.ts:303: * Unlike `validateVisualComponents`, this function never repairs by dropping a
+Instatic\src\core\persistence\validate.ts:325: * directly by `validatePages` and `validateVisualComponents`.
+Instatic\src\core\persistence\validate.ts:328: const knownVcIds = new Set(site.visualComponents.map((vc) => vc.id))
+Instatic\src\core\persistence\validate.ts:334: site.visualComponents.map((vc) => vc.tree.nodes as Record<string, BaseNode>),
+Instatic\src\core\persistence\validate.ts:345: function stripDanglingVCRefsInVCs(vcs: VisualComponent[]): void {
+Instatic\src\core\persistence\validate.ts:373: * Drop VisualComponents that form dependency cycles.
+Instatic\src\core\persistence\validate.ts:376: function filterCyclicVCs(vcs: VisualComponent[]): VisualComponent[] {
+Instatic\src\core\persistence\validate.ts:447: // VC post-checks (used by validateVisualComponents)
+Instatic\src\core\persistence\validate.ts:455: function dedupeVCsByName(vcs: VisualComponent[]): VisualComponent[] {
+Instatic\src\core\persistence\validate.ts:466: function validateStrictVCIdentity(vcs: VisualComponent[]): void {
+Instatic\src\core\persistence\validate.ts:471: const seenSlugs = new Map<string, VisualComponent>()
+Instatic\src\core\persistence\validate.ts:478: `site.visualComponents[${i}].id`,
+Instatic\src\core\persistence\validate.ts:485: throw new SiteValidationError(nameValidation.reason, `site.visualComponents[${i}].name`)
+Instatic\src\core\persistence\validate.ts:495: `site.visualComponents[${i}].name`,
+Instatic\src\core\persistence\validate.ts:502: function validateStrictVCRefs(vcs: VisualComponent[]): void {
+Instatic\src\core\persistence\validate.ts:510: `site.visualComponents[${i}].tree`,
+Instatic\src\core\persistence\validate.ts:517: function validateStrictVCDependencyGraph(vcs: VisualComponent[]): void {
+Instatic\src\core\persistence\validate.ts:526: `site.visualComponents`,
+Instatic\src\core\persistence\validate.ts:546: function sanitizeVCNodeRichtextProps(vcs: VisualComponent[]): void {
+Instatic\src\core\persistence\validate.ts:604: visualComponents: VisualComponent[],
+Instatic\src\core\persistence\validate.ts:606: const vcById = new Map(visualComponents.map((vc) => [vc.id, vc]))
+Instatic\src\core\persistence\validateLayouts.ts:10: *   Strict WRITE path mirroring `validateVisualComponentsForPartialWrite`:
+Instatic\src\core\plugin-sdk\builders\definePack.ts:10: *     visualComponents: [hero, featureRow],
+Instatic\src\core\plugin-sdk\builders\definePack.ts:38: import type { VisualComponent } from '@core/visualComponents'
+Instatic\src\core\plugin-sdk\builders\definePack.ts:43: visualComponents: VisualComponent[]
+Instatic\src\core\plugin-sdk\builders\definePack.ts:51: visualComponents?: VisualComponent[]
+Instatic\src\core\plugin-sdk\builders\definePack.ts:134: visualComponents: config.visualComponents ?? [],
+Instatic\src\core\plugin-sdk\builders\definePlugin.ts:13: *     permissions: [permissions.modulesRegister, permissions.visualComponentsRegister],
+Instatic\src\core\plugin-sdk\builders\definePlugin.ts:146: for (const vc of config.pack?.visualComponents ?? []) {
+Instatic\src\core\plugin-sdk\builders\permissions.ts:36: visualComponentsRegister: 'visualComponents.register',
+Instatic\src\core\plugin-sdk\builders\tree.ts:25: import type { VisualComponent, VCNode } from '@core/visualComponents'
+Instatic\src\core\plugin-sdk\builders\tree.ts:188: * Build a `VisualComponent` document from an id, name, and a tree
+Instatic\src\core\plugin-sdk\builders\tree.ts:196: ): VisualComponent {
+Instatic\src\core\plugin-sdk\builders\tree.ts:198: // Collect every classId referenced in the tree so the VisualComponent's
+Instatic\src\core\plugin-sdk\builders\tree.ts:222: ): VisualComponent {
+Instatic\src\core\plugin-sdk\types\manifest.ts:24: * with the shape `{ visualComponents?: VisualComponent[]; pages?: Page[];
+Instatic\src\core\plugin-sdk\types\permissions.ts:52: 'visualComponents.register',
+Instatic\src\core\plugin-sdk\capabilities.ts:114: permission: 'visualComponents.register',
+Instatic\src\core\publisher\classInjection.ts:12: * Shared by the standard renderer, `renderVisualComponentRef`, and
+Instatic\src\core\publisher\cssCollector.ts:31: * Traverses both page nodes (flat map) and VisualComponent flat tree nodes
+Instatic\src\core\publisher\cssCollector.ts:54: // Also collect classIds from all VisualComponent trees. VC nodes are rendered
+Instatic\src\core\publisher\cssCollector.ts:55: // inline by the publisher (renderVisualComponentRef) but live outside page.nodes —
+Instatic\src\core\publisher\cssCollector.ts:57: if (site.visualComponents) {
+Instatic\src\core\publisher\cssCollector.ts:58: for (const vc of site.visualComponents) {
+Instatic\src\core\publisher\dynamicDetection.ts:38: import { selectVisualComponentById } from '@core/page-tree'
+Instatic\src\core\publisher\dynamicDetection.ts:221: const vc = selectVisualComponentById(site, componentId)
+Instatic\src\core\publisher\frameworkCss.ts:84: for (const vc of site.visualComponents) {
+Instatic\src\core\publisher\holeSubtreeModules.ts:18: import { selectVisualComponentById } from '@core/page-tree'
+Instatic\src\core\publisher\holeSubtreeModules.ts:48: const vc = selectVisualComponentById(site, componentId)
+Instatic\src\core\publisher\render.ts:7: * `renderVisualComponentRef.ts`, `renderLoop.ts`). This file's job is the
+Instatic\src\core\publisher\renderConfig.ts:24: * (`renderNode.ts`), the specialised renderers (`renderVisualComponentRef.ts`,
+Instatic\src\core\publisher\renderNode.ts:34: import { renderVisualComponentRef } from './renderVisualComponentRef'
+Instatic\src\core\publisher\renderNode.ts:270: ['base.visual-component-ref', renderVisualComponentRef],
+Instatic\src\core\publisher\renderVisualComponentRef.ts:16: import { reindexNodeParents, selectVisualComponentById } from '@core/page-tree'
+Instatic\src\core\publisher\renderVisualComponentRef.ts:22: } from '@core/visualComponents'
+Instatic\src\core\publisher\renderVisualComponentRef.ts:68: export function renderVisualComponentRef(
+Instatic\src\core\publisher\renderVisualComponentRef.ts:82: const vc = selectVisualComponentById(config.site, componentId)
+Instatic\src\core\siteImport\adapter.ts:5: * The headless pipeline (`commitImportPlan`) calls the adapter to:
+Instatic\src\core\siteImport\adapter.ts:14: * @see src/core/siteImport/applyImport.ts — `commitImportPlan` caller
+Instatic\src\core\siteImport\adapter.ts:37: * `commitImportPlan`.
+Instatic\src\core\siteImport\adapter.ts:232: * @returns The new VisualComponent's id.
+Instatic\src\core\siteImport\adapter.ts:234: createVisualComponent(input: { name: string; nodeFragment: ImportFragment }): string
+Instatic\src\core\siteImport\applyAssetRewrites.ts:39: * @param plan       — ImportPlan produced by `buildImportPlan`.
+Instatic\src\core\siteImport\applyAssetRewrites.ts:78: * A file whose `src` didn't upload keeps its FileMap key — `commitImportPlan`
+Instatic\src\core\siteImport\buildPlan.ts:2: * buildImportPlan — the analysis half of the Super Import pipeline.
+Instatic\src\core\siteImport\buildPlan.ts:6: * for preview in the import wizard or direct commit via `commitImportPlan`
+Instatic\src\core\siteImport\buildPlan.ts:37: interface BuildImportPlanInput {
+Instatic\src\core\siteImport\buildPlan.ts:57: export function buildImportPlan({ fileMap, currentSite, options }: BuildImportPlanInput): ImportPlan {
+Instatic\src\core\siteImport\buildPlan.ts:180: //     VisualComponents on commit so operators edit once → all pages update.
+Instatic\src\core\siteImport\commitPlan.ts:2: * commitImportPlan — the commit half of the Super Import pipeline.
+Instatic\src\core\siteImport\commitPlan.ts:63: export async function commitImportPlan(
+Instatic\src\core\siteImport\commitPlan.ts:125: // Global sections: create VisualComponents and replace per-page section
+Instatic\src\core\siteImport\commitPlan.ts:447: *  1. Create a VisualComponent from the normalised representative fragment.
+Instatic\src\core\siteImport\commitPlan.ts:477: const vcId = tx.createVisualComponent({
+Instatic\src\core\siteImport\fontTokens.ts:92: function importTokenFromDeclaration(prop: string, value: string): ImportFontToken | null {
+Instatic\src\core\siteImport\fontTokens.ts:133: const token = typeof value === 'string' ? importTokenFromDeclaration(prop, value.trim()) : null
+Instatic\src\core\siteImport\globalSections.ts:8: * list of `GlobalSectionCandidate`s that `commitImportPlan` promotes to
+Instatic\src\core\siteImport\globalSections.ts:9: * VisualComponents.
+Instatic\src\core\siteImport\htmlPagePlan.ts:32: * the page had none. `buildImportPlan` parses this with the site's
+Instatic\src\core\siteImport\htmlPagePlan.ts:40: * `buildImportPlan` feeds these to `extractGoogleFontsFromHtmlLinks` so the
+Instatic\src\core\siteImport\index.ts:5: * Phase 2: ingestInput, classifyFiles, buildImportPlan (buildPlan.ts),
+Instatic\src\core\siteImport\index.ts:6: *          commitImportPlan (commitPlan.ts),
+Instatic\src\core\siteImport\index.ts:63: export { buildImportPlan } from './buildPlan'
+Instatic\src\core\siteImport\index.ts:64: export { commitImportPlan } from './commitPlan'
+Instatic\src\core\siteImport\planCss.ts:2: * CSS-source parsing phase of `buildImportPlan`.
+Instatic\src\core\siteImport\planCss.ts:10: * This used to be two copy-pasted loops inside `buildImportPlan`; any rule
+Instatic\src\core\siteImport\planCss.ts:25: * `buildImportPlan` run. Maps dedupe across sources (first occurrence wins,
+Instatic\src\core\siteImport\types.ts:259: /** Final committed page IDs. Filled by `commitImportPlan` before adapter call. */
+Instatic\src\core\siteImport\types.ts:308: /** Final committed page IDs. Filled by `commitImportPlan` before adapter call. */
+Instatic\src\core\siteImport\types.ts:517: * During commit, each candidate is promoted to a VisualComponent and every
+Instatic\src\core\siteImport\types.ts:534: * first matching page. Used as the VisualComponent's node tree on commit.
+Instatic\src\core\siteImport\types.ts:548: * Produced by `buildImportPlan`. Consumed by `commitImportPlan` (which calls
+Instatic\src\core\siteImport\types.ts:570: * uploaded media URL, then `commitImportPlan` assembles a `FontEntry`.
+Instatic\src\core\siteImport\types.ts:628: * VisualComponent by `commitImportPlan`, and each affected page's section node
+Instatic\src\core\siteImport\types.ts:639: * Returned by `commitImportPlan`. Provides enough information for the
+Instatic\src\core\visual-components-schema\index.ts:5: * Component shapes. The broad `@core/visualComponents` barrel also exports
+Instatic\src\core\visual-components-schema\index.ts:11: VisualComponentSchema,
+Instatic\src\core\visual-components-schema\index.ts:12: parseVisualComponent,
+Instatic\src\core\visual-components-schema\index.ts:13: } from '../visualComponents/schemas'
+Instatic\src\core\visual-components-schema\index.ts:18: VisualComponent,
+Instatic\src\core\visual-components-schema\index.ts:19: } from '../visualComponents/schemas'
+Instatic\src\core\visualComponents\deletionImpact.ts:14: import type { VisualComponent } from './schemas'
+Instatic\src\core\visualComponents\deletionImpact.ts:30: kind: 'visualComponent'
+Instatic\src\core\visualComponents\deletionImpact.ts:47: interface SiteWithVisualComponents {
+Instatic\src\core\visualComponents\deletionImpact.ts:49: visualComponents: ReadonlyArray<Pick<VisualComponent, 'id' | 'name'> & {
+Instatic\src\core\visualComponents\deletionImpact.ts:69: site: SiteWithVisualComponents,
+Instatic\src\core\visualComponents\deletionImpact.ts:72: const vc = site.visualComponents.find((v) => v.id === vcId)
+Instatic\src\core\visualComponents\deletionImpact.ts:95: for (const otherVc of site.visualComponents) {
+Instatic\src\core\visualComponents\deletionImpact.ts:102: kind: 'visualComponent',
+Instatic\src\core\visualComponents\index.ts:8: * External consumers import from `@core/visualComponents`. Files inside this
+Instatic\src\core\visualComponents\index.ts:12: export { VisualComponentSchema, parseVisualComponent } from './schemas'
+Instatic\src\core\visualComponents\index.ts:13: export type { VisualComponent, VCNode, VCParam, VCParamType } from './schemas'
+Instatic\src\core\visualComponents\instantiate.ts:20: *    delegates them to VisualComponentRefEditor for recursive rendering.
+Instatic\src\core\visualComponents\instantiate.ts:28: import type { VisualComponent, VCNode } from './schemas'
+Instatic\src\core\visualComponents\instantiate.ts:65: * Instantiate a VisualComponent at a reference site.
+Instatic\src\core\visualComponents\instantiate.ts:79: vc: VisualComponent,
+Instatic\src\core\visualComponents\origin.ts:14: import type { VisualComponent, VCParam } from './schemas'
+Instatic\src\core\visualComponents\origin.ts:43: vc: VisualComponent,
+Instatic\src\core\visualComponents\propGuards.ts:5: * `renderVisualComponentRef` walk raw, unvalidated `node.props` (they read the
+Instatic\src\core\visualComponents\recursionGuard.ts:12: *     without requiring a fully-typed VisualComponent.
+Instatic\src\core\visualComponents\recursionGuard.ts:14: *   wouldCreateCycle(visualComponents, hostVcId, candidateChildVcId)
+Instatic\src\core\visualComponents\recursionGuard.ts:40: * validateSite and wouldCreateCycle without requiring a fully-typed VisualComponent.
+Instatic\src\core\visualComponents\recursionGuard.ts:44: * @param vc - A VisualComponent (or unknown value from an untyped context).
+Instatic\src\core\visualComponents\recursionGuard.ts:81: * @param visualComponents - All VCs in the site.
+Instatic\src\core\visualComponents\recursionGuard.ts:87: visualComponents: unknown[],
+Instatic\src\core\visualComponents\recursionGuard.ts:96: for (const vc of visualComponents) {
+Instatic\src\core\visualComponents\schemas.ts:57: * stored in VisualComponent.tree: NodeTree<VCNode>.
+Instatic\src\core\visualComponents\schemas.ts:126: * Tolerant parser for a single VCNode (used by parseVisualComponent).
+Instatic\src\core\visualComponents\schemas.ts:130: * into a `null` drop so parseVisualComponent can skip the bad node without
+Instatic\src\core\visualComponents\schemas.ts:142: // tree rather than rejecting the whole VisualComponent.
+Instatic\src\core\visualComponents\schemas.ts:148: // VisualComponent — top-level VC document
+Instatic\src\core\visualComponents\schemas.ts:152: * TypeBox schema for a VisualComponent in memory.
+Instatic\src\core\visualComponents\schemas.ts:158: * `visualComponentFromRow` / `visualComponentToCells` in
+Instatic\src\core\visualComponents\schemas.ts:161: * For tolerant parsing, use `parseVisualComponent` instead of
+Instatic\src\core\visualComponents\schemas.ts:162: * `parseValue(VisualComponentSchema, raw)`.
+Instatic\src\core\visualComponents\schemas.ts:174: export const VisualComponentSchema = Type.Object({
+Instatic\src\core\visualComponents\schemas.ts:188: export type VisualComponent = Static<typeof VisualComponentSchema>
+Instatic\src\core\visualComponents\schemas.ts:191: * Tolerant parser for a VisualComponent. Handles:
+Instatic\src\core\visualComponents\schemas.ts:201: export function parseVisualComponent(raw: unknown): VisualComponent | null {
+Instatic\src\core\visualComponents\slotSync.ts:13: *     nodes map (called inside Mutative producers in siteSlice / visualComponentsSlice).
+Instatic\src\core\visualComponents\slotSync.ts:20: import type { VisualComponent } from './schemas'
+Instatic\src\core\visualComponents\slotSync.ts:160: vc: VisualComponent,
+Instatic\src\core\visualComponents\vcRefs.ts:28: * to typed `Page.nodes` / `VisualComponent.tree.nodes`. Non-object maps, non-ref
+Instatic\src\core\visualComponents\virtualPage.ts:5: * VC canvas mode (`activeDocument.kind === 'visualComponent'`) the surface
+Instatic\src\core\visualComponents\virtualPage.ts:16: * The id format is `vc-virtual:<vcId>` — `vcId` lives in `site.visualComponents`
+Instatic\src\core\visualComponents\virtualPage.ts:22: import type { VisualComponent } from './schemas'
+Instatic\src\core\visualComponents\virtualPage.ts:55: export function flattenVCToVirtualPage(vc: VisualComponent): Page {
+Instatic\src\admin\layouts\AdminCanvasLayout\AdminCanvasLayout.tsx:46: import { useStagedSiteImportHandoff } from '@admin/pages/site/hooks/useStagedSiteImportHandoff'
+Instatic\src\admin\layouts\AdminCanvasLayout\AdminCanvasLayout.tsx:175: // Share to CMS hand-off: pick up a staged FileMap from `?importToken=…` and
+Instatic\src\admin\layouts\AdminCanvasLayout\AdminCanvasLayout.tsx:177: useStagedSiteImportHandoff({ enabled: true })
+Instatic\src\admin\modals\SiteImport\shared\createSiteImportAdapter.ts:156: // `ensureFolderPath` propagate up — the surrounding `commitImportPlan`
+Instatic\src\admin\modals\SiteImport\shared\createSiteImportAdapter.ts:186: createVisualComponent: (input) => helpers.createVisualComponent(input),
+Instatic\src\admin\modals\SiteImport\shared\importPlanning.ts:115: * `commitImportPlan`.
+Instatic\src\admin\modals\SiteImport\shared\importPlanning.ts:207: visualComponents: [],
+Instatic\src\admin\modals\SiteImport\shared\useCmsBundleImport.ts:59: 'merge-overwrite': 'Merge-overwrite',
+Instatic\src\admin\modals\SiteImport\shared\useCmsBundleImport.ts:250: : cmsBundleState?.strategy === 'merge-overwrite'
+Instatic\src\admin\modals\SiteImport\steps\CmsBundleAnalyzeStep.tsx:52: value: 'merge-overwrite',
+Instatic\src\admin\modals\SiteImport\SiteImportModal.tsx:35: buildImportPlan,
+Instatic\src\admin\modals\SiteImport\SiteImportModal.tsx:36: commitImportPlan,
+Instatic\src\admin\modals\SiteImport\SiteImportModal.tsx:224: const importPlan = buildImportPlan({
+Instatic\src\admin\modals\SiteImport\SiteImportModal.tsx:241: // A FileMap staged by an external caller (see useStagedSiteImportHandoff)
+Instatic\src\admin\modals\SiteImport\SiteImportModal.tsx:435: const importResult = await commitImportPlan(resolvedPlan, adapter)
+Instatic\src\admin\pages\plugins\components\PluginCard\PluginCard.tsx:209: plugin.grantedPermissions.includes('visualComponents.register') &&
+Instatic\src\admin\pages\plugins\hooks\usePluginsWorkspace.ts:278: resolvedGrantedPermissions.includes('visualComponents.register')
+Instatic\src\admin\pages\plugins\hooks\usePluginsWorkspace.ts:363: summary.installed.visualComponents.length +
+Instatic\src\admin\pages\plugins\hooks\usePluginsWorkspace.ts:368: summary.replaced.visualComponents.length +
+Instatic\src\admin\pages\site\agent\codeAssetTools.ts:162: if (input.document.type === 'visualComponent') {
+Instatic\src\admin\pages\site\agent\documentTools.ts:16: import { flattenVCToVirtualPage } from '@core/visualComponents'
+Instatic\src\admin\pages\site\agent\documentTools.ts:33: if (activeDocument?.kind === 'visualComponent') {
+Instatic\src\admin\pages\site\agent\documentTools.ts:34: const vc = site.visualComponents?.find((component) => component.id === activeDocument.vcId)
+Instatic\src\admin\pages\site\agent\documentTools.ts:47: if (activeDocument?.kind === 'visualComponent') {
+Instatic\src\admin\pages\site\agent\documentTools.ts:48: const vc = site.visualComponents?.find((component) => component.id === activeDocument.vcId)
+Instatic\src\admin\pages\site\agent\documentTools.ts:64: for (const vc of site.visualComponents ?? []) {
+Instatic\src\admin\pages\site\agent\documentTools.ts:79: const ownerVc = site.visualComponents?.find((vc) => vc.tree.nodes[nodeId])
+Instatic\src\admin\pages\site\agent\documentTools.ts:80: if (ownerVc) store.setActiveDocument({ kind: 'visualComponent', vcId: ownerVc.id })
+Instatic\src\admin\pages\site\agent\documentTools.ts:87: if (activeDocument?.kind === 'visualComponent') {
+Instatic\src\admin\pages\site\agent\documentTools.ts:88: return { type: 'visualComponent', id: activeDocument.vcId }
+Instatic\src\admin\pages\site\agent\documentTools.ts:103: const vc = site.visualComponents?.find((component) => component.id === id)
+Instatic\src\admin\pages\site\agent\documentTools.ts:105: return `ID ${id} is a visualComponent document id, not a node id. Call site_read_document({ document: { type: "visualComponent", id: "${id}" } }) and use a returned uid.`
+Instatic\src\admin\pages\site\agent\documentTools.ts:131: if (document.type === 'visualComponent') {
+Instatic\src\admin\pages\site\agent\documentTools.ts:132: store.setActiveDocument({ kind: 'visualComponent', vcId: document.id })
+Instatic\src\admin\pages\site\agent\documentTools.ts:151: if (document.type === 'visualComponent') {
+Instatic\src\admin\pages\site\agent\documentTools.ts:152: const vc = site.visualComponents?.find((component) => component.id === document.id)
+Instatic\src\admin\pages\site\agent\documentTools.ts:155: type: 'visualComponent',
+Instatic\src\admin\pages\site\agent\executor.ts:425: const vc = site.visualComponents.find((v) => v.id === input.componentId)
+Instatic\src\admin\pages\site\agent\executor.ts:427: const available = site.visualComponents.map((v) => `${v.id} ("${v.name}")`).join(', ')
+Instatic\src\admin\pages\site\agent\pageContext.ts:31: if (state.activeDocument?.kind === 'visualComponent') {
+Instatic\src\admin\pages\site\agent\pageContext.ts:32: return { type: 'visualComponent', id: state.activeDocument.vcId }
+Instatic\src\admin\pages\site\agent\siteAgentSnapshot.ts:16: import { VisualComponentSchema } from '@core/visualComponents'
+Instatic\src\admin\pages\site\agent\siteAgentSnapshot.ts:31: visualComponents: Type.Array(VisualComponentSchema),
+Instatic\src\admin\pages\site\canvas\BreakpointFrame.tsx:101: setActiveDocument({ kind: 'visualComponent', vcId: id })
+Instatic\src\admin\pages\site\canvas\CanvasComposedTree.tsx:46: const isVcMode = useEditorStore((s) => s.activeDocument?.kind === 'visualComponent')
+Instatic\src\admin\pages\site\canvas\CanvasNotch.tsx:4: import type { VisualComponent } from "@core/visualComponents";
+Instatic\src\admin\pages\site\canvas\CanvasNotch.tsx:38: const EMPTY_COMPONENTS: VisualComponent[] = [];
+Instatic\src\admin\pages\site\canvas\CanvasNotch.tsx:143: const visualComponents = useEditorStore((s) => s.site?.visualComponents ?? EMPTY_COMPONENTS);
+Instatic\src\admin\pages\site\canvas\CanvasNotch.tsx:155: visualComponents,
+Instatic\src\admin\pages\site\canvas\CanvasRoot.tsx:57: const VisualComponentModeControl = lazy(() =>
+Instatic\src\admin\pages\site\canvas\CanvasRoot.tsx:58: import('./VisualComponentModeControl').then((module) => ({ default: module.default })),
+Instatic\src\admin\pages\site\canvas\CanvasRoot.tsx:140: ? getNodeDisplayName(node, definition, useEditorStore.getState().site?.visualComponents)
+Instatic\src\admin\pages\site\canvas\CanvasRoot.tsx:376: data-vc-mode={activeDocument?.kind === 'visualComponent' ? 'true' : undefined}
+Instatic\src\admin\pages\site\canvas\CanvasRoot.tsx:408: activeDocument?.kind === 'visualComponent' ? (
+Instatic\src\admin\pages\site\canvas\CanvasRoot.tsx:410: <VisualComponentModeControl />
+Instatic\src\admin\pages\site\canvas\CanvasTreeLadderMenu.tsx:5: import type { VisualComponent } from '@core/visualComponents'
+Instatic\src\admin\pages\site\canvas\CanvasTreeLadderMenu.tsx:14: const EMPTY_VISUAL_COMPONENTS: readonly VisualComponent[] = []
+Instatic\src\admin\pages\site\canvas\CanvasTreeLadderMenu.tsx:32: const visualComponents = useEditorStore((s) => s.site?.visualComponents ?? EMPTY_VISUAL_COMPONENTS)
+Instatic\src\admin\pages\site\canvas\CanvasTreeLadderMenu.tsx:73: visualComponents={visualComponents}
+Instatic\src\admin\pages\site\canvas\CanvasTreeLadderOverlay.tsx:11: import type { VisualComponent } from '@core/visualComponents'
+Instatic\src\admin\pages\site\canvas\CanvasTreeLadderOverlay.tsx:26: const EMPTY_VISUAL_COMPONENTS: readonly VisualComponent[] = []
+Instatic\src\admin\pages\site\canvas\CanvasTreeLadderOverlay.tsx:58: const visualComponents = useEditorStore((s) => s.site?.visualComponents ?? EMPTY_VISUAL_COMPONENTS)
+Instatic\src\admin\pages\site\canvas\CanvasTreeLadderOverlay.tsx:321: visualComponents={visualComponents}
+Instatic\src\admin\pages\site\canvas\CanvasTreeLadderRowButton.tsx:10: import type { VisualComponent } from '@core/visualComponents'
+Instatic\src\admin\pages\site\canvas\CanvasTreeLadderRowButton.tsx:20: visualComponents: ReadonlyArray<VisualComponent>
+Instatic\src\admin\pages\site\canvas\CanvasTreeLadderRowButton.tsx:31: visualComponents,
+Instatic\src\admin\pages\site\canvas\CanvasTreeLadderRowButton.tsx:37: const displayName = getNodeDisplayName(node, definition, visualComponents)
+Instatic\src\admin\pages\site\canvas\DocumentSwitcher.tsx:41: const components = useEditorStore((s) => s.site?.visualComponents ?? null)
+Instatic\src\admin\pages\site\canvas\DocumentSwitcher.tsx:58: setActiveDocument({ kind: 'visualComponent', vcId: id })
+Instatic\src\admin\pages\site\canvas\NodeRenderer.tsx:119: if (state.activeDocument?.kind !== 'visualComponent') {
+Instatic\src\admin\pages\site\canvas\NodeRenderer.tsx:144: if (state.activeDocument?.kind !== 'visualComponent') {
+Instatic\src\admin\pages\site\canvas\TemplateModeControl.tsx:4: * Mirrors `VisualComponentModeControl` visually: a borderless, text-first pill
+Instatic\src\admin\pages\site\canvas\TemplateModeControl.tsx:25: const isVcMode = useEditorStore((s) => s.activeDocument?.kind === 'visualComponent')
+Instatic\src\admin\pages\site\canvas\useCanvasKeyboardShortcuts.ts:162: if (activeDocument?.kind === 'visualComponent') {
+Instatic\src\admin\pages\site\canvas\useCanvasRenameDialog.ts:41: const currentName = getNodeDisplayName(node, definition, storeState.site?.visualComponents)
+Instatic\src\admin\pages\site\canvas\VisualComponentModeControl.tsx:2: * VisualComponentModeControl — floating Visual Component edit-mode control.
+Instatic\src\admin\pages\site\canvas\VisualComponentModeControl.tsx:11: import { type VisualComponent } from '@core/visualComponents'
+Instatic\src\admin\pages\site\canvas\VisualComponentModeControl.tsx:16: import styles from './VisualComponentModeControl.module.css'
+Instatic\src\admin\pages\site\canvas\VisualComponentModeControl.tsx:18: export default function VisualComponentModeControl() {
+Instatic\src\admin\pages\site\canvas\VisualComponentModeControl.tsx:20: const exitVisualComponentMode = useEditorStore((s) => s.exitVisualComponentMode)
+Instatic\src\admin\pages\site\canvas\VisualComponentModeControl.tsx:22: const vcId = activeDocument?.kind === 'visualComponent' ? activeDocument.vcId : null
+Instatic\src\admin\pages\site\canvas\VisualComponentModeControl.tsx:24: (s): VisualComponent | null =>
+Instatic\src\admin\pages\site\canvas\VisualComponentModeControl.tsx:25: s.site?.visualComponents?.find((component) => component.id === vcId) ?? null,
+Instatic\src\admin\pages\site\canvas\VisualComponentModeControl.tsx:28: if (activeDocument?.kind !== 'visualComponent' || !vc) return null
+Instatic\src\admin\pages\site\canvas\VisualComponentModeControl.tsx:37: onClick={exitVisualComponentMode}
+Instatic\src\admin\pages\site\componentization\componentizeEligibility.ts:9: activeDocument?.kind !== 'visualComponent' &&
+Instatic\src\admin\pages\site\hooks\usePersistence.ts:93: return !site.visualComponents.some((component) => component.id === deepLink.rowId)
+Instatic\src\admin\pages\site\hooks\useSiteEditorUrlSync.ts:20: *   /admin/site?table=components&row=<rowId>  → setActiveDocument({ kind: 'visualComponent', vcId: rowId })
+Instatic\src\admin\pages\site\hooks\useSiteEditorUrlSync.ts:61: } else if (table === 'components' && site.visualComponents.some((c) => c.id === rowId)) {
+Instatic\src\admin\pages\site\hooks\useSiteEditorUrlSync.ts:62: store.setActiveDocument({ kind: 'visualComponent', vcId: rowId })
+Instatic\src\admin\pages\site\hooks\useSiteEditorUrlSync.ts:81: if (s.activeDocument?.kind === 'visualComponent') return null
+Instatic\src\admin\pages\site\hooks\useStagedSiteImportHandoff.ts:2: * useStagedSiteImportHandoff — one-shot pickup of a FileMap staged by an
+Instatic\src\admin\pages\site\hooks\useStagedSiteImportHandoff.ts:4: * `server/handlers/cms/siteImport/stagedImports.ts`) so the tenant's browser
+Instatic\src\admin\pages\site\hooks\useStagedSiteImportHandoff.ts:6: * uses (`buildImportPlan` + `commitImportPlan` against the live editor
+Instatic\src\admin\pages\site\hooks\useStagedSiteImportHandoff.ts:9: * URL contract: `/admin/site?importToken=<token>` — consumed once on mount
+Instatic\src\admin\pages\site\hooks\useStagedSiteImportHandoff.ts:28: interface UseStagedSiteImportHandoffOptions {
+Instatic\src\admin\pages\site\hooks\useStagedSiteImportHandoff.ts:33: export function useStagedSiteImportHandoff({ enabled }: UseStagedSiteImportHandoffOptions): void {
+Instatic\src\admin\pages\site\hooks\useStagedSiteImportHandoff.ts:42: const token = initialParams.get('importToken')
+Instatic\src\admin\pages\site\hooks\useStagedSiteImportHandoff.ts:50: url.searchParams.delete('importToken')
+Instatic\src\admin\pages\site\hooks\useStagedSiteImportHandoff.ts:56: const result = await apiRequest(`/admin/api/cms/import/staged/${encodeURIComponent(token)}`, {
+Instatic\src\admin\pages\site\module-picker\ModuleInserterDialog.tsx:14: import type { VisualComponent } from '@core/visualComponents'
+Instatic\src\admin\pages\site\module-picker\ModuleInserterDialog.tsx:95: const EMPTY_COMPONENTS: VisualComponent[] = []
+Instatic\src\admin\pages\site\module-picker\ModuleInserterDialog.tsx:123: const visualComponents = useEditorStore((s) => s.site?.visualComponents ?? EMPTY_COMPONENTS)
+Instatic\src\admin\pages\site\module-picker\ModuleInserterDialog.tsx:142: visualComponents,
+Instatic\src\admin\pages\site\module-picker\moduleInserterModel.ts:7: import { wouldCreateCycle, type VisualComponent } from '@core/visualComponents'
+Instatic\src\admin\pages\site\module-picker\moduleInserterModel.ts:71: component: VisualComponent
+Instatic\src\admin\pages\site\module-picker\moduleInserterModel.ts:207: visualComponents: readonly VisualComponent[],
+Instatic\src\admin\pages\site\module-picker\moduleInserterModel.ts:222: if (wouldCreateCycle([...visualComponents], context.activeVcId, refId)) {
+Instatic\src\admin\pages\site\module-picker\moduleInserterModel.ts:239: visualComponents: readonly VisualComponent[],
+Instatic\src\admin\pages\site\module-picker\moduleInserterModel.ts:242: const disabledReason = savedLayoutDisabledReason(layout, context, visualComponents)
+Instatic\src\admin\pages\site\module-picker\moduleInserterModel.ts:309: components: readonly VisualComponent[],
+Instatic\src\admin\pages\site\module-picker\moduleInserterModel.ts:338: visualComponents,
+Instatic\src\admin\pages\site\module-picker\moduleInserterModel.ts:343: visualComponents: readonly VisualComponent[]
+Instatic\src\admin\pages\site\module-picker\moduleInserterModel.ts:346: const savedLayoutItems = getSavedLayoutItems(savedLayouts, context, visualComponents)
+Instatic\src\admin\pages\site\module-picker\moduleInserterModel.ts:347: const componentItems = getComponentItems(visualComponents)
+Instatic\src\admin\pages\site\module-picker\ModulePicker.tsx:28: import type { VisualComponent } from '@core/visualComponents'
+Instatic\src\admin\pages\site\module-picker\ModulePicker.tsx:40: const EMPTY_VCS: VisualComponent[] = []
+Instatic\src\admin\pages\site\module-picker\ModulePicker.tsx:67: const visualComponents = useEditorStore(
+Instatic\src\admin\pages\site\module-picker\ModulePicker.tsx:68: (s) => s.site?.visualComponents ?? EMPTY_VCS,
+Instatic\src\admin\pages\site\module-picker\ModulePicker.tsx:105: ? visualComponents
+Instatic\src\admin\pages\site\module-picker\ModulePicker.tsx:106: : visualComponents.filter((vc) =>
+Instatic\src\admin\pages\site\module-picker\useModuleInsertionContext.ts:13: const isVCMode = activeDocument?.kind === 'visualComponent'
+Instatic\src\admin\pages\site\module-picker\useModuleInsertionContext.ts:16: activeVcId: activeDocument?.kind === 'visualComponent' ? activeDocument.vcId : null,
+Instatic\src\admin\pages\site\panels\DomPanel\DomPanel.tsx:158: // Subscribe to the class registry + visualComponents so search results stay
+Instatic\src\admin\pages\site\panels\DomPanel\DomPanel.tsx:162: const visualComponents = useEditorStore((s) => s.site?.visualComponents)
+Instatic\src\admin\pages\site\panels\DomPanel\DomPanel.tsx:188: const hideStructuralRoot = activeDocument?.kind === 'visualComponent' && rootNode?.moduleId === 'base.body'
+Instatic\src\admin\pages\site\panels\DomPanel\DomPanel.tsx:371: const displayName = getNodeDisplayName(node, def, visualComponents)
+Instatic\src\admin\pages\site\panels\DomPanel\LayerNodeContextMenu.tsx:195: if (s.activeDocument?.kind === 'visualComponent') return false
+Instatic\src\admin\pages\site\panels\DomPanel\TreeNode.tsx:74: // Subscribe to visualComponents so VC renames re-render every ref's tree row
+Instatic\src\admin\pages\site\panels\DomPanel\TreeNode.tsx:76: const visualComponents = useEditorStore((s) => s.site?.visualComponents)
+Instatic\src\admin\pages\site\panels\DomPanel\TreeNode.tsx:149: const displayName = getNodeDisplayName(node, definition, visualComponents)
+Instatic\src\admin\pages\site\panels\DomPanel\useDomPanelDnd.ts:263: const visualComponents = useEditorStore.getState().site?.visualComponents
+Instatic\src\admin\pages\site\panels\DomPanel\useDomPanelDnd.ts:265: label: getNodeDisplayName(node, def, visualComponents),
+Instatic\src\admin\pages\site\panels\PropertiesPanel\ComponentParamsOverview.tsx:5: *   activeDocument.kind === 'visualComponent' && selectedNodeId === null && selectedSelectorClassId === null
+Instatic\src\admin\pages\site\panels\PropertiesPanel\ComponentParamsOverview.tsx:14: import { findParamOrigin } from '@core/visualComponents'
+Instatic\src\admin\pages\site\panels\PropertiesPanel\ComponentParamsOverview.tsx:16: import type { VisualComponent, VCParam } from '@core/visualComponents'
+Instatic\src\admin\pages\site\panels\PropertiesPanel\ComponentParamsOverview.tsx:27: vc: VisualComponent
+Instatic\src\admin\pages\site\panels\PropertiesPanel\ComponentRefView.tsx:6: * When a visualComponentRef node is selected, this view replaces the normal
+Instatic\src\admin\pages\site\panels\PropertiesPanel\ComponentRefView.tsx:38: (s) => s.site?.visualComponents?.find((v) => v.id === componentId) ?? null,
+Instatic\src\admin\pages\site\panels\PropertiesPanel\ComponentRefView.tsx:43: setActiveDocument({ kind: 'visualComponent', vcId: componentId })
+Instatic\src\admin\pages\site\panels\PropertiesPanel\ConvertToComponentButton.tsx:17: import { VisualComponentNameError } from '@site/store/slices/vcTreeOps'
+Instatic\src\admin\pages\site\panels\PropertiesPanel\ConvertToComponentButton.tsx:64: if (err instanceof VisualComponentNameError) {
+Instatic\src\admin\pages\site\panels\PropertiesPanel\MultiSelectionInspector.tsx:82: // The selectors subscribe to STABLE references (page + visualComponents +
+Instatic\src\admin\pages\site\panels\PropertiesPanel\MultiSelectionInspector.tsx:85: const visualComponents = useEditorStore((s) => s.site?.visualComponents)
+Instatic\src\admin\pages\site\panels\PropertiesPanel\MultiSelectionInspector.tsx:103: label: getNodeDisplayName(node, def, visualComponents),
+Instatic\src\admin\pages\site\panels\PropertiesPanel\ParamPromotableRow.tsx:20: import { validateParamName } from '@core/visualComponents'
+Instatic\src\admin\pages\site\panels\PropertiesPanel\ParamPromotableRow.tsx:28: import type { VCParam } from '@core/visualComponents'
+Instatic\src\admin\pages\site\panels\PropertiesPanel\ParamPromotableRow.tsx:71: (s) => s.site?.visualComponents?.find((v) => v.id === vcId)?.params ?? EMPTY_PARAMS,
+Instatic\src\admin\pages\site\panels\PropertiesPanel\ParamRow.tsx:16: import { validateParamName } from '@core/visualComponents'
+Instatic\src\admin\pages\site\panels\PropertiesPanel\ParamRow.tsx:17: import type { VCParamType } from '@core/visualComponents'
+Instatic\src\admin\pages\site\panels\PropertiesPanel\PropertiesPanelBody.tsx:26: import type { VisualComponent } from '@core/visualComponents'
+Instatic\src\admin\pages\site\panels\PropertiesPanel\PropertiesPanelBody.tsx:53: activeVc: VisualComponent | null
+Instatic\src\admin\pages\site\panels\PropertiesPanel\PropertiesPanelBody.tsx:104: activeDocument?.kind === 'visualComponent' &&
+Instatic\src\admin\pages\site\panels\PropertiesPanel\renderModuleTabContent.tsx:92: const inVisualComponent =
+Instatic\src\admin\pages\site\panels\PropertiesPanel\renderModuleTabContent.tsx:93: activeDocument?.kind === 'visualComponent' && selectedNodeId !== null
+Instatic\src\admin\pages\site\panels\PropertiesPanel\renderModuleTabContent.tsx:119: if (inVisualComponent && activeDocument?.kind === 'visualComponent' && selectedNodeId) {
+Instatic\src\admin\pages\site\panels\PropertiesPanel\usePropertiesPanelData.ts:31: import type { VisualComponent } from '@core/visualComponents'
+Instatic\src\admin\pages\site\panels\PropertiesPanel\usePropertiesPanelData.ts:52: activeVc: VisualComponent | null
+Instatic\src\admin\pages\site\panels\PropertiesPanel\usePropertiesPanelData.ts:130: const activeVc = activeDocument?.kind === 'visualComponent'
+Instatic\src\admin\pages\site\panels\PropertiesPanel\usePropertiesPanelData.ts:131: ? site?.visualComponents?.find((v) => v.id === activeDocument.vcId) ?? null
+Instatic\src\admin\pages\site\panels\SiteExplorerPanel\SiteExplorerPanel.tsx:93: const createVisualComponent = useEditorStore((s) => s.createVisualComponent)
+Instatic\src\admin\pages\site\panels\SiteExplorerPanel\SiteExplorerPanel.tsx:94: const renameVisualComponent = useEditorStore((s) => s.renameVisualComponent)
+Instatic\src\admin\pages\site\panels\SiteExplorerPanel\SiteExplorerPanel.tsx:95: const deleteVisualComponent = useEditorStore((s) => s.deleteVisualComponent)
+Instatic\src\admin\pages\site\panels\SiteExplorerPanel\SiteExplorerPanel.tsx:133: const vcId = createVisualComponent(name)
+Instatic\src\admin\pages\site\panels\SiteExplorerPanel\SiteExplorerPanel.tsx:134: setActiveDocument({ kind: 'visualComponent', vcId })
+Instatic\src\admin\pages\site\panels\SiteExplorerPanel\SiteExplorerPanel.tsx:151: const components = site?.visualComponents ?? []
+Instatic\src\admin\pages\site\panels\SiteExplorerPanel\SiteExplorerPanel.tsx:227: renameVisualComponent(inlineRenameTarget.id, value)
+Instatic\src\admin\pages\site\panels\SiteExplorerPanel\SiteExplorerPanel.tsx:257: deleteVisualComponent(target.id)
+Instatic\src\admin\pages\site\panels\SiteExplorerPanel\SiteExplorerPanel.tsx:258: if (activeDocument?.kind === 'visualComponent' && activeDocument.vcId === target.id) {
+Instatic\src\admin\pages\site\panels\SiteExplorerPanel\SiteExplorerPanel.tsx:308: for (const vcId of selection.itemIds) deleteVisualComponent(vcId)
+Instatic\src\admin\pages\site\panels\SiteExplorerPanel\SiteExplorerPanel.tsx:309: if (activeDocument?.kind === 'visualComponent' && selection.itemIds.includes(activeDocument.vcId)) {
+Instatic\src\admin\pages\site\panels\SiteExplorerPanel\SiteExplorerPanel.tsx:453: setActiveDocument({ kind: 'visualComponent', vcId: target.id })
+Instatic\src\admin\pages\site\panels\SiteExplorerPanel\SiteExplorerPanel.tsx:505: active: page.id === activePageId && activeDocument?.kind !== 'visualComponent',
+Instatic\src\admin\pages\site\panels\SiteExplorerPanel\SiteExplorerPanel.tsx:522: active: page.id === activePageId && activeDocument?.kind !== 'visualComponent',
+Instatic\src\admin\pages\site\panels\SiteExplorerPanel\SiteExplorerPanel.tsx:538: active: activeDocument?.kind === 'visualComponent' && activeDocument.vcId === component.id,
+Instatic\src\admin\pages\site\property-controls\paramTypeCompat.ts:10: import type { VCParamType } from '@core/visualComponents'
+Instatic\src\admin\pages\site\store\slices\site\framework\reconcile.ts:35: * VisualComponent itself, and every VCNode in the VC's flat tree.nodes map.
+Instatic\src\admin\pages\site\store\slices\site\framework\reconcile.ts:50: for (const vc of site.visualComponents) {
+Instatic\src\admin\pages\site\store\slices\site\defaults.ts:40: visualComponents: [],  // Contribution #619 — visual components data layer
+Instatic\src\admin\pages\site\store\slices\site\dirtyTracking.ts:11: *   - `['pages', i, …]` / `['visualComponents', i, …]` / `['layouts', i, …]`
+Instatic\src\admin\pages\site\store\slices\site\dirtyTracking.ts:20: *   - `['pages']` / `['visualComponents']` / `['layouts']` wholesale
+Instatic\src\admin\pages\site\store\slices\site\dirtyTracking.ts:44: const TRACKED_COLLECTIONS = ['pages', 'visualComponents', 'layouts'] as const
+Instatic\src\admin\pages\site\store\slices\site\dirtyTracking.ts:49: if (head === 'visualComponents') return marks.componentIds
+Instatic\src\admin\pages\site\store\slices\site\fontActions.ts:99: for (const vc of site.visualComponents) {
+Instatic\src\admin\pages\site\store\slices\site\helpers.ts:16: import type { VisualComponent, VCNode } from '@core/visualComponents'
+Instatic\src\admin\pages\site\store\slices\site\helpers.ts:18: import { collectSlotOutletNames } from '@core/visualComponents'
+Instatic\src\admin\pages\site\store\slices\site\helpers.ts:70: *   - VC mode (`activeDocument.kind === 'visualComponent'`): the VC's tree,
+Instatic\src\admin\pages\site\store\slices\site\helpers.ts:71: *     returned alongside the owning VisualComponent so callers can propagate
+Instatic\src\admin\pages\site\store\slices\site\helpers.ts:76: * This is the single implementation of the `kind === 'visualComponent'` tree
+Instatic\src\admin\pages\site\store\slices\site\helpers.ts:83: ): { tree: NodeTree<PageNode>; vc: VisualComponent | null } | null {
+Instatic\src\admin\pages\site\store\slices\site\helpers.ts:87: if (activeDocument?.kind === 'visualComponent') {
+Instatic\src\admin\pages\site\store\slices\site\helpers.ts:88: const vc = site.visualComponents.find((v) => v.id === activeDocument.vcId)
+Instatic\src\admin\pages\site\store\slices\site\helpers.ts:198: * `kind === 'visualComponent'` tree routing; `mutateActiveTree` is the only
+Instatic\src\admin\pages\site\store\slices\site\helpers.ts:339: const frozenVc = get().site?.visualComponents.find((v) => v.id === vc.id)
+Instatic\src\admin\pages\site\store\slices\site\helpers.ts:358: *   - VC mode (kind === 'visualComponent'): passes vc.tree directly, then
+Instatic\src\admin\pages\site\store\slices\site\helpers.ts:611: createVisualComponent({ name, nodeFragment }): string {
+Instatic\src\admin\pages\site\store\slices\site\helpers.ts:626: const newVC: VisualComponent = {
+Instatic\src\admin\pages\site\store\slices\site\helpers.ts:637: if (!site.visualComponents) site.visualComponents = []
+Instatic\src\admin\pages\site\store\slices\site\helpers.ts:638: site.visualComponents.push(newVC)
+Instatic\src\admin\pages\site\store\slices\site\lifecycleActions.ts:36: for (const vc of site.visualComponents ?? []) reindexNodeParents(vc.tree.nodes)
+Instatic\src\admin\pages\site\store\slices\site\nodeActions.ts:8: * MUST NOT contain their own `kind === 'visualComponent'` branch — that
+Instatic\src\admin\pages\site\store\slices\site\nodeActions.ts:36: import { wouldCreateCycle, syncSlotInstances, applySlotSyncResult } from '@core/visualComponents'
+Instatic\src\admin\pages\site\store\slices\site\nodeActions.ts:95: * `visualComponentsSlice.clonePageSubtreeToFlatNodes` so the publisher can
+Instatic\src\admin\pages\site\store\slices\site\nodeActions.ts:260: if (activeDocument?.kind === 'visualComponent' && site) {
+Instatic\src\admin\pages\site\store\slices\site\nodeActions.ts:261: if (wouldCreateCycle(site.visualComponents, activeDocument.vcId, componentId)) {
+Instatic\src\admin\pages\site\store\slices\site\nodeActions.ts:269: const vc = site?.visualComponents.find((v) => v.id === componentId)
+Instatic\src\admin\pages\site\store\slices\site\types.ts:409: *   - VC mode (kind === 'visualComponent'): passes vc.tree directly —
+Instatic\src\admin\pages\site\store\slices\styleRule\helpers.ts:87: for (const vc of site.visualComponents) {
+Instatic\src\admin\pages\site\store\slices\styleRule\helpers.ts:118: for (const vc of state.site.visualComponents) {
+Instatic\src\admin\pages\site\store\slices\styleRule\registryActions.ts:184: for (const vc of site.visualComponents) {
+Instatic\src\admin\pages\site\store\slices\layoutsSlice.ts:30: import { wouldCreateCycle } from '@core/visualComponents'
+Instatic\src\admin\pages\site\store\slices\layoutsSlice.ts:51: if (state.activeDocument?.kind === 'visualComponent') return null
+Instatic\src\admin\pages\site\store\slices\layoutsSlice.ts:169: const knownVcIds = new Set(site.visualComponents.map((vc) => vc.id))
+Instatic\src\admin\pages\site\store\slices\layoutsSlice.ts:183: if (state.activeDocument?.kind === 'visualComponent') {
+Instatic\src\admin\pages\site\store\slices\layoutsSlice.ts:186: if (wouldCreateCycle(site.visualComponents, hostVcId, refId)) {
+Instatic\src\admin\pages\site\store\slices\selectionSlice.ts:377: if (activeDocument?.kind === 'visualComponent') {
+Instatic\src\admin\pages\site\store\slices\selectionSlice.ts:378: const vc = state.site.visualComponents?.find((v) => v.id === activeDocument.vcId)
+Instatic\src\admin\pages\site\store\slices\selectionSlice.ts:429: if (activeDocument?.kind === 'visualComponent') {
+Instatic\src\admin\pages\site\store\slices\selectionSlice.ts:430: const component = state.site.visualComponents?.find((vc) => vc.id === activeDocument.vcId)
+Instatic\src\admin\pages\site\store\slices\siteSlice.ts:127: for (const vc of site.visualComponents ?? []) {
+Instatic\src\admin\pages\site\store\slices\uiSlice.ts:26: * 'page' → standard page canvas; 'visualComponent' → VC canvas mode (Task #438).
+Instatic\src\admin\pages\site\store\slices\uiSlice.ts:31: | { kind: 'visualComponent'; vcId: string }
+Instatic\src\admin\pages\site\store\slices\uiSlice.ts:201: exitVisualComponentMode: () => void
+Instatic\src\admin\pages\site\store\slices\uiSlice.ts:244: * avoid intermediate states where activeDocument is still 'visualComponent'
+Instatic\src\admin\pages\site\store\slices\uiSlice.ts:532: if (doc?.kind === 'visualComponent') {
+Instatic\src\admin\pages\site\store\slices\uiSlice.ts:557: exitVisualComponentMode: () =>
+Instatic\src\admin\pages\site\store\slices\uiSlice.ts:628: // Avoids an intermediate state where activeDocument is still 'visualComponent'
+Instatic\src\admin\pages\site\store\slices\uiSlice.ts:669: if (a.kind === 'visualComponent' && b.kind === 'visualComponent') return a.vcId === b.vcId
+Instatic\src\admin\pages\site\store\slices\vcSlotReconcile.ts:4: * Split out of `visualComponentsSlice.ts` (which owns the slice actions) so the
+Instatic\src\admin\pages\site\store\slices\vcSlotReconcile.ts:10: import type { VisualComponent } from '@core/visualComponents'
+Instatic\src\admin\pages\site\store\slices\vcSlotReconcile.ts:11: import { syncSlotInstances, applySlotSyncResult } from '@core/visualComponents'
+Instatic\src\admin\pages\site\store\slices\vcSlotReconcile.ts:21: vc: VisualComponent,
+Instatic\src\admin\pages\site\store\slices\vcSlotReconcile.ts:43: visualComponents: Array<{ tree: { nodes: Record<string, BaseNode> } }>
+Instatic\src\admin\pages\site\store\slices\vcSlotReconcile.ts:47: ...site.visualComponents.map((vc) => vc.tree.nodes),
+Instatic\src\admin\pages\site\store\slices\vcTreeOps.ts:3: * data layer. Split out of `visualComponentsSlice.ts` (which owns the store
+Instatic\src\admin\pages\site\store\slices\vcTreeOps.ts:10: import type { VCNode } from '@core/visualComponents'
+Instatic\src\admin\pages\site\store\slices\vcTreeOps.ts:18: export class VisualComponentNameError extends Error {
+Instatic\src\admin\pages\site\store\slices\vcTreeOps.ts:21: super(`[visualComponentsSlice] ${message}`)
+Instatic\src\admin\pages\site\store\slices\vcTreeOps.ts:22: this.name = 'VisualComponentNameError'
+Instatic\src\admin\pages\site\store\slices\vcTreeOps.ts:27: export class VisualComponentParamNameError extends Error {
+Instatic\src\admin\pages\site\store\slices\vcTreeOps.ts:30: super(`[visualComponentsSlice] ${message}`)
+Instatic\src\admin\pages\site\store\slices\vcTreeOps.ts:31: this.name = 'VisualComponentParamNameError'
+Instatic\src\admin\pages\site\store\slices\vcTreeOps.ts:36: export class VisualComponentRecursionError extends Error {
+Instatic\src\admin\pages\site\store\slices\vcTreeOps.ts:38: super(`[visualComponentsSlice] ${message}`)
+Instatic\src\admin\pages\site\store\slices\vcTreeOps.ts:39: this.name = 'VisualComponentRecursionError'
+Instatic\src\admin\pages\site\store\slices\vcTreeOps.ts:96: * Used by `deleteVisualComponent` to cascade ref removal across every page and
+Instatic\src\admin\pages\site\store\slices\vcTreeOps.ts:131: * Returns { nodes, rootNodeId } — a flat NodeTree for VisualComponent.tree.
+Instatic\src\admin\pages\site\store\slices\visualComponentsSlice.ts:2: * visualComponentsSlice — Visual Components Data Layer store slice.
+Instatic\src\admin\pages\site\store\slices\visualComponentsSlice.ts:6: * Manages site.visualComponents[] CRUD.
+Instatic\src\admin\pages\site\store\slices\visualComponentsSlice.ts:7: * State lives in site.visualComponents (owned by siteSlice);
+Instatic\src\admin\pages\site\store\slices\visualComponentsSlice.ts:20: import type { VisualComponent, VCParam, VCNode } from '@core/visualComponents'
+Instatic\src\admin\pages\site\store\slices\visualComponentsSlice.ts:27: } from '@core/visualComponents'
+Instatic\src\admin\pages\site\store\slices\visualComponentsSlice.ts:31: VisualComponentNameError,
+Instatic\src\admin\pages\site\store\slices\visualComponentsSlice.ts:32: VisualComponentParamNameError,
+Instatic\src\admin\pages\site\store\slices\visualComponentsSlice.ts:33: VisualComponentRecursionError,
+Instatic\src\admin\pages\site\store\slices\visualComponentsSlice.ts:40: interface VisualComponentsSlice {
+Instatic\src\admin\pages\site\store\slices\visualComponentsSlice.ts:45: * Throws VisualComponentNameError if:
+Instatic\src\admin\pages\site\store\slices\visualComponentsSlice.ts:48: createVisualComponent(name: string): string
+Instatic\src\admin\pages\site\store\slices\visualComponentsSlice.ts:53: * Throws VisualComponentNameError if the new name is invalid.
+Instatic\src\admin\pages\site\store\slices\visualComponentsSlice.ts:57: renameVisualComponent(id: string, newName: string): void
+Instatic\src\admin\pages\site\store\slices\visualComponentsSlice.ts:63: deleteVisualComponent(id: string): void
+Instatic\src\admin\pages\site\store\slices\visualComponentsSlice.ts:89: * Throws VisualComponentRecursionError if `newNode` is a
+Instatic\src\admin\pages\site\store\slices\visualComponentsSlice.ts:98: * Operates on the active VC tree (activeDocument.kind === 'visualComponent') or
+Instatic\src\admin\pages\site\store\slices\visualComponentsSlice.ts:120: * Throws VisualComponentParamNameError on invalid name.
+Instatic\src\admin\pages\site\store\slices\visualComponentsSlice.ts:144: * Throws VisualComponentNameError if `name` is invalid.
+Instatic\src\admin\pages\site\store\slices\visualComponentsSlice.ts:145: * Throws VisualComponentRecursionError if the subtree would introduce a
+Instatic\src\admin\pages\site\store\slices\visualComponentsSlice.ts:148: *   - Called while editing a visual component (activeDocument.kind === 'visualComponent')
+Instatic\src\admin\pages\site\store\slices\visualComponentsSlice.ts:164: interface EditorStore extends VisualComponentsSlice {}
+Instatic\src\admin\pages\site\store\slices\visualComponentsSlice.ts:167: export const createVisualComponentsSlice: EditorStoreSliceCreator<VisualComponentsSlice> = (set, get) => {
+Instatic\src\admin\pages\site\store\slices\visualComponentsSlice.ts:174: createVisualComponent(name) {
+Instatic\src\admin\pages\site\store\slices\visualComponentsSlice.ts:176: if (!site) throw new Error('[visualComponentsSlice] Site document is not initialized')
+Instatic\src\admin\pages\site\store\slices\visualComponentsSlice.ts:178: const validation = validateComponentName(name, site.visualComponents ?? [])
+Instatic\src\admin\pages\site\store\slices\visualComponentsSlice.ts:180: throw new VisualComponentNameError(validation.reason, validation.error)
+Instatic\src\admin\pages\site\store\slices\visualComponentsSlice.ts:198: const newVC: VisualComponent = {
+Instatic\src\admin\pages\site\store\slices\visualComponentsSlice.ts:211: if (!site.visualComponents) site.visualComponents = []
+Instatic\src\admin\pages\site\store\slices\visualComponentsSlice.ts:212: site.visualComponents.push(newVC)
+Instatic\src\admin\pages\site\store\slices\visualComponentsSlice.ts:219: renameVisualComponent(id, newName) {
+Instatic\src\admin\pages\site\store\slices\visualComponentsSlice.ts:221: if (!site) throw new Error('[visualComponentsSlice] Site document is not initialized')
+Instatic\src\admin\pages\site\store\slices\visualComponentsSlice.ts:223: const validation = validateComponentName(newName, site.visualComponents ?? [], id)
+Instatic\src\admin\pages\site\store\slices\visualComponentsSlice.ts:225: throw new VisualComponentNameError(validation.reason, validation.error)
+Instatic\src\admin\pages\site\store\slices\visualComponentsSlice.ts:231: const vc = (site.visualComponents ?? []).find((v) => v.id === id)
+Instatic\src\admin\pages\site\store\slices\visualComponentsSlice.ts:239: deleteVisualComponent(id) {
+Instatic\src\admin\pages\site\store\slices\visualComponentsSlice.ts:241: const idx = (site.visualComponents ?? []).findIndex((v) => v.id === id)
+Instatic\src\admin\pages\site\store\slices\visualComponentsSlice.ts:246: site.visualComponents.splice(idx, 1)
+Instatic\src\admin\pages\site\store\slices\visualComponentsSlice.ts:255: for (const vc of site.visualComponents) {
+Instatic\src\admin\pages\site\store\slices\visualComponentsSlice.ts:266: const vc = (site.visualComponents ?? []).find((v) => v.id === vcId)
+Instatic\src\admin\pages\site\store\slices\visualComponentsSlice.ts:270: throw new VisualComponentParamNameError(validation.reason, validation.error)
+Instatic\src\admin\pages\site\store\slices\visualComponentsSlice.ts:279: const vc = (site.visualComponents ?? []).find((v) => v.id === vcId)
+Instatic\src\admin\pages\site\store\slices\visualComponentsSlice.ts:304: const vc = (site.visualComponents ?? []).find((v) => v.id === vcId)
+Instatic\src\admin\pages\site\store\slices\visualComponentsSlice.ts:354: if (!site) throw new Error('[visualComponentsSlice] Site document is not initialized')
+Instatic\src\admin\pages\site\store\slices\visualComponentsSlice.ts:356: const vcs = site.visualComponents ?? []
+Instatic\src\admin\pages\site\store\slices\visualComponentsSlice.ts:363: throw new VisualComponentRecursionError(
+Instatic\src\admin\pages\site\store\slices\visualComponentsSlice.ts:371: const vc = (site.visualComponents ?? []).find((v) => v.id === vcId)
+Instatic\src\admin\pages\site\store\slices\visualComponentsSlice.ts:397: if (activeDocument?.kind !== 'visualComponent' && pageId == null) {
+Instatic\src\admin\pages\site\store\slices\visualComponentsSlice.ts:402: if (activeDocument?.kind === 'visualComponent') {
+Instatic\src\admin\pages\site\store\slices\visualComponentsSlice.ts:403: const vc = (site.visualComponents ?? []).find((v) => v.id === activeDocument.vcId)
+Instatic\src\admin\pages\site\store\slices\visualComponentsSlice.ts:427: if (activeDocument?.kind !== 'visualComponent' && pageId == null) {
+Instatic\src\admin\pages\site\store\slices\visualComponentsSlice.ts:432: if (activeDocument?.kind === 'visualComponent') {
+Instatic\src\admin\pages\site\store\slices\visualComponentsSlice.ts:433: const vc = (site.visualComponents ?? []).find((v) => v.id === activeDocument.vcId)
+Instatic\src\admin\pages\site\store\slices\visualComponentsSlice.ts:470: const vc = (site.visualComponents ?? []).find((v) => v.id === vcId)
+Instatic\src\admin\pages\site\store\slices\visualComponentsSlice.ts:484: const vc = (site.visualComponents ?? []).find((v) => v.id === vcId)
+Instatic\src\admin\pages\site\store\slices\visualComponentsSlice.ts:488: throw new VisualComponentParamNameError(validation.reason, validation.error)
+Instatic\src\admin\pages\site\store\slices\visualComponentsSlice.ts:496: const vc = (site.visualComponents ?? []).find((v) => v.id === vcId)
+Instatic\src\admin\pages\site\store\slices\visualComponentsSlice.ts:515: const vc = (site.visualComponents ?? []).find((v) => v.id === vcId)
+Instatic\src\admin\pages\site\store\slices\visualComponentsSlice.ts:556: if (!site) throw new Error('[visualComponentsSlice] Site document is not initialized')
+Instatic\src\admin\pages\site\store\slices\visualComponentsSlice.ts:558: // 1. Pre-validate name (mirrors renameVisualComponent pattern)
+Instatic\src\admin\pages\site\store\slices\visualComponentsSlice.ts:559: const nameValidation = validateComponentName(name, site.visualComponents ?? [])
+Instatic\src\admin\pages\site\store\slices\visualComponentsSlice.ts:561: throw new VisualComponentNameError(nameValidation.reason, nameValidation.error)
+Instatic\src\admin\pages\site\store\slices\visualComponentsSlice.ts:566: if (activeDocument?.kind === 'visualComponent') {
+Instatic\src\admin\pages\site\store\slices\visualComponentsSlice.ts:595: const refExists = (site.visualComponents ?? []).some((v) => v.id === vcRefId)
+Instatic\src\admin\pages\site\store\slices\visualComponentsSlice.ts:597: throw new VisualComponentRecursionError(
+Instatic\src\admin\pages\site\store\slices\visualComponentsSlice.ts:630: // this by construction; `createVisualComponent` enforces it for new
+Instatic\src\admin\pages\site\store\slices\visualComponentsSlice.ts:660: // 5d. Build the new VisualComponent
+Instatic\src\admin\pages\site\store\slices\visualComponentsSlice.ts:661: const newVc: VisualComponent = {
+Instatic\src\admin\pages\site\store\slices\visualComponentsSlice.ts:669: site.visualComponents.push(newVc)
+Instatic\src\admin\pages\site\store\slices\visualComponentsSlice.ts:707: state.activeDocument = { kind: 'visualComponent', vcId: newVcId }
+Instatic\src\admin\pages\site\store\store.ts:5: import { flattenVCToVirtualPage } from '@core/visualComponents'
+Instatic\src\admin\pages\site\store\store.ts:13: import { createVisualComponentsSlice } from './slices/visualComponentsSlice'
+Instatic\src\admin\pages\site\store\store.ts:29: * Composed of 14 slices (6 canonical Phase 0 + agentSlice + sitePanelSlice + filesSlice + visualComponentsSlice + clipboardSlice + inlineEditSlice + layoutsSlice + saveTrackingSlice):
+Instatic\src\admin\pages\site\store\store.ts:36: *   - visualComponentsSlice: VisualComponent CRUD (Contribution #619 / Task #436)
+Instatic\src\admin\pages\site\store\store.ts:72: ...createVisualComponentsSlice(...args),
+Instatic\src\admin\pages\site\store\store.ts:221: * - activeDocument.kind === 'visualComponent': returns a virtual Page built from the VC's rootNode.
+Instatic\src\admin\pages\site\store\store.ts:232: if (activeDocument.kind === 'visualComponent') {
+Instatic\src\admin\pages\site\store\store.ts:233: const vc = s.site?.visualComponents?.find(
+Instatic\src\admin\pages\site\SitePage.tsx:34: const newVc = consumePendingAction('site.newVisualComponent')
+Instatic\src\admin\pages\site\SitePage.tsx:38: const vcId = store.createVisualComponent(name)
+Instatic\src\admin\pages\site\SitePage.tsx:39: store.setActiveDocument({ kind: 'visualComponent', vcId })
+Instatic\src\admin\shared\dialogs\VCDeletionConfirmDialog\VCDeletionConfirmContext.tsx:29: import { previewVCDeletion } from '@core/visualComponents'
+Instatic\src\admin\shared\dialogs\VCDeletionConfirmDialog\VCDeletionConfirmDialog.tsx:16: import type { VCDeletionImpact, VCRefUsage } from '@core/visualComponents'
+Instatic\src\admin\shared\dialogs\VCDeletionConfirmDialog\VCDeletionConfirmDialog.tsx:36: (u): u is VCRefUsage & { source: { kind: 'visualComponent' } } =>
+Instatic\src\admin\shared\dialogs\VCDeletionConfirmDialog\VCDeletionConfirmDialog.tsx:37: u.source.kind === 'visualComponent',
+Instatic\src\admin\shared\dialogs\VCDeletionConfirmDialog\vcDeletionConfirmHook.ts:10: import type { VCDeletionImpact } from '@core/visualComponents'
+Instatic\src\admin\shared\dialogs\VCDeletionConfirmDialog\vcDeletionConfirmHook.ts:17: * Executes the actual deletion (deleteVisualComponent + any post-delete cleanup
+Instatic\src\admin\spotlight\commands\visualComponents.ts:12: export function getVisualComponentsCommands(): Command[] {
+Instatic\src\admin\spotlight\commands\visualComponents.ts:16: id: 'visualComponents.open',
+Instatic\src\admin\spotlight\commands\visualComponents.ts:19: group: 'visualComponents',
+Instatic\src\admin\spotlight\commands\visualComponents.ts:25: ctx.pushScope('visualComponents')
+Instatic\src\admin\spotlight\commands\visualComponents.ts:34: id: 'visualComponents.create',
+Instatic\src\admin\spotlight\commands\visualComponents.ts:37: group: 'visualComponents',
+Instatic\src\admin\spotlight\commands\visualComponents.ts:60: const vcId = store.createVisualComponent(name)
+Instatic\src\admin\spotlight\commands\visualComponents.ts:61: store.setActiveDocument({ kind: 'visualComponent', vcId })
+Instatic\src\admin\spotlight\commands\visualComponents.ts:65: console.error('[spotlight] createVisualComponent failed:', err)
+Instatic\src\admin\spotlight\commands\visualComponents.ts:69: queuePendingAction('site.newVisualComponent', { name })
+Instatic\src\admin\spotlight\commands\visualComponents.ts:76: id: 'visualComponents.exitMode',
+Instatic\src\admin\spotlight\commands\visualComponents.ts:79: group: 'visualComponents',
+Instatic\src\admin\spotlight\commands\visualComponents.ts:84: when: (ctx) => ctx.editor?.activeDocument?.kind === 'visualComponent',
+Instatic\src\admin\spotlight\commands\visualComponents.ts:90: useEditorStore.getState().exitVisualComponentMode()
+Instatic\src\admin\spotlight\commands\visualComponents.ts:92: console.error('[spotlight] exitVisualComponentMode failed:', err)
+Instatic\src\admin\spotlight\scopes\vcScope.ts:17: const vcs = site.visualComponents || []
+Instatic\src\admin\spotlight\scopes\vcScope.ts:18: const activeVcId = activeDocument?.kind === 'visualComponent'
+Instatic\src\admin\spotlight\scopes\vcScope.ts:23: id: `visualComponents.open.${vc.id}`,
+Instatic\src\admin\spotlight\scopes\vcScope.ts:26: group: 'visualComponents',
+Instatic\src\admin\spotlight\scopes\vcScope.ts:34: store.getState().setActiveDocument({ kind: 'visualComponent', vcId: vc.id })
+Instatic\src\admin\spotlight\scopes\vcScope.ts:43: id: 'visualComponents',
+Instatic\src\admin\spotlight\builtinCommands.ts:33: import { getVisualComponentsCommands } from './commands/visualComponents'
+Instatic\src\admin\spotlight\builtinCommands.ts:78: ...getVisualComponentsCommands(),
+Instatic\src\admin\spotlight\commandRegistry.ts:42: ['visualComponents', vcScope],
+Instatic\src\admin\spotlight\groupAccent.ts:33: visualComponents: 'violet',
+Instatic\src\admin\spotlight\matcher.ts:33: 'visualComponents',
+Instatic\src\admin\spotlight\pendingAction.ts:37: 'site.newVisualComponent',
+Instatic\src\admin\spotlight\SpotlightResults.tsx:51: visualComponents: 'Visual Components',
+Instatic\src\admin\spotlight\types.ts:23: | 'visualComponents'
+Instatic\src\admin\spotlight\types.ts:61: | { kind: 'visualComponent'; vcId: string }
+Instatic\src\admin\state\adminUi.ts:43: * landing straight on "Review import" — see `useStagedSiteImportHandoff`.
+Operator\control-plane\lib\env.mjs:56: // cleanly. Passed to each Instatic-connected OD daemon as OD_CMS_RULE_FILE;
+Operator\control-plane\lib\env.mjs:59: cmsRuleFile: abs(process.env.CMS_RULE_FILE || './Operator/rules/templateRule.md'),
+Operator\control-plane\runtime\odRuntime.mjs:73: OD_SSO_SECRET: config.tokenSecret,
+Operator\control-plane\runtime\odRuntime.mjs:74: OD_TENANT_SLUG: slug,
+Operator\control-plane\runtime\odRuntime.mjs:77: // daemon's localhost OD_INSTATIC_URL which a remote client can't reach.
+Operator\control-plane\runtime\odRuntime.mjs:81: ...(tenant.instaticUrl ? { OD_INSTATIC_URL: tenant.instaticUrl } : {}),
+Operator\control-plane\runtime\odRuntime.mjs:87: ? { OD_CMS_RULE_FILE: config.cmsRuleFile }
+Operator\control-plane\runtime\tenantRuntime.mjs:55: INSTATIC_SSO_SECRET: config.tokenSecret,
+Operator\control-plane\runtime\tenantRuntime.mjs:74: INSTATIC_AI_GATEWAY_URL: `${config.publicBaseUrl}/ai/${signTenantToken(slug)}/v1`,
+Operator\control-plane\runtime\tenantRuntime.mjs:79: INSTATIC_DEPLOY_WEBHOOK: `${config.publicBaseUrl}/deploy/${signTenantToken(slug)}`,
+Operator\rules\check-template-rule.mjs:5: // "Website Build Rule" (templateRule.md) — the same output contract OD is told
+Operator\rules\check-template-rule.mjs:143: injectsContent ? 'Inline <script> writes innerHTML/insertAdjacentHTML/outerHTML — visible content must be static HTML, not JS-rendered (see templateRule.md)' : '');
+Operator\rules\check-template-rule.mjs:152: hardcodedAssetInJs ? 'Inline <script> hardcodes an image path (e.g. /images/x.svg) — it 404s after import (paths rewrite to /uploads/). Read image URLs from an existing DOM <img> src instead (see templateRule.md)' : '');
+Operator\rules\check-template-rule.mjs:166: shorthandColorHit ? `Modern color function in a shorthand is dropped on import (color lost): ${firstLine(shorthandColorHit[0])} — use a :root var token (background: var(--token)) or the longhand (background-color: …) instead (see templateRule.md)` : '');
+Operator\rules\check-template-rule.mjs:173: droppedAtRule ? `${firstLine(droppedAtRule[0])} is dropped on import — all rules inside a @layer are lost. Write plain, source-ordered CSS (see templateRule.md)` : '');
+Operator\rules\check-template-rule.mjs:181: badImageFmt ? `Image uses a format the importer can't upload (avif/ico/bmp/tiff/heic): ${firstLine(badImageFmt[0])} — use jpg/png/webp/gif/svg (see templateRule.md)` : '');
+Operator\rules\check-template-rule.mjs:187: // the published site). The share transform (makeVisibleWithoutJs) injects a
+Operator\rules\check-template-rule.mjs:210: stillHidden.length ? `Hidden until JS runs → blank in the CMS canvas: ${[...new Set(stillHidden)].slice(0, 5).join(', ')} — content must be visible with CSS alone (see templateRule.md). The share auto-fix normally rewrites this.` : '');
+Operator\rules\globalAiGuidanceRule.md:5: English into correct edits on a site that was built with `templateRule.md`.
+Operator\rules\globalAiGuidanceRule.md:30: Every site here was imported from a template built to `templateRule.md`. That means the
+docs\CHANGELOG.md:9: - **Images are saved into the site (no more broken/missing images).** A build that referenced `/images/x.jpg` for files that were never created — OD's AI image provider is unconfigured and the rule banned external hotlinks, so the AI wrote dead local paths — shipped broken images and an empty media panel. A new deterministic step (`cms-image-materialize.ts`) guarantees every referenced image is a real file under `public/images/`: it captures an external photo URL, fetches a real royalty-free photo (keyless Lorem Picsum, deterministic) for a bare local path, or writes an SVG placeholder when offline. It runs on the OD canvas preview (images now show in the editor + Design panel) and at share (real bytes reach the CMS, importing as content-hash-deduplicated `/uploads/` media assets visible in the CMS editor and the published site). Provider-free — no image API key needed. Verified end-to-end (real photos fetched; zero broken links).
+docs\CHANGELOG.md:10: - **No more blank page in the CMS editor.** Pages looked blank in the Instatic editing canvas but fine once published — because the content was hidden until JavaScript ran (a full-screen loading overlay removed only by JS, plus `opacity:0` scroll-reveal sections), and the importer strips every `<script>` from the editing canvas. A share-time transform (`cms-normalize.makeVisibleWithoutJs`) rewrites the CMS-bound copy so all content is visible with CSS alone (loading overlay hidden, reveal content shown); OD's own design is untouched and keeps its animations. Verified: 0 gate failures across the real 5-page project, content visible on every page.
+docs\CHANGELOG.md:11: - **Friendlier "Fix it" (no jargon for tenants).** The block dialog and the "Fix it" chat message used to dump the full technical compliance report. Now the tenant sees a short, reassuring message (*"Your design looks great — one quick fix"*) while the full failure detail + fix directives go to the AI privately through a new hidden request channel (`context.agentInstruction`) — so a non-technical tenant never sees jargon, and the agent still gets everything it needs to make the page importable without changing the design.
+docs\CHANGELOG.md:12: - **Rulebook + gate.** Updated the build rule (`templateRule.md`) and the AI contract so OD produces compliant pages from the start (real images saved in; all content visible without JS), and added a "content visible without JavaScript" compliance check kept in parity across both checkers (`cms-compliance.ts` + `check-template-rule.mjs`). Compliance docs updated.
+docs\CHANGELOG.md:24: - **Share to CMS (no duplicates).** OpenDesign's share menu gains a "Share to CMS" action: it reads the project's built HTML/CSS/images, signs in as the Owner, and pushes to a new server-side importer in Instatic (`POST /admin/api/cms/import/site-html`). That importer reuses Instatic's own headless HTML→CMS analysis + class-linking (with a happy-dom `DOMParser` polyfill) and upserts pages by a stable id via `merge-overwrite`, so re-pushing the same site UPDATES pages instead of duplicating them. Verified E2E with the real "Build HTML from screenshot" project (first push imports; re-push → `replaced`, `inserted=0` → no duplicates).
+docs\CHANGELOG.md:35: The tenant clicks **Publish** inside Instatic → the site bakes locally AND ships to Cloudflare Pages, all from that one explicit action (never on autosave/edits). The CF token stays operator-only: Instatic just POSTs a token-authenticated webhook to the control-plane (`POST /deploy/<token>`), which runs the deploy with the operator's token — the token never enters the tenant instance. Fire-and-forget so Publish returns instantly; the deploy runs in the background and its live `.pages.dev` URL lands in the deploys registry (visible in the console). Wiring: `INSTATIC_DEPLOY_WEBHOOK` env from TenantRuntime → hook in Instatic's publish handler → token-verified control-plane endpoint.
+docs\CHANGELOG.md:44: Managed mode is now enabled by the gateway URL alone (`INSTATIC_AI_GATEWAY_URL`); `INSTATIC_AI_MODEL` remains only as an offline fallback. Change the model in the console → it applies to every tenant with no restart and no re-provision.
+docs\CHANGELOG.md:55: - **Env-driven managed mode** (`server/ai/managed.ts`, new): when the operator's runtime sets `INSTATIC_AI_GATEWAY_URL` + `INSTATIC_AI_MODEL`, Instatic runs "managed" — a synthetic gateway credential + the operator's model are auto-provided, so the editor AI Assistant works with zero tenant config.
+docs\CHANGELOG.md:64: Validated by importing a real Astro replica (**AtlasInfra**, built per `templateRule.md`) into a live tenant and comparing the published site to the original at `localhost:4321`. Every difference traced to a **platform** bug (the replica followed the rule correctly). Fixed 6 import/publish bugs + 2 operator bugs — all in `instatic/vendor` and `operator/control-plane`, so they apply to **every** tenant. First application-code change (earlier phases were planning + spikes). Regression tests added; full publisher/import suite green.
+docs\CHANGELOG.md:77: **`Afternoon`** — Tenant workflow clarified + `templateRule.md` created
+docs\CHANGELOG.md:79: - Path B use case: a client has an old website with no developer — someone (Operator, developer, AI agent — not SiteAgent's concern) rebuilds it following `docs/templateRule.md`, hands the `dist/` folder to the Tenant, and the Tenant imports it into Instatic for full editing.
+docs\CHANGELOG.md:80: - Created **`docs/templateRule.md`**: the build standard for Site Replicas — Astro static output, CSS inlined in HTML (`assetsInlineLimit: 1048576`, `cssCodeSplit: false`), JS libraries from CDN, all images in `public/` as plain `<img>` tags, `data-sa` markers on editable content.
+docs\CHANGELOG.md:81: - Updated `UserFlow.md` (Flow 4 rewritten), `CONTEXT.md` (new terms: templateRule.md, Site Replica, Tenant site paths).
+docs\mmsbuild-final-plan-review.md:33: | **Import Engine** (Firecrawl + visual-reconstruction) | Automatically reads an old website and pulls out its content | **Doesn't exist.** Today, rebuilding an old site is done **by hand** (a person or an AI agent follows `docs/templateRule.md` and rebuilds the site), then it's imported into Instatic. That import step works — the automatic "read the old site for me" step doesn't exist yet. |
+docs\mmsbuild-final-plan-review.md:100: **Where we stand:** the "import it into Instatic" half already works today (Super Import). What's missing is the automatic reading step before that — right now a person still has to rebuild the old site by hand following `docs/templateRule.md`. This phase can't really start until Firecrawl is set up (still pending, per our conversation).
+docs\od-cms-compliance.md:3: _Canonical reference for how OpenDesign (OD) is kept compatible with the Instatic CMS importer. Read this before touching `templateRule.md`, the OD CMS contract prompt, or the compliance gate. Companion to [`od-cms-vision.md`](./od-cms-vision.md) (the acceptance bar for "Share to CMS")._
+docs\od-cms-compliance.md:17: 1. **Prevention — OD builds it right (the primary layer).** `templateRule.md` is the authoritative, example-rich contract of exactly what the importer accepts; it is injected into OD's system prompt via [`cms-contract.ts`](../OpenDesign/apps/daemon/src/prompts/cms-contract.ts) (`renderCmsOutputContract`, read live from `OD_CMS_RULE_FILE`), with a hard-requirements shortlist and a silent self-audit.
+docs\od-cms-compliance.md:19: - **Images** — [`cms-image-materialize.ts`](../OpenDesign/apps/daemon/src/cms-image-materialize.ts) guarantees every referenced image is a real CMS-accepted file under `public/images/`: it **captures** an external photo URL (SSRF-guarded download), **fetches a real royalty-free photo** (keyless Lorem Picsum, deterministic seed) for a bare local `/images/x` with no file, or writes a **self-contained SVG placeholder** offline. Runs on the **preview** serve (fixes the OD canvas + Design panel) and in the **share** pipeline (real bytes reach the CMS). Provider-free (the AI image provider isn't needed).
+docs\od-cms-compliance.md:20: - **Visible-without-JS** — [`cms-normalize.ts`](../OpenDesign/apps/daemon/src/cms-normalize.ts) `makeVisibleWithoutJs` injects a `data-od-cms-visible` override on the **CMS-bound copy only** so content hidden until JS runs (a JS-dismissed loading overlay → `display:none`; `opacity:0`/`visibility:hidden` in-flow content → forced visible) shows in the (script-less) editing canvas. OD's source/preview keeps its JS animations.
+docs\od-cms-compliance.md:22: 3. **The gate — last-resort net + one-click self-heal.** At Share-to-CMS, [`cms-compliance.ts`](../OpenDesign/apps/daemon/src/cms-compliance.ts) checks the (normalized + auto-fixed) HTML; a `fail` returns HTTP 422 `CMS_COMPLIANCE_FAILED`. With layer 2 handling images + blank-canvas, the gate should rarely fire — only for a design-level violation (Tailwind, `@layer`, `color-mix` shorthand, JS-*built* content, external CSS). Then the tenant sees a **reassure-first dialog** (no jargon dump) with **Cancel** and **Fix it**. "Fix it" drops a short, reassuring message into the OD chat (`buildFixVisibleMessage`) while the agent privately receives the full compliance detail + fix directives via the hidden **`context.agentInstruction`** channel (`buildFixInstruction` → `onFixItPrompt` → `ProjectView.handleFixItPrompt` → `handleSend`, `entryFrom:'cms_fix'`); the agent edits the source to comply. A `warn`-only rule 14 ("content visible without JavaScript") backstops anything the transform missed.
+docs\od-cms-compliance.md:31: → materialize images (real files under public/images) + normalize + makeVisibleWithoutJs (CMS copy)
+docs\od-cms-compliance.md:35: └─ Fix it → short message in chat + hidden agentInstruction → AI edits source
+docs\od-cms-compliance.md:42: Evidence lives in the importer: `Instatic/src/core/siteImport/*`, `htmlImport/*`, `css-substitution/*`, and the publisher. The full, example-rich version is in [`Operator/rules/templateRule.md`](../Operator/rules/templateRule.md); this is the summary.
+docs\od-cms-compliance.md:46: - **Content hidden until JS runs** (a full-screen loading overlay a script removes; `opacity:0`/`visibility:hidden` content revealed only by a JS-added class / `IntersectionObserver` scroll reveal) — the importer strips `<script>`s from the editing canvas, so it renders **blank there** (shows only on the published site). *Auto-fixed at share by `makeVisibleWithoutJs`; prevention keeps OD from building it.*
+docs\od-cms-compliance.md:52: - **Unsupported images**: avif/ico/bmp/tiff/heic; `data:` images; any `?query`/`#fragment` in the path. *(External `http(s)` photo URLs are now OK — `cms-image-materialize.ts` captures them into `public/images/` before share; a bare `/images/x` with no file is filled with a real photo/placeholder. So a build never ships a dead `<img>`.)*
+docs\od-cms-compliance.md:73: - **(A) Adherence gap — OD broke a rule that IS already in `templateRule.md`.** The rule exists; the AI didn't follow it. → Fix: make the rule more prominent in `templateRule.md` and the `cms-contract.ts` hard-requirements shortlist; strengthen the self-audit. (The operator's stronger-model knob also helps here — see the vision doc's model note.) The tenant's immediate escape hatch is the gate's **Fix it** button, which asks the AI to correct the *source*. Do **not** paper over a content-level adherence gap with a silent rewrite in `cms-normalize.ts` — that hides the miss and leaves the OD source wrong; normalize is reserved for *lossless* mechanical transforms only.
+docs\od-cms-compliance.md:74: - **(B) Coverage gap — OD did something the CMS rejects that is NOT in `templateRule.md`.** A newly-discovered importer limitation. → Fix: research the exact importer behavior in `Instatic/src/core/siteImport|htmlImport`, then ADD the constraint to **all three**: `templateRule.md` (with a ✅/❌ example), the compliance checkers (`cms-compliance.ts` + `check-template-rule.mjs`, in parity), and the matrix above.
+docs\od-cms-compliance.md:78: Keep the two checkers (`cms-compliance.ts` and `check-template-rule.mjs`) in lockstep, and keep `templateRule.md` ↔ the checkers ↔ this matrix in sync — a rule that blocks at the gate must also be taught to OD, or a tenant hits a wall they can't understand.
+docs\od-cms-compliance.md:81: - `Operator/rules/templateRule.md` — the authoritative build contract (read live by OD).
+docs\od-cms-compliance.md:83: - `OpenDesign/apps/daemon/src/cms-compliance.ts` + `Operator/rules/check-template-rule.mjs` — the gate checkers, incl. rule 14 "content visible without JavaScript" (keep in parity).
+docs\od-cms-compliance.md:84: - `OpenDesign/apps/daemon/src/cms-normalize.ts` — lossless mechanical normalizer **+ `makeVisibleWithoutJs`** (the CMS-copy visible-without-JS auto-fix); no design-choice rewrites.
+docs\od-cms-compliance.md:85: - `OpenDesign/apps/daemon/src/cms-image-materialize.ts` — the deterministic image guarantee (capture external / fetch Picsum / SVG placeholder → `public/images/`); wired into the raw-route preview serve (`routes/project/index.ts`) and the share handler (`server.ts`), reusing `connectionTest.ts`'s SSRF-guarded fetch.
+docs\od-cms-compliance.md:86: - Share gate + dialog: `OpenDesign/apps/daemon/src/server.ts` (422 + the hidden `context.agentInstruction` → `# User request` compose) → reassure-first `CmsBlockedDialog` + `buildFixVisibleMessage`/`buildFixInstruction` in `OpenDesign/apps/web/src/components/FileViewer.tsx`; **Fix it** wiring `onFixItPrompt` (`{visible, instruction}`) → `FileWorkspace.tsx` → `ProjectView.tsx` (`handleFixItPrompt` → `handleSend` with `context.agentInstruction`, `entryFrom:'cms_fix'`). Hidden channel typed in `packages/contracts/src/api/context.ts` + `apps/daemon/src/runtimes/chat-run-context.ts`.
+docs\od-cms-vision.md:11: 2. **`templateRule.md` was written *based on how Instatic's import actually works*** — i.e. the rule
+docs\od-cms-vision.md:16: **obey `templateRule.md` 100%**. OD is a design studio; it is NOT the CMS and is NOT merged into
+docs\od-cms-vision.md:21: > Build a page in OD (or literally any tool) following `templateRule.md` → **download** the project →
+docs\od-cms-vision.md:33: pipeline** (the same `buildImportPlan` + `commitImportPlan` the manual wizard uses, in the tenant's
+docs\od-cms-vision.md:61: - The rule file (`Operator/rules/templateRule.md`) is read **live** by OD (`OD_CMS_RULE_FILE`,
+docs\od-cms-vision.md:64: `templateRule.md` and OD's compliance enforcement — so OD stops producing importer-hostile output,
+docs\od-cms-vision.md:72: - **[`docs/od-cms-compliance.md`](./od-cms-compliance.md)** — the core compliance logic (veg-kitchen: OD only builds what the CMS can import), the researched accept/block matrix, and the **future-failure playbook** (diagnose adherence-gap vs coverage-gap → fix → test). Read it before touching templateRule / the CMS contract / the gate.
+docs\od-cms-vision.md:73: - **`Operator/rules/templateRule.md`** — the build rule OD must obey (derived from the importer).
+docs\od-cms-vision.md:75: - **`OpenDesign/apps/daemon/src/cms-compliance.ts`** — the same checks, run at OD's export boundary
+docs\od-cms-vision.md:77: - **`OpenDesign/apps/daemon/src/od-share-to-cms.ts`** + the `/api/projects/:id/push/instatic` route —
+docs\od-cms-vision.md:81: (`POST /import/site-html` → token; `GET /import/staged/:token` → burn-on-read).
+docs\od-cms-vision.md:83: `buildImportPlan`/`commitImportPlan` pipeline — the one true importer, shared by manual + automated.
+docs\phase5-share-to-cms-design.md:8: Instatic's `merge-overwrite` import **upserts data rows by `id`** (`bundleSchema.ts`: `willReplace` =
+docs\phase5-share-to-cms-design.md:9: "row id already exists locally"). And its Super Import already resolves conflicts: `buildImportPlan`
+docs\phase5-share-to-cms-design.md:10: matches an imported page to an **existing page by slug**, and `commitImportPlan` then calls
+docs\phase5-share-to-cms-design.md:12: re-push comes for free** as long as `currentSite` passed to `buildImportPlan` carries the existing
+docs\phase5-share-to-cms-design.md:19: → OD daemon POST /api/projects/:id/push/instatic
+docs\phase5-share-to-cms-design.md:20: 1. build the project's static files (templateRule-compliant HTML/CSS/images) into a FileMap
+docs\phase5-share-to-cms-design.md:21: 2. mint an SSO session on the tenant's Instatic (OD already has OD_SSO_SECRET + OD_INSTATIC_URL):
+docs\phase5-share-to-cms-design.md:22: GET  {OD_INSTATIC_URL}/admin/api/cms/sso?token=<signed target:'instatic'>  (redirect:manual)
+docs\phase5-share-to-cms-design.md:25: 4. redirect the tenant into {OD_INSTATIC_URL}/admin
+docs\phase5-share-to-cms-design.md:26: → Instatic  POST /admin/api/cms/import/site-html?strategy=merge-overwrite   (NEW)
+docs\phase5-share-to-cms-design.md:29: 2. currentSite: SiteDocument = { ...getDraftSite(db), pages, visualComponents, layouts }
+docs\phase5-share-to-cms-design.md:31: visualComponents= listDataRows(db,'components') .map(componentFromRow)
+docs\phase5-share-to-cms-design.md:33: 3. plan = buildImportPlan({ fileMap, currentSite })          // headless, pure — verified pure by design
+docs\phase5-share-to-cms-design.md:34: 4. commitImportPlan(plan, serverAdapter)                     // serverAdapter is the new piece
+docs\phase5-share-to-cms-design.md:36: EXISTING bundle path: serialize → SiteBundle → handleImportRoute(bundle, strategy:'merge-overwrite')
+docs\phase5-share-to-cms-design.md:49: `handleImportRoute(…, 'merge-overwrite')`.
+docs\phase5-share-to-cms-design.md:60: - `tx.createVisualComponent` → a `components` row (nav/footer become shared Visual Components).
+docs\phase5-share-to-cms-design.md:64: `handleImportRoute` with `merge-overwrite`.
+docs\phase5-share-to-cms-design.md:68: - `apps/daemon/src/routes/` — new `POST /api/projects/:id/push/instatic` (model on `import-export-routes.ts`
+docs\phase5-share-to-cms-design.md:70: `/api/projects/:id/archive`). Requires `OD_INSTATIC_URL` (advanced tenants only — see odRuntime).
+docs\phase5-share-to-cms-design.md:77: - OD receives `OD_SSO_SECRET`, `OD_TENANT_SLUG`, `OD_INSTATIC_URL` (advanced tenants) — committed.
+docs\phase5-share-to-cms-design.md:79: - Instatic `merge-overwrite` import exists — verified by reading `import.ts`.
+docs\phase5-share-to-cms-design.md:82: 1. Instatic on SQLite: POST a 2-page FileMap to `/import/site-html` → 2 `pages` rows, styles/tokens in the shell.
+docs\PLAN.md:10: - **Astro (build-time only for tenant sites):** Instatic builds *and* renders the **live** tenant site itself — there is no separate site **runtime** framework and **no headless content API**. Astro is still used to **build replica static sites that import into Instatic** (Super Import / "Path B" — see [`templateRule.md`](templateRule.md)) and to build our own Operator Console. Astro is **not** the tenant runtime — once imported, Instatic owns rendering and publishing.
+docs\PLAN.md:65: - **Global AI guidance:** a standing plain-English instruction (authored in `rules/globalAiGuidanceRule.md`, served by the gateway `/config` probe) is injected into **every tenant's AI chat** so a non-technical owner's words become correct edits (turn phrasing → editor actions, respect the `templateRule.md` structure, clean up empty wrappers on removal, etc.). It is **file-authored + version-controlled**, not edited in the console. Category **model ids are never disclosed** to the tenant via `/config`; only the single Default model id is exposed (legacy `/model` probe).
+docs\PLAN.md:123: Product intent; the simple edit → preview → Publish loop (native to Instatic); the Operator/Tenant model (now a fleet); BYO model key (OpenRouter); deploy-to-Cloudflare ownership (matches `templateRule.md`).

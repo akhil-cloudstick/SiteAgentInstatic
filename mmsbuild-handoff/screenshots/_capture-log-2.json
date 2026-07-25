@@ -1,0 +1,26 @@
+[
+  {
+    "name": "tenant-opendesign-web",
+    "url": "http://127.0.0.1:8100/",
+    "status": "ok",
+    "note": "HTTP 404 -> http://127.0.0.1:8100/"
+  },
+  {
+    "name": "tenant-od-projects",
+    "url": "http://127.0.0.1:8100/projects",
+    "status": "ok",
+    "note": "HTTP 404 -> http://127.0.0.1:8100/projects"
+  },
+  {
+    "name": "tenant-od-onboarding",
+    "url": "http://127.0.0.1:8100/onboarding",
+    "status": "ok",
+    "note": "HTTP 404 -> http://127.0.0.1:8100/onboarding"
+  },
+  {
+    "name": "od-daemon-health",
+    "url": "http://127.0.0.1:7500/api/health",
+    "status": "ok",
+    "note": "HTTP 200 -> http://127.0.0.1:7500/api/health"
+  }
+]

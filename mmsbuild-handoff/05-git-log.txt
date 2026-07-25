@@ -1,0 +1,20 @@
+﻿a6db789 (HEAD -> Instatic_opendesign, origin/Instatic_opendesign) latest bug fix for the image loading
+9e13bf1 fix: new 3 bug fix
+3d27304 fix: 2/3 bug fixed
+2e496fb fix: bugs from od to cms
+3466845 feat: gateway proxy/funnel + Share-to-CMS refinements
+63b916e feat: Share to CMS pipeline — OD normalize/compliance + Instatic site import (Phase 5)
+cdc1d68 docs: turnkey design for Phase 5 (no-duplicate Share to CMS)
+ddd78d0 feat: Phase 5 plumbing — pass OD_INSTATIC_URL to per-tenant OpenDesign daemons
+7933b4a feat: tier-gated Instatic provisioning + Owner auto-create + tenant SSO (Phase 4)
+6d0959c feat: OpenDesign tenant SSO + whole-surface gate (Phase 3b)
+88042d9 feat: per-tenant OpenDesign daemon orchestration (Phase 3, control-plane side)
+ef16594 refactor+feat: restructure to Operator/Instatic/OpenDesign + tenant IdP hub (Phases 0-2)
+9410d6c (origin/branch_V1, branch_V1) fix: fixing bugs
+be3c307 chore: reorganize into Insatic/ and vendor complete OpenDesign app
+680c7b5 (origin/master, master) fix: add image refrence
+5b3c16d fix: uptodate
+fe90c33 fix: bugs
+2955a7b fix show model usage for tenant
+41b95ff fix: difrent models
+44c1a60 fix: bugs fix

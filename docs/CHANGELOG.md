@@ -1,6 +1,16 @@
 # SiteAgent — Changelog
 _Plain-language log of what changed, newest first._
 
+## 2026-07-17
+
+**Share-to-CMS: pages import with real images, no blank pages, and a friendlier "Fix it"**
+Three bugs surfaced while testing OpenDesign → Instatic "Share to CMS" on real tenant projects (broken images, a blank page in the CMS editor, and a wall of technical jargon). All three are now fixed at the source, deterministically, so pages "just pass" on share without the tenant hitting a wall.
+
+- **Images are saved into the site (no more broken/missing images).** A build that referenced `/images/x.jpg` for files that were never created — OD's AI image provider is unconfigured and the rule banned external hotlinks, so the AI wrote dead local paths — shipped broken images and an empty media panel. A new deterministic step (`cms-image-materialize.ts`) guarantees every referenced image is a real file under `public/images/`: it captures an external photo URL, fetches a real royalty-free photo (keyless Lorem Picsum, deterministic) for a bare local path, or writes an SVG placeholder when offline. It runs on the OD canvas preview (images now show in the editor + Design panel) and at share (real bytes reach the CMS, importing as content-hash-deduplicated `/uploads/` media assets visible in the CMS editor and the published site). Provider-free — no image API key needed. Verified end-to-end (real photos fetched; zero broken links).
+- **No more blank page in the CMS editor.** Pages looked blank in the Instatic editing canvas but fine once published — because the content was hidden until JavaScript ran (a full-screen loading overlay removed only by JS, plus `opacity:0` scroll-reveal sections), and the importer strips every `<script>` from the editing canvas. A share-time transform (`cms-normalize.makeVisibleWithoutJs`) rewrites the CMS-bound copy so all content is visible with CSS alone (loading overlay hidden, reveal content shown); OD's own design is untouched and keeps its animations. Verified: 0 gate failures across the real 5-page project, content visible on every page.
+- **Friendlier "Fix it" (no jargon for tenants).** The block dialog and the "Fix it" chat message used to dump the full technical compliance report. Now the tenant sees a short, reassuring message (*"Your design looks great — one quick fix"*) while the full failure detail + fix directives go to the AI privately through a new hidden request channel (`context.agentInstruction`) — so a non-technical tenant never sees jargon, and the agent still gets everything it needs to make the page importable without changing the design.
+- **Rulebook + gate.** Updated the build rule (`templateRule.md`) and the AI contract so OD produces compliant pages from the start (real images saved in; all content visible without JS), and added a "content visible without JavaScript" compliance check kept in parity across both checkers (`cms-compliance.ts` + `check-template-rule.mjs`). Compliance docs updated.
+
 ## 2026-07-10
 
 **MMSBUILD tenant integration — OpenDesign + Instatic wired together per tenant (grilled, then built & verified end-to-end)**

@@ -13,6 +13,9 @@ tenant-users/
 # Cloudflare Wrangler local cache — never commit
 .wrangler/
 
+# Foglamp scan output — scan.lock.json holds the edit token (secret)
+.foglamp/
+
 # Local throwaway DB introspection scripts with hardcoded creds — never commit
 Instatic/_creds.ts
 
