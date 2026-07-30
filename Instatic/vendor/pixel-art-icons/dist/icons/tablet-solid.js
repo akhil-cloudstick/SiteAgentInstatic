@@ -1,4 +1,4 @@
 import { jsx as _jsx } from "react/jsx-runtime";
 export function TabletSolidIcon({ size = 24, color = 'currentColor', className, style }) {
-    return (_jsx("svg", { width: size, height: size, viewBox: "0 0 24 24", fill: color, xmlns: "http://www.w3.org/2000/svg", className: className, style: style, children: _jsx("path", { d: "M19 22H5v-2H3V4h2V2h14v2h2v16h-2v2Zm-8-4h2v-2h-2v2Z" }) }));
+    return (_jsx("i", { className: `ri-tablet-line${className ? ' ' + className : ''}`, "aria-hidden": "true", style: { fontSize: size, width: size, height: size, lineHeight: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color, ...style } }));
 }

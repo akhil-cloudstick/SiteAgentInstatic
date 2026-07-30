@@ -1,18 +1,25 @@
-import React from 'react';
-import type { IconProps } from '../types';
+import type { IconProps } from '../types'
 
-export function AppGridPlusGlyphIcon({ size = 24, color = 'currentColor', className, style }: IconProps): React.ReactElement {
+// Remix Icon glyph "ri-apps-2-add-line" (MMS Design System line-icon set). Rendered as a
+// webfont <i>; the pixel-art-icons specifier is retained so existing imports and
+// the IconComponent contract keep resolving unchanged.
+export function AppGridPlusGlyphIcon({ size = 24, color = 'currentColor', className, style }: IconProps) {
   return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill={color}
-      xmlns="http://www.w3.org/2000/svg"
-      className={className}
-      style={style}
-    >
-      <path d="M2 2h9v9H2zm0 11h9v9H2zM13 2h9v9h-9zm4 12h2v8h-2z"/><path d="M22 17v2h-8v-2z"/>
-    </svg>
-  );
+    <i
+      className={`ri-apps-2-add-line${className ? ' ' + className : ''}`}
+      aria-hidden="true"
+      style={{
+        fontSize: size,
+        width: size,
+        height: size,
+        lineHeight: 1,
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexShrink: 0,
+        color,
+        ...style,
+      }}
+    />
+  )
 }

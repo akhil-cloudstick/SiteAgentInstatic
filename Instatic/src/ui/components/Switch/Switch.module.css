@@ -32,8 +32,8 @@
 }
 
 .trackOn {
-    background: var(--bg-surface-3);
-    border-color: var(--bg-surface-3);
+    background: var(--success);
+    border-color: var(--success);
 }
 
 .trackOff {
@@ -50,7 +50,7 @@
 }
 
 .switch[data-hit-area="true"] .trackOn {
-    background: var(--overlay);
+    background: var(--success);
 }
 
 .switch[data-hit-area="true"] .trackOff {

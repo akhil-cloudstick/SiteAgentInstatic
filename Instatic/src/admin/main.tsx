@@ -8,6 +8,7 @@ import { AdminZoomGuard } from './shared/AdminZoomGuard'
 import { ErrorBoundary, flattenErrorChain, logErrorChain } from '@ui/components/ErrorBoundary'
 import { ToastProvider, pushToast } from '@ui/components/Toast'
 import '../styles/globals.css'
+import '../styles/remixicon/remixicon.css'
 
 // `installPluginRuntime()` used to be called here, eagerly. That dragged
 // the whole plugin-host-hooks module (which imports `useEditorStore` from

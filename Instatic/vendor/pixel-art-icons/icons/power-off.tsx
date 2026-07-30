@@ -1,18 +1,25 @@
-import React from 'react';
-import type { IconProps } from '../types';
+import type { IconProps } from '../types'
 
-export function PowerOffIcon({ size = 24, color = 'currentColor', className, style }: IconProps): React.ReactElement {
+// Remix Icon glyph "ri-shut-down-line" (MMS Design System line-icon set). Rendered as a
+// webfont <i>; the pixel-art-icons specifier is retained so existing imports and
+// the IconComponent contract keep resolving unchanged.
+export function PowerOffIcon({ size = 24, color = 'currentColor', className, style }: IconProps) {
   return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill={color}
-      xmlns="http://www.w3.org/2000/svg"
-      className={className}
-      style={style}
-    >
-      <path d="M16 22H6v-2h10v2Zm6 0h-2v-2h2v2ZM6 20H4v-2h2v2Zm14 0h-2v-2h2v2ZM4 18H2V8h2v10Zm14 0h-2v-2h2v2Zm-2-2h-2v-2h2v2Zm6 0h-2V8h2v8Zm-8-2h-2v-2h2v2Zm-2-2h-2v-2h2v2Zm-2-2H8V8h2v2ZM8 8H6V6h2v2Zm5 0h-2V2h2v6Zm7 0h-2V6h2v2ZM6 6H4V4h2v2Zm12 0h-2V4h2v2ZM4 4H2V2h2v2Z"/>
-    </svg>
-  );
+    <i
+      className={`ri-shut-down-line${className ? ' ' + className : ''}`}
+      aria-hidden="true"
+      style={{
+        fontSize: size,
+        width: size,
+        height: size,
+        lineHeight: 1,
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexShrink: 0,
+        color,
+        ...style,
+      }}
+    />
+  )
 }

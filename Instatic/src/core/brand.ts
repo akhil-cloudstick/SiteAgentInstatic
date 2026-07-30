@@ -18,11 +18,10 @@
  */
 
 /** The product name shown in the admin UI (tab title, login, dialogs, help). */
-export const BRAND_NAME = 'Site Agent'
+export const BRAND_NAME = 'MMS-CMS'
 
-// External project links surfaced in the Help menu and the Plugins page.
-// Point these at your own docs/repo/issue tracker for a full white-label; they
-// default to the upstream project so a fresh clone still has working links.
-export const BRAND_DOCS_URL = 'https://github.com/corebunch/instatic/blob/main/docs/'
-export const BRAND_REPO_URL = 'https://github.com/corebunch/instatic'
-export const BRAND_ISSUES_URL = 'https://github.com/corebunch/instatic/issues/new'
+// External project links (docs / repo / issues) were removed with the MMS-CMS
+// rebrand: no branded destinations exist yet, and pointing them at the upstream
+// project would leak the old name into user-facing help actions. Re-introduce
+// them here (and the Help-menu commands in spotlight/commands/help.ts) once
+// branded URLs exist.

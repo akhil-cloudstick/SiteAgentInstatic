@@ -1,0 +1,12 @@
+/* RemixIcon — line-icon primitive box. Size flows through --ri-size (set as a
+   dynamic custom property on the element); this module owns the geometry. */
+.icon {
+    font-size: var(--ri-size);
+    width: var(--ri-size);
+    height: var(--ri-size);
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}

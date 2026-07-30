@@ -1,4 +1,4 @@
 import { jsx as _jsx } from "react/jsx-runtime";
 export function FolderGlyphIcon({ size = 24, color = 'currentColor', className, style }) {
-    return (_jsx("svg", { width: size, height: size, viewBox: "0 0 24 24", fill: color, xmlns: "http://www.w3.org/2000/svg", className: className, style: style, children: _jsx("path", { d: "M12 6h10v14H2V4h10v2Z" }) }));
+    return (_jsx("i", { className: `ri-folder-line${className ? ' ' + className : ''}`, "aria-hidden": "true", style: { fontSize: size, width: size, height: size, lineHeight: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color, ...style } }));
 }

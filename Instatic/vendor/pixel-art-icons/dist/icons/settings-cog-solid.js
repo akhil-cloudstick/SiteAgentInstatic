@@ -1,4 +1,4 @@
-import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
+import { jsx as _jsx } from "react/jsx-runtime";
 export function SettingsCogSolidIcon({ size = 24, color = 'currentColor', className, style }) {
-    return (_jsxs("svg", { width: size, height: size, viewBox: "0 0 24 24", fill: color, xmlns: "http://www.w3.org/2000/svg", className: className, style: style, children: [_jsx("defs", { children: _jsx("clipPath", { id: "a", children: _jsx("path", { d: "M0 0h24v24H0z" }) }) }), _jsx("g", { clipPath: "url(#a)", children: _jsx("path", { d: "M15 4h2V2h5v5h-2v2h4v6h-4v2h2v5h-5v-2h-2v4H9v-4H7v2H2v-5h2v-2H0V9h4V7H2V2h5v2h2V0h6v4Zm-5 10h4v-4h-4v4Z" }) })] }));
+    return (_jsx("i", { className: `ri-settings-4-line${className ? ' ' + className : ''}`, "aria-hidden": "true", style: { fontSize: size, width: size, height: size, lineHeight: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color, ...style } }));
 }

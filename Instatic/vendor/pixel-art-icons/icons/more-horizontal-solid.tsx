@@ -1,18 +1,25 @@
-import React from 'react';
-import type { IconProps } from '../types';
+import type { IconProps } from '../types'
 
-export function MoreHorizontalSolidIcon({ size = 24, color = 'currentColor', className, style }: IconProps): React.ReactElement {
+// Remix Icon glyph "ri-more-line" (MMS Design System line-icon set). Rendered as a
+// webfont <i>; the pixel-art-icons specifier is retained so existing imports and
+// the IconComponent contract keep resolving unchanged.
+export function MoreHorizontalSolidIcon({ size = 24, color = 'currentColor', className, style }: IconProps) {
   return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill={color}
-      xmlns="http://www.w3.org/2000/svg"
-      className={className}
-      style={style}
-    >
-      <path d="M5 11h2v2H5v2H3v-2H1v-2h2V9h2v2Zm8 0h2v2h-2v2h-2v-2H9v-2h2V9h2v2Zm8 0h2v2h-2v2h-2v-2h-2v-2h2V9h2v2Z"/>
-    </svg>
-  );
+    <i
+      className={`ri-more-line${className ? ' ' + className : ''}`}
+      aria-hidden="true"
+      style={{
+        fontSize: size,
+        width: size,
+        height: size,
+        lineHeight: 1,
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexShrink: 0,
+        color,
+        ...style,
+      }}
+    />
+  )
 }

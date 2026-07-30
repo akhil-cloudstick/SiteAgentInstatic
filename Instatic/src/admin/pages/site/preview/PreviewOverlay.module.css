@@ -58,6 +58,6 @@
 .iframe {
     flex: 1;
     border: 0;
-    background: var(--overlay);
+    background: var(--bg-surface);
     display: block;
 }

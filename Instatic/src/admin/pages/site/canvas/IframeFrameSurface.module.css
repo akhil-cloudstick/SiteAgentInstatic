@@ -23,7 +23,7 @@
    * Once content exceeds the viewport, the measurement loop sets a larger
    * inline `height` and the frame grows to fit. */
   min-height: 100vh;
-  background: var(--overlay);
+  background: var(--bg-surface);
   box-shadow: 0 2px 12px var(--scrim-30);
   /* `overflow: hidden` would clip pop-out chrome inside the iframe (e.g.
    * a sticky nav that overlaps the page bottom). We rely on the iframe's

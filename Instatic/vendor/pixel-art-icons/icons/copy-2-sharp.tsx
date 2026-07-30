@@ -1,18 +1,25 @@
-import React from 'react';
-import type { IconProps } from '../types';
+import type { IconProps } from '../types'
 
-export function Copy2SharpIcon({ size = 24, color = 'currentColor', className, style }: IconProps): React.ReactElement {
+// Remix Icon glyph "ri-file-copy-line" (MMS Design System line-icon set). Rendered as a
+// webfont <i>; the pixel-art-icons specifier is retained so existing imports and
+// the IconComponent contract keep resolving unchanged.
+export function Copy2SharpIcon({ size = 24, color = 'currentColor', className, style }: IconProps) {
   return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill={color}
-      xmlns="http://www.w3.org/2000/svg"
-      className={className}
-      style={style}
-    >
-      <path d="M16 6h4v16H8v-4H4V2h12v4Zm-6 14h8V8h-8v12Zm-2-4V6h6V4H6v12h2Z"/>
-    </svg>
-  );
+    <i
+      className={`ri-file-copy-line${className ? ' ' + className : ''}`}
+      aria-hidden="true"
+      style={{
+        fontSize: size,
+        width: size,
+        height: size,
+        lineHeight: 1,
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexShrink: 0,
+        color,
+        ...style,
+      }}
+    />
+  )
 }

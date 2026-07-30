@@ -1,18 +1,25 @@
-import React from 'react';
-import type { IconProps } from '../types';
+import type { IconProps } from '../types'
 
-export function BoldIcon({ size = 24, color = 'currentColor', className, style }: IconProps): React.ReactElement {
+// Remix Icon glyph "ri-bold" (MMS Design System line-icon set). Rendered as a
+// webfont <i>; the pixel-art-icons specifier is retained so existing imports and
+// the IconComponent contract keep resolving unchanged.
+export function BoldIcon({ size = 24, color = 'currentColor', className, style }: IconProps) {
   return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill={color}
-      xmlns="http://www.w3.org/2000/svg"
-      className={className}
-      style={style}
-    >
-      <path d="M14 4v2H8v5h6V6h2v7H8v5h8v2H6V4h8Zm4 14h-2v-5h2v5Z"/>
-    </svg>
-  );
+    <i
+      className={`ri-bold${className ? ' ' + className : ''}`}
+      aria-hidden="true"
+      style={{
+        fontSize: size,
+        width: size,
+        height: size,
+        lineHeight: 1,
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexShrink: 0,
+        color,
+        ...style,
+      }}
+    />
+  )
 }

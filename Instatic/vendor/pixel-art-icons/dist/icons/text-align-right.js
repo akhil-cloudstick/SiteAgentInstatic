@@ -1,4 +1,4 @@
 import { jsx as _jsx } from "react/jsx-runtime";
 export function TextAlignRightIcon({ size = 24, color = 'currentColor', className, style }) {
-    return (_jsx("svg", { width: size, height: size, viewBox: "0 0 24 24", fill: color, xmlns: "http://www.w3.org/2000/svg", className: className, style: style, children: _jsx("path", { d: "M22 19H6v-2h16v2Zm0-6H10v-2h12v2Zm0-6H2V5h20v2Z" }) }));
+    return (_jsx("i", { className: `ri-align-right${className ? ' ' + className : ''}`, "aria-hidden": "true", style: { fontSize: size, width: size, height: size, lineHeight: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color, ...style } }));
 }

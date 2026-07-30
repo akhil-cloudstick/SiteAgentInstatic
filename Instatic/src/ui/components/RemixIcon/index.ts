@@ -1,0 +1,1 @@
+export { RemixIcon } from './RemixIcon'

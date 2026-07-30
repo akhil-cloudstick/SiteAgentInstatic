@@ -2,7 +2,6 @@ import { useId, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Button } from '@ui/components/Button'
 import { Input } from '@ui/components/Input'
-import { DatabaseSolidIcon } from 'pixel-art-icons/icons/database-solid'
 import { LoaderIcon } from 'pixel-art-icons/icons/loader'
 import {
   getCurrentCmsUser,
@@ -144,9 +143,13 @@ export function AdminPreAuthForm({
               draggable={false}
             />
           ) : (
-            <div className={styles.brandIcon} aria-hidden="true">
-              <DatabaseSolidIcon size={16} />
-            </div>
+            <img
+              className={styles.brandFavicon}
+              src="/mms-mascot.png"
+              alt=""
+              aria-hidden="true"
+              draggable={false}
+            />
           )}
           <span>{brandLabel}</span>
         </div>

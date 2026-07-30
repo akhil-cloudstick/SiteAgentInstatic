@@ -1,4 +1,4 @@
 import { jsx as _jsx } from "react/jsx-runtime";
 export function ColorsSwatchSolidIcon({ size = 24, color = 'currentColor', className, style }) {
-    return (_jsx("svg", { width: size, height: size, viewBox: "0 0 24 24", fill: color, xmlns: "http://www.w3.org/2000/svg", className: className, style: style, children: _jsx("path", { d: "M20 4h2v16h-2v2h-6v-2h-2v2H4v-2H2v-4h2v-2h6v6h2V4h2V2h6v2Zm-4 14h2v-2h-2v2ZM6 8V6h4v6H4V8h2Z" }) }));
+    return (_jsx("i", { className: `ri-palette-line${className ? ' ' + className : ''}`, "aria-hidden": "true", style: { fontSize: size, width: size, height: size, lineHeight: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color, ...style } }));
 }

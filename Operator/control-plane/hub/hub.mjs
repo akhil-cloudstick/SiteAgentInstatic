@@ -76,28 +76,34 @@ export function ssoUrl(tenant, target) {
 
 // ---- page templates ------------------------------------------------------
 function shell(title, inner) {
-  return `<!doctype html><html><head><meta charset="utf-8">
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${esc(title)}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&family=Nunito+Sans:wght@400;500;600;700;800&display=swap">
 <style>
-  :root{--bg:#0e0f12;--card:#16181d;--line:#262a31;--text:#e8eaed;--muted:#9aa0aa;--accent:#5b8def}
+  /* MMS Design System — cream canvas, navy ink, Approval-Green CTA. */
+  :root{--bg:#f8f1df;--card:#ffffff;--line:rgba(8,42,56,.16);--text:#082a38;--muted:#44515a;--accent:#1ba957;--accent-strong:#0e8c45}
   *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);
-    font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;min-height:100vh;
+    font:15px/1.55 'Nunito Sans',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;min-height:100vh;
     display:flex;align-items:center;justify-content:center;padding:24px}
   .wrap{width:100%;max-width:560px}
-  h1{font-size:22px;margin:0 0 4px} .muted{color:var(--muted)}
+  h1{font-family:'Nunito','Nunito Sans',sans-serif;font-weight:800;font-size:24px;margin:0 0 4px} .muted{color:var(--muted)}
   form{margin-top:18px} label{display:block;font-size:13px;color:var(--muted);margin:12px 0 4px}
-  input{width:100%;padding:10px 12px;background:#0b0c0f;border:1px solid var(--line);
-    border-radius:8px;color:var(--text);font-size:15px}
-  button{margin-top:18px;width:100%;padding:11px;background:var(--accent);color:#fff;border:0;
-    border-radius:8px;font-size:15px;font-weight:600;cursor:pointer}
-  .err{background:#3a1a1a;color:#f0a0a0;border:1px solid #5a2a2a;border-radius:8px;padding:10px;margin-top:14px;font-size:14px}
+  input{width:100%;padding:10px 12px;background:#fff;border:1px solid var(--line);
+    border-radius:8px;color:var(--text);font:inherit}
+  input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(27,169,87,.18)}
+  button{margin-top:18px;width:100%;padding:12px;background:var(--accent);color:#fff;border:0;
+    border-radius:999px;font-size:15px;font-weight:800;cursor:pointer;transition:background .12s,filter .12s}
+  button:hover{background:var(--accent-strong)}
+  .err{background:#fdeae6;color:#8a2a1a;border:1px solid #f5c7bf;border-radius:8px;padding:10px;margin-top:14px;font-size:14px}
   .cards{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:22px}
   @media(max-width:520px){.cards{grid-template-columns:1fr}}
   .card{display:block;text-decoration:none;color:inherit;background:var(--card);border:1px solid var(--line);
-    border-radius:14px;padding:22px;transition:border-color .15s,transform .15s}
-  .card:hover{border-color:var(--accent);transform:translateY(-2px)}
-  .card .ico{font-size:30px} .card h3{margin:10px 0 4px;font-size:17px}
+    border-radius:14px;padding:22px;box-shadow:0 6px 24px rgba(8,42,56,.08),0 2px 6px rgba(8,42,56,.05);transition:border-color .15s,transform .15s,box-shadow .15s}
+  .card:hover{border-color:var(--accent);transform:translateY(-2px);box-shadow:0 22px 48px rgba(8,42,56,.16)}
+  .card .ico{font-size:30px} .card h3{font-family:'Nunito','Nunito Sans',sans-serif;margin:10px 0 4px;font-size:17px;font-weight:800}
   .topbar{display:flex;justify-content:space-between;align-items:center}
   .logout{font-size:13px;color:var(--muted);text-decoration:none}
 </style></head><body><div class="wrap">${inner}</div></body></html>`;

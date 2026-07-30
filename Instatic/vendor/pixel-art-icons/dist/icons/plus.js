@@ -1,4 +1,4 @@
 import { jsx as _jsx } from "react/jsx-runtime";
 export function PlusIcon({ size = 24, color = 'currentColor', className, style }) {
-    return (_jsx("svg", { width: size, height: size, viewBox: "0 0 24 24", fill: color, xmlns: "http://www.w3.org/2000/svg", className: className, style: style, children: _jsx("path", { d: "M13 11h7v2h-7v7h-2v-7H4v-2h7V4h2v7Z" }) }));
+    return (_jsx("i", { className: `ri-add-line${className ? ' ' + className : ''}`, "aria-hidden": "true", style: { fontSize: size, width: size, height: size, lineHeight: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color, ...style } }));
 }

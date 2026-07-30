@@ -1,4 +1,4 @@
 import { jsx as _jsx } from "react/jsx-runtime";
 export function AlignCenterHorizontalSolidIcon({ size = 24, color = 'currentColor', className, style }) {
-    return (_jsx("svg", { width: size, height: size, viewBox: "0 0 24 24", fill: color, xmlns: "http://www.w3.org/2000/svg", className: className, style: style, children: _jsx("path", { d: "M11 20H9v2H5v-2H3v-5h8v5Zm10-3h-2v2h-4v-2h-2v-2h8v2Zm1-4H2v-2h20v2ZM9 4h2v5H3V4h2V2h4v2Zm10 3h2v2h-8V7h2V5h4v2Z" }) }));
+    return (_jsx("i", { className: `ri-align-item-horizontal-center-line${className ? ' ' + className : ''}`, "aria-hidden": "true", style: { fontSize: size, width: size, height: size, lineHeight: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color, ...style } }));
 }
