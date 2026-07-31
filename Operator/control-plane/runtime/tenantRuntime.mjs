@@ -25,7 +25,12 @@ export function buildDatabaseUrl(role, password) {
   return `postgres://${encodeURIComponent(role)}:${encodeURIComponent(password)}@${config.pgHost}:${config.pgPort}/${config.pgDb}`;
 }
 
-export const distDir = () => resolve(config.instaticDir, 'dist');
+// TEMP (incident recovery): the canonical `dist` was left with a locked,
+// delete-pending `dist/runtime` on the network share and could not be rebuilt
+// in place. `dist_new` is a full, verified production build (identical config)
+// with a working runtime. Point tenants here until `dist` is restored, then
+// revert this to 'dist'.
+export const distDir = () => resolve(config.instaticDir, 'dist_new');
 
 export function isRunning(slug) {
   return running.has(slug);
