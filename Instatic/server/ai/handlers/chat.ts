@@ -4,7 +4,7 @@
  * Opens an NDJSON stream against a chat. Body:
  *   {
  *     conversationId: string,
- *     prompt:         string,
+ *     content:        Array<{ kind: 'text' | 'image', ... }>,
  *     snapshot?:      unknown   // scope-specific per-request context
  *   }
  *
@@ -19,9 +19,20 @@
  *   6. Streams NDJSON events back as the driver produces them.
  */
 
-import { Type, safeParseValue } from '@core/utils/typeboxHelpers'
-import type { AiContentBlock } from '@core/ai'
-import { jsonResponse, readValidatedBody, badRequest } from '../../http'
+import { safeParseValue } from '@core/utils/typeboxHelpers'
+import {
+  AI_CHAT_MAX_REQUEST_BYTES,
+  AiChatRequestBodySchema,
+  type AiChatRequestBody,
+  type AiContentBlock,
+} from '@core/ai'
+import {
+  RequestBodyTooLargeError,
+  badRequest,
+  jsonResponse,
+  payloadTooLarge,
+  readValidatedBody,
+} from '../../http'
 import { requireCapability } from '../../auth/authz'
 import type { DbClient } from '../../db/client'
 import { createAuditEvent } from '../../repositories/audit'
@@ -29,14 +40,26 @@ import {
   appendMessage,
   listMessagesForConversation,
   readConversationForUser,
+  replaceDefaultConversationTitle,
+  deriveConversationTitle,
+  DEFAULT_CONVERSATION_TITLE,
 } from '../conversations/store'
-import { buildMessageHistory } from '../conversations/history'
+import {
+  buildMessageHistory,
+  projectUserImagesForModel,
+} from '../conversations/history'
 import {
   readCredentialForUser,
   resolveCredentialForDriver,
   touchCredentialLastUsed,
 } from '../credentials/store'
 import { resolveDriver } from '../drivers'
+import { resolveModelCapabilities } from '../drivers/modelCapabilities'
+import {
+  AiImageInputError,
+  canonicaliseAiUserContent,
+  preflightAiUserContent,
+} from '../inputImages'
 import { selectToolsForScope } from '../tools'
 import {
   buildSiteSystemPrompt,
@@ -68,39 +91,9 @@ import {
   classifyCategory,
 } from '../managed'
 
-// Reference images tenants attach to a message (screenshots / mockups). The
-// browser downscales + base64-encodes before upload; these caps are the
-// server-side backstop against an oversized or malformed payload.
-const MAX_IMAGE_ATTACHMENTS = 8
-// ~7 MB of base64 ≈ ~5 MB of image bytes. Generous — the client downscales the
-// long edge to ~1568px first, so real screenshots land far below this.
-const MAX_IMAGE_BASE64_LEN = 7_000_000
-const ALLOWED_IMAGE_MIME = new Set([
-  'image/png',
-  'image/jpeg',
-  'image/webp',
-  'image/gif',
-])
-
-const ImageInputSchema = Type.Object({
-  mimeType: Type.String({ minLength: 1 }),
-  data: Type.String({ minLength: 1 }), // raw base64, no `data:` URL prefix
-})
-
-const ChatRequestBodySchema = Type.Object({
-  conversationId: Type.String({ minLength: 1 }),
-  // May be empty when the message carries only images — the handler enforces
-  // "text or at least one image" below.
-  prompt: Type.String(),
-  // Optional reference images. Empty/absent for a text-only message.
-  images: Type.Optional(Type.Array(ImageInputSchema)),
-  // snapshot stays loose here — scope-specific shape; tools cast it inside
-  // their handlers. The handler narrows below based on the conversation's
-  // scope before passing to the system-prompt builder.
-  snapshot: Type.Optional(Type.Unknown()),
-})
-
 const VALID_SCOPES: ToolScope[] = ['site', 'content', 'data', 'plugin']
+const activeChatConversations = new Set<string>()
+const REQUEST_ABORTED = Symbol('request-aborted')
 
 /**
  * Match `/admin/api/ai/chat/:scope`. Returns `null` if path doesn't match.
@@ -134,27 +127,19 @@ async function handleAiChat(
   if (userOrResponse instanceof Response) return userOrResponse
   const user = userOrResponse
 
-  const chatBody = await readValidatedBody(req, ChatRequestBodySchema)
+  let chatBody: AiChatRequestBody | null
+  try {
+    chatBody = await readValidatedBody(req, AiChatRequestBodySchema, {
+      maxBytes: AI_CHAT_MAX_REQUEST_BYTES,
+    })
+  } catch (err) {
+    if (err instanceof RequestBodyTooLargeError) {
+      return payloadTooLarge('Chat request is too large.')
+    }
+    throw err
+  }
   if (!chatBody) return badRequest('Invalid request body.')
-  const { conversationId, prompt, snapshot } = chatBody
-  const images = chatBody.images ?? []
-  const text = prompt.trim()
-
-  // A message needs a body: either text, at least one image, or both.
-  if (!text && images.length === 0) {
-    return badRequest('Message must include text or at least one image.')
-  }
-  if (images.length > MAX_IMAGE_ATTACHMENTS) {
-    return badRequest(`Too many images — attach at most ${MAX_IMAGE_ATTACHMENTS}.`)
-  }
-  for (const img of images) {
-    if (!ALLOWED_IMAGE_MIME.has(img.mimeType)) {
-      return badRequest(`Unsupported image type "${img.mimeType}". Use PNG, JPEG, WebP, or GIF.`)
-    }
-    if (img.data.length > MAX_IMAGE_BASE64_LEN) {
-      return badRequest('One of the images is too large. Attach a smaller screenshot.')
-    }
-  }
+  const { conversationId, content, snapshot } = chatBody
 
   const conversation = await readConversationForUser(db, user.id, conversationId)
   if (!conversation) {
@@ -166,6 +151,7 @@ async function handleAiChat(
       { status: 400 },
     )
   }
+
   // Managed mode: route every chat through the operator's AI Gateway with the
   // operator's fixed model, ignoring any per-conversation credential. Otherwise
   // resolve the user's own credential from the conversation.
@@ -206,100 +192,214 @@ async function handleAiChat(
 
   const driver = resolveDriver(providerId)
 
+  // Preflight the attached images (cheap header/size validation) before the
+  // expensive Sharp boundary so a malformed payload fails fast.
+  let preflight: ReturnType<typeof preflightAiUserContent>
+  try {
+    preflight = preflightAiUserContent(content)
+  } catch (err) {
+    if (err instanceof AiImageInputError) {
+      return err.status === 413 ? payloadTooLarge(err.message) : badRequest(err.message)
+    }
+    throw err
+  }
+  const requestedImage = preflight.images.length > 0
+
   // In managed mode the model is gateway-routed per request, so the OpenRouter
   // driver's sync `capabilities()` can't introspect it — it returns a permissive
   // default with `visionInput: false`. Trust the operator's managed capabilities
   // instead; otherwise every attached reference image is wrongly rejected below,
-  // and the tool loop would never capture a screenshot the model can read.
-  const modelCapabilities = isManagedAiMode()
-    ? managedModelCapabilities()
-    : driver.capabilities(modelId)
-
-  // Reject attached images up front when the resolved model can't read them,
-  // rather than silently dropping them or letting the provider 400 mid-stream.
-  if (images.length > 0 && !modelCapabilities.visionInput) {
-    return jsonResponse(
-      {
-        error:
-          'The selected model cannot read images. Choose a vision-capable model, or remove the attachments.',
-      },
-      { status: 400 },
+  // and the tool loop would never capture a screenshot the model can read. In
+  // standalone mode, resolve the selected model's real capabilities (an async
+  // probe that also gates browser-tool screenshots), abort-aware.
+  let modelCapabilities
+  if (isManagedAiMode()) {
+    modelCapabilities = managedModelCapabilities()
+  } else {
+    const resolved = await waitForRequest(
+      resolveModelCapabilities(driver, resolvedCredential, modelId),
+      req.signal,
     )
+    if (resolved === REQUEST_ABORTED) return clientClosedRequest()
+    modelCapabilities = resolved
   }
 
   // Capability-filtered toolset. Callers without `ai.tools.write` only see
   // read tools registered with the driver — the model has no way to
   // emit a write call. See B6 in the capabilities review.
   const tools = selectToolsForScope(scope, user.capabilities)
+  if (requestedImage && !modelCapabilities.visionInput) {
+    return jsonResponse(
+      { error: 'The selected model does not support image input. Choose a vision-capable model.' },
+      { status: 422 },
+    )
+  }
+  if (tools.length > 0 && !modelCapabilities.toolCalling) {
+    return jsonResponse(
+      { error: 'The selected model does not support tool calling. Choose an agent-capable model.' },
+      { status: 422 },
+    )
+  }
+  if (req.signal.aborted) return clientClosedRequest()
 
-  // Append the user's message BEFORE streaming so it's persisted even if
-  // the stream aborts mid-response. Images render first, then the text — the
-  // order the composer shows them and vision models read best.
-  const userContent: AiContentBlock[] = [
-    ...images.map((img) => ({
-      kind: 'image' as const,
-      mimeType: img.mimeType,
-      data: img.data,
-    })),
-    ...(text ? [{ kind: 'text' as const, text }] : []),
-  ]
-  await appendMessage(db, conversation.id, {
-    role: 'user',
-    content: userContent,
-  })
-
-  const existingMessages = await listMessagesForConversation(db, conversation.id)
-  const messages = buildMessageHistory(existingMessages)
-
-  // Managed mode: auto-route this message to the operator's per-task-type model
-  // (Design / Content / custom) and inject the operator's global plain-English
-  // guidance. Classification is best-effort — a null category tells the gateway
-  // to use the operator's default model, so a slow/failed classify never blocks
-  // the tenant's chat.
-  let managedCategory: string | null = null
-  let guidance = ''
-  if (isManagedAiMode()) {
-    const cfg = await getManagedAiConfig()
-    if (cfg) {
-      guidance = cfg.guidance
-      // Classify off the text only. An image-only message has nothing to
-      // classify, so it falls through to the operator's default model.
-      if (cfg.hasClassifier && cfg.categories.length > 0 && text) {
-        managedCategory = await classifyCategory(text, cfg.categories, req.signal)
-      }
-    }
+  // One provider stream may write a conversation at a time so concurrent tabs
+  // cannot interleave assistant/tool rows. Acquire admission before the
+  // expensive Sharp boundary: the retryable loser must not decode eight images
+  // only to discover that another request already owns the conversation.
+  const releaseConversation = acquireConversationStream(conversation.id)
+  if (!releaseConversation) {
+    return jsonResponse(
+      { error: 'This conversation is already generating a response. Wait for it to finish.' },
+      { status: 409 },
+    )
+  }
+  if (req.signal.aborted) {
+    releaseConversation()
+    return clientClosedRequest()
   }
 
-  const systemPrompt = buildSystemPromptForScope(scope, snapshot, guidance)
+  // Full decode/re-encode is deliberately after the capability gates so an
+  // incompatible selected model cannot force needless Sharp work.
+  let userContent: AiContentBlock[]
+  try {
+    userContent = await canonicaliseAiUserContent(preflight, req.signal)
+  } catch (err) {
+    releaseConversation()
+    if (req.signal.aborted) return clientClosedRequest()
+    if (err instanceof AiImageInputError) {
+      return err.status === 413 ? payloadTooLarge(err.message) : badRequest(err.message)
+    }
+    throw err
+  }
+  if (req.signal.aborted) {
+    releaseConversation()
+    return clientClosedRequest()
+  }
+
+  let existingRecords: Awaited<ReturnType<typeof listMessagesForConversation>>
+  let latestConversation: NonNullable<Awaited<ReturnType<typeof readConversationForUser>>>
+  try {
+    const refreshedConversation = await readConversationForUser(db, user.id, conversation.id)
+    if (!refreshedConversation) {
+      releaseConversation()
+      return jsonResponse({ error: 'Conversation not found' }, { status: 404 })
+    }
+    latestConversation = refreshedConversation
+    if (
+      latestConversation.credentialId !== conversation.credentialId
+      || latestConversation.modelId !== conversation.modelId
+    ) {
+      releaseConversation()
+      return jsonResponse(
+        { error: 'The conversation model changed while this message was being prepared. Send again.' },
+        { status: 409 },
+      )
+    }
+    existingRecords = await listMessagesForConversation(db, conversation.id)
+  } catch (err) {
+    releaseConversation()
+    throw err
+  }
+  if (req.signal.aborted) {
+    releaseConversation()
+    return clientClosedRequest()
+  }
+
+  const prepared = await (async () => {
+    try {
+      // Append the user's message BEFORE streaming so it's persisted even if
+      // the stream aborts mid-response.
+      const appendedMessage = await appendMessage(db, conversation.id, {
+        role: 'user',
+        content: userContent,
+      })
+
+      // The first prompt names the conversation: replace the placeholder title
+      // with an excerpt of what the user asked for. Only fires while the title
+      // is still the default, so a user-renamed chat is never overwritten.
+      if (latestConversation.title === DEFAULT_CONVERSATION_TITLE) {
+        const text = userContent.find((block) => block.kind === 'text')
+        const imageCount = userContent.filter((block) => block.kind === 'image').length
+        const derivedTitle = text?.kind === 'text'
+          ? deriveConversationTitle(text.text)
+          : imageCount === 1 ? 'Image' : 'Images'
+        if (derivedTitle) {
+          await replaceDefaultConversationTitle(db, user.id, conversation.id, derivedTitle)
+            .catch((err) => { console.error('[ai/chat] auto-title failed:', err) })
+        }
+      }
+
+      const messages = projectUserImagesForModel(
+        buildMessageHistory([...existingRecords, appendedMessage]),
+        modelCapabilities.visionInput,
+      )
+
+      // Managed mode: auto-route this message to the operator's per-task-type
+      // model (Design / Content / custom) and inject the operator's global
+      // plain-English guidance. Classification is best-effort — a null category
+      // tells the gateway to use the operator's default model, so a slow/failed
+      // classify never blocks the tenant's chat.
+      let managedCategory: string | null = null
+      let guidance = ''
+      if (isManagedAiMode()) {
+        const cfg = await getManagedAiConfig()
+        if (cfg) {
+          guidance = cfg.guidance
+          // Classify off the text only. An image-only message has nothing to
+          // classify, so it falls through to the operator's default model.
+          const textBlock = userContent.find((block) => block.kind === 'text')
+          const text = textBlock?.kind === 'text' ? textBlock.text.trim() : ''
+          if (cfg.hasClassifier && cfg.categories.length > 0 && text) {
+            managedCategory = await classifyCategory(text, cfg.categories, req.signal)
+          }
+        }
+      }
+
+      const systemPrompt = buildSystemPromptForScope(scope, snapshot, guidance)
+
+      // Capture totals reported by the persister so the audit row can hold
+      // them when the stream completes (we read them off the conversation row
+      // diff post-stream — see the post-loop block).
+      const tokensAtStart = {
+        prompt: latestConversation.promptTokensTotal,
+        completion: latestConversation.completionTokensTotal,
+        cost: latestConversation.costUsdTotal,
+      }
+
+      await createAuditEvent(db, {
+        actorUserId: user.id,
+        action: 'ai.chat.started',
+        targetType: 'ai_conversation',
+        targetId: conversation.id,
+        metadata: {
+          scope,
+          providerId,
+          modelId,
+        },
+      })
+      return { messages, systemPrompt, tokensAtStart, managedCategory }
+    } catch (err) {
+      releaseConversation()
+      throw err
+    }
+  })()
+  const { messages, systemPrompt, tokensAtStart, managedCategory } = prepared
 
   // Captures the gateway's echo of the model that actually ran, so the audit
-  // records the routed model rather than the nominal probe model.
+  // and per-message usage rows record the routed model rather than the nominal
+  // probe model.
   let resolvedModel: string | null = null
   const onResponseHeaders = (h: Headers): void => {
     const m = h.get('x-instatic-resolved-model')
     if (m) resolvedModel = m
   }
 
-  // Capture totals reported by the persister so the audit row can hold
-  // them when the stream completes (we read them off the conversation row
-  // diff post-stream — see the post-loop block).
-  const tokensAtStart = {
-    prompt: conversation.promptTokensTotal,
-    completion: conversation.completionTokensTotal,
-    cost: conversation.costUsdTotal,
-  }
-
-  await createAuditEvent(db, {
-    actorUserId: user.id,
-    action: 'ai.chat.started',
-    targetType: 'ai_conversation',
-    targetId: conversation.id,
-    metadata: {
-      scope,
-      providerId,
-      modelId,
-    },
-  })
+  // `req.signal` covers request-side aborts, but a streaming response consumer
+  // can disappear independently (tab reload, dev-server hot restart, proxy
+  // disconnect). Own a second lifecycle signal and abort it from the response
+  // stream's `cancel()` hook or when enqueue proves the consumer is gone.
+  const streamAbort = new AbortController()
+  const turnSignal = AbortSignal.any([req.signal, streamAbort.signal])
 
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
@@ -329,6 +429,7 @@ async function handleAiChat(
           controller.enqueue(encodeStreamEvent(wireEvent))
         } catch {
           streamClosed = true
+          streamAbort.abort()
         }
       }
 
@@ -347,7 +448,7 @@ async function handleAiChat(
         }
         const { bridgeId, bridge, destroy } = createBridge(
           emit,
-          req.signal,
+          turnSignal,
           undefined,
           (next) => { toolContextBase.snapshot = next },
         )
@@ -363,7 +464,7 @@ async function handleAiChat(
           modelId,
           modelCapabilities,
           credentials: resolvedCredential,
-          signal: req.signal,
+          signal: turnSignal,
           bridge,
           toolContextBase,
           ...(isManagedAiMode()
@@ -394,7 +495,6 @@ async function handleAiChat(
         emit({ type: 'error', message: `AI chat failed: ${detail}` })
       } finally {
         if (destroyBridge) destroyBridge()
-        closeStream()
         // Emit the terminal audit event. Re-read the conversation row to
         // capture the deltas the persister just committed.
         try {
@@ -424,8 +524,17 @@ async function handleAiChat(
           // Audit failures must never break the user-visible stream — the
           // request already finished by the time we hit this branch.
           console.error('[ai/chat] audit emit failed:', auditErr)
+        } finally {
+          releaseConversation()
+          closeStream()
         }
       }
+    },
+    cancel() {
+      // Abort provider fetches and pending browser waiters immediately; the
+      // handler's finally block then destroys the bridge and releases the
+      // per-conversation writer lock.
+      streamAbort.abort()
     },
   })
 
@@ -433,7 +542,7 @@ async function handleAiChat(
     status: 200,
     headers: {
       'Content-Type': 'application/x-ndjson',
-      'Cache-Control': 'no-cache',
+      'Cache-Control': 'private, no-store',
       'X-Accel-Buffering': 'no',
     },
   })
@@ -442,6 +551,30 @@ async function handleAiChat(
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+function acquireConversationStream(conversationId: string): (() => void) | null {
+  if (activeChatConversations.has(conversationId)) return null
+  activeChatConversations.add(conversationId)
+  let released = false
+  return () => {
+    if (released) return
+    released = true
+    activeChatConversations.delete(conversationId)
+  }
+}
+
+function clientClosedRequest(): Response {
+  return new Response(null, { status: 499, statusText: 'Client Closed Request' })
+}
+
+function waitForRequest<T>(promise: Promise<T>, signal: AbortSignal): Promise<T | typeof REQUEST_ABORTED> {
+  if (signal.aborted) return Promise.resolve(REQUEST_ABORTED)
+  return new Promise<T | typeof REQUEST_ABORTED>((resolve, reject) => {
+    const onAbort = () => resolve(REQUEST_ABORTED)
+    signal.addEventListener('abort', onAbort, { once: true })
+    promise.then(resolve, reject).finally(() => signal.removeEventListener('abort', onAbort))
+  })
+}
 
 export function buildSystemPromptForScope(
   scope: ToolScope,

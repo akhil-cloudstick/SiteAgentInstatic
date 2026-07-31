@@ -16,7 +16,7 @@ import type { AgentSlice } from '@site/agent'
  * Typed loosely as a structural shape (subscribe + getState + setState)
  * rather than `StoreApi<AgentSlice>` so the type accepts any Zustand
  * store whose state includes AgentSlice — including stores wrapped in
- * middleware (subscribeWithSelector, immer) whose `setState` signature
+ * middleware (subscribeWithSelector, zustand-mutative) whose `setState` signature
  * widens to accept the combined store shape.
  */
 export interface AgentStoreApi {
@@ -39,12 +39,8 @@ export interface AgentStoreApi {
  */
 export const AgentStoreContext = createContext<AgentStoreApi | null>(null)
 
-/**
- * Read agent state from the host store. Throws when called outside an
- * AgentStoreProvider — the panel components rely on a host being
- * mounted; an unprovided render is a wiring bug, not a missing-data case.
- */
-export function useAgentStore<U>(selector: (slice: AgentSlice) => U): U {
+/** Raw injected store API for effects that need an external-store subscription. */
+export function useAgentStoreApi(): AgentStoreApi {
   const api = useContext(AgentStoreContext)
   if (!api) {
     throw new Error(
@@ -52,5 +48,15 @@ export function useAgentStore<U>(selector: (slice: AgentSlice) => U): U {
       'Wrap the AgentPanel mount in <AgentStoreProvider store={...}>.',
     )
   }
+  return api
+}
+
+/**
+ * Read agent state from the host store. Throws when called outside an
+ * AgentStoreProvider — the panel components rely on a host being
+ * mounted; an unprovided render is a wiring bug, not a missing-data case.
+ */
+export function useAgentStore<U>(selector: (slice: AgentSlice) => U): U {
+  const api = useAgentStoreApi()
   return useZustandStore(api, selector)
 }

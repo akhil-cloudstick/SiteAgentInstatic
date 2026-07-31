@@ -1,6 +1,12 @@
-import type { StyleRule, Condition, ConditionDef } from '@core/page-tree'
+import type {
+  CSSDeclarationPriorityBag,
+  StyleRule,
+  Condition,
+  ConditionDef,
+} from '@core/page-tree'
 import { breakpointMediaQuery, styleRuleSelector } from '@core/page-tree'
 import { sanitiseCssValue } from './utils'
+import { responsiveBackgroundImage, type ResponsiveCssOptions } from './responsiveBackground'
 
 /**
  * Convert a camelCase CSS property name to kebab-case.
@@ -106,17 +112,26 @@ function buildSidesShorthand(top: string, right: string, bottom: string, left: s
 function tryCollapseSides(
   bag: Record<string, unknown>,
   prefix: SideShorthandPrefix,
-): string | null {
+  priorities: CSSDeclarationPriorityBag,
+): { value: string; important: boolean } | null {
   const values: string[] = []
+  let important: boolean | undefined
   for (const side of SIDES) {
-    const raw = bag[`${prefix}${side}`]
+    const property = `${prefix}${side}`
+    const raw = bag[property]
     if (raw === undefined || raw === null || raw === '') return null
     const sanitised = sanitiseCssValue(raw as string | number)
     if (sanitised === null) return null
+    const propertyImportant = priorities[property] === 'important'
+    if (important !== undefined && propertyImportant !== important) return null
+    important = propertyImportant
     values.push(sanitised)
   }
   const [top, right, bottom, left] = values
-  return buildSidesShorthand(top, right, bottom, left)
+  return {
+    value: buildSidesShorthand(top, right, bottom, left),
+    important: important ?? false,
+  }
 }
 
 /**
@@ -137,8 +152,12 @@ function tryCollapseSides(
  * collapse, the property denylist, and value sanitisation all live here so the
  * two formatters can never drift.
  */
-function bagToDeclarations(bag: Record<string, unknown>): Array<[string, string]> {
-  const decls: Array<[string, string]> = []
+function bagToDeclarations(
+  bag: Record<string, unknown>,
+  options: ResponsiveCssOptions = {},
+  priorities: CSSDeclarationPriorityBag = {},
+): Array<[string, string, boolean]> {
+  const decls: Array<[string, string, boolean]> = []
   // Track which prefixes have already been emitted as a collapsed shorthand
   // so we skip the remaining three side properties for that prefix.
   const collapsedPrefixes = new Set<SideShorthandPrefix>()
@@ -150,9 +169,9 @@ function bagToDeclarations(bag: Record<string, unknown>): Array<[string, string]
     const sidePrefix = SIDE_PROP_TO_PREFIX.get(prop)
     if (sidePrefix) {
       if (collapsedPrefixes.has(sidePrefix)) continue
-      const shorthand = tryCollapseSides(bag, sidePrefix)
+      const shorthand = tryCollapseSides(bag, sidePrefix, priorities)
       if (shorthand !== null) {
-        decls.push([sidePrefix, shorthand])
+        decls.push([sidePrefix, shorthand.value, shorthand.important])
         collapsedPrefixes.add(sidePrefix)
         continue
       }
@@ -161,7 +180,19 @@ function bagToDeclarations(bag: Record<string, unknown>): Array<[string, string]
 
     const sanitised = sanitiseCssValue(value as string | number)
     if (sanitised === null) continue
-    decls.push([toKebab(prop), sanitised])
+    const kebab = toKebab(prop)
+    const important = priorities[prop] === 'important'
+    if (prop === 'backgroundImage') {
+      const responsive = responsiveBackgroundImage(sanitised, options.mediaAssets)
+      const fallback = sanitiseCssValue(responsive.fallback)
+      if (fallback !== null) decls.push([kebab, fallback, important])
+      if (responsive.imageSet) {
+        const imageSet = sanitiseCssValue(responsive.imageSet)
+        if (imageSet !== null) decls.push([kebab, imageSet, important])
+      }
+      continue
+    }
+    decls.push([kebab, sanitised, important])
   }
   return decls
 }
@@ -171,9 +202,13 @@ function bagToDeclarations(bag: Record<string, unknown>): Array<[string, string]
  * for use inside a `{ … }` rule body). See `bagToDeclarations` for the shared
  * extraction rules.
  */
-export function bagToCSS(bag: Record<string, unknown>): string {
-  return bagToDeclarations(bag)
-    .map(([prop, value]) => `  ${prop}: ${value};`)
+export function bagToCSS(
+  bag: Record<string, unknown>,
+  options: ResponsiveCssOptions = {},
+  priorities: CSSDeclarationPriorityBag = {},
+): string {
+  return bagToDeclarations(bag, options, priorities)
+    .map(([prop, value, important]) => `  ${prop}: ${value}${important ? ' !important' : ''};`)
     .join('\n')
 }
 
@@ -186,8 +221,8 @@ export function bagToCSS(bag: Record<string, unknown>): string {
  * Returns `''` when no declaration survives the gate (the caller then emits no
  * `style` attribute at all).
  */
-export function bagToInlineStyle(bag: Record<string, unknown>): string {
-  return bagToDeclarations(bag)
+export function bagToInlineStyle(bag: Record<string, unknown>, options: ResponsiveCssOptions = {}): string {
+  return bagToDeclarations(bag, options)
     .map(([prop, value]) => `${prop}: ${value}`)
     .join('; ')
 }
@@ -315,15 +350,22 @@ export function compareConditionCascade(
  * viewport @media contexts (see `compareViewportContextCascade`). Context keys
  * matching neither registry are skipped (orphaned overrides).
  */
+export interface StyleRuleDeclarationLayers {
+  styles: Record<string, unknown>
+  stylePriorities?: CSSDeclarationPriorityBag
+  contextStyles?: Record<string, Record<string, unknown>>
+  contextStylePriorities?: Record<string, CSSDeclarationPriorityBag>
+}
+
 export type StyleRuleCssEmitter = (
   selector: string,
-  styles: Record<string, unknown>,
-  contextStyles?: Record<string, Record<string, unknown>>,
+  layers: StyleRuleDeclarationLayers,
 ) => string[]
 
 export function createStyleRuleCssEmitter(
   breakpoints: ViewportContext[],
   conditions: ReadonlyArray<ConditionDef> = [],
+  options: ResponsiveCssOptions = {},
 ): StyleRuleCssEmitter {
   const breakpointById = new Map<string, { breakpoint: ViewportContext; index: number }>(
     breakpoints.map((bp, index) => [bp.id, { breakpoint: bp, index }]),
@@ -334,26 +376,36 @@ export function createStyleRuleCssEmitter(
     conditions.map((c, index) => [c.id, { condition: c.condition, index }]),
   )
 
-  return (selector, styles, contextStyles) => {
+  return (selector, layers) => {
     const blocks: string[] = []
 
-    const baseDecls = bagToCSS(styles)
+    const baseDecls = bagToCSS(layers.styles, options, layers.stylePriorities)
     if (baseDecls) {
       blocks.push(`${selector} {\n${baseDecls}\n}`)
     }
 
     // Partition contextStyles into custom-condition entries and viewport-context
     // entries. Keys matching neither registry are skipped (orphaned overrides).
-    const conditionEntries: Array<{ bag: Record<string, unknown>; condition: Condition; index: number }> = []
-    const bpEntries: Array<{ bag: Record<string, unknown>; breakpoint: ViewportContext; index: number }> = []
-    for (const [contextId, bag] of Object.entries(contextStyles ?? {})) {
+    const conditionEntries: Array<{
+      contextId: string
+      bag: Record<string, unknown>
+      condition: Condition
+      index: number
+    }> = []
+    const bpEntries: Array<{
+      contextId: string
+      bag: Record<string, unknown>
+      breakpoint: ViewportContext
+      index: number
+    }> = []
+    for (const [contextId, bag] of Object.entries(layers.contextStyles ?? {})) {
       const cond = conditionById.get(contextId)
       if (cond) {
-        conditionEntries.push({ bag, condition: cond.condition, index: cond.index })
+        conditionEntries.push({ contextId, bag, condition: cond.condition, index: cond.index })
         continue
       }
       const breakpointEntry = breakpointById.get(contextId)
-      if (breakpointEntry) bpEntries.push({ bag, ...breakpointEntry })
+      if (breakpointEntry) bpEntries.push({ contextId, bag, ...breakpointEntry })
     }
 
     // Custom conditions emit AFTER base but BEFORE viewport contexts, so
@@ -362,8 +414,8 @@ export function createStyleRuleCssEmitter(
     // min-width ascending, desktop-first max-width descending) so an imported
     // responsive sheet keeps the breakpoint that should win on equal specificity.
     conditionEntries.sort(compareConditionCascade)
-    for (const { bag, condition } of conditionEntries) {
-      const decls = bagToCSS(bag)
+    for (const { contextId, bag, condition } of conditionEntries) {
+      const decls = bagToCSS(bag, options, layers.contextStylePriorities?.[contextId])
       if (!decls) continue
       const prelude = conditionPrelude(condition)
       if (!prelude) continue
@@ -371,8 +423,8 @@ export function createStyleRuleCssEmitter(
     }
 
     bpEntries.sort(compareViewportContextCascade)
-    for (const { bag, breakpoint } of bpEntries) {
-      const decls = bagToCSS(bag)
+    for (const { contextId, bag, breakpoint } of bpEntries) {
+      const decls = bagToCSS(bag, options, layers.contextStylePriorities?.[contextId])
       if (!decls) continue
       const prelude = conditionPrelude({ kind: 'media', query: breakpointMediaQuery(breakpoint) })
       if (!prelude) continue
@@ -387,9 +439,10 @@ export function generateClassCSS(
   classes: Record<string, StyleRule>,
   breakpoints: ViewportContext[],
   conditions: ReadonlyArray<ConditionDef> = [],
+  options: ResponsiveCssOptions = {},
 ): string {
   const blocks: string[] = []
-  const emitRule = createStyleRuleCssEmitter(breakpoints, conditions)
+  const emitRule = createStyleRuleCssEmitter(breakpoints, conditions, options)
 
   // Cascade order: rules with a smaller `order` are emitted first so a later,
   // more-specific override appears later in source and wins on equal
@@ -426,7 +479,7 @@ export function generateClassCSS(
     if (seen.has(key)) continue
     seen.add(key)
 
-    blocks.push(...emitRule(selector, cls.styles, cls.contextStyles))
+    blocks.push(...emitRule(selector, cls))
   }
 
   return blocks.join('\n\n')

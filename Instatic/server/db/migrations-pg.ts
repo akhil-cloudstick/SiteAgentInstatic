@@ -810,13 +810,7 @@ export const pgMigrations: Migration[] = [
         conversation_id text not null references ai_conversations(id) on delete cascade,
         position integer not null,
         role text not null,
-        -- jsonb (not text) like every other *_json column: Bun auto-serialises on
-        -- write and auto-parses on read, so message content round-trips. As a
-        -- plain text column it came back as a raw string, failed
-        -- ContentBlocksSchema, and every history read returned empty — the model
-        -- saw no messages and could only greet. (SQLite keeps text; its adapter
-        -- parses *_json string columns itself.)
-        content_json jsonb not null,
+        content_json text not null,
         tool_call_id text,
         tool_name text,
         prompt_tokens integer not null default 0,
@@ -1046,6 +1040,90 @@ export const pgMigrations: Migration[] = [
     `,
   },
   {
+    id: '021_mcp_connector_token_expiry',
+    sql: `
+      alter table ai_mcp_connectors add column expires_at timestamptz;
+    `,
+  },
+  {
+    // Multi-admin sync substrate: every row written or soft-deleted by the
+    // transactional site-document save is stamped with a site-global,
+    // monotonically increasing sequence number. One column serves conflict
+    // detection (stored seq > client base seq), O(delta) reconnect
+    // reconciliation (rows where seq > cursor), and event ordering.
+    // `site_sync_state` is the single-row counter (dialect-neutral: a plain
+    // row bumped with `set seq = seq + 1 returning seq` inside the save
+    // transaction — kept as a row, not a PG sequence, for SQLite parity).
+    id: '022_site_sync_sequence',
+    sql: `
+      alter table data_rows add column seq bigint not null default 0;
+
+      create index if not exists data_rows_table_seq_idx
+        on data_rows (table_id, seq);
+
+      alter table site add column seq bigint not null default 0;
+
+      create table if not exists site_sync_state (
+        id integer primary key check (id = 1),
+        seq bigint not null default 0
+      );
+
+      insert into site_sync_state (id, seq) values (1, 0);
+    `,
+  },
+  {
+    // OAuth 2.1 authorization-code + PKCE support for hosted MCP clients.
+    // Connector rows remain the user/capability grant; these tables hold the
+    // dynamically registered public client, one-time authorization codes, and
+    // opaque access/refresh credentials for that grant.
+    id: '023_mcp_oauth',
+    sql: `
+      create table if not exists ai_mcp_oauth_clients (
+        client_id text primary key,
+        client_name text not null,
+        redirect_uris_json jsonb not null,
+        client_id_issued_at bigint not null,
+        created_at timestamptz not null default current_timestamp
+      );
+
+      create table if not exists ai_mcp_oauth_codes (
+        code_hash text primary key,
+        connector_id text not null references ai_mcp_connectors(id) on delete cascade,
+        client_id text not null references ai_mcp_oauth_clients(client_id) on delete cascade,
+        redirect_uri text not null,
+        code_challenge text not null,
+        scope text not null,
+        resource text not null,
+        created_at timestamptz not null default current_timestamp,
+        expires_at timestamptz not null,
+        consumed_at timestamptz
+      );
+
+      create index if not exists ai_mcp_oauth_codes_connector_idx
+        on ai_mcp_oauth_codes (connector_id);
+
+      create table if not exists ai_mcp_oauth_tokens (
+        id text primary key,
+        connector_id text not null references ai_mcp_connectors(id) on delete cascade,
+        client_id text not null references ai_mcp_oauth_clients(client_id) on delete cascade,
+        kind text not null,
+        token_hash text not null unique,
+        scope text not null,
+        resource text not null,
+        created_at timestamptz not null default current_timestamp,
+        expires_at timestamptz not null,
+        revoked_at timestamptz,
+        constraint ai_mcp_oauth_tokens_kind_check check (kind in ('access', 'refresh'))
+      );
+
+      create index if not exists ai_mcp_oauth_tokens_connector_idx
+        on ai_mcp_oauth_tokens (connector_id);
+    `,
+  },
+  {
+    // MMS migration: keeps its original id 019 (already applied on existing
+    // tenant DBs, so the per-id runner skips it); upstream 0.0.14's new
+    // migrations were renumbered to 021-023 to sit after it, no re-run needed.
     id: '019_ai_message_model_id',
     sql: `
       -- Per-message routed-model attribution. In managed mode the AI Gateway
@@ -1061,6 +1139,7 @@ export const pgMigrations: Migration[] = [
     `,
   },
   {
+    // MMS migration: keeps its original id 020 (see 019 above).
     id: '020_media_content_hash',
     sql: `
       -- Content-addressed dedup for imported media. Share-to-CMS re-uploads a

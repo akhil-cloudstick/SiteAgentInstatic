@@ -20,6 +20,7 @@ import './matchers'  // Register toBeCleanHTML
 
 import { runModuleConformanceSuite, renderModule, withBannedGlobals } from './helpers'
 import { escapeProps } from '@core/publisher'
+import { CanvasDocumentContext } from '@site/canvas/CanvasContexts'
 
 // ---------------------------------------------------------------------------
 // Import base modules (self-register into global registry on import)
@@ -300,7 +301,7 @@ describe('base.text — unified text module', () => {
     expect(container.querySelector('.ist-x')).toBeNull()
   })
 
-  it('renders tag "none" multiline as bare text with <br> breaks and no wrapper', () => {
+  it('renders tag "none" multiline as one literal bare text node', () => {
     const { container } = renderReact(
       React.createElement(TextModule.component, {
         props: { text: 'a\nb', tag: 'none', htmlAttributes: {} },
@@ -312,8 +313,8 @@ describe('base.text — unified text module', () => {
     )
 
     expect(container.querySelector('span')).toBeNull()
-    expect(container.querySelector('br')).not.toBeNull()
-    expect(container.textContent).toBe('ab')
+    expect(container.querySelector('br')).toBeNull()
+    expect(container.textContent).toBe('a\nb')
   })
 
   it('still wraps a non-none tag in its element carrying the canvas identity', () => {
@@ -426,23 +427,45 @@ describe('base.body — render() specifics', () => {
 
   it('applies editor identity to the iframe body without wrapping children', () => {
     const editorDocument = document.implementation.createHTMLDocument('canvas')
+    editorDocument.body.className = 'frame-default'
+    editorDocument.body.dataset.breakpointId = 'desktop'
+    editorDocument.body.style.backgroundColor = 'rgb(1, 2, 3)'
     const mount = editorDocument.createElement('div')
     editorDocument.body.appendChild(mount)
 
-    const { container } = renderReact(
-      React.createElement(BodyModule.component, {
-        props: {},
-        nodeId: 'body-node',
-        isSelected: true,
-        mcClassName: 'ist-body',
-        nodeWrapperProps: {
-          'data-node-id': 'body-node',
-          'data-module-id': 'base.body',
-          'data-canvas-selected': 'true',
-          tabIndex: 0,
-        },
-        children: React.createElement('p', null, 'Body child'),
-      } as never),
+    const { container, unmount } = renderReact(
+      React.createElement(
+        CanvasDocumentContext.Provider,
+        { value: editorDocument },
+        React.createElement(BodyModule.component, {
+          props: {
+            htmlAttributes: {
+              id: 'site-body',
+              dir: 'rtl',
+              role: 'document',
+              'aria-pressed': 'false',
+              'data-theme': 'dark',
+              'data-breakpoint-id': 'forged',
+              tabindex: '9',
+              onclick: 'alert(1)',
+            },
+          },
+          nodeId: 'body-node',
+          isSelected: true,
+          mcClassName: 'ist-body',
+          nodeWrapperProps: {
+            'data-node-id': 'body-node',
+            'data-module-id': 'base.body',
+            'data-canvas-selected': 'true',
+            tabIndex: 0,
+            style: {
+              backgroundColor: 'rgb(9, 10, 11)',
+              backgroundImage: 'linear-gradient(red, blue)',
+            },
+          },
+          children: React.createElement('p', null, 'Body child'),
+        } as never),
+      ),
       { container: mount },
     )
 
@@ -450,10 +473,32 @@ describe('base.body — render() specifics', () => {
     expect(editorDocument.body.getAttribute('data-module-id')).toBe('base.body')
     expect(editorDocument.body.getAttribute('data-canvas-selected')).toBe('true')
     expect(editorDocument.body.getAttribute('tabindex')).toBe('0')
+    expect(editorDocument.body.getAttribute('id')).toBe('site-body')
+    expect(editorDocument.body.getAttribute('dir')).toBe('rtl')
+    expect(editorDocument.body.getAttribute('role')).toBe('document')
+    expect(editorDocument.body.getAttribute('aria-pressed')).toBe('false')
+    expect(editorDocument.body.getAttribute('data-theme')).toBe('dark')
+    expect(editorDocument.body.getAttribute('data-breakpoint-id')).toBe('desktop')
+    expect(editorDocument.body.hasAttribute('onclick')).toBe(false)
     expect(editorDocument.body.className).toBe('ist-body')
-    expect(container.querySelector('[data-instatic-body-probe]')?.getAttribute('aria-hidden')).toBe('true')
+    expect(editorDocument.body.style.backgroundColor).toBe('rgb(9, 10, 11)')
+    expect(editorDocument.body.style.backgroundImage).toBe('linear-gradient(red, blue)')
+    expect(container.querySelector('[data-instatic-body-probe]')).toBeNull()
     expect(container.querySelector('p')?.textContent).toBe('Body child')
-    expect(container.firstElementChild?.nextElementSibling?.tagName).toBe('P')
+    expect(container.children).toHaveLength(1)
+    expect(container.firstElementChild?.tagName).toBe('P')
+
+    unmount()
+    expect(editorDocument.body.className).toBe('frame-default')
+    expect(editorDocument.body.style.backgroundColor).toBe('rgb(1, 2, 3)')
+    expect(editorDocument.body.style.backgroundImage).toBe('')
+    expect(editorDocument.body.hasAttribute('id')).toBe(false)
+    expect(editorDocument.body.hasAttribute('data-theme')).toBe(false)
+    expect(editorDocument.body.getAttribute('data-breakpoint-id')).toBe('desktop')
+    expect(editorDocument.body.hasAttribute('data-node-id')).toBe(false)
+    expect(editorDocument.body.hasAttribute('data-module-id')).toBe(false)
+    expect(editorDocument.body.hasAttribute('data-canvas-selected')).toBe(false)
+    expect(editorDocument.body.hasAttribute('tabindex')).toBe(false)
   })
 
   it('does not access DOM globals during publish render', () => {
@@ -868,13 +913,13 @@ describe('base.svg — render() specifics', () => {
       } as never),
     )
 
-    const wrapper = container.querySelector('span')
-    expect(wrapper?.getAttribute('role')).toBe('img')
-    expect(wrapper?.getAttribute('aria-label')).toBe('Preview mark')
-    expect(wrapper?.classList.contains('ist-svg')).toBe(true)
-    expect(wrapper?.querySelector('svg')).not.toBeNull()
-    expect(wrapper?.innerHTML.toLowerCase()).not.toContain('<script')
-    expect(wrapper?.innerHTML.toLowerCase()).not.toContain('onload')
+    const svg = container.querySelector('svg')
+    expect(container.querySelector('span')).toBeNull()
+    expect(svg?.getAttribute('role')).toBe('img')
+    expect(svg?.getAttribute('aria-label')).toBe('Preview mark')
+    expect(svg?.classList.contains('ist-svg')).toBe(true)
+    expect(svg?.innerHTML.toLowerCase()).not.toContain('<script')
+    expect(svg?.innerHTML.toLowerCase()).not.toContain('onload')
   })
 
   it('does not access DOM globals during publish render', () => {
@@ -891,15 +936,17 @@ describe('base.svg — render() specifics', () => {
 // ---------------------------------------------------------------------------
 
 describe('base.video — render() specifics', () => {
-  it('exposes the v4 schema (single videoUrl, playback, poster, perf hints)', () => {
+  it('exposes the v4 schema (single videoUrl, playback, poster, perf hints, title, noRelatedVideos)', () => {
     expect(Object.keys(VideoModule.schema).sort()).toEqual([
       'autoplay',
       'controls',
       'loop',
       'muted',
+      'noRelatedVideos',
       'playsinline',
       'poster',
       'preload',
+      'title',
       'videoUrl',
     ])
   })
@@ -1004,6 +1051,88 @@ describe('base.video — render() specifics', () => {
     expect(() =>
       withBannedGlobals(() => VideoModule.render(VideoModule.defaults, []))
     ).not.toThrow()
+  })
+
+  // --- cspSources ---
+
+  it('returns cspSources with frame-src YouTube origins for a youtube watch URL', () => {
+    const out = renderModule(VideoModule, {
+      videoUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+    })
+    expect(out.cspSources).toBeDefined()
+    const frameSrc = out.cspSources?.find((r) => r.directive === 'frame-src')
+    expect(frameSrc).toBeDefined()
+    expect(frameSrc?.sources).toContain('https://www.youtube.com')
+    expect(frameSrc?.sources).toContain('https://www.youtube-nocookie.com')
+  })
+
+  it('returns cspSources with frame-src YouTube origins for a youtu.be short link', () => {
+    const out = renderModule(VideoModule, { videoUrl: 'https://youtu.be/dQw4w9WgXcQ' })
+    const frameSrc = out.cspSources?.find((r) => r.directive === 'frame-src')
+    expect(frameSrc?.sources).toContain('https://www.youtube.com')
+    expect(frameSrc?.sources).toContain('https://www.youtube-nocookie.com')
+  })
+
+  it('returns cspSources with frame-src YouTube origins for a shorts URL', () => {
+    // Shorts ID must be exactly 11 base64-url chars (same as regular YouTube IDs)
+    const out = renderModule(VideoModule, { videoUrl: 'https://www.youtube.com/shorts/dQw4w9WgXcQ' })
+    const frameSrc = out.cspSources?.find((r) => r.directive === 'frame-src')
+    expect(frameSrc?.sources).toContain('https://www.youtube.com')
+  })
+
+  it('does not declare cspSources for a self-hosted video URL', () => {
+    const out = renderModule(VideoModule, { videoUrl: '/uploads/intro.mp4' })
+    expect(out.cspSources).toBeUndefined()
+  })
+
+  it('does not declare cspSources when videoUrl is empty (no embed)', () => {
+    const out = renderModule(VideoModule, { videoUrl: '' })
+    expect(out.cspSources).toBeUndefined()
+  })
+
+  // --- title prop ---
+
+  it('title prop is used as the iframe title attribute for YouTube embeds', () => {
+    const { html } = renderModule(VideoModule, {
+      videoUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+      title: 'Rick Astley Never Gonna Give You Up',
+    })
+    expect(html).toContain('title="Rick Astley Never Gonna Give You Up"')
+    expect(html).not.toContain('title="YouTube video"')
+  })
+
+  it('title prop defaults to "YouTube video" when not set', () => {
+    const { html } = renderModule(VideoModule, {
+      videoUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+    })
+    expect(html).toContain('title="YouTube video"')
+  })
+
+  // --- noRelatedVideos prop ---
+
+  it('noRelatedVideos: true appends rel=0 to the YouTube embed URL', () => {
+    const { html } = renderModule(VideoModule, {
+      videoUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+      noRelatedVideos: true,
+    })
+    expect(html).toMatch(/youtube\.com\/embed\/dQw4w9WgXcQ[^"]*rel=0/)
+  })
+
+  it('noRelatedVideos: false (default) does NOT add rel=0', () => {
+    const { html } = renderModule(VideoModule, {
+      videoUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+    })
+    expect(html).not.toContain('rel=0')
+  })
+
+  it('noRelatedVideos still declares cspSources for frame-src YouTube', () => {
+    const out = renderModule(VideoModule, {
+      videoUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+      noRelatedVideos: true,
+    })
+    const frameSrc = out.cspSources?.find((r) => r.directive === 'frame-src')
+    expect(frameSrc?.sources).toContain('https://www.youtube.com')
+    expect(frameSrc?.sources).toContain('https://www.youtube-nocookie.com')
   })
 })
 

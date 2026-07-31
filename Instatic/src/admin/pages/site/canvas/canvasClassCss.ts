@@ -4,6 +4,7 @@ import {
   generateClassCSS,
   PUBLISHER_RESET_CSS,
   type ViewportContext,
+  type ResponsiveCssOptions,
 } from '@core/publisher'
 import { generateFrameworkRootCss } from '@core/framework'
 import { generateFontsCss } from '@core/fonts'
@@ -17,6 +18,10 @@ import type {
   FrameworkTypographySettings,
 } from '@core/framework-schema'
 
+interface CanvasResponsiveCssOptions extends ResponsiveCssOptions {
+  mediaSignature?: string
+}
+
 function buildCanvasClassCSS(
   classes: Record<string, StyleRule>,
   breakpoints: ViewportContext[],
@@ -26,6 +31,7 @@ function buildCanvasClassCSS(
   frameworkSpacing?: FrameworkSpacingSettings | null,
   frameworkPreferences?: FrameworkPreferencesSettings | null,
   fonts?: SiteFontsSettings | null,
+  responsiveOptions: CanvasResponsiveCssOptions = {},
 ): string {
   const blocks: string[] = []
 
@@ -56,7 +62,7 @@ function buildCanvasClassCSS(
   // exact bytes a publish would (rule order, condition/viewport cascade, and
   // sanitized raw @keyframes rules included), so the preview cannot drift
   // from the published output.
-  const classCss = generateClassCSS(classes, breakpoints, conditions)
+  const classCss = generateClassCSS(classes, breakpoints, conditions, responsiveOptions)
   if (classCss) blocks.push(classCss)
 
   return blocks.join('\n\n')
@@ -90,6 +96,7 @@ export function createCanvasClassCssMemo(
     frameworkSpacing,
     frameworkPreferences,
     fonts,
+    responsiveOptions = {},
   ) => {
     const inputs = [
       classes,
@@ -100,6 +107,7 @@ export function createCanvasClassCssMemo(
       frameworkSpacing,
       frameworkPreferences,
       fonts,
+      responsiveOptions.mediaSignature,
     ]
     const prev = lastInputs
     if (prev && inputs.every((value, i) => Object.is(value, prev[i]))) {
@@ -114,6 +122,7 @@ export function createCanvasClassCssMemo(
       frameworkSpacing,
       frameworkPreferences,
       fonts,
+      responsiveOptions,
     )
     lastInputs = inputs
     return lastCss
@@ -127,6 +136,55 @@ export function createCanvasClassCssMemo(
  */
 export const generateCanvasClassCSS: CanvasClassCssGenerator = createCanvasClassCssMemo()
 
+const EMPTY_CONTAINER_PLACEHOLDER_SELECTOR = '[data-canvas-module-placeholder]'
+
+function ruleHasAuthoredDeclarations(rule: StyleRule): boolean {
+  if (Object.keys(rule.styles).length > 0) return true
+  return Object.values(rule.contextStyles).some((styles) => Object.keys(styles).length > 0)
+}
+
+/**
+ * Hide the editor-only empty-container placeholder when an ambient selector
+ * styles the authored element.
+ *
+ * Class-assigned and inline-styled empty containers suppress the placeholder
+ * in `ContainerEditor` because that styling is present in the node props.
+ * Ambient rules attach only through selector matching, so the component cannot
+ * see them. These canvas-only rules let the browser perform the same selector
+ * matching it already performs for the authored CSS, including descendant,
+ * sibling, attribute, and state selectors.
+ *
+ * `:is()` keeps comma-separated selector lists scoped as one subject before
+ * the direct-child placeholder suffix is added. `:empty` is rewritten against
+ * the editor-only placeholder child so selectors authored for a genuinely
+ * empty published element still suppress the canvas affordance.
+ */
+export function generateAmbientPlaceholderSuppressionCSS(
+  rules: Record<string, StyleRule>,
+): string {
+  const selectors = Object.values(rules)
+    .filter((rule) =>
+      rule.kind === 'ambient' &&
+      !rule.rawCss &&
+      ruleHasAuthoredDeclarations(rule)
+    )
+    .map((rule) =>
+      styleRuleSelector(rule).replace(
+        /:empty\b/g,
+        `:has(> ${EMPTY_CONTAINER_PLACEHOLDER_SELECTOR}:only-child)`,
+      )
+    )
+
+  if (selectors.length === 0) return ''
+
+  return selectors
+    .map(
+      (selector) =>
+        `:is(${selector}) > ${EMPTY_CONTAINER_PLACEHOLDER_SELECTOR} { display: none; }`,
+    )
+    .join('\n')
+}
+
 /**
  * Generate a higher-specificity preview rule for a single class, used by
  * the canvas style injector while a user is hovering a suggestion. The
@@ -137,8 +195,12 @@ export const generateCanvasClassCSS: CanvasClassCssGenerator = createCanvasClass
 export function generatePreviewClassCSS(
   cls: StyleRule,
   preview: { breakpointId?: string | null; styles: Record<string, unknown> },
+  responsiveOptions: ResponsiveCssOptions = {},
 ): string {
-  const decls = bagToCSS(preview.styles)
+  const priorities = preview.breakpointId
+    ? cls.contextStylePriorities?.[preview.breakpointId]
+    : cls.stylePriorities
+  const decls = bagToCSS(preview.styles, responsiveOptions, priorities)
   if (!decls) return ''
   const selector = styleRuleSelector(cls)
   const doubled = `${selector}${selector}`
@@ -182,6 +244,7 @@ export function generateForcedStateCSS(
   breakpoints: ViewportContext[],
   conditions: ReadonlyArray<ConditionDef> = [],
   inflight?: ForcedStateInflight | null,
+  responsiveOptions: ResponsiveCssOptions = {},
 ): string {
   const rawSelector = `[data-node-id="${escapeCssAttribute(nodeId)}"]`
   const selector = `${rawSelector}${rawSelector}`
@@ -197,8 +260,13 @@ export function generateForcedStateCSS(
     contextStyles[inflight.contextId] = { ...(contextStyles[inflight.contextId] ?? {}), ...inflight.styles }
   }
 
-  const emitRule = createStyleRuleCssEmitter(breakpoints, conditions)
-  return emitRule(selector, baseStyles, contextStyles).join('\n\n')
+  const emitRule = createStyleRuleCssEmitter(breakpoints, conditions, responsiveOptions)
+  return emitRule(selector, {
+    styles: baseStyles,
+    stylePriorities: rule.stylePriorities,
+    contextStyles,
+    contextStylePriorities: rule.contextStylePriorities,
+  }).join('\n\n')
 }
 
 function escapeCssAttribute(value: string): string {

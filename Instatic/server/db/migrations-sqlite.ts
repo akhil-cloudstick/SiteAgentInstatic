@@ -1104,21 +1104,101 @@ export const sqliteMigrations: Migration[] = [
     `,
   },
   {
+    id: '021_mcp_connector_token_expiry',
+    sql: `
+      alter table ai_mcp_connectors add column expires_at text;
+    `,
+  },
+  {
+    // Multi-admin sync substrate: every row written or soft-deleted by the
+    // transactional site-document save is stamped with a site-global,
+    // monotonically increasing sequence number. One column serves conflict
+    // detection (stored seq > client base seq), O(delta) reconnect
+    // reconciliation (rows where seq > cursor), and event ordering.
+    // `site_sync_state` is the single-row counter (dialect-neutral: a plain
+    // row bumped with `set seq = seq + 1 returning seq` inside the save
+    // transaction — SQLite has no sequence objects).
+    id: '022_site_sync_sequence',
+    sql: `
+      alter table data_rows add column seq integer not null default 0;
+
+      create index if not exists data_rows_table_seq_idx
+        on data_rows (table_id, seq);
+
+      alter table site add column seq integer not null default 0;
+
+      create table if not exists site_sync_state (
+        id integer primary key check (id = 1),
+        seq integer not null default 0
+      );
+
+      insert into site_sync_state (id, seq) values (1, 0);
+    `,
+  },
+  {
+    // OAuth 2.1 authorization-code + PKCE support for hosted MCP clients.
+    // Connector rows remain the user/capability grant; these tables hold the
+    // dynamically registered public client, one-time authorization codes, and
+    // opaque access/refresh credentials for that grant.
+    id: '023_mcp_oauth',
+    sql: `
+      create table if not exists ai_mcp_oauth_clients (
+        client_id text primary key,
+        client_name text not null,
+        redirect_uris_json text not null,
+        client_id_issued_at integer not null,
+        created_at text not null default (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+      );
+
+      create table if not exists ai_mcp_oauth_codes (
+        code_hash text primary key,
+        connector_id text not null references ai_mcp_connectors(id) on delete cascade,
+        client_id text not null references ai_mcp_oauth_clients(client_id) on delete cascade,
+        redirect_uri text not null,
+        code_challenge text not null,
+        scope text not null,
+        resource text not null,
+        created_at text not null default (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        expires_at text not null,
+        consumed_at text
+      );
+
+      create index if not exists ai_mcp_oauth_codes_connector_idx
+        on ai_mcp_oauth_codes (connector_id);
+
+      create table if not exists ai_mcp_oauth_tokens (
+        id text primary key,
+        connector_id text not null references ai_mcp_connectors(id) on delete cascade,
+        client_id text not null references ai_mcp_oauth_clients(client_id) on delete cascade,
+        kind text not null,
+        token_hash text not null unique,
+        scope text not null,
+        resource text not null,
+        created_at text not null default (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        expires_at text not null,
+        revoked_at text,
+        constraint ai_mcp_oauth_tokens_kind_check check (kind in ('access', 'refresh'))
+      );
+
+      create index if not exists ai_mcp_oauth_tokens_connector_idx
+        on ai_mcp_oauth_tokens (connector_id);
+    `,
+  },
+  {
+    // MMS migration: keeps its original id 019 (already applied on existing
+    // tenant DBs, so the per-id runner skips it); upstream 0.0.14's new
+    // migrations were renumbered to 021-023 to sit after it, no re-run needed.
     id: '019_ai_message_model_id',
     sql: `
-      -- Per-message routed-model attribution. In managed mode the AI Gateway
-      -- routes each turn to a per-category model (Design, Content, …) while the
-      -- conversation carries a single nominal model_id. Without this column the
-      -- "By model" audit rollup grouped every message under the conversation's
-      -- one model, so a Content-routed turn's tokens were mislabelled as the
-      -- default model. The persister now stamps the actually-routed model onto
-      -- the usage-bearing assistant message; nullable because only that row
-      -- (the one carrying the turn's tokens) is stamped.
+      -- Per-message routed-model attribution (see the Postgres twin for the
+      -- full rationale). Nullable; only the usage-bearing assistant message
+      -- carrying the turn's tokens is stamped.
       alter table ai_messages
         add column model_id text;
     `,
   },
   {
+    // MMS migration: keeps its original id 020 (see 019 above).
     id: '020_media_content_hash',
     sql: `
       -- Content-addressed dedup for imported media (see the Postgres twin for

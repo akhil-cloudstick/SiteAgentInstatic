@@ -81,9 +81,37 @@ export async function insertModuleViaPicker(
 export async function openLayersPanel(page: Page): Promise<void> {
   const tree = page.getByRole('tree', { name: 'Page element tree' })
   if (!(await tree.isVisible().catch(() => false))) {
-    await page.getByRole('button', { name: 'Open Layers panel' }).click()
+    const explorer = page.getByRole('complementary', { name: 'Explorer' })
+    if (!(await explorer.isVisible().catch(() => false))) {
+      await page.getByRole('button', { name: 'Open Explorer panel' }).click()
+    }
+    await explorer.getByRole('button', { name: 'Layers', exact: true }).click()
   }
   await expect(tree).toBeVisible()
+}
+
+type ExplorerTab = 'Site' | 'Code' | 'Media'
+
+/** Open one of the consolidated Explorer tabs and wait for it to become active. */
+export async function openExplorerTab(page: Page, tab: ExplorerTab): Promise<void> {
+  const explorer = page.getByRole('complementary', { name: 'Explorer' })
+  if (!(await explorer.isVisible().catch(() => false))) {
+    await page.getByRole('button', { name: 'Open Explorer panel' }).click()
+  }
+
+  const tabButton = explorer.getByRole('button', { name: tab, exact: true })
+  if ((await tabButton.getAttribute('aria-pressed')) !== 'true') {
+    await tabButton.click()
+  }
+  await expect(tabButton).toHaveAttribute('aria-pressed', 'true')
+}
+
+/** Open the Code Explorer tab (stylesheets + scripts). */
+export async function openCodePanel(page: Page): Promise<void> {
+  await openExplorerTab(page, 'Code')
+  await expect(
+    page.getByRole('button', { name: 'New stylesheet', exact: true }),
+  ).toBeVisible()
 }
 
 /** Select a layer in the DOM/layers tree by its display name. */
@@ -112,9 +140,7 @@ export async function setPropValue(
  */
 export async function openSitePanel(page: Page): Promise<void> {
   const newPageButton = page.getByRole('button', { name: 'New page', exact: true })
-  if (!(await newPageButton.isVisible().catch(() => false))) {
-    await page.getByRole('button', { name: 'Open Site panel' }).click()
-  }
+  await openExplorerTab(page, 'Site')
   await expect(newPageButton).toBeVisible()
 }
 
@@ -151,7 +177,12 @@ export async function saveDraft(page: Page): Promise<void> {
     await page.keyboard.press('Escape')
   }
   await expect(saveAction).toBeVisible()
+  const saveResponse = page.waitForResponse((response) =>
+    new URL(response.url()).pathname === '/admin/api/cms/site-document' &&
+    response.request().method() === 'PUT',
+  )
   await saveAction.click()
+  expect((await saveResponse).ok()).toBe(true)
   await expect(page.getByRole('status', { name: 'Draft saved' })).toBeVisible({
     timeout: 20_000,
   })

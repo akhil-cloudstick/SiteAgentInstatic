@@ -1,7 +1,9 @@
 import { describe, test, expect } from 'bun:test'
+import { INTERRUPTED_TOOL_RESULT_ERROR } from '@core/ai'
 import {
   buildMessageHistory,
-  INTERRUPTED_TOOL_RESULT_ERROR,
+  NON_VISION_USER_IMAGE_OMITTED,
+  projectUserImagesForModel,
 } from '../../../server/ai/conversations/history'
 import type { MessageRecord } from '../../../server/ai/conversations/types'
 import type { AiContentBlock } from '../../../server/ai/runtime/types'
@@ -34,6 +36,12 @@ function rec(
 function userText(text: string): MessageRecord {
   return rec('user', [{ kind: 'text', text }])
 }
+function userImage(data: string, text?: string): MessageRecord {
+  return rec('user', [
+    ...(text ? [{ kind: 'text' as const, text }] : []),
+    { kind: 'image', mimeType: 'image/jpeg', data },
+  ])
+}
 function assistantToolCall(id: string, name: string, input: unknown): MessageRecord {
   return rec('assistant', [{ kind: 'toolCall', toolCallId: id, toolName: name, input }], id, name)
 }
@@ -61,6 +69,59 @@ describe('buildMessageHistory', () => {
       { role: 'assistant', content: [{ kind: 'toolCall', toolCallId: 't1', toolName: 'site_insert_html', input: { a: 1 } }] },
       { role: 'tool', toolCallId: 't1', output: { ok: true, error: undefined } },
       { role: 'assistant', content: [{ kind: 'text', text: 'done' }] },
+    ])
+  })
+
+  test('drops a tool result row with no preceding assistant tool call', () => {
+    const history = buildMessageHistory([
+      userText('hi'),
+      toolResult('orphan', 'site_apply_css'),
+      rec('assistant', [{ kind: 'text', text: 'still ok' }]),
+    ])
+
+    expect(history).toEqual([
+      { role: 'user', content: [{ kind: 'text', text: 'hi' }] },
+      { role: 'assistant', content: [{ kind: 'text', text: 'still ok' }] },
+    ])
+  })
+
+  test('drops orphan tool results while preserving valid pairs in mixed corrupted history', () => {
+    const history = buildMessageHistory([
+      userText('duplicate prompt'),
+      userText('duplicate prompt'),
+      toolResult('orphan-before-a', 'site_apply_css', 'late write failed'),
+      assistantToolCall('valid-a', 'site_apply_css', { sel: 'main' }),
+      toolResult('valid-a', 'site_apply_css'),
+      toolResult('orphan-before-b', 'site_apply_css'),
+      toolResult('orphan-before-c', 'site_apply_css', 'late browser disconnect'),
+      userText('later prompt'),
+      rec('assistant', [{ kind: 'text', text: 'recovered' }]),
+    ])
+
+    const toolMsgs = history.filter((m) => m.role === 'tool')
+    expect(toolMsgs).toHaveLength(1)
+    expect(toolMsgs[0]).toEqual({
+      role: 'tool',
+      toolCallId: 'valid-a',
+      output: { ok: true, error: undefined },
+    })
+    expect(history).toEqual([
+      { role: 'user', content: [{ kind: 'text', text: 'duplicate prompt' }] },
+      { role: 'user', content: [{ kind: 'text', text: 'duplicate prompt' }] },
+      {
+        role: 'assistant',
+        content: [
+          {
+            kind: 'toolCall',
+            toolCallId: 'valid-a',
+            toolName: 'site_apply_css',
+            input: { sel: 'main' },
+          },
+        ],
+      },
+      { role: 'tool', toolCallId: 'valid-a', output: { ok: true, error: undefined } },
+      { role: 'user', content: [{ kind: 'text', text: 'later prompt' }] },
+      { role: 'assistant', content: [{ kind: 'text', text: 'recovered' }] },
     ])
   })
 
@@ -120,6 +181,25 @@ describe('buildMessageHistory', () => {
     ])
   })
 
+  test('drops a late tool result after a user turn flushed its unanswered call', () => {
+    const history = buildMessageHistory([
+      userText('continue'),
+      assistantToolCall('late', 'tool', {}),
+      userText('next prompt'),
+      toolResult('late', 'tool'),
+    ])
+
+    expect(history).toEqual([
+      { role: 'user', content: [{ kind: 'text', text: 'continue' }] },
+      {
+        role: 'assistant',
+        content: [{ kind: 'toolCall', toolCallId: 'late', toolName: 'tool', input: {} }],
+      },
+      { role: 'tool', toolCallId: 'late', output: { ok: false, error: INTERRUPTED_TOOL_RESULT_ERROR } },
+      { role: 'user', content: [{ kind: 'text', text: 'next prompt' }] },
+    ])
+  })
+
   test('preserves a persisted error tool result as an error', () => {
     const history = buildMessageHistory([
       assistantToolCall('t1', 'x', {}),
@@ -130,5 +210,69 @@ describe('buildMessageHistory', () => {
       toolCallId: 't1',
       output: { ok: false, error: 'boom' },
     })
+  })
+})
+
+describe('user-image history projection', () => {
+  test('keeps every image-bearing user turn for a vision model', () => {
+    const history = buildMessageHistory([
+      userImage('old-image', 'Old screenshot'),
+      rec('assistant', [{ kind: 'text', text: 'old answer' }]),
+      rec('user', [
+        { kind: 'image', mimeType: 'image/jpeg', data: 'new-image-1' },
+        { kind: 'image', mimeType: 'image/jpeg', data: 'new-image-2' },
+      ]),
+      rec('assistant', [{ kind: 'text', text: 'new answer' }]),
+    ])
+    const original = JSON.stringify(history)
+
+    const projected = projectUserImagesForModel(history, true)
+
+    expect(projected).toEqual([
+      {
+        role: 'user',
+        content: [
+          { kind: 'text', text: 'Old screenshot' },
+          { kind: 'image', mimeType: 'image/jpeg', data: 'old-image' },
+        ],
+      },
+      { role: 'assistant', content: [{ kind: 'text', text: 'old answer' }] },
+      {
+        role: 'user',
+        content: [
+          { kind: 'image', mimeType: 'image/jpeg', data: 'new-image-1' },
+          { kind: 'image', mimeType: 'image/jpeg', data: 'new-image-2' },
+        ],
+      },
+      { role: 'assistant', content: [{ kind: 'text', text: 'new answer' }] },
+    ])
+    expect(JSON.stringify(history)).toBe(original)
+  })
+
+  test('elides every user image for a text-only model while keeping turns valid', () => {
+    const history = buildMessageHistory([
+      userImage('old-image', 'First'),
+      rec('assistant', [{ kind: 'text', text: 'answer' }]),
+      userImage('new-image'),
+    ])
+    const original = JSON.stringify(history)
+
+    const projected = projectUserImagesForModel(history, false)
+
+    expect(projected).toEqual([
+      {
+        role: 'user',
+        content: [
+          { kind: 'text', text: 'First' },
+          { kind: 'text', text: NON_VISION_USER_IMAGE_OMITTED },
+        ],
+      },
+      { role: 'assistant', content: [{ kind: 'text', text: 'answer' }] },
+      {
+        role: 'user',
+        content: [{ kind: 'text', text: NON_VISION_USER_IMAGE_OMITTED }],
+      },
+    ])
+    expect(JSON.stringify(history)).toBe(original)
   })
 })

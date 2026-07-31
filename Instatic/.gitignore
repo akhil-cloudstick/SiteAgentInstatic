@@ -9,6 +9,7 @@ lerna-debug.log*
 
 node_modules
 dist
+dist_new
 !vendor/pixel-art-icons/dist/
 !vendor/pixel-art-icons/dist/**
 dist-ssr

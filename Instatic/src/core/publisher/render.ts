@@ -26,8 +26,8 @@ import type { TemplateRenderDataContext } from '@core/templates/dynamicBindings'
 import { buildPageFrame, buildSiteFrame, buildRouteFrame } from '@core/templates/contextFrames'
 import { classNamesForClassIds } from '@core/page-tree'
 import {
-  isRenderableHtmlAttributeName,
   normalizeHtmlAttributeName,
+  sanitizeRenderableHtmlAttribute,
 } from '@core/htmlAttributes'
 import { bagToInlineStyle } from './classCss'
 import { collectClassCSS, sanitizeModuleCSS } from './cssCollector'
@@ -36,7 +36,7 @@ import { PUBLISHER_RESET_CSS } from './reset'
 import { buildSiteFrameworkCss } from './frameworkCss'
 import type { SiteCssBundle } from './siteCssBundle'
 import { escapeHtml, isSafeUrl } from './utils'
-import { createBaseCspPlan, cspMetaTag } from './cspPlan'
+import { addCspSources, createBaseCspPlan, cspMetaTag } from './cspPlan'
 import type { PublishedPageRuntimeAssets } from '@core/site-runtime/schemas'
 import { hasPublishedRuntimeScripts, scriptTagsForRuntimeAssets } from '@core/site-runtime'
 import { renderNode } from './renderNode'
@@ -97,7 +97,7 @@ interface PublishPageOptions {
    *   framework CSS (variables + generated utilities) + module CSS + user
    *   class CSS. Best for self-contained exports, the iframe runtime preview,
    *   and tests.
-   * - `'external'`: emits three `<link rel="stylesheet">` tags pointing at the
+   * - `'external'`: emits up to four `<link rel="stylesheet">` tags pointing at the
    *   pre-built site CSS bundle (`/_instatic/css/<filename>`). The HTML stays small,
    *   the bundles are content-hashed for `Cache-Control: immutable` reuse
    *   across page navigations. Pass `cssBundle` + `cssAssetBaseUrl` to use this
@@ -106,7 +106,7 @@ interface PublishPageOptions {
    * In external mode any per-page module CSS that would have been inlined is
    * skipped here — it's assumed to live in `cssBundle.framework.content`,
    * which is what `buildSiteCssBundle()` produces. This keeps every visitor's
-   * three CSS files cacheable.
+   * four CSS files cacheable.
    */
   cssEmission?: 'inline' | 'external'
   /**
@@ -204,7 +204,7 @@ function buildStyleHead(
 
   const frameworkCss = buildSiteFrameworkCss(site)
   const moduleCss = Array.from(cssMap.values()).join('\n')
-  const classCss = collectClassCSS(site)
+  const classCss = collectClassCSS(site, { mediaAssets: options.mediaAssets })
   const userCss = collectUserStylesheetCss(site, page)
   // Same cascade order as the external-link path: user CSS comes last so it
   // wins specificity ties against the class registry. Neutralise `</style>` in
@@ -258,7 +258,11 @@ function composeTemplateContext(
  * element, so root-level classIds belong on `<body>` itself — clean HTML
  * with no freeloader `<div>`.
  */
-function computeBodyOpenTag(page: Page, site: SiteDocument): string {
+function computeBodyOpenTag(
+  page: Page,
+  site: SiteDocument,
+  mediaAssets?: Map<string, RenderResolvedMedia>,
+): string {
   const rootNode = page.nodes[page.rootNodeId]
   if (!rootNode) return '<body>'
 
@@ -267,7 +271,9 @@ function computeBodyOpenTag(page: Page, site: SiteDocument): string {
     : ''
   // base.body emits no wrapper, so the root node's inline styles also belong
   // on <body> itself (same reasoning as classIds above).
-  const styleAttr = rootNode.inlineStyles ? escapeHtml(bagToInlineStyle(rootNode.inlineStyles)) : ''
+  const styleAttr = rootNode.inlineStyles
+    ? escapeHtml(bagToInlineStyle(rootNode.inlineStyles, { mediaAssets }))
+    : ''
   const htmlAttrs = bodyHtmlAttributes(rootNode.props.htmlAttributes)
 
   const attrs =
@@ -281,9 +287,11 @@ function bodyHtmlAttributes(value: unknown): string {
   return Object.entries(value)
     .toSorted(([a], [b]) => a.localeCompare(b))
     .map(([rawName, rawValue]) => {
+      if (typeof rawValue !== 'string') return ''
       const name = normalizeHtmlAttributeName(rawName)
-      if (!isRenderableHtmlAttributeName(name) || typeof rawValue !== 'string') return ''
-      return ` ${name}="${escapeHtml(rawValue)}"`
+      const safeValue = sanitizeRenderableHtmlAttribute(name, rawValue)
+      if (safeValue === null) return ''
+      return ` ${name}="${escapeHtml(safeValue)}"`
     })
     .join('')
 }
@@ -403,8 +411,17 @@ function buildRuntimeAssetsBlock(
 function buildContentSecurityPolicy(
   anyScriptTag: boolean,
   importmap: PublishedRuntimePackageImportmap | undefined,
+  moduleCspSources: ReadonlyMap<string, ReadonlySet<string>>,
 ): string {
   const plan = createBaseCspPlan({ anyScriptTag, importmapSha: importmap?.sha256 })
+  // Merge per-page CSP requirements declared by module render() outputs.
+  // addCspSources automatically drops the lone 'none' when real sources are
+  // added, so frame-src 'none' becomes frame-src <origins> on pages that
+  // embed external iframes (e.g. YouTube). Pages with no such embeds are
+  // unaffected and keep frame-src 'none'.
+  for (const [directive, sources] of moduleCspSources) {
+    addCspSources(plan, directive, sources)
+  }
   return `\n  ${cspMetaTag(plan)}`
 }
 
@@ -499,7 +516,7 @@ export function publishPage(
   }
 
   // Mutable outputs, owned here and threaded by reference through the whole
-  // walk. All four are initialised up-front (no lazy undefined): the walk
+  // walk. All five are initialised up-front (no lazy undefined): the walk
   // appends module CSS to `cssMap`, module JS to `jsMap`, infinite-loop ids
   // to `infiniteLoopIds`, and the ids of nodes that actually emitted a
   // `<instatic-hole>` to `holeNodeIds`. After the walk, the head builders
@@ -507,6 +524,7 @@ export function publishPage(
   const acc: RenderAccumulators = {
     cssMap: new Map<string, string>(),
     jsMap: new Map<string, string>(),
+    cspSources: new Map<string, Set<string>>(),
     infiniteLoopIds: new Set<string>(),
     holeNodeIds: new Set<string>(),
   }
@@ -539,7 +557,7 @@ export function publishPage(
 
   const meta = buildDocumentMetaTags(site, page)
   const runtime = buildRuntimeAssetsBlock(options, acc)
-  const csp = buildContentSecurityPolicy(runtime.anyScriptTag, runtime.importmap)
+  const csp = buildContentSecurityPolicy(runtime.anyScriptTag, runtime.importmap, acc.cspSources)
 
   const html = assembleHtmlDocument({
     langAttr: meta.langAttr,
@@ -551,7 +569,7 @@ export function publishPage(
     importmapTag: runtime.importmapTag,
     headRuntimeScripts: runtime.headRuntimeScripts,
     holeRuntimeScript: runtime.holeRuntimeScript,
-    bodyOpenTag: computeBodyOpenTag(page, site),
+    bodyOpenTag: computeBodyOpenTag(page, site, options.mediaAssets),
     bodyHtml,
     bodyEndRuntimeScripts: runtime.bodyEndRuntimeScripts,
     loopRuntimeScript: runtime.loopRuntimeScript,

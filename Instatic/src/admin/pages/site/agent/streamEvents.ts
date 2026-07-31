@@ -25,7 +25,7 @@
 import { nanoid } from 'nanoid'
 import { aiToolError, type AiToolOutput } from '@core/ai'
 import { Type } from '@core/utils/typeboxHelpers'
-import { postToolResult } from './agentApi'
+import { postToolResult } from '@admin/ai/toolResultApi'
 import type { EditorStoreSet } from './agentSliceTypes'
 import type {
   AgentBridgeRuntime,
@@ -34,6 +34,7 @@ import type {
   ServerStreamEvent,
 } from './types'
 import { getErrorMessage } from '@core/utils/errorMessage'
+import { failPendingToolCalls } from './toolCallLifecycle'
 
 // ---------------------------------------------------------------------------
 // Stream-event schema
@@ -75,7 +76,9 @@ export const ServerStreamEventSchema = Type.Union([
     type: Type.Literal('usage'),
     promptTokens: Type.Number(),
     completionTokens: Type.Number(),
-    costUsd: Type.Optional(Type.Number()),
+    costUsd: Type.Number(),
+    cacheReadTokens: Type.Optional(Type.Number()),
+    cacheCreationTokens: Type.Optional(Type.Number()),
   }),
   Type.Object({
     // Per-round context size — drives the live meter mid-turn. `contextTokens`
@@ -130,6 +133,28 @@ export async function processStreamEvent(
         const message = getErrorMessage(err, String(err))
         console.error(`[AgentSlice] tool ${event.toolName} threw unexpectedly:`, err)
         result = aiToolError(`Browser exception: ${message}`)
+      }
+      // A browser tool may return preview images (for example render_snapshot).
+      // Stash them on the matching pending tool-call block so the panel can show
+      // what the agent looked at. The `toolCall` event for this call already
+      // created the block, and tool calls are sequential, so exactly one block
+      // for this tool is pending. The full tool result is posted to the active
+      // provider turn below, but preview URLs are session-only and are not
+      // persisted in conversation history, so they rehydrate empty on reload.
+      const previewImages = result.ok
+        ? result.images?.map((image) => `data:${image.mimeType};base64,${image.data}`)
+        : undefined
+      if (previewImages?.length) {
+        set((state) => {
+          const msg = state.agentMessages.find((m) => m.id === assistantId)
+          const block = msg?.blocks.find(
+            (b): b is { kind: 'toolCall'; toolCall: AgentToolCall } =>
+              b.kind === 'toolCall'
+              && b.toolCall.actionType === event.toolName
+              && b.toolCall.status === 'pending',
+          )
+          if (block) block.toolCall.previewImages = previewImages
+        })
       }
       if (!bridge.bridgeId) {
         console.error('[AgentSlice] toolRequest received before bridgeReady')
@@ -200,8 +225,18 @@ export async function processStreamEvent(
     }
 
     case 'usage': {
-      // Token + cost totals are persisted server-side automatically; nothing
-      // to do client-side. The context meter is driven by `context` events.
+      // Billing totals are cumulative across provider rounds and therefore
+      // separate from current context. The server resolves authoritative,
+      // cache-aware USD cost before this terminal event reaches the browser.
+      set((state) => {
+        state.agentUsage.promptTokens += event.promptTokens
+        state.agentUsage.completionTokens += event.completionTokens
+        state.agentUsage.cacheReadTokens += event.cacheReadTokens ?? 0
+        state.agentUsage.cacheCreationTokens += event.cacheCreationTokens ?? 0
+        state.agentUsage.costUsd = Number(
+          (state.agentUsage.costUsd + event.costUsd).toFixed(6),
+        )
+      })
       break
     }
 
@@ -212,7 +247,9 @@ export async function processStreamEvent(
       // window half is supplied by the view layer from the model catalogue.
       const used = event.contextTokens
       set((state) => {
-        state.agentContextTokens = used
+        state.agentUsage.contextTokens = used
+        state.agentUsage.contextCredentialId = state.agentActiveCredentialId
+        state.agentUsage.contextModelId = state.agentActiveModelId
       })
       break
     }
@@ -225,11 +262,25 @@ export async function processStreamEvent(
       // went wrong" placeholder; this surface is admin-only (capability
       // gated) so info-disclosure concerns don't apply.
       console.error('[AgentSlice] Server error event:', event.message)
-      set({ agentError: event.message })
+      set((state) => {
+        state.agentError = event.message
+        const message = state.agentMessages.find((item) => item.id === assistantId)
+        failPendingToolCalls(message, event.message)
+      })
       break
     }
 
-    case 'done':
+    case 'done': {
+      // `done` with a pending call is an inconsistent/truncated server turn.
+      // Keep the completed response usable, but never leave historical work
+      // rendered as though it were still running.
+      set((state) => {
+        const message = state.agentMessages.find((item) => item.id === assistantId)
+        failPendingToolCalls(message)
+      })
+      break
+    }
+
     default:
       break
   }

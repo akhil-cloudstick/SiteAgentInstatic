@@ -1,7 +1,7 @@
 import { Type } from '@sinclair/typebox'
 import { safeParseJson } from '@core/utils/jsonValidate'
 
-export type PropertiesPanelMode = 'docked' | 'floating'
+export type PanelMode = 'docked' | 'floating'
 
 /**
  * Per-workspace editor layout storage.
@@ -28,8 +28,13 @@ export interface PanelPosition {
   y: number
 }
 
+/** Persisted dimensions for a user-resizable floating panel. */
+export interface PanelSize {
+  width: number
+  height: number
+}
+
 export type FloatingPanelId =
-  | 'dom'
   | 'properties'
   | 'site'
   | 'selectors'
@@ -40,6 +45,7 @@ export type FloatingPanelId =
   | 'dependencies'
   | 'codeeditor'
   | 'agent'
+  | 'agentImagePreview'
   | 'mediaUploadQueue'
   | 'mediaDetachedInspector'
   | 'mediaBulkEdit'
@@ -65,20 +71,29 @@ export interface StoredWorkspaceLayout {
   /**
    * Workspace-specific identifier of the panel that is open in the left
    * sidebar. Each workspace uses its own id space:
-   *   - site:    'layers' | 'site' | 'selectors' | 'colors' | ...
-   *   - content: 'content' | 'media' | 'agent'
+   *   - site:    'explorer' | 'selectors' | 'framework' | 'dependencies' | ...
+   *   - content: 'explorer' | 'agent'
    *   - media:   'folders' | 'storage'
    *   - data:    null (the data workspace has a single toggleable panel)
    */
   activeLeftPanel?: string | null
 
   // ── Site-workspace-only fields ────────────────────────────────────────────
+  /**
+   * Active tab inside the consolidated Explorer panel
+   * ('layers' | 'pages' | 'media'). Site/content workspaces only.
+   */
+  explorerPanelTab?: string
   /** ID of the file currently open in the floating code editor (site only). */
   activeEditorFileId?: string | null
   /** Whether the floating code editor is visible (site only). */
   codeEditorPanelOpen?: boolean
   /** Properties panel docked vs floating (site only). */
-  propertiesPanelMode?: PropertiesPanelMode
+  propertiesPanelMode?: PanelMode
+  /** Left-rail panel docked vs floating (site only). */
+  leftSidebarMode?: PanelMode
+  /** Whether the independent floating AI assistant is open (site only). */
+  agentPanelOpen?: boolean
 }
 
 interface StoredEditorLayout {
@@ -88,6 +103,8 @@ interface StoredEditorLayout {
    * unique to a single workspace so positions are kept at the top level.
    */
   panelPositions?: Partial<Record<FloatingPanelId, PanelPosition>>
+  /** User-set dimensions for floating panels that support two-axis resizing. */
+  panelSizes?: Partial<Record<FloatingPanelId, PanelSize>>
   /** Per-workspace sidebar / panel state. */
   workspaces?: Partial<Record<EditorWorkspaceId, StoredWorkspaceLayout>>
 }
@@ -106,6 +123,14 @@ const PanelPositionSchema = Type.Object(
   { additionalProperties: true },
 )
 
+const PanelSizeSchema = Type.Object(
+  {
+    width: Type.Number(),
+    height: Type.Number(),
+  },
+  { additionalProperties: true },
+)
+
 const StoredWorkspaceLayoutSchema = Type.Object(
   {
     leftWidth: Type.Optional(Type.Number()),
@@ -113,11 +138,14 @@ const StoredWorkspaceLayoutSchema = Type.Object(
     leftOpen: Type.Optional(Type.Boolean()),
     rightOpen: Type.Optional(Type.Boolean()),
     activeLeftPanel: Type.Optional(Type.Union([Type.String(), Type.Null()])),
+    explorerPanelTab: Type.Optional(Type.String()),
     activeEditorFileId: Type.Optional(Type.Union([Type.String(), Type.Null()])),
     codeEditorPanelOpen: Type.Optional(Type.Boolean()),
-    // PropertiesPanelMode is a string union; keep loose to avoid coupling to
-    // its exact membership here.
+    // Panel modes are string unions; keep them loose to avoid coupling this
+    // persisted boundary to their exact membership.
     propertiesPanelMode: Type.Optional(Type.String()),
+    leftSidebarMode: Type.Optional(Type.String()),
+    agentPanelOpen: Type.Optional(Type.Boolean()),
   },
   { additionalProperties: true },
 )
@@ -127,6 +155,9 @@ const StoredEditorLayoutSchema = Type.Object(
     version: Type.Literal(2),
     panelPositions: Type.Optional(
       Type.Record(Type.String(), PanelPositionSchema),
+    ),
+    panelSizes: Type.Optional(
+      Type.Record(Type.String(), PanelSizeSchema),
     ),
     workspaces: Type.Optional(
       Type.Record(Type.String(), StoredWorkspaceLayoutSchema),
@@ -144,6 +175,13 @@ function isPanelPosition(value: unknown): value is PanelPosition {
   const pos = value as Partial<PanelPosition>
   return typeof pos.x === 'number' && Number.isFinite(pos.x)
     && typeof pos.y === 'number' && Number.isFinite(pos.y)
+}
+
+function isPanelSize(value: unknown): value is PanelSize {
+  if (!value || typeof value !== 'object') return false
+  const size = value as Partial<PanelSize>
+  return typeof size.width === 'number' && Number.isFinite(size.width)
+    && typeof size.height === 'number' && Number.isFinite(size.height)
 }
 
 export function readEditorLayout(): StoredEditorLayout | null {
@@ -215,6 +253,22 @@ export function writeStoredPanelPosition(panelId: FloatingPanelId, position: Pan
     panelPositions: {
       ...layout.panelPositions,
       [panelId]: position,
+    },
+  }))
+}
+
+export function readStoredPanelSize(panelId: FloatingPanelId): PanelSize | null {
+  const size = readEditorLayout()?.panelSizes?.[panelId]
+  return isPanelSize(size) ? size : null
+}
+
+export function writeStoredPanelSize(panelId: FloatingPanelId, size: PanelSize) {
+  updateEditorLayout((layout) => ({
+    ...layout,
+    version: 2,
+    panelSizes: {
+      ...layout.panelSizes,
+      [panelId]: size,
     },
   }))
 }

@@ -16,17 +16,19 @@
  * unanswered by the persisted rows gets a synthetic error `tool_result`. The
  * model sees that the prior turn's tool call was interrupted and can retry,
  * instead of the whole conversation becoming permanently un-sendable.
+ *
+ * The opposite corruption can also happen: a `role:'tool'` result row may be
+ * persisted without the assistant `toolCall` row that declared it. Those rows
+ * are dropped here, because providers reject tool results that do not answer a
+ * preceding tool call in the replayed history.
  */
 
-import type { AiMessage, AiToolOutput } from '../runtime/types'
+import { INTERRUPTED_TOOL_RESULT_ERROR } from '@core/ai'
+import type { AiContentBlock, AiMessage, AiToolOutput } from '../runtime/types'
 import type { MessageRecord } from './types'
 
-/**
- * Error surfaced to the model for a tool call whose result was never persisted
- * because the turn was interrupted before it completed.
- */
-export const INTERRUPTED_TOOL_RESULT_ERROR =
-  'Tool call did not complete — the previous turn was interrupted before a result was produced.'
+export const NON_VISION_USER_IMAGE_OMITTED =
+  '[Attached image omitted because the selected model does not support image input.]'
 
 /**
  * Reconstruct `AiMessage` history from persisted `MessageRecord` rows.
@@ -73,6 +75,7 @@ export function buildMessageHistory(records: MessageRecord[]): AiMessage[] {
         if (block.kind === 'toolCall') unanswered.set(block.toolCallId, block.toolName)
       }
     } else if (rec.role === 'tool' && rec.toolCallId) {
+      if (!unanswered.has(rec.toolCallId)) continue
       unanswered.delete(rec.toolCallId)
       // The outcome lives in a first-class `toolResult` block (validated at the
       // store boundary), so `ok`/`error` are read directly — never inferred from
@@ -93,4 +96,37 @@ export function buildMessageHistory(records: MessageRecord[]): AiMessage[] {
   flushSyntheticResults()
 
   return out
+}
+
+/**
+ * Adapt persisted user images to the selected model without mutating history.
+ *
+ * Vision models retain every image-bearing turn. Text-only models receive one
+ * breadcrumb per image-bearing turn, which keeps a conversation usable after
+ * switching away from a vision model.
+ */
+export function projectUserImagesForModel(
+  messages: readonly AiMessage[],
+  visionInput: boolean,
+): AiMessage[] {
+  if (visionInput) return [...messages]
+
+  return messages.map((message) => {
+    if (message.role !== 'user' || !message.content.some((block) => block.kind === 'image')) {
+      return message
+    }
+    let breadcrumbAdded = false
+    const content: AiContentBlock[] = []
+    for (const block of message.content) {
+      if (block.kind !== 'image') {
+        content.push(block)
+        continue
+      }
+      if (!breadcrumbAdded) {
+        content.push({ kind: 'text', text: NON_VISION_USER_IMAGE_OMITTED })
+        breadcrumbAdded = true
+      }
+    }
+    return { role: 'user', content }
+  })
 }

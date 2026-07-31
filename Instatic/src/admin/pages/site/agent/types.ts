@@ -9,7 +9,7 @@
  * JSON). Each line is a `ServerStreamEvent` value, JSON-serialised.
  */
 
-import type { AiToolOutput } from '@core/ai'
+import type { AiContentBlock, AiToolOutput } from '@core/ai'
 
 // ---------------------------------------------------------------------------
 // Execution result
@@ -116,7 +116,10 @@ interface UsageEvent {
   type: 'usage'
   promptTokens: number
   completionTokens: number
-  costUsd?: number
+  /** Authoritative cache-aware turn cost resolved by the server persister. */
+  costUsd: number
+  cacheReadTokens?: number
+  cacheCreationTokens?: number
 }
 
 /** Per-round context size — drives the live "context used" meter. Emitted once
@@ -153,6 +156,12 @@ export interface AgentToolCall {
   params: Record<string, unknown>
   result: AiToolOutput | null
   status: 'pending' | 'success' | 'error'
+  /**
+   * Session-only preview image captured by a browser tool (e.g. the
+   * `render_snapshot` PNG). Held in memory so the panel can show what the
+   * agent looked at; never persisted — it rehydrates empty after a reload.
+   */
+  previewImages?: string[]
 }
 
 /**
@@ -162,51 +171,22 @@ export interface AgentToolCall {
  * tools" (which mis-orders late text in front of earlier tool calls).
  */
 type AgentMessageBlock =
-  | { kind: 'text'; text: string }
-  | { kind: 'image'; mimeType: string; data: string }
+  | Extract<AiContentBlock, { kind: 'text' }>
+  | AgentMessageImageBlock
   | { kind: 'toolCall'; toolCall: AgentToolCall }
+
+export interface AgentMessageImageBlock {
+  kind: 'image'
+  mimeType: 'image/jpeg'
+  /** Data URL for a fresh local turn; authenticated lazy URL after rehydrate. */
+  src: string
+}
 
 export interface AgentMessage {
   id: string
   role: 'user' | 'assistant'
   blocks: AgentMessageBlock[]
   timestamp: number
-}
-
-// ---------------------------------------------------------------------------
-// Browser → Server request body
-// ---------------------------------------------------------------------------
-
-/**
- * One image the user attached to a message (pasted, dropped, or picked from
- * disk). `data` is raw base64 (no `data:` URL prefix); `mimeType` is one of the
- * provider-supported image types. Mirrors the server's `AiImageBlock` fields —
- * the chat handler turns each attachment into a `{ kind:'image', … }` content
- * block on the persisted user message.
- */
-export interface AgentImageAttachment {
-  mimeType: string
-  data: string
-}
-
-export interface AgentRequestBody {
-  /** Per-conversation id; the chat handler loads its credential + history. */
-  conversationId: string
-  /** The user's new message. May be empty when only images are attached. */
-  prompt: string
-  /**
-   * Reference images attached to this message (screenshots, mockups). Omitted
-   * when the message is text-only. The model sees them alongside the prompt on
-   * vision-capable models; the handler rejects them otherwise.
-   */
-  images?: AgentImageAttachment[]
-  /**
-   * Scope-specific snapshot handed to the read tools via
-   * `ToolContext.snapshot`. Loose `unknown` here because the body now
-   * crosses every scope (site → SiteAgentSnapshot, content → ContentSnapshot,
-   * …); each scope's tool handlers cast at the boundary.
-   */
-  snapshot: unknown
 }
 
 export interface AgentLayoutRect {
@@ -229,6 +209,10 @@ export interface AgentLayoutNodeContext {
     overflow: string
     color: string
     backgroundColor: string
+    backgroundImage: string
+    backgroundClip: string
+    webkitBackgroundClip: string
+    webkitTextFillColor: string
     fontSize: string
     lineHeight: string
   }

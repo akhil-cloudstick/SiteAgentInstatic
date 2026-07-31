@@ -46,14 +46,13 @@
  *    measures elements (selection overlay handles its own iframe-rect
  *    translation; other callers may need updates).
  *
- * Cross-iframe drag relay (canvas reorder)
+ * Cross-iframe drag relay
  * ────────────────────────────────────────
- * The canvas reorder drag (`useCanvasReorderDrag`) starts on the selection
- * toolbar's drag handle in the parent doc, but the cursor inevitably
- * crosses into an iframe partway through. Left-click pointer events
- * inside the iframe never bubble to the parent's `window`, so the parent's
- * pointermove / up / cancel listeners go silent the moment the cursor
- * enters a frame. To fix that, `useCanvasReorderDrag` sets
+ * Canvas drags that start in the parent doc (selection-toolbar reorders,
+ * media-panel inserts) inevitably cross into an iframe partway through.
+ * Left-click pointer events inside the iframe never bubble to the parent's
+ * `window`, so the parent's pointermove / up / cancel listeners go silent
+ * the moment the cursor enters a frame. To fix that, drag hooks set
  * `data-instatic-canvas-dragging` and `data-instatic-canvas-dragging-pointer-id` on
  * the parent's `<html>` while a drag is in flight. Every iframe reads
  * those flags inside its pointer handler and, when set, forwards the
@@ -83,11 +82,37 @@ import { useCanvasFormControlSuppression } from './useCanvasFormControlSuppressi
 import { CANVAS_VIEWPORT_HEIGHT, type CanvasViewport } from './resolveViewportUnits'
 import { useIframeFrameAutoHeight } from './useIframeFrameAutoHeight'
 import { applyIframeBodyReset, type IframeInteraction } from './iframeBodyReset'
+import {
+  isCanvasSpacePanActive,
+  setCanvasSpacePanActive,
+  shouldStartCanvasPointerPan,
+} from './canvasPanInput'
 import { useEditorStore } from '@site/store/store'
 import { closestReadonlyRegion, isElementLike } from './readonlyRegion'
+import { CanvasDocumentContext, CanvasFrameElementContext } from './CanvasContexts'
 import styles from './IframeFrameSurface.module.css'
 
-const IFRAME_SRC_DOC = '<!doctype html><html><head></head><body></body></html>'
+const IFRAME_DOCUMENT_SENTINEL = 'data-instatic-canvas-document'
+const IFRAME_SRC_DOC = `<!doctype html><html ${IFRAME_DOCUMENT_SENTINEL}><head></head><body></body></html>`
+const IFRAME_DOCUMENT_FLAG = '__instaticCanvasDocument'
+
+type InstaticIframeDocument = Document & { [IFRAME_DOCUMENT_FLAG]?: true }
+
+function claimIframeSrcDocument(doc: Document): boolean {
+  const taggedDocument = doc as InstaticIframeDocument
+  if (taggedDocument[IFRAME_DOCUMENT_FLAG]) return true
+  if (!doc.documentElement.hasAttribute(IFRAME_DOCUMENT_SENTINEL)) return false
+
+  // The sentinel identifies the final srcDoc only during bootstrap. Remove it
+  // before authored CSS/DOM selectors run, then keep the identity off-DOM so
+  // the editor document matches published <html> structure.
+  doc.documentElement.removeAttribute(IFRAME_DOCUMENT_SENTINEL)
+  Object.defineProperty(taggedDocument, IFRAME_DOCUMENT_FLAG, {
+    configurable: true,
+    value: true,
+  })
+  return true
+}
 
 /** Stable empty list so a script-less frame doesn't churn the injector's deps. */
 const EMPTY_RUNTIME_SCRIPTS: InjectableRuntimeScript[] = []
@@ -210,18 +235,33 @@ export const IframeFrameSurface = forwardRef<IframeFrameSurfaceHandle, IframeFra
         setIframeDoc(null)
         return
       }
-      const tryCapture = () => {
+      delete iframe.dataset.instaticCanvasDocumentLoaded
+      const captureSrcDoc = () => {
         const doc = iframe.contentDocument
-        if (doc && doc.readyState !== 'loading') setIframeDoc(doc)
+        if (
+          !doc ||
+          doc.readyState === 'loading' ||
+          !claimIframeSrcDocument(doc)
+        ) return
+        // Never portal the canvas tree into the short-lived initial about:blank
+        // document. Module effects, media reads, and authored runtime scripts
+        // must run once against the final srcDoc document only.
+        setIframeDoc(doc)
+        iframe.dataset.instaticCanvasDocumentLoaded = 'true'
       }
-      tryCapture()
-      iframe.addEventListener('load', tryCapture)
+      // srcDoc often parses before the ref commits; otherwise its load event
+      // retries. The bootstrap sentinel, not event timing or URL heuristics,
+      // identifies the document we own; claimIframeSrcDocument removes it from
+      // authored DOM before the portal mounts.
+      captureSrcDoc()
+      iframe.addEventListener('load', captureSrcDoc)
       // Stash the cleanup on the ref so React's ref-callback contract (the
       // function may be called again with null on unmount) doesn't leak
       // listeners.
       const cleanableIframe = iframe as IframeWithCleanup
       cleanableIframe._instaticCleanup = () => {
-        iframe.removeEventListener('load', tryCapture)
+        iframe.removeEventListener('load', captureSrcDoc)
+        delete iframe.dataset.instaticCanvasDocumentLoaded
         cleanableIframe._instaticCleanup = undefined
       }
     }
@@ -370,21 +410,19 @@ export const IframeFrameSurface = forwardRef<IframeFrameSurfaceHandle, IframeFra
       }
     }, [iframeDoc, isLive])
 
-    // ── Forward pointer events for canvas pan gestures + reorder drag ────
+    // ── Forward pointer events for canvas pan gestures + parent-doc canvas drags ────
     // The canvas pan gesture (useCanvas via @use-gesture) and the canvas
-    // reorder drag (useCanvasReorderDrag) both live in the parent document
-    // and rely on `window` pointer events. Three scenarios need to cross
+    // parent-doc canvas drag handlers both live in the parent document
+    // and rely on `window` pointer events. Two scenarios need to cross
     // the iframe boundary from inside the iframe back to the parent:
     //
-    //   1. Middle-click drag (`e.button === 1`) — always a pan, regardless
-    //      of where the cursor is.
-    //   2. Space + left-click drag (Figma convention) — pan when the user
+    //   1. Space + left-click drag (Figma convention) — pan when the user
     //      is holding space, even with the cursor over a frame.
-    //   3. An active reorder drag started outside the iframe (the
-    //      selection toolbar's drag handle lives in the parent doc). The
+    //   2. An active canvas drag started outside the iframe (selection
+    //      toolbar handle, media panel asset, etc.). The
     //      pointer down fires in the parent, then as the cursor enters an
     //      iframe its pointermove/up events go to the iframe instead of
-    //      bubbling up to `window`. `useCanvasReorderDrag` sets
+    //      bubbling up to `window`. Canvas drag hooks set
     //      `data-instatic-canvas-dragging` on `<html>` so each iframe knows to
     //      forward pointermove / up / cancel events while the drag is in
     //      flight. The drag id is also stashed so we can mint forwarded
@@ -398,8 +436,8 @@ export const IframeFrameSurface = forwardRef<IframeFrameSurfaceHandle, IframeFra
     // pointer event into module selection logic (otherwise a module would
     // get selected while the user was trying to pan).
     useEffect(() => {
-      // Pan-gesture / reorder-drag relay is canvas-only. Live frames neither
-      // pan nor host the cross-frame reorder drag.
+      // Pan-gesture / parent-doc canvas-drag relay is canvas-only. Live frames
+      // neither pan nor host the cross-frame canvas drag.
       if (isLive) return
       if (!iframeDoc) return
       const iframe = iframeRef.current
@@ -415,16 +453,9 @@ export const IframeFrameSurface = forwardRef<IframeFrameSurfaceHandle, IframeFra
       // and every `window`-level listener during capture/bubble.
       //
       // We deliberately dispatch on `document`, NOT on the iframe element. The
-      // canvas's own shortcut handler (delete / duplicate / clipboard / Escape)
-      // is a React `onKeyDown` on the canvas root, and React already delivers
-      // iframe-originated key events to it through the React fiber tree (see
-      // docs/features/canvas-iframe-per-frame.md). Dispatching the clone on the
-      // iframe element would bubble it through React's root container too and
-      // fire those handlers a SECOND time (duplicate twice, delete twice).
-      // `document` is above React's root container in the DOM, so the clone is
-      // seen only by the native window/document listeners — never re-entering
-      // React. The clone also lands in the parent document, so this
-      // iframe-document listener never sees it again (no loop).
+      // global shortcut dispatcher and canvas-level native bridge both listen
+      // in the parent document; dispatching here keeps the clone out of the
+      // iframe document so this listener never sees it again (no loop).
       const parentDocument = iframe.ownerDocument
       const forwardKeyboard = (e: KeyboardEvent) => {
         const forwarded = new KeyboardEvent('keydown', {
@@ -460,7 +491,10 @@ export const IframeFrameSurface = forwardRef<IframeFrameSurfaceHandle, IframeFra
         // coalesced session) while the DOM keeps the text — store/DOM diverge.
         // The element's own React onKeyDown still owns Escape/Enter.
         if (useEditorStore.getState().activeInlineEdit) return
-        if (e.code === 'Space' && !e.repeat) spaceHeld = true
+        if (e.code === 'Space' && !e.repeat) {
+          spaceHeld = true
+          setCanvasSpacePanActive(parentDocument, 'iframe', true)
+        }
         // Block Tab navigation inside the canvas iframe. The author is
         // designing, not using, the page — letting Tab walk through
         // link / button controls inside the iframe surface the browser's
@@ -475,7 +509,10 @@ export const IframeFrameSurface = forwardRef<IframeFrameSurfaceHandle, IframeFra
         forwardKeyboard(e)
       }
       const onKeyUp = (e: KeyboardEvent) => {
-        if (e.code === 'Space') spaceHeld = false
+        if (e.code === 'Space') {
+          spaceHeld = false
+          setCanvasSpacePanActive(parentDocument, 'iframe', false)
+        }
       }
       iframeDoc.addEventListener('keydown', onKeyDown)
       iframeDoc.addEventListener('keyup', onKeyUp)
@@ -511,25 +548,22 @@ export const IframeFrameSurface = forwardRef<IframeFrameSurfaceHandle, IframeFra
         return Number.isFinite(id) ? { pointerId: id } : { pointerId: 0 }
       }
       // True while a pan gesture started inside this iframe is still in
-      // flight (middle-click hold OR space+left-click hold). We start a
-      // pan on pointerdown when the conditions match and keep forwarding
-      // every subsequent pointermove / pointerup for the same pointerId
-      // until the button comes back up. This is the only way to know that
-      // a stray pointermove is "part of an active pan" — `e.buttons` is 0
-      // on the final pointerup, and using `e.button === 0` to detect "left
-      // is down during move" matches every casual mouse motion (because
-      // pointermove always reports `button` as 0). Tracking explicitly is
-      // the only correct option.
+      // flight (space+left-click hold). We start a pan on pointerdown when
+      // the conditions match and keep forwarding every subsequent pointermove
+      // / pointerup for the same pointerId until the button comes back up.
+      // This is the only way to know that a stray pointermove is "part of an
+      // active pan" — `e.buttons` is 0 on the final pointerup, and using
+      // `e.button === 0` to detect "left is down during move" matches every
+      // casual mouse motion (because pointermove always reports `button` as 0).
+      // Tracking explicitly is the only correct option.
       let panPointerId: number | null = null
       const isPanStartPointer = (e: PointerEvent): boolean => {
-        // Middle button down — middle-click pan.
-        if (e.button === 1) return true
-        // Space + left button down — Figma-style pan.
-        if (spaceHeld && e.button === 0) return true
-        return false
+        return shouldStartCanvasPointerPan(e, {
+          spaceHeld: spaceHeld || isCanvasSpacePanActive(parentDocument),
+        })
       }
       const maybeForward = (e: PointerEvent) => {
-        // (3) An external reorder drag is in progress — forward move/up/
+        // (2) An external canvas drag is in progress — forward move/up/
         // cancel so the parent's `window` listeners keep ticking.
         // pointerdown is excluded: the iframe never originates the drag,
         // and forwarding the first iframe-internal pointerdown would
@@ -540,20 +574,17 @@ export const IframeFrameSurface = forwardRef<IframeFrameSurfaceHandle, IframeFra
           // logic listens for raw pointermove inside the iframe), so we
           // don't swallow it — but we do forward it to the parent doc with
           // the original drag's pointerId so the session-id check in
-          // useCanvasReorderDrag is consistent.
+          // the parent drag session is consistent.
           forwardPointer(e, dragSignal.pointerId)
           return
         }
 
         if (e.type === 'pointerdown' && isPanStartPointer(e)) {
           panPointerId = e.pointerId
-          // Space + left-click: swallow the original so the click doesn't
-          // also trigger module selection. Middle-click never selects
-          // anything so it doesn't need swallowing.
-          if (spaceHeld && e.button === 0) {
-            e.preventDefault()
-            e.stopPropagation()
-          }
+          // Swallow the original so the click doesn't also trigger module
+          // selection while the user is intentionally panning.
+          e.preventDefault()
+          e.stopPropagation()
           forwardPointer(e)
           return
         }
@@ -579,6 +610,7 @@ export const IframeFrameSurface = forwardRef<IframeFrameSurfaceHandle, IframeFra
       iframeDoc.addEventListener('pointerup', maybeForward)
       iframeDoc.addEventListener('pointercancel', maybeForward)
       return () => {
+        setCanvasSpacePanActive(parentDocument, 'iframe', false)
         iframeDoc.removeEventListener('keydown', onKeyDown)
         iframeDoc.removeEventListener('keyup', onKeyUp)
         iframeDoc.removeEventListener('pointerdown', maybeForward)
@@ -620,17 +652,19 @@ export const IframeFrameSurface = forwardRef<IframeFrameSurfaceHandle, IframeFra
         />
         {iframeDoc &&
           createPortal(
-            <>
-              {/* Editor-chrome stylesheet — UNLAYERED so it beats @layer user-authored author CSS */}
-              <EditorChromeInjector targetDocument={iframeDoc} parentDocument={document} />
-              {/* Author CSS — both wrapped in @layer user-authored inside the injectors */}
-              <ClassStyleInjector targetDocument={iframeDoc} viewport={viewport} />
-              <UserStylesheetInjector targetDocument={iframeDoc} viewport={viewport} />
-              {children}
-              {/* Runtime scripts (opt-in) run against the node tree mounted
-                  above. Empty list = no-op, so this is safe to always mount. */}
-              <RuntimeScriptInjector targetDocument={iframeDoc} scripts={runtimeScripts ?? EMPTY_RUNTIME_SCRIPTS} />
-            </>,
+            <CanvasFrameElementContext.Provider value={iframeRef.current}>
+              <CanvasDocumentContext.Provider value={iframeDoc}>
+                {/* Editor-chrome stylesheet — UNLAYERED so it beats @layer user-authored author CSS */}
+                <EditorChromeInjector targetDocument={iframeDoc} parentDocument={document} />
+                {/* Author CSS — both wrapped in @layer user-authored inside the injectors */}
+                <ClassStyleInjector targetDocument={iframeDoc} viewport={viewport} />
+                <UserStylesheetInjector targetDocument={iframeDoc} viewport={viewport} />
+                {children}
+                {/* Runtime scripts (opt-in) run against the node tree mounted
+                    above. Empty list = no-op, so this is safe to always mount. */}
+                <RuntimeScriptInjector targetDocument={iframeDoc} scripts={runtimeScripts ?? EMPTY_RUNTIME_SCRIPTS} />
+              </CanvasDocumentContext.Provider>
+            </CanvasFrameElementContext.Provider>,
             iframeDoc.body,
           )}
       </>

@@ -97,6 +97,9 @@ export async function handleLoopRequest(
   if (!source) {
     return jsonResponse({ error: 'Source not registered' }, { status: 404 })
   }
+  if (source.kind === 'contextual') {
+    return jsonResponse({ error: 'Contextual loops do not support infinite pagination' }, { status: 400 })
+  }
 
   // Fetch the requested page slice.
   const offset = props.offset + (pageNumber - 1) * props.pageSize
@@ -142,6 +145,7 @@ export async function handleLoopRequest(
     jsMap: new Map(),
     infiniteLoopIds: new Set(),
     holeNodeIds: new Set(),
+    cspSources: new Map(),
   }
 
   // Render each item by walking each variant child once per iteration.

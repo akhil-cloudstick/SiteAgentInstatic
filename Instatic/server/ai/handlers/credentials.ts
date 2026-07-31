@@ -24,6 +24,8 @@ import {
   updateCredentialForUser,
 } from '../credentials/store'
 import { resolveDriver } from '../drivers'
+import { listProviderModels } from '../drivers/modelList'
+import type { AiProviderModel } from '../drivers/types'
 import type { CredentialRecord } from '../credentials/types'
 import { listDefaults, setDefaultForScope } from '../defaults/store'
 import type { ToolScope } from '../runtime/types'
@@ -50,6 +52,7 @@ const ProviderId = Type.Union([
   Type.Literal('openai'),
   Type.Literal('ollama'),
   Type.Literal('openrouter'),
+  Type.Literal('openai-compatible'),
 ])
 
 const CreateBodySchema = Type.Union([
@@ -146,7 +149,7 @@ async function handleCreate(req: Request, db: DbClient): Promise<Response> {
     // credential. Never overwrites an existing choice; failures here must not
     // fail credential creation.
     try {
-      await seedEmptyDefaults(db, record, userOrResponse.id)
+      await seedEmptyDefaults(db, record, userOrResponse.id, req.signal)
     } catch (err) {
       console.warn(
         '[ai/credentials] auto-default skipped - default seeding failed:',
@@ -180,6 +183,7 @@ async function seedEmptyDefaults(
   db: DbClient,
   record: CredentialRecord,
   userId: string,
+  signal?: AbortSignal,
 ): Promise<void> {
   const existing = await listDefaults(db)
   const filled = new Set(existing.map((d) => d.scope))
@@ -192,7 +196,7 @@ async function seedEmptyDefaults(
     const resolved = await resolveCredentialForDriver(record)
     apiKeyForRedaction = resolved.apiKey
     const driver = resolveDriver(record.providerId)
-    const models = await driver.listModels(resolved)
+    const models = await listProviderModels(driver, resolved, signal)
     const liveModels = models.filter((model) => model.catalogueSource !== 'fallback')
     const top = liveModels.find((m) => m.tier === 'smartest') ?? liveModels[0]
     topModelId = top?.id ?? null
@@ -326,7 +330,14 @@ async function dispatchTest(req: Request, db: DbClient, id: string): Promise<Res
     const resolved = await resolveCredentialForDriver(record)
     apiKeyForRedaction = resolved.apiKey
     const driver = resolveDriver(record.providerId)
-    const models = await driver.listModels(resolved)
+    const models = await listProviderModels(driver, resolved, req.signal)
+    const modelCount = liveModelCount(models)
+    if (modelCount === 0) {
+      throw new CredentialError(
+        `No live models were returned for ${driver.label}. Check the credential and provider endpoint.`,
+        400,
+      )
+    }
     await createAuditEvent(db, {
       actorUserId: userOrResponse.id,
       action: 'ai.credential.tested',
@@ -336,10 +347,10 @@ async function dispatchTest(req: Request, db: DbClient, id: string): Promise<Res
         providerId: record.providerId,
         displayLabel: record.displayLabel,
         ok: true,
-        modelCount: models.length,
+        modelCount,
       },
     })
-    return jsonResponse({ ok: true, modelCount: models.length })
+    return jsonResponse({ ok: true, modelCount })
   } catch (err) {
     const message = safeCredentialErrorMessage(err, [apiKeyForRedaction], 'Test failed.')
     await createAuditEvent(db, {
@@ -358,6 +369,10 @@ async function dispatchTest(req: Request, db: DbClient, id: string): Promise<Res
     })
     return jsonResponse({ ok: false, error: message }, { status: 200 })
   }
+}
+
+function liveModelCount(models: readonly AiProviderModel[]): number {
+  return models.filter((model) => model.catalogueSource !== 'fallback').length
 }
 
 function bodySecrets(body: { apiKey?: string }): string[] {

@@ -46,10 +46,14 @@ export const PUBLISHER_RESET_CSS = [
   // canvas reset so the design view and the published page agree on spacing.
   ':where(*) { margin: 0; padding: 0; }',
 
-  // Sensible body baseline. font-family pinned to system-ui so the published
-  // page picks the OS native font (matches what most modern stacks ship). Users
-  // who want a custom default can set it on `body` via a class or framework
-  // typography settings.
+  // Keep the document's natural height. Constraining both roots to 100% makes
+  // an authored `overflow-x: hidden` turn <body> into a viewport-height scroll
+  // container, so window-level scroll listeners never observe page scrolling.
+  //
+  // font-family is pinned to system-ui so the published page picks the OS
+  // native font (matches what most modern stacks ship). Users who want a
+  // custom default can set it on `body` via a class or framework typography
+  // settings.
   //
   // line-height is intentionally `normal` (the UA default), NOT an opinionated
   // 1.5. A fixed line-height here inherits into every element that doesn't set
@@ -57,15 +61,6 @@ export const PUBLISHER_RESET_CSS = [
   // source design. Imported sites (which rely on the browser default) then no
   // longer match pixel-for-pixel. `normal` keeps the reset neutral; a site that
   // wants 1.5 sets it explicitly on `body`.
-  // `html` keeps a definite height so percentage-height children resolve, but
-  // `body` uses `min-height` — NOT `height: 100%`. A fixed `height: 100%` pins
-  // the body box to one viewport tall; `position: sticky` is then confined to
-  // that one-screen box and un-sticks as soon as the page scrolls past it
-  // (breaking sticky navs/sidebars on imported sites). `min-height` lets the
-  // body grow with content so sticky spans the full page, while short pages
-  // still fill the viewport.
-  ':where(html) { height: 100%; }',
-  ':where(body) { min-height: 100%; }',
   ':where(body) {' +
     ' line-height: normal;' +
     ' font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;' +

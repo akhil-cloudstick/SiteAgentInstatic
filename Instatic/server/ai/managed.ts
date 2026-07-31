@@ -277,6 +277,9 @@ export function managedModelCapabilities(): AiProviderCapabilities {
   return {
     toolCalling: true,
     visionInput: true,
+    // Managed mode's whole purpose is the model seeing tool-result screenshots
+    // (render_snapshot); vision is on, so accept tool-result images too.
+    toolResultImages: true,
     promptCache: false,
     streaming: true,
   }

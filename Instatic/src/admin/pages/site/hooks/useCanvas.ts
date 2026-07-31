@@ -11,7 +11,6 @@
  * Input support:
  * - Ctrl/Cmd + wheel → zoom towards cursor
  * - Plain wheel → pan vertically (and horizontally with shift)
- * - Middle mouse drag → pan
  * - Space + left-drag → pan
  * - Pinch (touch) → zoom+pan
  * - +/- keys → zoom in/out (committed immediately)
@@ -31,6 +30,13 @@ import {
   incrementalScaleFromPinchMovement,
 } from '@site/canvas/math'
 import { panToCenterBreakpointFrame } from '@site/canvas/canvasDomGeometry'
+import {
+  CANVAS_DRAG_PAN_BUTTONS,
+  isCanvasPointerPanActive,
+  isMiddleMousePointerPan,
+  panDeltaFromWheel,
+  setCanvasSpacePanActive,
+} from '@site/canvas/canvasPanInput'
 
 interface Transform {
   zoom: number
@@ -262,16 +268,19 @@ export function useCanvas({ canvasRootRef, transformLayerRef, enabled }: UseCanv
         ) return
         e.preventDefault()
         spaceActiveRef.current = true
+        setCanvasSpacePanActive(document, 'parentDocument', true)
       }
     }
     function onKeyUp(e: KeyboardEvent) {
       if (e.code === 'Space') {
         spaceActiveRef.current = false
+        setCanvasSpacePanActive(document, 'parentDocument', false)
       }
     }
     document.addEventListener('keydown', onKeyDown)
     document.addEventListener('keyup', onKeyUp)
     return () => {
+      setCanvasSpacePanActive(document, 'parentDocument', false)
       document.removeEventListener('keydown', onKeyDown)
       document.removeEventListener('keyup', onKeyUp)
     }
@@ -414,9 +423,8 @@ export function useCanvas({ canvasRootRef, transformLayerRef, enabled }: UseCanv
         return
       }
 
-      const wheelX = event.shiftKey && event.deltaX === 0 ? event.deltaY : event.deltaX
-      const wheelY = event.shiftKey ? 0 : event.deltaY
-      const next = applyPan(t.panX, t.panY, -wheelX, -wheelY)
+      const { dx, dy } = panDeltaFromWheel(event)
+      const next = applyPan(t.panX, t.panY, dx, dy)
       updateTransform({ zoom: t.zoom, ...next })
     }
 
@@ -428,15 +436,20 @@ export function useCanvas({ canvasRootRef, transformLayerRef, enabled }: UseCanv
 
   // ─── Gesture handlers ─────────────────────────────────────────────────────
 
-  const bind = useGesture(
+  const gestureBind = useGesture(
     {
-      onDrag: ({ delta: [dx, dy], buttons, first, last }) => {
-        const isMiddleButton = (buttons & 4) !== 0
-        const isSpacePan = spaceActiveRef.current
+      onDrag: ({ delta: [dx, dy], buttons, first, last, event }) => {
+        if (first) {
+          isDraggingRef.current = isCanvasPointerPanActive(
+            { buttons },
+            { spaceHeld: spaceActiveRef.current },
+          )
+          if (isDraggingRef.current && isMiddleMousePointerPan({ buttons }) && event.cancelable) {
+            event.preventDefault()
+          }
+        }
 
-        if (!isMiddleButton && !isSpacePan) return
-
-        if (first) isDraggingRef.current = true
+        if (!isDraggingRef.current) return
         if (last) isDraggingRef.current = false
 
         const t = transformRef.current
@@ -471,7 +484,10 @@ export function useCanvas({ canvasRootRef, transformLayerRef, enabled }: UseCanv
       },
     },
     {
-      drag: { filterTaps: true },
+      drag: {
+        filterTaps: true,
+        pointer: { buttons: [...CANVAS_DRAG_PAN_BUTTONS] },
+      },
       pinch: {
         eventOptions: { passive: false },
         // Trackpad pinch already arrives here through the native ctrl/meta
@@ -481,6 +497,31 @@ export function useCanvas({ canvasRootRef, transformLayerRef, enabled }: UseCanv
       },
     },
   )
+
+  const bind = () => {
+    const gestureHandlers = gestureBind()
+    return {
+      ...gestureHandlers,
+      onPointerDown: (event: React.PointerEvent<HTMLElement>) => {
+        if (isMiddleMousePointerPan({ buttons: event.buttons }) && event.cancelable) {
+          event.preventDefault()
+        }
+        gestureHandlers.onPointerDown?.(event)
+      },
+      onMouseDown: (event: React.MouseEvent<HTMLElement>) => {
+        if (event.button === 1 && event.cancelable) {
+          event.preventDefault()
+        }
+        gestureHandlers.onMouseDown?.(event)
+      },
+      onAuxClick: (event: React.MouseEvent<HTMLElement>) => {
+        if (event.button === 1 && event.cancelable) {
+          event.preventDefault()
+        }
+        gestureHandlers.onAuxClick?.(event)
+      },
+    }
+  }
 
   // ─── Cleanup on unmount ───────────────────────────────────────────────────
 
@@ -497,7 +538,7 @@ export function useCanvas({ canvasRootRef, transformLayerRef, enabled }: UseCanv
     handleKeyDown,
     panBy,
     centerOnBreakpointFrame,
-    /** Whether a space-pan or middle-mouse drag is in progress */
+    /** Whether a space-pan drag is in progress */
     isDragging: isDraggingRef,
   }
 }

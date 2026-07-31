@@ -6,6 +6,127 @@ This project is pre-1.0. Breaking changes may appear in minor or patch releases 
 
 ## Unreleased
 
+## 0.0.14 - 2026-07-25
+
+### Security
+
+- Fixed a URL-scheme filter bypass in `isSafeUrl()` ([GHSA-pqcp-872g-gmp8](https://github.com/CoreBunch/Instatic/security/advisories/GHSA-pqcp-872g-gmp8)). The guard normalised input with `String.prototype.trim()`, which does not strip U+0000–U+0008 or U+000E–U+001F, while browsers strip the whole U+0000–U+0020 range before reading a URL scheme. A `javascript:` URL behind a leading control character was therefore reported safe and emitted verbatim into `href` / `src` / `action` attributes. Reported by [@overgrowncarrot1](https://github.com/overgrowncarrot1).
+- Replaced the three-entry scheme denylist with an allowlist (`http`, `https`, `mailto`, `tel`, `sms`, plus all relative forms) read through a scheme extractor that follows the WHATWG stripping rules, so the guard cannot disagree with the browser that resolves the value.
+- Consolidated three divergent URL guards into one. The plugin-SDK `safeUrl` was a weaker copy that a plain leading space defeated and that never blocked `data:` at all; the editor input gate now shares the same scheme extractor. An architecture test fails the build if a fourth copy appears.
+
+## 0.0.13 - 2026-07-24
+
+### Editor, import, and publishing
+
+- Added a dedicated Page settings dialog so authors can edit page slugs directly.
+- Restored contrast for editor switches and canvas mode controls.
+- Preserved node inline styles in image previews and hid empty canvas chrome for ambient style rules.
+- Rendered imported SVG sizing and presentation styles on the canvas root so editor previews match published output.
+- Preserved safe SVG fragment references through Super Import, editor rendering, and publishing so circular text paths remain visible and animated.
+
+### Platform and maintenance
+
+- Updated Sharp to its patched release.
+- Restored function-level coverage reporting for Fallow health checks.
+
+## 0.0.12 - 2026-07-24
+
+### AI and integrations
+
+- Redesigned AI provider settings around clearer provider and connection management.
+- Added OAuth authorization for MCP connectors, including scoped authorization, token lifecycle handling, and hardened protocol validation.
+
+### Editor, content, and publishing
+
+- Rendered loop output in page preview so preview mode matches authored loop content.
+- Preserved in-progress decimal values in number controls instead of replacing valid partial input while editing.
+- Kept responsive admin navigation aligned to the left at narrow widths.
+- Fixed new custom data tables retaining their selected table kind instead of always becoming plain data tables.
+- Fixed composed templates so published pages, entries, and entry previews use the rendered page or entry title rather than the wrapping template title.
+
+## 0.0.11 - 2026-07-11
+
+### AI and integrations
+
+- Added multi-image AI conversations with paste and picker flows, compact galleries and previews, private history persistence, model capability checks, and optional Save to Media actions.
+- Added a compact context meter with remaining-context, token, cache, cost, and model-pricing details.
+- Made render snapshots faithfully capture authored backgrounds and breakpoint-specific layouts without changing the visible canvas state.
+- Expanded `site_apply_css` with explicit merge, replace, property-removal, and delete operations, preserved `!important` priorities, and an Anthropic-compatible provider schema.
+- Expanded MCP connectors with headless document listing, scoped Site and Content workspace bridges, and explicit capability-gated publishing after saved draft edits.
+
+### Editor, content, and publishing
+
+- Added a light admin theme and UI text-size preferences alongside the existing density setting.
+- Added editors for custom content fields, including structured, media, and relation values, directly in the Content settings panel.
+- Added middle-mouse canvas panning and improved Layers visibility, scrolling, and empty-container presentation.
+- Derived font-weight choices from installed variants, tolerated malformed stored font settings, and fixed stale selection or focus after undo, redo, and assistant-panel interactions.
+
+### Import and publishing
+
+- Imported YouTube iframes and HTML `<video>` elements as native Video modules, preserving playback and accessibility settings.
+- Optimized media-library background images into responsive variant fallbacks and `image-set()` output in both the editor and published CSS.
+- Made whole-site saves transactional with explicit deletes and a serialized save queue, preventing partial or interleaved saves before publishing.
+
+### Security and data safety
+
+- Hardened custom HTML attributes and tags against stored script injection by rejecting dangerous URL schemes, `srcdoc`, and unsafe embedded elements.
+- Applied shared magic-byte, MIME, extension, SVG-sanitization, traversal, and reserved-path validation to JSON and archive media imports.
+- Added `base-uri 'self'` and `object-src 'none'` to the admin Content Security Policy.
+
+### Platform and reliability
+
+- Fixed Postgres JSON text-column hydration and made static publish-slot swaps reliable on Windows.
+- Made Windows development startup use the active Bun runtime with safer Vite launching and stale-port recovery.
+- Recovered interrupted AI browser-tool turns as terminal, retryable failures instead of leaving conversations stuck or replaying malformed history.
+- Cleaned up disconnected MCP, editor, and plugin streams and bounded orphaned connection lifetimes so abandoned connections cannot exhaust the development proxy.
+
+## 0.0.10 - 2026-07-01
+
+### AI and integrations
+
+- Added an OpenAI-compatible AI provider for custom base URL endpoints.
+
+### Import, editor, and publishing
+
+- Fixed imported module scripts so their npm dependencies install correctly.
+- Aligned canvas and Layers panel keyboard shortcuts.
+- Let modules declare Content Security Policy sources, so published `base.video` YouTube embeds render correctly.
+- Fixed empty-folder explorer operations so they apply without showing the "0 paths" dialog.
+
+## 0.0.9 - 2026-07-01
+
+### AI and integrations
+
+- Redesigned the AI assistant panel message stream: agent tool calls render as compact rows with a per-tool icon, a human-readable label, and status, with consecutive calls grouped under one turn.
+- Added inline previews to tool calls — colour-token swatches for palette updates, and the captured screenshot for render-snapshot.
+- Auto-titled conversations from the first prompt instead of "New conversation", and gave each message turn an avatar and a relative timestamp.
+- Fixed the AI panel dropping the selected model when starting a new chat, and surfaced conversation delete/load failures as toasts.
+
+### Editor and framework
+
+- Added a body context menu when right-clicking empty space on the canvas.
+
+## 0.0.8 - 2026-07-01
+
+### Editor and framework
+
+- Unified Core Framework management into one tabbed panel with a declarative Full / Variables / None manager.
+- Consolidated Layers, Site, Code, and Media into one Explorer panel, including a dedicated Code tab and refreshed media browsing.
+- Added canvas support for dragging media assets directly from the Media workspace.
+- Fixed onboarding framework import defaults and retained pending site reloads so imported framework changes appear in the editor without a hard refresh.
+- Fixed canvas mouse-wheel behavior so normal wheel scrolling stays vertical and Shift+wheel pans sideways.
+- Kept the highlighted Spotlight result scrolled into view during keyboard navigation.
+
+### AI and integrations
+
+- Made AI token tools more tolerant of model-authored argument aliases for framework typography and spacing updates.
+
+### Security
+
+- Added central security response headers for admin and upload routes.
+- Revalidated and sanitized imported archive media, including SVG payloads, before writing them to disk.
+- Added expiry timestamps for MCP connector tokens, with existing tokens backfilled to a 90-day grace period.
+
 ## 0.0.7 - 2026-06-29
 
 ### AI & integrations

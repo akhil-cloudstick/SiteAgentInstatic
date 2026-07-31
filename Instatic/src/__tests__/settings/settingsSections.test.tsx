@@ -31,7 +31,6 @@ function resetStore() {
     hoveredNodeId: null,
     isSettingsOpen: false,
     activeSection: 'general',
-    domTreePanel: { collapsed: false, x: 0, y: 0, width: 280 },
     propertiesPanel: { collapsed: false, x: 0, y: 0, width: 280 },
     focusedPanel: 'canvas',
     _historyPast: [],
@@ -82,11 +81,13 @@ describe('PreferencesSection — catalog-driven rendering', () => {
 
   it('auto-renders one combobox per select catalog entry', () => {
     render(<PreferencesSection />)
-    // Select preferences: autoSaveDelay, density, defaultBreakpoint
+    // Select preferences: autoSaveDelay, theme, density, textScale, defaultBreakpoint
     const selects = screen.getAllByRole('combobox')
-    expect(selects.length).toBe(3)
+    expect(selects.length).toBe(5)
     expect(screen.getByRole('combobox', { name: /auto-save delay/i })).toBeDefined()
+    expect(screen.getByRole('combobox', { name: /theme/i })).toBeDefined()
     expect(screen.getByRole('combobox', { name: /ui density/i })).toBeDefined()
+    expect(screen.getByRole('combobox', { name: /ui text size/i })).toBeDefined()
     expect(screen.getByRole('combobox', { name: /default viewport/i })).toBeDefined()
   })
 })

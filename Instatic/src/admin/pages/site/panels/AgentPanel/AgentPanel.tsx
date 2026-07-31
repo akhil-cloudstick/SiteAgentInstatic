@@ -22,51 +22,50 @@
  */
 
 import { useRef, useEffect, useState, memo } from 'react'
-import { useAgentStore } from '@admin/ai/useAgentStore'
+import { useAgentStore, useAgentStoreApi } from '@admin/ai/useAgentStore'
 import { useAsyncResource } from '@admin/lib/useAsyncResource'
 import { useAdminNavigate } from '@admin/lib/useAdminNavigate'
-import { listCredentials, listModels } from '@admin/ai/api'
-import {
-  renderMarkdownToHtml,
-  type AgentImageAttachment,
-  type AgentMessage,
-  type AgentToolCall,
-} from '@site/agent'
-import { TrashSolidIcon } from 'pixel-art-icons/icons/trash-solid'
-import { SquareSolidIcon } from 'pixel-art-icons/icons/square-solid'
-import { SendSolidIcon } from 'pixel-art-icons/icons/send-solid'
-import { LoaderIcon } from 'pixel-art-icons/icons/loader'
-import { CheckIcon } from 'pixel-art-icons/icons/check'
-import { CircleAlertSolidIcon } from 'pixel-art-icons/icons/circle-alert-solid'
+import { useAuthenticatedAdminUser } from '@admin/sessionContext'
+import { listCredentials } from '@admin/ai/api'
+import { renderMarkdownToHtml, type AgentMessage, type AgentToolCall } from '@site/agent'
 import { AiBoxSolidIcon } from 'pixel-art-icons/icons/ai-box-solid'
 import { AiSettingsSolidIcon } from 'pixel-art-icons/icons/ai-settings-solid'
 import { EditSolidIcon } from 'pixel-art-icons/icons/edit-solid'
 import { ArrowRightIcon } from 'pixel-art-icons/icons/arrow-right'
-import { CloseIcon } from 'pixel-art-icons/icons/close'
 import { PanelHeader } from '@admin/shared/PanelHeader'
+import { UserAvatar } from '@admin/shared/UserAvatar'
 import { Button } from '@ui/components/Button'
 import { EmptyState } from '@ui/components/EmptyState'
-import { Textarea } from '@ui/components/Input'
-import { useDraggablePanel } from '@site/hooks/useDraggablePanel'
-import { cn } from '@ui/cn'
-import { ModelPicker } from './ModelPicker'
-import { ConversationHistory } from './ConversationHistory'
-import { ContextMeter } from './ContextMeter'
-import { AttachMenu } from './AttachMenu'
 import {
-  attachmentSrc,
-  fileToAttachment,
-  imageFilesFrom,
-  AttachmentError,
-  MAX_ATTACHMENTS,
-  type PendingAttachment,
-} from './attachments'
+  PanelResizeHandle,
+  useDraggablePanel,
+  useResizablePanel,
+} from '@admin/shared/FloatingWindow'
+import { cn } from '@ui/cn'
+import { ConversationHistory } from './ConversationHistory'
+import { AgentComposer, type ComposerLockReason } from './AgentComposer'
+import {
+  AgentImageGallery,
+} from './AgentImageGallery'
+import { AgentImageContextMenu } from './AgentImageContextMenu'
+import { AgentImagePreview } from './AgentImagePreview'
+import type {
+  AgentImageMenuRequest,
+  AgentPreviewImage,
+  OpenAgentImageMenu,
+} from './agentImageTypes'
+import { ToolCallRow } from './ToolCallRow'
+import { formatRelativeTime } from './relativeTime'
 import styles from './AgentPanel.module.css'
 
 const PANEL_WIDTH = 320
 const PANEL_HEIGHT = 480
 const AI_SETTINGS_ROUTE = '/admin/ai'
 type PanelVariant = 'floating' | 'docked'
+
+interface AgentPanelProps {
+  variant?: PanelVariant
+}
 
 // ---------------------------------------------------------------------------
 // AgentPanel
@@ -79,19 +78,22 @@ type PanelVariant = 'floating' | 'docked'
  * (`.floatPanelClosed`) to preserve Zustand conversation state across open/close cycles.
  * Agent routes via Vite proxy `/admin/api/agent` → local Bun server → Claude SDK.
  */
-export function AgentPanel({ variant = 'floating' }: { variant?: PanelVariant }) {
+export function AgentPanel({ variant = 'floating' }: AgentPanelProps) {
+  const agentStore = useAgentStoreApi()
   const isOpen = useAgentStore((s) => s.isAgentOpen)
   const isStreaming = useAgentStore((s) => s.isAgentStreaming)
+  const conversationPending = useAgentStore((s) => s.isAgentConversationPending)
+  const providerPending = useAgentStore((s) => s.isAgentProviderPending)
   const messages = useAgentStore((s) => s.agentMessages)
   const agentError = useAgentStore((s) => s.agentError)
   const closeAgent = useAgentStore((s) => s.closeAgent)
-  const sendAgentMessage = useAgentStore((s) => s.sendAgentMessage)
-  const abortAgent = useAgentStore((s) => s.abortAgent)
-  const clearAgentMessages = useAgentStore((s) => s.clearAgentMessages)
   const startNewAgentConversation = useAgentStore((s) => s.startNewAgentConversation)
   const loadScopeDefault = useAgentStore((s) => s.loadScopeDefault)
+  const composerEpoch = useAgentStore((s) => s.agentComposerEpoch)
   const activeCredentialId = useAgentStore((s) => s.agentActiveCredentialId)
   const activeModelId = useAgentStore((s) => s.agentActiveModelId)
+  const [previewImage, setPreviewImage] = useState<AgentPreviewImage | null>(null)
+  const [imageMenu, setImageMenu] = useState<AgentImageMenuRequest | null>(null)
   const credentialsResource = useAsyncResource(
     (signal) => listCredentials(signal),
     [],
@@ -113,7 +115,7 @@ export function AgentPanel({ variant = 'floating' }: { variant?: PanelVariant })
   //                   choose a model below, or set a default in AI settings.
   // While credentials are still loading we keep messaging neutral (null) so
   // the panel doesn't flash a setup prompt before the default preload lands.
-  const lockReason: 'setup' | 'chooseModel' | null = !composerLocked
+  const lockReason: ComposerLockReason | null = !composerLocked
     ? null
     : noCredentials
       ? 'setup'
@@ -121,97 +123,31 @@ export function AgentPanel({ variant = 'floating' }: { variant?: PanelVariant })
         ? 'chooseModel'
         : null
 
-  // Resolve the active model's context window from the catalogue (via the
-  // models endpoint) so the composer meter can show "0 / window" before the
-  // first turn. Re-runs whenever the selected credential/model changes; null
-  // until a model is picked, or when the provider has no published window
-  // (Ollama / uncatalogued) — the meter then stays hidden.
-  const activeProviderId =
-    credentials.find((c) => c.id === activeCredentialId)?.providerId ?? null
-  const contextWindowResource = useAsyncResource(
-    async () => {
-      if (!activeProviderId || !activeCredentialId || !activeModelId) return null
-      const models = await listModels(activeProviderId, activeCredentialId)
-      return models.find((m) => m.id === activeModelId)?.contextWindow ?? null
-    },
-    [activeProviderId, activeCredentialId, activeModelId],
-    { swallowErrors: true },
-  )
-
-  const inputRef = useRef<HTMLTextAreaElement>(null)
   const threadRef = useRef<HTMLDivElement>(null)
-
-  // ── Composer image attachments ─────────────────────────────────────────────
-  // Reference screenshots the user pastes / drops / picks before sending. Held
-  // as local composer state (like the uncontrolled textarea text) and consumed
-  // on submit. `attachError` surfaces validation problems inline.
-  const [attachments, setAttachments] = useState<PendingAttachment[]>([])
-  const [attachError, setAttachError] = useState<string | null>(null)
-  const [isDraggingImage, setIsDraggingImage] = useState(false)
-
-  async function addFiles(files: File[]) {
-    setAttachError(null)
-    const room = MAX_ATTACHMENTS - attachments.length
-    if (room <= 0) {
-      setAttachError(`You can attach up to ${MAX_ATTACHMENTS} images per message.`)
-      return
-    }
-    if (files.length > room) {
-      setAttachError(`Only ${room} more image${room === 1 ? '' : 's'} can be added (max ${MAX_ATTACHMENTS}).`)
-    }
-    const added: PendingAttachment[] = []
-    for (const file of files.slice(0, room)) {
-      try {
-        added.push(await fileToAttachment(file))
-      } catch (err) {
-        if (err instanceof AttachmentError) {
-          setAttachError(err.message)
-        } else {
-          console.error('[AgentPanel] attach failed:', err)
-          setAttachError('That image could not be attached.')
-        }
-      }
-    }
-    if (added.length > 0) setAttachments((prev) => [...prev, ...added])
-  }
-
-  function removeAttachment(id: string) {
-    setAttachments((prev) => prev.filter((att) => att.id !== id))
-  }
-
-  function handlePaste(e: React.ClipboardEvent<HTMLTextAreaElement>) {
-    const files = imageFilesFrom(e.clipboardData)
-    if (files.length === 0) return // plain-text paste — let it fall through
-    e.preventDefault()
-    void addFiles(files)
-  }
-
-  function handleDragOver(e: React.DragEvent) {
-    if (composerLocked) return
-    // Only react to file drags, not text/selection drags.
-    if (!Array.from(e.dataTransfer.types).includes('Files')) return
-    e.preventDefault()
-    setIsDraggingImage(true)
-  }
-
-  function handleDrop(e: React.DragEvent) {
-    e.preventDefault()
-    setIsDraggingImage(false)
-    if (composerLocked) return
-    const files = imageFilesFrom(e.dataTransfer)
-    if (files.length > 0) void addFiles(files)
-  }
 
   // ── Draggable panel position ───────────────────────────────────────────────
   // Default to bottom-right corner.
-  const { panelRef, headerDragProps, panelPositionStyle } = useDraggablePanel(
+  const {
+    panelRef,
+    setPanelRef,
+    headerDragProps,
+    panelPositionStyle,
+  } = useDraggablePanel(
     'agent',
     () => ({
       x: typeof window !== 'undefined' ? window.innerWidth - PANEL_WIDTH - 16 : 16,
       y: typeof window !== 'undefined'
         ? window.innerHeight - PANEL_HEIGHT - 16
         : 200,
-    }),
+      }),
+  )
+  const {
+    panelSizeStyle,
+    resizeHandleProps,
+  } = useResizablePanel(
+    'agent',
+    panelRef,
+    () => ({ width: PANEL_WIDTH, height: PANEL_HEIGHT }),
   )
 
   // Auto-scroll to bottom when new messages arrive
@@ -219,16 +155,6 @@ export function AgentPanel({ variant = 'floating' }: { variant?: PanelVariant })
     const el = threadRef.current
     if (el) el.scrollTop = el.scrollHeight
   }, [messages])
-
-  // Focus input when panel becomes active (isOpen transitions to true).
-  // The 50ms delay lets the panel's open transition settle before we steal
-  // focus; cleanup cancels the pending focus if the panel closes again
-  // (or the component unmounts) before the timer fires.
-  useEffect(() => {
-    if (!isOpen) return
-    const id = setTimeout(() => inputRef.current?.focus(), 50)
-    return () => clearTimeout(id)
-  }, [isOpen])
 
   // Preload the per-scope default credential + model when the panel opens, so
   // the picker shows the configured default immediately and the first send
@@ -238,9 +164,42 @@ export function AgentPanel({ variant = 'floating' }: { variant?: PanelVariant })
     if (isOpen) void loadScopeDefault()
   }, [isOpen, loadScopeDefault])
 
+  useEffect(() => agentStore.subscribe((state, previous) => {
+    if (
+      (previous.isAgentOpen && !state.isAgentOpen)
+      || previous.agentComposerEpoch !== state.agentComposerEpoch
+    ) {
+      setPreviewImage(null)
+      setImageMenu(null)
+    }
+  }), [agentStore])
+
+  function openImageMenu(request: AgentImageMenuRequest): void {
+    setImageMenu(request)
+  }
+
+  function openImagePreview(image: AgentPreviewImage): void {
+    setImageMenu(null)
+    setPreviewImage(image)
+  }
+
+  function closeImageMenu(): void {
+    const returnFocus = imageMenu?.returnFocus
+    setImageMenu(null)
+    if (returnFocus?.isConnected) {
+      requestAnimationFrame(() => returnFocus.focus())
+    }
+  }
+
+  function closeImagePreview(): void {
+    setPreviewImage(null)
+    setImageMenu(null)
+  }
+
   // Escape key — close the AI panel
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
+      if (e.defaultPrevented || imageMenu !== null) return
       if (e.key === 'Escape' && isOpen) {
         e.preventDefault()
         closeAgent()
@@ -248,45 +207,23 @@ export function AgentPanel({ variant = 'floating' }: { variant?: PanelVariant })
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
-  }, [isOpen, closeAgent])
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    const input = inputRef.current
-    if (!input) return
-    const content = input.value.trim()
-    // Allow sending when there's text OR at least one attached image.
-    if ((!content && attachments.length === 0) || isStreaming) return
-    const images: AgentImageAttachment[] = attachments.map((att) => ({
-      mimeType: att.mimeType,
-      data: att.data,
-    }))
-    input.value = ''
-    input.style.height = 'auto'
-    setAttachments([])
-    setAttachError(null)
-    await sendAgentMessage(content, images)
-  }
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      handleSubmit(e as unknown as React.FormEvent)
-    }
-  }
+  }, [isOpen, imageMenu, closeAgent])
 
   // Always-mounted: CSS display:none when closed (via .floatPanelClosed) preserves
   // Zustand state across open/close cycles without conditional rendering.
   return (
     <aside
-      ref={panelRef as React.RefObject<HTMLElement>}
+      ref={setPanelRef}
       role="complementary"
       aria-label="AI Assistant"
       data-panel=""
       tabIndex={-1}
       onClick={(e) => e.stopPropagation()}
-      // Panel position is drag-driven — CSS var injection from useDraggablePanel
-      style={variant === 'floating' ? panelPositionStyle : undefined}
+      style={
+        variant === 'floating'
+          ? { ...panelPositionStyle, ...panelSizeStyle }
+          : undefined
+      }
       className={cn(
         styles.floatPanel,
         variant === 'docked' && styles.floatPanelDocked,
@@ -311,6 +248,7 @@ export function AgentPanel({ variant = 'floating' }: { variant?: PanelVariant })
           variant="ghost"
           size="xs"
           iconOnly
+          disabled={isStreaming || conversationPending || providerPending}
           onClick={startNewAgentConversation}
           tooltip="New chat"
           aria-label="New chat"
@@ -318,19 +256,6 @@ export function AgentPanel({ variant = 'floating' }: { variant?: PanelVariant })
         >
           <EditSolidIcon size={14} />
         </Button>
-        {/* "Clear conversation" — shown when there are messages */}
-        {messages.length > 0 && (
-          <Button
-            variant="ghost"
-            size="xs"
-            iconOnly
-            onClick={clearAgentMessages}
-            tooltip="Clear conversation"
-            aria-label="Clear conversation"
-          >
-            <TrashSolidIcon size={14} />
-          </Button>
-        )}
         {isStreaming && (
           <span className={styles.streamingBadge}>
             <span className={styles.streamingDot} aria-hidden="true" />
@@ -361,7 +286,14 @@ export function AgentPanel({ variant = 'floating' }: { variant?: PanelVariant })
         ) : (
           <>
             {lockReason && <AgentCredentialAlert mode={lockReason} />}
-            {messages.map((msg) => <MessageBubble key={msg.id} msg={msg} />)}
+            {groupConsecutiveMessages(messages).map((group) => (
+              <MessageBubble
+                key={group.id}
+                group={group}
+                onOpenImage={openImagePreview}
+                onOpenImageMenu={openImageMenu}
+              />
+            ))}
           </>
         )}
 
@@ -374,122 +306,32 @@ export function AgentPanel({ variant = 'floating' }: { variant?: PanelVariant })
         )}
       </div>
 
-      {/* ── Input bar ───────────────────────────────────────────────────────── */}
-      <div className={styles.inputBar}>
-        {/* Live context-window meter — renders once the active model's window
-            is known (pre-turn shows 0 / window). */}
-        <ContextMeter windowTokens={contextWindowResource.data} />
-        <form
-          onSubmit={handleSubmit}
-          className={cn(styles.inputForm, isDraggingImage && styles.inputFormDragging)}
-          onDragOver={handleDragOver}
-          onDragLeave={() => setIsDraggingImage(false)}
-          onDrop={handleDrop}
-        >
-          {/* Pending reference-image thumbnails (paste / drop / picker). */}
-          {attachments.length > 0 && (
-            <ul className={styles.attachmentStrip} aria-label="Attached images">
-              {attachments.map((att) => (
-                <li key={att.id} className={styles.attachmentThumb}>
-                  <img
-                    className={styles.attachmentImage}
-                    src={attachmentSrc(att)}
-                    alt="Attached reference"
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="xs"
-                    iconOnly
-                    className={styles.attachmentRemove}
-                    aria-label="Remove image"
-                    onClick={() => removeAttachment(att.id)}
-                  >
-                    <CloseIcon size={10} aria-hidden="true" />
-                  </Button>
-                </li>
-              ))}
-            </ul>
-          )}
-          {attachError && (
-            <p role="status" className={styles.attachError}>
-              {attachError}
-            </p>
-          )}
-          {/* Textarea is hidden while streaming — the controls row collapses
-              to just the model picker + Stop button. */}
-          {!isStreaming && (
-            <Textarea
-              ref={inputRef}
-              placeholder={lockReason === 'setup'
-                ? 'Add AI credentials to start chatting'
-                : lockReason === 'chooseModel'
-                  ? 'Choose a model below to start'
-                  : 'Tell me what to build… (paste or drop an image, Enter to send)'}
-              aria-label="Message to AI assistant"
-              rows={2}
-              resize="none"
-              disabled={composerLocked}
-              onKeyDown={handleKeyDown}
-              onPaste={handlePaste}
-              onChange={(e) => {
-                // Auto-grow textarea
-                e.target.style.height = 'auto'
-                e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`
-              }}
-            />
-          )}
-          {/* Controls row: attach + model picker on the left (saves vertical
-              space), minimal icon-only send/stop button on the right. */}
-          <div className={styles.inputControls}>
-            <div className={styles.inputControlsLeft}>
-              {!isStreaming && (
-                <AttachMenu
-                  onFiles={addFiles}
-                  onError={setAttachError}
-                  disabled={composerLocked}
-                />
-              )}
-              <ModelPicker
-                className={styles.inputControlsPicker}
-                credentials={credentials}
-                credentialsLoaded={credentialsLoaded}
-                onRefreshCredentials={credentialsResource.refresh}
-              />
-            </div>
-            {isStreaming ? (
-              <Button
-                type="button"
-                variant="destructive"
-                size="sm"
-                iconOnly
-                onClick={abortAgent}
-                tooltip="Stop"
-                aria-label="Stop"
-              >
-                <SquareSolidIcon size={14} />
-              </Button>
-            ) : (
-              <Button
-                type="submit"
-                variant="primary"
-                size="sm"
-                iconOnly
-                disabled={composerLocked}
-                tooltip={lockReason === 'setup'
-                  ? 'Add AI credentials first'
-                  : lockReason === 'chooseModel'
-                    ? 'Choose a model first'
-                    : 'Send'}
-                aria-label="Send"
-              >
-                <SendSolidIcon size={14} />
-              </Button>
-            )}
-          </div>
-        </form>
-      </div>
+      <AgentComposer
+        key={composerEpoch}
+        composerLocked={composerLocked}
+        lockReason={lockReason}
+        credentials={credentials}
+        credentialsLoaded={credentialsLoaded}
+        onRefreshCredentials={credentialsResource.refresh}
+        onOpenImage={openImagePreview}
+        onOpenImageMenu={openImageMenu}
+      />
     </div>
+      <AgentImagePreview
+        image={isOpen ? previewImage : null}
+        imageMenuOpen={imageMenu !== null}
+        onOpenImageMenu={openImageMenu}
+        onClose={closeImagePreview}
+      />
+      {isOpen && imageMenu && (
+        <AgentImageContextMenu request={imageMenu} onClose={closeImageMenu} />
+      )}
+      {variant === 'floating' && (
+        <PanelResizeHandle
+          panelLabel="AI Assistant"
+          resizeHandleProps={resizeHandleProps}
+        />
+      )}
     </aside>
   )
 }
@@ -498,20 +340,40 @@ export function AgentPanel({ variant = 'floating' }: { variant?: PanelVariant })
 // MessageBubble
 // ---------------------------------------------------------------------------
 
-interface MessageBubbleProps {
-  msg: AgentMessage
+interface ConversationGroup {
+  id: string
+  role: AgentMessage['role']
+  messages: AgentMessage[]
 }
 
-// Exception #2: React.memo re-render bailout on a hot, list-rendered component
-// (one per message in messages.map).
-const MessageBubble = memo(function MessageBubble({ msg }: MessageBubbleProps) {
-  const isUser = msg.role === 'user'
+function MessageBubble({
+  group,
+  onOpenImage,
+  onOpenImageMenu,
+}: {
+  group: ConversationGroup
+  onOpenImage(image: AgentPreviewImage): void
+  onOpenImageMenu: OpenAgentImageMenu
+}) {
+  const isUser = group.role === 'user'
+  const user = useAuthenticatedAdminUser()
+  const startedAt = group.messages[0]?.timestamp
+  const relativeTime = startedAt ? formatRelativeTime(startedAt) : ''
 
   return (
-    <div className={cn(styles.messageBubble, isUser ? styles.messageBubbleUser : styles.messageBubbleAssistant)}>
-      {/* Role label */}
+    <div className={styles.messageTurn}>
+      {/* Role marker — avatar + name + relative time, once per turn. The user
+          reuses their Gravatar; the agent gets the robot glyph. */}
       <div className={styles.roleLabel}>
-        {isUser ? 'You' : 'Assistant'}
+        {isUser ? (
+          <UserAvatar user={user} size={16} alt={null} />
+        ) : (
+          <span className={styles.roleAvatarAi} aria-hidden="true">
+            <AiBoxSolidIcon size={11} />
+          </span>
+        )}
+        <span className={styles.roleName}>{isUser ? 'You' : 'Assistant'}</span>
+        {relativeTime && <span className={styles.roleTime}>· {relativeTime}</span>}
       </div>
 
       {/* Chronological blocks — text and tool calls render in the order
@@ -519,39 +381,159 @@ const MessageBubble = memo(function MessageBubble({ msg }: MessageBubbleProps) {
           shows two separate text bubbles around the tool badges. Text is
           rendered as markdown (bold, lists, inline code, links, …) via a
           DOMPurify-sanitised HTML pipeline. */}
-      {msg.blocks.map((block, index) => {
-        if (block.kind === 'text') {
-          return (
-            <MarkdownTextBubble
-              // Stable key per text block: text deltas append in place, so each
-              // run of text gets its position-based key.
-              key={`text-${index}`}
-              text={block.text}
-              isUser={isUser}
+      {groupRenderItems(group.messages).map((item) =>
+        item.kind === 'text' ? (
+          <MarkdownTextBubble key={item.key} text={item.text} isUser={isUser} />
+        ) : item.kind === 'images' ? (
+          <MessageImageGallery
+            key={item.key}
+            images={item.images}
+            isUser={isUser}
+            onOpenImage={onOpenImage}
+            onOpenImageMenu={onOpenImageMenu}
+          />
+        ) : (
+          // A run of consecutive tool calls shares one container so the rows
+          // stack tightly; text blocks around them stay separate bubbles.
+          <div key={item.key} className={styles.toolCallsContainer}>
+            {item.toolCalls.map((toolCall) => (
+              <ToolCallRow key={toolCall.id} toolCall={toolCall} />
+            ))}
+            <ToolPreviewGallery
+              toolCalls={item.toolCalls}
+              onOpenImage={onOpenImage}
+              onOpenImageMenu={onOpenImageMenu}
             />
-          )
-        }
-        if (block.kind === 'image') {
-          // Reference screenshot the user attached — rendered inline in their
-          // own bubble so they see exactly what the model received.
-          return (
-            <img
-              key={`image-${index}`}
-              className={styles.messageImage}
-              src={attachmentSrc(block)}
-              alt="Attached reference"
-            />
-          )
-        }
-        return (
-          <div key={block.toolCall.id} className={styles.toolCallsContainer}>
-            <ToolCallBadge toolCall={block.toolCall} />
           </div>
-        )
-      })}
+        ),
+      )}
     </div>
   )
-})
+}
+
+// Collapse the flat message list into conversational turns: consecutive
+// messages of the same role become one group (one bubble, one role label).
+// The agent emits each tool call as its own message, so without this a burst
+// of tool activity would render as a stack of repeated "Assistant" labels.
+function groupConsecutiveMessages(messages: AgentMessage[]): ConversationGroup[] {
+  const groups: ConversationGroup[] = []
+  for (const message of messages) {
+    const last = groups.at(-1)
+    if (last && last.role === message.role) {
+      last.messages.push(message)
+      continue
+    }
+    groups.push({ id: message.id, role: message.role, messages: [message] })
+  }
+  return groups
+}
+
+// Flatten a turn's blocks (across its messages) in emission order, coalescing
+// each run of consecutive tool-call blocks into one item so they render inside
+// a single tight container; text blocks stay separate bubbles.
+type MessageBlock = AgentMessage['blocks'][number]
+
+type MessageRenderItem =
+  | { kind: 'text'; key: string; text: string }
+  | {
+      kind: 'images'
+      key: string
+      images: Array<{ key: string; src: string }>
+    }
+  | { kind: 'tools'; key: string; toolCalls: AgentToolCall[] }
+
+function groupRenderItems(messages: AgentMessage[]): MessageRenderItem[] {
+  const items: MessageRenderItem[] = []
+  for (const message of messages) {
+    message.blocks.forEach((block: MessageBlock, index) => {
+      if (block.kind === 'text') {
+        // Position-based key, stable as streaming deltas append in place.
+        items.push({ kind: 'text', key: `text-${message.id}-${index}`, text: block.text })
+        return
+      }
+      if (block.kind === 'image') {
+        const image = {
+          key: `image-${message.id}-${index}`,
+          src: block.src,
+        }
+        const last = items.at(-1)
+        if (last?.kind === 'images') last.images.push(image)
+        else items.push({ kind: 'images', key: image.key, images: [image] })
+        return
+      }
+      const last = items.at(-1)
+      if (last && last.kind === 'tools') {
+        last.toolCalls.push(block.toolCall)
+        return
+      }
+      items.push({ kind: 'tools', key: `tools-${block.toolCall.id}`, toolCalls: [block.toolCall] })
+    })
+  }
+  return items
+}
+
+function MessageImageGallery({
+  images,
+  isUser,
+  onOpenImage,
+  onOpenImageMenu,
+}: {
+  images: Array<{ key: string; src: string }>
+  isUser: boolean
+  onOpenImage(image: AgentPreviewImage): void
+  onOpenImageMenu: OpenAgentImageMenu
+}) {
+  const galleryImages = images.map((image, index): AgentPreviewImage => ({
+    id: image.key,
+    src: image.src,
+    alt: images.length === 1
+      ? isUser ? 'Attachment from you' : 'Image from assistant'
+      : isUser
+        ? `Attachment ${index + 1} of ${images.length} from you`
+        : `Image ${index + 1} of ${images.length} from assistant`,
+    title: isUser ? 'Your attachment' : 'Assistant image',
+    filename: isUser
+      ? `your-attachment-${index + 1}`
+      : `assistant-image-${index + 1}`,
+  }))
+
+  return (
+    <AgentImageGallery
+      images={galleryImages}
+      label={isUser ? 'Images from you' : 'Images from assistant'}
+      onOpenImage={onOpenImage}
+      onOpenImageMenu={onOpenImageMenu}
+    />
+  )
+}
+
+function ToolPreviewGallery({
+  toolCalls,
+  onOpenImage,
+  onOpenImageMenu,
+}: {
+  toolCalls: AgentToolCall[]
+  onOpenImage(image: AgentPreviewImage): void
+  onOpenImageMenu: OpenAgentImageMenu
+}) {
+  const images = toolCalls.flatMap((toolCall) =>
+    (toolCall.previewImages ?? []).map((src, index): AgentPreviewImage => ({
+      id: `${toolCall.id}-preview-${index}`,
+      src,
+      alt: `Image ${index + 1} captured while running ${toolCall.actionType}`,
+      title: 'Tool result image',
+      filename: `${toolCall.actionType}-${index + 1}`,
+    })),
+  )
+  return (
+    <AgentImageGallery
+      images={images}
+      label="Images captured by assistant tools"
+      onOpenImage={onOpenImage}
+      onOpenImageMenu={onOpenImageMenu}
+    />
+  )
+}
 
 // ---------------------------------------------------------------------------
 // MarkdownTextBubble — parses + sanitises the block text and injects it via
@@ -577,9 +559,9 @@ const MarkdownTextBubble = memo(function MarkdownTextBubble({
   return (
     <div
       className={cn(
-        styles.contentBubble,
-        isUser ? styles.contentBubbleUser : styles.contentBubbleAssistant,
-        styles.markdownBubble,
+        styles.messageText,
+        isUser ? styles.messageTextUser : styles.messageTextAssistant,
+        styles.markdownText,
       )}
       // Safe: sanitised by DOMPurify (via sanitizeRichtext) before reaching here.
       dangerouslySetInnerHTML={{ __html: html }}
@@ -588,106 +570,8 @@ const MarkdownTextBubble = memo(function MarkdownTextBubble({
 })
 
 // ---------------------------------------------------------------------------
-// ToolCallBadge
-// ---------------------------------------------------------------------------
-
-function ToolCallBadge({ toolCall }: { toolCall: AgentToolCall }) {
-  const isPending = toolCall.status === 'pending'
-  const isSuccess = toolCall.status === 'success'
-  const isError = toolCall.status === 'error'
-
-  const iconClass = isPending
-    ? styles.toolCallIconPending
-    : isSuccess
-    ? styles.toolCallIconSuccess
-    : styles.toolCallIconFailed
-  const displayType = formatToolCallType(toolCall.actionType)
-  const label = formatActionLabel(toolCall.actionType, toolCall.params)
-  const statusLabel = isPending
-    ? `Running ${displayType}${label ? ` — ${label}` : ''}`
-    : isSuccess
-    ? `Completed ${displayType}${label ? ` — ${label}` : ''}`
-    : `Failed ${displayType}${label ? ` — ${label}` : ''}`
-
-  // Surface the tool's error message directly in the badge stream so the
-  // user sees WHY a tool failed without having to dig through devtools. The
-  // toolResult handler in agentSlice.ts already populates `result.error`.
-  const errorMessage = isError ? toolCall.result?.error ?? 'Tool call failed.' : null
-
-  return (
-    <>
-      <div
-        role="status"
-        aria-label={statusLabel}
-        className={styles.toolCallBadge}
-      >
-        <span className={iconClass} aria-hidden="true">
-          {isPending ? (
-            <LoaderIcon size={10} />
-          ) : isSuccess ? (
-            <CheckIcon size={10} />
-          ) : (
-            <CircleAlertSolidIcon size={10} />
-          )}
-        </span>
-        <span className={styles.toolCallType} aria-hidden="true">
-          {displayType}
-        </span>
-        <span aria-hidden="true">{label}</span>
-      </div>
-      {errorMessage && (
-        <p
-          role="alert"
-          // Tone-aligned with `.errorBanner` (red text on muted background)
-          // but inline + compact so a string of failed tool calls stays
-          // readable.
-          className={styles.toolCallError}
-        >
-          {errorMessage}
-        </p>
-      )}
-    </>
-  )
-}
-
-function formatToolCallType(actionType: string): string {
-  return actionType.replace(/^mcp__instatic__/, '')
-}
-
-/** Compact one-line summary of an applyCss payload: the selectors it touches. */
-function summarizeCss(css: string): string {
-  const selectors = css
-    .match(/[^{}]+(?=\{)/g)
-    ?.map((s) => s.trim().replace(/\s+/g, ' '))
-    .filter(Boolean) ?? []
-  if (selectors.length === 0) return 'css'
-  const head = selectors.slice(0, 2).join(', ')
-  return selectors.length > 2 ? `${head} +${selectors.length - 2}` : head
-}
-
-function formatActionLabel(actionType: string, params: unknown): string {
-  const p = params as Record<string, unknown>
-  switch (actionType) {
-    case 'site_insert_html': return `→ ${String(p.parentId ?? '').slice(0, 8)}`
-    case 'site_get_node_html': return `node ${String(p.nodeId ?? '').slice(0, 6)}…`
-    case 'site_replace_node_html': return `node ${String(p.nodeId ?? '').slice(0, 6)}…`
-    case 'site_delete_node': return `node ${String(p.nodeId ?? '').slice(0, 6)}…`
-    case 'site_update_node_props': return `node ${String(p.nodeId ?? '').slice(0, 6)}…`
-    case 'site_move_node': return `→ ${String(p.newParentId ?? '').slice(0, 6)}…`
-    case 'site_rename_node': return `"${String(p.label ?? '')}"`
-    case 'site_apply_css': return summarizeCss(String(p.css ?? ''))
-    case 'site_assign_class': return `${String(p.classId ?? '').slice(0, 6)}… → node`
-    case 'site_remove_class': return `${String(p.classId ?? '').slice(0, 6)}… from node`
-    case 'site_add_page': return `"${String(p.title ?? '')}"`
-    default: return ''
-  }
-}
-
-// ---------------------------------------------------------------------------
 // Empty state
 // ---------------------------------------------------------------------------
-
-type ComposerLockReason = 'setup' | 'chooseModel'
 
 function AgentEmptyState({ mode }: { mode: ComposerLockReason | 'prompt' }) {
   if (mode === 'setup') {

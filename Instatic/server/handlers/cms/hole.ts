@@ -1,7 +1,7 @@
 /**
  * `/_instatic/hole-runtime.js` and `/_instatic/hole/<nodeId>` endpoints — Layer C server islands.
  *
- * The runtime asset is a tiny JavaScript module (< 1 KB) that uses
+ * The runtime asset is a tiny JavaScript module (~1.1 KB) that uses
  * IntersectionObserver to lazily fetch rendered fragments for `<instatic-hole>`
  * elements in published pages.
  *
@@ -148,6 +148,7 @@ async function renderHoleFragment(
     jsMap: new Map(),
     infiniteLoopIds: new Set(),
     holeNodeIds: new Set(),
+    cspSources: new Map(),
   }
   // Hole fragments bypass the published-HTML pipeline, so CMS forms inside
   // them would never receive their page token. Stamp here — tokens are

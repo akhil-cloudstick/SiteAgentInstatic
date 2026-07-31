@@ -12,12 +12,14 @@
  * Phase 3 / Task #464 / Spec #671.
  */
 
+import { useState } from 'react'
 import type { CSSPropertyBag } from '@core/page-tree'
 import { TextControl } from '@site/property-controls/TextControl'
 import { ColorControl } from '@site/property-controls/ColorControl'
 import { SelectControl } from '@site/property-controls/SelectControl'
 import { BackgroundImageControl } from '@site/property-controls/BackgroundImageControl'
 import { FontFamilyControl } from '@site/property-controls/FontFamilyControl'
+import { useEditorStore } from '@site/store/store'
 import { ControlRow } from '@ui/components/ControlRow'
 import { TokenAwareInput } from '@site/property-controls/TokenAwareInput'
 import {
@@ -35,6 +37,7 @@ import {
   cssPropertyLabel,
   NUMBER_TYPED_PROPS,
 } from './cssControlTypes'
+import { getFontWeightOptions } from './fontWeightOptions'
 import styles from './ClassPropertyRow.module.css'
 
 // ---------------------------------------------------------------------------
@@ -45,6 +48,7 @@ interface ClassPropertyRowProps {
   property: keyof CSSPropertyBag
   value: string | number | undefined
   placeholder?: string | number
+  fontFamilyValue?: unknown
   isSet?: boolean
   onChange: (property: keyof CSSPropertyBag, value: string | number | undefined) => void
   onRemove: (property: keyof CSSPropertyBag) => void
@@ -64,6 +68,7 @@ export function ClassPropertyRow({
   property,
   value,
   placeholder,
+  fontFamilyValue,
   isSet = true,
   onChange,
   onRemove,
@@ -74,6 +79,12 @@ export function ClassPropertyRow({
   const tokenSource = getCSSPropertyTokenSource(property)
   const label = cssPropertyLabel(String(property))
   const placeholderText = placeholder !== undefined ? String(placeholder) : undefined
+  const fonts = useEditorStore((state) => state.site?.settings.fonts ?? null)
+  const isNumberTyped = NUMBER_TYPED_PROPS.has(property)
+  // Numeric CSS values are persisted as numbers, but their text fields need
+  // to retain lexical editing states such as `0.`, `-`, and `1e`. `null`
+  // means the field is not being edited and should reflect the stored value.
+  const [numberDraft, setNumberDraft] = useState<string | null>(null)
 
   // Always read both token catalogs — hooks must run unconditionally on
   // every render. The selected catalog is forwarded to TokenAwareInput
@@ -87,23 +98,49 @@ export function ClassPropertyRow({
         ? spacingTokens
         : []
 
+  const commitNumberValue = (rawValue: string) => {
+    const trimmed = rawValue.trim()
+    if (trimmed === '') {
+      if (value !== undefined) onChange(property, undefined)
+      return
+    }
+
+    const parsed = Number(trimmed)
+    if (Number.isFinite(parsed) && !Object.is(value, parsed)) {
+      onChange(property, parsed)
+    }
+  }
+
   // Translate a control's (propKey, val) onChange signature into a typed
-  // CSSPropertyBag value, coercing to number when the property expects one.
+  // CSSPropertyBag value. Number-typed properties keep the raw focused draft
+  // in the input while finite values continue to update the canvas live.
   const handleControlChange = (_key: string, val: unknown) => {
     const nextValue = String(val ?? '')
-    if (NUMBER_TYPED_PROPS.has(property)) {
-      const parsed = Number(nextValue)
-      onChange(property, Number.isFinite(parsed) && nextValue.trim() !== '' ? parsed : undefined)
+    if (isNumberTyped) {
+      setNumberDraft(nextValue)
+      commitNumberValue(nextValue)
       return
     }
     onChange(property, nextValue)
+  }
+
+  const handleNumberFocus = () => {
+    if (isNumberTyped) setNumberDraft(String(value ?? ''))
+  }
+
+  const handleNumberBlur = (nextValue: string) => {
+    if (!isNumberTyped) return
+    commitNumberValue(nextValue)
+    // Returning to the stored value also canonicalizes incomplete drafts:
+    // `0.` becomes `0`, while an uncommittable `-`/`.` is discarded.
+    setNumberDraft(null)
   }
 
   // Token-aware properties commit on blur via TokenAwareInput's `onCommit`.
   // It already returns undefined for empty input (clears the value), so
   // the only translation we do here is the number-typed coercion.
   const handleTokenCommit = (resolved: string | undefined) => {
-    if (NUMBER_TYPED_PROPS.has(property)) {
+    if (isNumberTyped) {
       if (resolved == null || resolved === '') {
         onChange(property, undefined)
         return
@@ -121,7 +158,7 @@ export function ClassPropertyRow({
   const handleControlPreview = (_key: string, val: unknown) => {
     if (!onPreview) return
     const nextValue = String(val ?? '')
-    if (NUMBER_TYPED_PROPS.has(property)) {
+    if (isNumberTyped) {
       const parsed = Number(nextValue)
       onPreview(property, Number.isFinite(parsed) && nextValue.trim() !== '' ? parsed : undefined)
       return
@@ -131,7 +168,7 @@ export function ClassPropertyRow({
 
   const handleTokenPreview = (resolved: string | undefined) => {
     if (!onPreview) return
-    if (NUMBER_TYPED_PROPS.has(property)) {
+    if (isNumberTyped) {
       if (resolved == null || resolved === '') {
         onPreview(property, undefined)
         return
@@ -208,7 +245,10 @@ export function ClassPropertyRow({
       break
 
     case 'select': {
-      const opts = getEnumOptions(property) ?? []
+      const enumOptions = getEnumOptions(property) ?? []
+      const opts = property === 'fontWeight'
+        ? getFontWeightOptions(fontFamilyValue, fonts, enumOptions)
+        : enumOptions
       control = (
         <SelectControl
           propKey={String(property)}
@@ -232,10 +272,12 @@ export function ClassPropertyRow({
       control = (
         <TextControl
           propKey={String(property)}
-          value={String(value ?? '')}
+          value={isNumberTyped && numberDraft !== null ? numberDraft : String(value ?? '')}
           placeholder={placeholderText}
           onChange={handleControlChange}
           label={label}
+          onInputFocus={isNumberTyped ? handleNumberFocus : undefined}
+          onInputBlur={isNumberTyped ? handleNumberBlur : undefined}
         />
       )
       break

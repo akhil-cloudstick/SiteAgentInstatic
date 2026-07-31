@@ -317,32 +317,24 @@ describe('PublishButton — publish state machine', () => {
     expect(state).toBe('error')
   })
 
-  it('source emits role="alert" for error messages (Guideline #224)', () => {
+  it('source drives aria-busy during publish (via SplitButton busy prop)', () => {
     const { readFileSync } = require('fs')
     const src = readFileSync(
       new URL('../../admin/pages/site/toolbar/PublishActionGroup.tsx', import.meta.url),
       'utf-8',
     )
-    // Error must be surfaced via role="alert" — not silently swallowed
-    expect(src).toContain("role={toast.tone === 'alert' ? 'alert' : 'status'}")
+    // SplitButton applies aria-busy to the primary button from its `busy` prop.
+    expect(src).toContain('busy={publishBusy}')
   })
 
-  it('source uses aria-busy during publish', () => {
+  it('publish button has data-testid for Playwright targeting (via SplitButton)', () => {
     const { readFileSync } = require('fs')
     const src = readFileSync(
       new URL('../../admin/pages/site/toolbar/PublishActionGroup.tsx', import.meta.url),
       'utf-8',
     )
-    expect(src).toContain('aria-busy={publishBusy}')
-  })
-
-  it('publish button has data-testid for Playwright targeting', () => {
-    const { readFileSync } = require('fs')
-    const src = readFileSync(
-      new URL('../../admin/pages/site/toolbar/PublishActionGroup.tsx', import.meta.url),
-      'utf-8',
-    )
-    expect(src).toContain('data-testid="toolbar-publish-btn"')
+    // SplitButton renders data-testid="toolbar-publish-btn" on the primary button.
+    expect(src).toContain('primaryTestId="toolbar-publish-btn"')
   })
 
   it('saves the current draft before calling the CMS publish endpoint', () => {
@@ -509,12 +501,13 @@ describe('Toolbar — structural requirements', () => {
     )
     expect(zoomSrc).toContain('data-testid="toolbar-zoom-controls"')
 
-    // Publishing split-button testids
+    // Publishing split-button testids — passed to SplitButton, which renders
+    // them as data-testid on the chevron trigger and the menu.
     const publishingSrc = readFileSync(
       new URL('../../admin/pages/site/toolbar/PublishActionGroup.tsx', import.meta.url), 'utf-8',
     )
-    expect(publishingSrc).toContain('data-testid="toolbar-publish-actions-trigger"')
-    expect(publishingSrc).toContain('data-testid="toolbar-publish-actions-menu"')
+    expect(publishingSrc).toContain('menuTriggerTestId="toolbar-publish-actions-trigger"')
+    expect(publishingSrc).toContain('menuTestId="toolbar-publish-actions-menu"')
   })
 
   it('ModulePicker uses ContextMenu primitives (role="menu" + role="menuitem")', () => {
@@ -560,54 +553,32 @@ describe('Toolbar — structural requirements', () => {
     expect(src).toContain('useEffect')
   })
 
-  it('PublishButton uses one split publishing control with explicit draft actions', () => {
-    const { readFileSync } = require('fs')
-    const src = readFileSync(
-      new URL('../../admin/pages/site/toolbar/PublishButton.tsx', import.meta.url),
-      'utf-8',
-    )
-    expect(src).toContain('PublishActionGroup')
-    expect(src).toContain('Draft saved')
-    expect(src).toContain('Unsaved draft')
-    expect(src).toContain("state === 'published' ? 'Published'")
-    expect(src).toContain('state === \'published\' ? CheckIcon')
-    expect(src).toContain("statusLabel={state === 'published' ? null : status.label}")
-    expect(src).toContain('publishDisabled={disabled || state === \'published\'}')
-    expect(src).toContain('Save draft')
-    expect(src).toContain('Preview page')
-    // "Open live page" used to live in this menu — it's now a dedicated
-    // icon button (OpenLivePageButton) next to the avatar in the Toolbar
-    // shell so it's reachable from every admin route, not just the Site
-    // editor. Asserting it's gone from the menu keeps the two surfaces
-    // from drifting back into a duplicate action.
-    expect(src).not.toContain("label: 'Open live page'")
-    expect(src).not.toContain("'toolbar-open-page-new-tab-action'")
-    expect(src).toContain("'Retry publish'")
-    expect(src).not.toContain("label: 'Live'")
-    expect(src).not.toContain("'Publish failed'")
-  })
-
-  it('PublishActionGroup exposes a menu button for secondary publishing actions and can omit the status label', () => {
+  it('PublishActionGroup keeps the status pill and delegates its split control to the shared SplitButton', () => {
     const { readFileSync } = require('fs')
     const src = readFileSync(
       new URL('../../admin/pages/site/toolbar/PublishActionGroup.tsx', import.meta.url),
       'utf-8',
     )
+    // The optional status pill stays owned by PublishActionGroup.
     expect(src).toContain('statusLabel?: string | null')
     expect(src).toContain('{statusLabel && (')
-    expect(src).toContain('aria-haspopup="menu"')
-    expect(src).toContain('aria-expanded={menuOpen}')
-    expect(src).toContain('<ContextMenu')
-    expect(src).toContain('<ContextMenuItem')
+    // The split button + dropdown mechanics now live in the shared primitive.
+    expect(src).toContain('@ui/components/SplitButton')
+    expect(src).toContain('<SplitButton')
+    expect(src).toContain('menuItems={menuItems}')
   })
 
-  it('PublishActionGroup uses the shared ContextMenu portal above editor panels', () => {
+  it('SplitButton exposes a menu trigger and portals the menu above editor panels', () => {
     const { readFileSync } = require('fs')
     const src = readFileSync(
-      new URL('../../admin/pages/site/toolbar/PublishActionGroup.tsx', import.meta.url),
+      new URL('../../ui/components/SplitButton/SplitButton.tsx', import.meta.url),
       'utf-8',
     )
+    expect(src).toContain('aria-haspopup="menu"')
+    expect(src).toContain('aria-expanded={menuOpen}')
     expect(src).toContain('@ui/components/ContextMenu')
+    expect(src).toContain('<ContextMenu')
+    expect(src).toContain('<ContextMenuItem')
     expect(src).toContain('createPortal')
     expect(src).toContain('zIndex={10000}')
   })

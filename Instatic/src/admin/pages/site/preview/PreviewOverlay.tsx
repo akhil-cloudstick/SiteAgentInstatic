@@ -1,8 +1,10 @@
 /**
- * PreviewOverlay — full-screen in-browser preview of the published page.
+ * PreviewOverlay — full-screen in-browser preview of the current draft page.
  *
- * Renders the active page via publishPage() into a sandboxed <iframe> so
- * the user can see exactly what visitors will see before exporting.
+ * Builds the active in-memory draft through the authenticated runtime-preview
+ * endpoint, then renders the result into a sandboxed <iframe>. The server path
+ * owns request-time concerns such as loop and media prefetch, keeping Preview
+ * aligned with the public renderer without publishing the draft.
  *
  * Accessibility (Guideline #225 / WCAG 2.1 AA):
  * - role="dialog" + aria-modal="true"
@@ -17,40 +19,119 @@
  */
 
 import { useEffect, useRef } from 'react'
+import type { Page, SiteDocument } from '@core/page-tree'
+import { isAbortError } from '@core/http'
+import { buildCmsRuntimePreview } from '@core/persistence'
+import type { TemplateRenderDataContext } from '@core/templates/dynamicBindings'
+import { useAsyncResource } from '@admin/lib/useAsyncResource'
 import { useEditorStore, selectActivePage } from '@site/store/store'
-import { publishPage } from '@core/publisher'
-import { registry } from '@core/module-engine'
 import { useTemplatePreviewContext } from '@site/hooks/useTemplatePreviewContext'
 import { EyeSolidIcon } from 'pixel-art-icons/icons/eye-solid'
 import { CloseIcon } from 'pixel-art-icons/icons/close'
 import { ExternalLinkSolidIcon } from 'pixel-art-icons/icons/external-link-solid'
 import { Button } from '@ui/components/Button'
+import { EmptyState } from '@ui/components/EmptyState'
+import { pushToast } from '@ui/components/Toast'
 import { useAdminUi } from '@admin/state/adminUi'
 import styles from './PreviewOverlay.module.css'
 
-/**
- * Prepare the published HTML for the `srcDoc` preview iframe. The iframe is
- * `sandbox="allow-same-origin"` (see the iframe for why — asset requests are
- * gateway-routed by the `sa_hub` cookie, so they must be same-origin), which
- * fetches `/uploads/…` correctly. On top of that, two HTML fix-ups:
- *
- * 1. **Base href.** Inject `<base href="<admin origin>/">` as the first child of
- *    `<head>` so root-relative `/uploads/…` URLs resolve to the admin origin
- *    explicitly, independent of `about:srcdoc` base-URL inheritance. Skipped if
- *    a `<base>` already exists or there's no `<head>`.
- * 2. **Eager images.** Rewrite `loading="lazy"` → `eager`. The preview is a
- *    static, script-less snapshot, so native lazy-loading (which the user would
- *    have to scroll to trigger, if it fires at all inside the iframe) buys
- *    nothing — eager-load everything so the whole page renders at once.
- */
-function preparePreviewHtml(html: string): string {
-  if (typeof window === 'undefined') return html
-  let out = html.replace(/\bloading\s*=\s*(["'])lazy\1/gi, 'loading="eager"')
-  if (!/<base\b/i.test(out)) {
-    const baseTag = `<base href="${window.location.origin}/">`
-    out = out.replace(/<head(\s[^>]*)?>/i, (match) => `${match}${baseTag}`)
+interface PreviewDocumentProps {
+  site: SiteDocument
+  page: Page
+  templatePreviewContext: TemplateRenderDataContext | undefined
+}
+
+interface LoadedPreviewDocument {
+  site: SiteDocument
+  pageId: string
+  contextKey: string
+  html: string
+}
+
+function PreviewDocument({ site, page, templatePreviewContext }: PreviewDocumentProps) {
+  const contextKey = JSON.stringify(templatePreviewContext ?? null)
+  const reportedErrorRef = useRef<string | null>(null)
+  const { data, loading, error, refresh } = useAsyncResource<LoadedPreviewDocument>(
+    async (signal) => {
+      try {
+        const preview = await buildCmsRuntimePreview(
+          {
+            site,
+            pageId: page.id,
+            templateContext: templatePreviewContext,
+          },
+          { signal },
+        )
+        return {
+          site,
+          pageId: page.id,
+          contextKey,
+          html: preview.html,
+        }
+      } catch (err) {
+        if (!signal.aborted && !isAbortError(err)) {
+          console.error('[PreviewOverlay] Failed to build preview:', err)
+        }
+        throw err
+      }
+    },
+    [site, page.id, contextKey],
+    { fallbackError: 'Preview build failed' },
+  )
+
+  useEffect(() => {
+    if (!error) {
+      reportedErrorRef.current = null
+      return
+    }
+    if (reportedErrorRef.current === error) return
+    reportedErrorRef.current = error
+    pushToast({
+      kind: 'error',
+      title: "Couldn't build preview",
+      body: error,
+      location: 'preview-overlay',
+    })
+  }, [error])
+
+  const currentHtml =
+    data?.site === site && data.pageId === page.id && data.contextKey === contextKey
+      ? data.html
+      : null
+
+  if (error) {
+    return (
+      <EmptyState
+        variant="centered"
+        title="Preview unavailable"
+        description={error}
+        action={<Button variant="secondary" onClick={refresh}>Retry preview</Button>}
+        role="alert"
+        data-testid="preview-error"
+      />
+    )
   }
-  return out
+
+  if (loading || !currentHtml) {
+    return (
+      <EmptyState
+        variant="centered"
+        title="Building preview…"
+        description="Resolving dynamic content and page assets."
+        data-testid="preview-loading"
+      />
+    )
+  }
+
+  return (
+    <iframe
+      srcDoc={currentHtml}
+      sandbox=""
+      title={`Preview: ${page.title}`}
+      data-testid="preview-iframe"
+      className={styles.iframe}
+    />
+  )
 }
 
 export function PreviewOverlay() {
@@ -58,7 +139,7 @@ export function PreviewOverlay() {
   const closePreview = useEditorStore((s) => s.closePreview)
   const site = useEditorStore((s) => s.site)
   const activePage = useEditorStore(selectActivePage)
-  const templatePreviewContext = useTemplatePreviewContext(activePage)
+  const { context: templatePreviewContext } = useTemplatePreviewContext(activePage)
   // Target for the "Open live" button — the active page's public path, kept in
   // the shared admin store by `useActiveLivePath` (same source the toolbar's
   // Open-live button uses). Falls back to the site root.
@@ -89,15 +170,6 @@ export function PreviewOverlay() {
   }
 
   if (!open || !site || !activePage) return null
-
-  const { html } = publishPage(activePage, site, registry, {
-    templateContext: templatePreviewContext,
-  })
-  // Fix the published HTML up for the sandboxed preview iframe: resolve
-  // root-relative `/uploads/…` asset URLs against the admin origin, and force
-  // eager image loading (native lazy-load never fires in this sandboxed srcDoc,
-  // so below-the-fold images stay blank). See preparePreviewHtml.
-  const previewHtml = preparePreviewHtml(html)
 
   return (
     <>
@@ -155,25 +227,14 @@ export function PreviewOverlay() {
             </Button>
           </div>
 
-          {/* ── Sandboxed iframe ───────────────────────────────────────────
-              `allow-same-origin` (but deliberately NOT `allow-scripts`) is
-              required, not a relaxation: tenant assets (`/uploads/fonts`,
-              `/uploads/*.svg`) are served through the funnel gateway, which
-              routes each request to the right tenant by the `sa_hub` session
-              cookie. An opaque-origin (`sandbox=""`) iframe is cross-site, so
-              that cookie is never sent → the gateway can't resolve a tenant →
-              every asset 404s (fonts + images). Same-origin makes the cookie
-              ride along like the canvas, so assets load. Scripts stay disabled
-              (no `allow-scripts`), so the preview is still an inert static
-              snapshot — safe, since `allow-same-origin` grants nothing without
-              script execution. */}
-          <iframe
-            srcDoc={previewHtml}
-            sandbox="allow-same-origin"
-            title={`Preview: ${activePage.title}`}
-            data-testid="preview-iframe"
-            className={styles.iframe}
-          />
+          {/* ── Sandboxed server-built preview ─────────────────────────── */}
+          <div className={styles.previewContent}>
+            <PreviewDocument
+              site={site}
+              page={activePage}
+              templatePreviewContext={templatePreviewContext}
+            />
+          </div>
         </div>
       </div>
     </>

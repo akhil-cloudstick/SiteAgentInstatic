@@ -11,16 +11,16 @@
  */
 
 import { createWriteStream } from 'node:fs'
-import { copyFile, mkdir, mkdtemp, rm, rename, unlink } from 'node:fs/promises'
+import { copyFile, mkdir, mkdtemp, rm, rename, unlink, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { once } from 'node:events'
 import { tmpdir } from 'node:os'
 import type { DbClient } from '../../db/client'
 import { requireCapability } from '../../auth/authz'
 import { jsonResponse, badRequest } from '../../http'
-import { assertPathWithin } from '../../util/pathWithin'
 import { importMediaAsset, assignAssetToFolders } from '../../repositories/media'
 import { parseValue, formatValueErrors, compiled } from '@core/utils/typeboxHelpers'
+import { validateAndSanitizeMediaBytes, resolveMediaWriteTarget } from './importMediaValidation'
 import {
   ImportResultSchema,
   ImportStrategySchema,
@@ -167,7 +167,15 @@ async function cleanupStagedMedia(stagedMedia: StagedArchiveMedia): Promise<void
   }
 }
 
-async function importStagedArchiveMediaEntries(input: {
+/**
+ * Commit staged archive media entries to the uploads directory and the media
+ * DB. Before writing each entry to disk, the bytes are validated and — for
+ * SVG — sanitised, mirroring the security checks the normal upload pipeline
+ * applies via `acceptUploadedMedia`.
+ *
+ * Exported for integration testing.
+ */
+export async function importStagedArchiveMediaEntries(input: {
   stagedMedia: StagedArchiveMedia
   db: DbClient
   uploadsDir: string
@@ -176,16 +184,33 @@ async function importStagedArchiveMediaEntries(input: {
   let imported = 0
 
   for (const { asset, stagedPath } of input.stagedMedia.entries) {
-    const target = join(input.uploadsDir, asset.storagePath)
-    assertPathWithin(input.uploadsDir, target)
+    const target = resolveMediaWriteTarget(input.uploadsDir, asset.storagePath)
     await mkdir(dirname(target), { recursive: true })
-    await moveFile(stagedPath, target)
+
+    // Security gate: detect the real MIME from magic bytes and sanitize SVG
+    // before committing bytes to disk.  Reuses the same helpers as the normal
+    // upload pipeline so there is exactly one place to update if the detection
+    // or sanitisation logic changes. The staged file is fully buffered here to
+    // sniff its magic bytes (unavoidable — MIME detection needs the head).
+    const safeBytes = validateAndSanitizeMediaBytes(
+      new Uint8Array(await Bun.file(stagedPath).arrayBuffer()),
+      asset,
+    )
+
+    // SVG entries are written from the sanitized in-memory bytes; all other
+    // types are moved from staging (zero-copy fast path).
+    if (asset.mimeType === 'image/svg+xml') {
+      await writeFile(target, safeBytes)
+    } else {
+      await moveFile(stagedPath, target)
+    }
 
     await importMediaAsset(input.db, {
       id: asset.id,
       filename: asset.filename,
       mimeType: asset.mimeType,
-      sizeBytes: asset.sizeBytes,
+      // Use the sanitized byte length — SVG shrinks after script removal.
+      sizeBytes: safeBytes.length,
       storagePath: asset.storagePath,
       publicPath: `/uploads/${asset.storagePath}`,
       altText: asset.altText,

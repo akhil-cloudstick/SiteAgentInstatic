@@ -44,23 +44,25 @@ import type { SiteDocument, SiteSettings } from '@core/page-tree'
 import type { FrameworkPreferencesSettings } from '@core/framework-schema'
 import { useEditorStore } from '@site/store/store'
 import { useAdminUi } from '@admin/state/adminUi'
-import { CMS_SITE_RELOAD_EVENT } from '@admin/state/adminEvents'
+import { requestCmsSiteReload } from '@admin/state/adminEvents'
 import { getErrorMessage } from '@core/utils/errorMessage'
 
 const SITE_ID = 'default'
 
 /**
  * Save only the site shell (name + settings) — leave pages / components /
- * layouts untouched. `saveSite` always writes the shell; passing empty dirty
- * sets (with `all: false`) means the row collections ship an empty change set
- * against their full id roster, so the server reaps nothing and rewrites
- * nothing. See `CmsAdapter.saveSite`.
+ * layouts untouched. `saveSite` always writes the shell; empty changed and
+ * deleted sets (with `all: false`) make the incremental save touch no rows
+ * at all. See `CmsAdapter.saveSite`.
  */
 const SHELL_ONLY_DIRTY = {
   all: false,
   pageIds: new Set<string>(),
   componentIds: new Set<string>(),
   layoutIds: new Set<string>(),
+  deletedPageIds: new Set<string>(),
+  deletedComponentIds: new Set<string>(),
+  deletedLayoutIds: new Set<string>(),
 } as const
 
 interface SettingsDraftState {
@@ -97,7 +99,7 @@ const useSettingsDraftStore = create<SettingsDraftState>((set, get) => {
           name: next.name,
           faviconUrl: next.settings.faviconUrl ?? null,
         })
-        window.dispatchEvent(new Event(CMS_SITE_RELOAD_EVENT))
+        requestCmsSiteReload()
       })
       .catch((err: unknown) => {
         console.error('[useSiteSettingsController] failed to save site settings:', err)

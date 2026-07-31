@@ -198,7 +198,7 @@ html: { type: 'richtext', label: 'Content', hidden: true }
 
 | control `type`            | escaper at the publisher boundary                          |
 |---------------------------|------------------------------------------------------------|
-| `url`                     | `isSafeUrl` (blocks `javascript:` / `vbscript:` / `data:`; passed raw for the module's `safeUrl`) |
+| `url`                     | `isSafeUrl` (scheme allowlist: `http`, `https`, `mailto`, `tel`, `sms`, plus relative URLs; blocks `javascript:` / `vbscript:` / `data:`; passed raw for the module's `safeUrl`) |
 | `image` / `media`         | `isSafeUrl` with `allowDataImages` — like `url`, but self-contained `data:image/*` URIs are permitted (they render into `<img>`/`<video>` where SVG runs in the browser's secure static mode; mirrors the CSP `img-src 'self' data:`). The module's `safeUrl` must pass the same option. |
 | `richtext`                | `sanitizeRichtext` (DOMPurify)                             |
 | `svg`                     | `sanitizeSvg` (DOMPurify SVG profile)                      |

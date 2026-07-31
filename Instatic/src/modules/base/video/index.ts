@@ -24,7 +24,7 @@
  * optional — missing values fall back gracefully.
  */
 import { registry } from '@core/module-engine'
-import type { ModuleDefinition } from '@core/module-engine'
+import type { ModuleDefinition, RenderOutput, CspSourceRequirement } from '@core/module-engine'
 import type { RenderResolvedMedia } from '@core/publisher'
 import { Value } from '@core/utils/typeboxHelpers'
 import { VideoSolidIcon } from 'pixel-art-icons/icons/video-solid'
@@ -91,6 +91,8 @@ export const VideoModule: ModuleDefinition<VideoProps> = {
         { label: 'Auto', value: 'auto' },
       ],
     },
+    title: { type: 'text', label: 'Video title', description: 'Accessibility label for the embedded YouTube player iframe.' },
+    noRelatedVideos: { type: 'toggle', label: 'Hide related videos', description: 'Adds rel=0 to suppress YouTube recommended videos after playback.' },
   },
 
   // Single source of truth: defaults are derived from the schema's `default`
@@ -118,6 +120,8 @@ export const VideoModule: ModuleDefinition<VideoProps> = {
       return renderYoutube({
         youtubeId,
         autoplay: Boolean(props.autoplay),
+        noRelatedVideos: Boolean(props.noRelatedVideos),
+        title: String(props.title || 'YouTube video'),
         posterUrl: String(props.poster ?? ''),
         posterMedia: props._resolvedMediaByKey?.poster ?? null,
       })
@@ -170,11 +174,29 @@ export const VideoModule: ModuleDefinition<VideoProps> = {
 interface YoutubeRenderInput {
   youtubeId: string
   autoplay: boolean
+  noRelatedVideos: boolean
+  /** Accessibility title for the iframe element. */
+  title: string
   /** Raw author-set poster URL (already escapeProps-passed). */
   posterUrl: string
   /** Resolved poster asset (variants, intrinsic dims) if the publisher pre-pass ran. */
   posterMedia: RenderResolvedMedia | null
 }
+
+/**
+ * CSP frame-src origins required when a YouTube embed is rendered.
+ * Declared on every YouTube render so the publisher can lift frame-src
+ * from 'none' to these origins — but ONLY on pages that actually embed
+ * YouTube. Pages with no YouTube nodes keep frame-src 'none'.
+ * youtube-nocookie.com is included because the embed URL may use that
+ * domain when privacy-enhanced mode is configured in the future.
+ */
+const YOUTUBE_CSP_SOURCES: CspSourceRequirement[] = [
+  {
+    directive: 'frame-src',
+    sources: ['https://www.youtube.com', 'https://www.youtube-nocookie.com'],
+  },
+]
 
 /**
  * Emit a YouTube iframe.
@@ -188,13 +210,13 @@ interface YoutubeRenderInput {
  *
  * Without a poster: emit just the iframe, also `loading="lazy"`.
  */
-function renderYoutube(input: YoutubeRenderInput): { html: string; css?: string } {
-  const embedSrc = youtubeEmbedUrl(input.youtubeId, input.autoplay)
+function renderYoutube(input: YoutubeRenderInput): RenderOutput {
+  const embedSrc = youtubeEmbedUrl(input.youtubeId, input.autoplay, input.noRelatedVideos)
   if (!embedSrc) return { html: '' }
 
   const iframeAttrs = [
     `src="${embedSrc}"`,
-    `title="YouTube video"`,
+    `title="${input.title}"`,
     `loading="lazy"`,
     `frameborder="0"`,
     `allow="autoplay; encrypted-media; fullscreen"`,
@@ -203,7 +225,7 @@ function renderYoutube(input: YoutubeRenderInput): { html: string; css?: string 
   const iframeHtml = `<iframe ${iframeAttrs.join(' ')}></iframe>`
 
   if (!input.posterUrl && !input.posterMedia) {
-    return { html: iframeHtml }
+    return { html: iframeHtml, cspSources: YOUTUBE_CSP_SOURCES }
   }
 
   // Poster aspect target — derives the variant pick. YouTube embeds are
@@ -216,7 +238,7 @@ function renderYoutube(input: YoutubeRenderInput): { html: string; css?: string 
   if (!posterSrc) {
     // Poster prop set but URL didn't survive safeUrl — fall back to
     // bare iframe rather than emitting an `<img src>` we can't trust.
-    return { html: iframeHtml }
+    return { html: iframeHtml, cspSources: YOUTUBE_CSP_SOURCES }
   }
 
   const posterSrcset = input.posterMedia ? buildMediaSrcset(input.posterMedia) : null
@@ -243,7 +265,7 @@ function renderYoutube(input: YoutubeRenderInput): { html: string; css?: string 
     + `<iframe class="bv-yt-frame" ${iframeAttrs.join(' ')}></iframe>`
     + `</div>`
 
-  return { html, css: YOUTUBE_FACADE_CSS }
+  return { html, css: YOUTUBE_FACADE_CSS, cspSources: YOUTUBE_CSP_SOURCES }
 }
 
 // Scoped to `.bv-yt` so the publisher's per-moduleId CSS dedup applies

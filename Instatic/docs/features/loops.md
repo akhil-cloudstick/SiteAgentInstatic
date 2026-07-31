@@ -10,6 +10,7 @@ Loop sources are pluggable: built-in sources (`data.rows`, `site.pages`, `site.m
 
 - Loop source registry: `loopSourceRegistry` in `src/core/loops/registry.ts`. First-party sources self-register from `src/core/loops/sources/index.ts` at boot.
 - `LoopEntitySource` shape: `{ id, label, fields, filterSchema?, orderByOptions?, fetch, preview? }` in `src/core/loops/types.ts`.
+- `entry.field` is the contextual exception: it resolves an array on the closest `currentEntry` separately for every outer iteration, so a Project's multi-media `gallery` field can drive an inner loop.
 - The `base.loop` module's children are **variants** — different per-item layouts (e.g. "Card", "Featured"). The walker round-robins across them as it iterates.
 - At publish time, `loopPrefetch.ts` calls each loop's `fetch()` and stores results on the render context. The walker is then purely synchronous.
 - Each iteration renders against a fresh `entryStack` snapshot (`[...baseStack, item]`) carried in a child `RenderConfig`; nodes inside the loop resolve `currentEntry.<field>` against that item via dynamic bindings. The stack is never mutated in place.
@@ -26,6 +27,7 @@ src/core/loops/
 └── sources/
     ├── index.ts             — register the three built-ins at boot
     ├── dataRows.ts          — data.rows (any data_table)
+    ├── entryField.ts        — entry.field (array field on currentEntry)
     ├── sitePages.ts         — site.pages (+ shared helpers re-exported via barrel)
     └── siteMedia.ts         — site.media
 
@@ -64,8 +66,9 @@ interface LoopEntitySource {
   /**
    * Default `false`. Set `true` when the source returns data that varies per
    * request (live API, time-of-day data). Loops using a request-dependent source
-   * become Layer C "holes" — the publisher emits a placeholder + a tiny client
-   * runtime fetches the rendered fragment lazily via `/_instatic/hole/<nodeId>`.
+   * become Layer C "holes" — the publisher emits a placeholder + a ~1.1 KB client
+   * runtime fetches the rendered fragment lazily via
+   * `/_instatic/hole/<nodeId>?v=<publishVersion>&u=<page-url>`.
    *
    * A `requestDependent` (non-perVisitor) hole is rendered at request time and
    * cached by Layer B per `(nodeId, query, publishVersion)`.
@@ -142,6 +145,30 @@ Iterates `media_assets`. Filters by MIME type prefix.
 Used by galleries.
 
 Its author-facing `fields` list exposes filename, path/URL/source URL, MIME type, and upload date. Internal uploader ids stay in `LoopItem.fields` for code that needs them, but they are not binding-picker rows.
+
+### `entry.field`
+
+Iterates an array-valued field on the closest enclosing entry. It is resolved
+inside the synchronous render walk rather than prefetched once by loop node id,
+because the value can differ for every outer iteration:
+
+```text
+Projects loop
+  Project A → gallery [a1, a2] → inner loop renders a1, a2
+  Project B → gallery [b1]     → inner loop renders b1
+```
+
+The Properties panel offers collection fields from the current entry table:
+multi-media, multi-relation, and multi-select fields. Primitive items are
+available as `currentEntry.value`; object-array members are exposed by key.
+Media ids are resolved through the publisher's batched media prefetch and
+provide `currentEntry.src`, `url`, `path`, `altText`, `mimeType`, `width`, and
+`height`.
+
+Contextual loops preserve authored order by default, can reverse/slice with
+direction/offset/limit, and do not support infinite pagination. Infinite
+fragments are independent requests and cannot recover an arbitrary outer
+entry stack safely.
 
 ### Plugin-registered sources
 
@@ -242,7 +269,10 @@ See [docs/features/publisher.md](publisher.md) → "renderLoop" for the broader 
 
 ## Prefetch
 
-The walker is **purely synchronous** — async data (loop sources, media) is resolved up-front so the publisher doesn't have to `await` per node.
+The walker is **purely synchronous**. Async data (prefetched loop sources and
+media) is resolved up-front so the publisher doesn't have to `await` per node.
+`entry.field` stays synchronous by deriving its items from the already-present
+entry stack.
 
 `server/publish/loopPrefetch.ts`:
 
@@ -264,6 +294,13 @@ async function prefetchLoops(page, site, db) {
 ```
 
 The map is passed into `RenderConfig.loopData`. The walker reads from it; no async at render time.
+
+The public renderer and the editor's full-page **Preview page** overlay both
+use this server-side prefetch path. Preview sends the current in-memory draft
+to `/admin/api/cms/runtime/preview`; the server resolves loop and media data
+before calling `publishPage`. Calling the pure publisher without `loopData`
+is intentionally not a preview fallback — the loop emits its missing-data
+marker instead.
 
 ---
 
@@ -297,6 +334,18 @@ Subscription granularity: the hook never subscribes to the whole `site` document
    - Add nodes inside: a heading bound to `currentEntry.title`, content bound to `currentEntry.body`, an image bound to `currentEntry.featuredMedia`.
 6. Publish. Each iteration renders the variant with the item's fields substituted.
 
+### Build a per-project media gallery
+
+1. Add a Media field named `gallery` to the Projects post type and enable
+   **Allow multiple**.
+2. On the Project entry template, insert a Loop.
+3. Set Source to **Current entry field** and Field to **Gallery**.
+4. Add an Image as the loop's child template.
+5. Bind the Image source to **Current entry field → Media source** and,
+   optionally, its alt text to **Alt text**.
+6. Publish the site and a Project entry. Each project route renders only that
+   project's gallery items, in the field's authored order.
+
 ### Build a loop with the AI agent
 
 The site-scope AI agent stays on the HTML-native edit surface. It calls `list_loop_sources` to get valid source ids, table ids, order options, and `{currentEntry.field}` tokens, then inserts an `<instatic-loop>` marker through `insertHtml` / `replaceNodeHtml`:
@@ -316,10 +365,8 @@ The HTML importer maps the marker to a real `base.loop` node, preserving classes
 
 ### Register a plugin loop source
 
-```ts
+```js
 // plugin server/index.js
-import { permissions } from '@core/plugin-sdk'
-
 export function activate(api) {
   const products = api.cms.storage.collection('products')
 
@@ -327,8 +374,8 @@ export function activate(api) {
     id:    'acme.products',
     label: 'Acme products',
     fields: [
-      { id: 'name',  label: 'Name',  format: 'text' },
-      { id: 'price', label: 'Price', format: 'number' },
+      { id: 'name',  label: 'Name',  format: 'plain' },
+      { id: 'price', label: 'Price', format: 'plain' },
       { id: 'image', label: 'Image', format: 'media' },
     ],
     filterSchema: {
@@ -347,8 +394,9 @@ export function activate(api) {
       { id: 'price:asc',      label: 'Price low → high' },
     ],
     async fetch(ctx) {
-      const all = await products.list()
-      const items = all
+      const { records } = await products.list({ limit: ctx.limit ?? 100 })
+      const items = records
+        .map((record) => ({ id: record.id, ...record.data }))
         .filter((p) => !ctx.filters?.category || p.category === ctx.filters.category)
         .sort(/* by ctx.orderBy */)
         .slice(0, ctx.limit)
@@ -364,14 +412,29 @@ export function activate(api) {
 }
 ```
 
-Manifest:
+Plugin config:
 
-```json
-{
-  "permissions": ["cms.storage", "loops.register"],
-  "resources": [{ "id": "products", "label": "Products", "fields": [...] }],
-  "entrypoints": { "server": "server/index.js" }
-}
+```ts
+import { definePlugin, permissions } from '@instatic/plugin-sdk'
+
+export default definePlugin({
+  id: 'acme.catalog',
+  name: 'Acme Catalog',
+  version: '1.0.0',
+  permissions: [permissions.cmsStorage, permissions.loopsRegister],
+  resources: [
+    {
+      id: 'products',
+      title: 'Products',
+      fields: [
+        { id: 'name', label: 'Name', type: 'text', required: true },
+        { id: 'price', label: 'Price', type: 'number' },
+        { id: 'image', label: 'Image', type: 'text' },
+        { id: 'category', label: 'Category', type: 'text' },
+      ],
+    },
+  ],
+})
 ```
 
 ### Add variants to a loop

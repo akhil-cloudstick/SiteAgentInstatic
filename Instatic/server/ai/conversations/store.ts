@@ -11,7 +11,7 @@
 
 import { nanoid } from 'nanoid'
 import { Type, safeParseValue } from '@core/utils/typeboxHelpers'
-import { AiContentBlockSchema } from '@core/ai'
+import { AiContentBlockSchema, type AiContentViewBlock } from '@core/ai'
 import type { DbClient } from '../../db/client'
 import { isoDateOrNull } from '@core/utils/isoDate'
 import type { AiContentBlock, ToolScope } from '../runtime/types'
@@ -54,8 +54,8 @@ interface MessageRow {
   conversation_id: string
   position: number
   role: string
-  // Both dialects auto-hydrate `_json` columns to JS values (SQLite via the
-  // adapter's parseJsonColumns; PG via jsonb). The row arrives already-parsed.
+  // Both dialect adapters auto-hydrate `_json` columns to JS values. The row
+  // arrives already parsed even when a backing column stores JSON as text.
   content_json: unknown
   tool_call_id: string | null
   tool_name: string | null
@@ -94,8 +94,8 @@ function conversationRowToRecord(row: ConversationRow): ConversationRecord {
 const ContentBlocksSchema = Type.Array(AiContentBlockSchema)
 
 function parseContentBlocks(raw: unknown): AiContentBlock[] {
-  // SQLite adapter + PG jsonb both deliver this column pre-parsed. This is the
-  // read boundary: every block is validated against the canonical
+  // The DB adapters deliver this column pre-parsed. This is the read boundary:
+  // every block is validated against the canonical
   // `AiContentBlockSchema`, so callers (e.g. `buildMessageHistory`) receive a
   // fully-typed `AiContentBlock[]` and never re-cast.
   const parsed = safeParseValue(ContentBlocksSchema, raw)
@@ -147,12 +147,27 @@ export function toConversationView(record: ConversationRecord): ConversationView
   }
 }
 
-function toMessageView(record: MessageRecord): MessageView {
+type ImageUrlFor = (messageId: string, blockIndex: number) => string
+
+const UNSUPPORTED_STORED_IMAGE =
+  '[Stored image omitted because its format is not supported by conversation preview.]'
+
+function toMessageView(record: MessageRecord, imageUrlFor: ImageUrlFor): MessageView {
   return {
     id: record.id,
     position: record.position,
     role: record.role,
-    content: record.content,
+    content: record.content.map((block, blockIndex): AiContentViewBlock => {
+      if (block.kind !== 'image') return block
+      if (block.mimeType !== 'image/jpeg') {
+        return { kind: 'text', text: UNSUPPORTED_STORED_IMAGE }
+      }
+      return {
+        kind: 'image',
+        mimeType: 'image/jpeg',
+        url: imageUrlFor(record.id, blockIndex),
+      }
+    }),
     toolCallId: record.toolCallId,
     toolName: record.toolName,
     createdAt: record.createdAt,
@@ -162,10 +177,11 @@ function toMessageView(record: MessageRecord): MessageView {
 export function toConversationDetailView(
   conversation: ConversationRecord,
   messages: MessageRecord[],
+  imageUrlFor: ImageUrlFor,
 ): ConversationDetailView {
   return {
     ...toConversationView(conversation),
-    messages: messages.map(toMessageView),
+    messages: messages.map((message) => toMessageView(message, imageUrlFor)),
   }
 }
 
@@ -239,14 +255,53 @@ export async function listMessagesForConversation(
   return rows.map(messageRowToRecord)
 }
 
+/** Read one message through its owning, non-deleted user conversation. */
+export async function readMessageForUser(
+  db: DbClient,
+  userId: string,
+  conversationId: string,
+  messageId: string,
+): Promise<MessageRecord | null> {
+  const { rows } = await db<MessageRow>`
+    select m.id, m.conversation_id, m.position, m.role, m.content_json,
+           m.tool_call_id, m.tool_name,
+           m.prompt_tokens, m.completion_tokens, m.cost_usd,
+           m.cache_read_tokens, m.cache_creation_tokens, m.created_at
+    from ai_messages m
+    join ai_conversations c on c.id = m.conversation_id
+    where m.id = ${messageId}
+      and m.conversation_id = ${conversationId}
+      and c.user_id = ${userId}
+      and c.deleted_at is null
+    limit 1
+  `
+  return rows[0] ? messageRowToRecord(rows[0]) : null
+}
+
 // ---------------------------------------------------------------------------
 // Writes
 // ---------------------------------------------------------------------------
 
+/** Placeholder title for a freshly-created conversation, before the first
+ * prompt lands and gives it a real name. */
+export const DEFAULT_CONVERSATION_TITLE = 'New conversation'
+
 /**
- * Create a new conversation row. `title` defaults to "New conversation" —
- * the runner can rename it after the first user message lands (or the UI
- * can offer "Rename this chat").
+ * Derive a short conversation title from the first user prompt: collapse
+ * whitespace to a single line, trim, and cap the length. Returns '' for an
+ * empty prompt (caller keeps the placeholder in that case).
+ */
+export function deriveConversationTitle(prompt: string): string {
+  const oneLine = prompt.replace(/\s+/g, ' ').trim()
+  if (!oneLine) return ''
+  const MAX = 60
+  return oneLine.length > MAX ? `${oneLine.slice(0, MAX).trimEnd()}…` : oneLine
+}
+
+/**
+ * Create a new conversation row. `title` defaults to
+ * `DEFAULT_CONVERSATION_TITLE`; the chat handler renames it from the first
+ * user prompt (see `deriveConversationTitle`).
  */
 export async function createConversationForUser(
   db: DbClient,
@@ -254,7 +309,7 @@ export async function createConversationForUser(
   input: CreateConversationInput,
 ): Promise<ConversationRecord> {
   const id = nanoid()
-  const title = (input.title ?? '').trim() || 'New conversation'
+  const title = (input.title ?? '').trim() || DEFAULT_CONVERSATION_TITLE
   const { rows } = await db<ConversationRow>`
     insert into ai_conversations (
       id, user_id, scope, title, credential_id, model_id
@@ -305,6 +360,31 @@ export async function updateConversationForUser(
 }
 
 /**
+ * Give a first turn its derived title without overwriting a rename that won
+ * the race in another tab. The placeholder predicate belongs in the UPDATE,
+ * not in a preceding read.
+ */
+export async function replaceDefaultConversationTitle(
+  db: DbClient,
+  userId: string,
+  conversationId: string,
+  title: string,
+): Promise<boolean> {
+  const nextTitle = title.trim()
+  if (!nextTitle) return false
+  const result = await db`
+    update ai_conversations
+    set title = ${nextTitle},
+        updated_at = current_timestamp
+    where id = ${conversationId}
+      and user_id = ${userId}
+      and deleted_at is null
+      and title = ${DEFAULT_CONVERSATION_TITLE}
+  `
+  return result.rowCount > 0
+}
+
+/**
  * Soft-delete by setting `deleted_at`. Idempotent — calling on an
  * already-deleted row sets deleted_at to the current time again.
  * Returns true when a row was matched.
@@ -351,8 +431,8 @@ export async function appendMessage(
     const cacheReadTokens = input.cacheReadTokens ?? 0
     const cacheCreationTokens = input.cacheCreationTokens ?? 0
 
-    // Pass content as a plain array; both dialect adapters handle the JSON
-    // encoding (SQLite auto-stringify on bind for objects; PG jsonb native).
+    // Pass content as a plain array; the DB boundary handles JSON
+    // encoding/decoding for `_json` columns.
     const { rows: msgRows } = await tx<MessageRow>`
       insert into ai_messages (
         id, conversation_id, position, role, content_json,

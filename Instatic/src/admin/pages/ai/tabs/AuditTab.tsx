@@ -24,7 +24,7 @@ import {
   type AiUsageByUserRow,
 } from '../../../ai/api'
 import { UsageTablePanel } from './UsageTablePanel'
-import { formatCost, formatNumber } from './usageFormat'
+import { formatCost, formatNumber } from '@admin/ai/usageFormat'
 import { BRAND_NAME } from '@core/brand'
 import styles from '../AiPage.module.css'
 

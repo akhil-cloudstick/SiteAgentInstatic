@@ -14,6 +14,7 @@ import { ContextMenu, ContextMenuItem, ContextMenuSeparator } from '@ui/componen
 import { BulletlistSolidIcon } from 'pixel-art-icons/icons/bulletlist-solid'
 import { PlusIcon } from 'pixel-art-icons/icons/plus'
 import { TrashSolidIcon } from 'pixel-art-icons/icons/trash-solid'
+import { formatRelativeTime } from './relativeTime'
 import styles from './AgentPanel.module.css'
 
 export function ConversationHistory() {
@@ -23,6 +24,10 @@ export function ConversationHistory() {
   const loadAgentConversation = useAgentStore((s) => s.loadAgentConversation)
   const startNewAgentConversation = useAgentStore((s) => s.startNewAgentConversation)
   const deleteAgentConversation = useAgentStore((s) => s.deleteAgentConversation)
+  const isStreaming = useAgentStore((s) => s.isAgentStreaming)
+  const conversationPending = useAgentStore((s) => s.isAgentConversationPending)
+  const providerPending = useAgentStore((s) => s.isAgentProviderPending)
+  const controlsDisabled = isStreaming || conversationPending || providerPending
 
   const triggerRef = useRef<HTMLButtonElement>(null)
   const [open, setOpen] = useState(false)
@@ -41,6 +46,7 @@ export function ConversationHistory() {
         variant="ghost"
         size="xs"
         iconOnly
+        disabled={controlsDisabled}
         onClick={() => setOpen((v) => !v)}
         tooltip="Chat history"
         aria-haspopup="menu"
@@ -62,6 +68,7 @@ export function ConversationHistory() {
           onClose={() => setOpen(false)}
         >
           <ContextMenuItem
+            disabled={controlsDisabled}
             onClick={() => {
               startNewAgentConversation()
               setOpen(false)
@@ -84,6 +91,7 @@ export function ConversationHistory() {
                   role="menuitemradio"
                   aria-checked={isActive}
                   active={isActive}
+                  disabled={controlsDisabled}
                   onClick={() => {
                     if (!isActive) void loadAgentConversation(conv.id)
                     setOpen(false)
@@ -92,21 +100,24 @@ export function ConversationHistory() {
                   <span className={styles.historyItemTitle}>{conv.title}</span>
                   <span className={styles.historyItemMeta}>
                     <span className={styles.historyItemTime}>
-                      {formatRelativeTime(conv.updatedAt)}
+                      {formatRelativeTime(Date.parse(conv.updatedAt))}
                     </span>
                     {/* Span (not a native button) so it doesn't nest inside the
                         ContextMenuItem's Button — nested interactive
                         elements are invalid HTML + would trip BTN-3. */}
                     <span
                       role="button"
-                      tabIndex={0}
+                      tabIndex={controlsDisabled ? -1 : 0}
+                      aria-disabled={controlsDisabled}
                       className={styles.historyItemDelete}
                       aria-label={`Delete chat "${conv.title}"`}
                       onClick={(e) => {
                         e.stopPropagation()
+                        if (controlsDisabled) return
                         void deleteAgentConversation(conv.id)
                       }}
                       onKeyDown={(e) => {
+                        if (controlsDisabled) return
                         if (e.key === 'Enter' || e.key === ' ') {
                           e.preventDefault()
                           e.stopPropagation()
@@ -125,17 +136,4 @@ export function ConversationHistory() {
       )}
     </>
   )
-}
-
-function formatRelativeTime(iso: string): string {
-  const ms = Date.now() - Date.parse(iso)
-  if (Number.isNaN(ms)) return ''
-  const minutes = Math.floor(ms / 60000)
-  if (minutes < 1) return 'now'
-  if (minutes < 60) return `${minutes}m`
-  const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `${hours}h`
-  const days = Math.floor(hours / 24)
-  if (days < 7) return `${days}d`
-  return new Date(iso).toLocaleDateString()
 }

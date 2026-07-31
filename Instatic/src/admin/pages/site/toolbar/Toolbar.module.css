@@ -235,63 +235,21 @@
     background: var(--danger-light);
 }
 
-.publishActionWrapper {
-    position: relative;
-    height: 28px;
-}
-
-.publishSplitButton {
-    display: inline-flex;
-    align-items: center;
-    height: 28px;
-}
-
+/* Publish-specific overrides on the shared SplitButton halves: a stable min
+ * width so the label can swap (Publish → Publishing → Published) without the
+ * control reflowing, a slightly slimmer chevron trigger, and a softened
+ * disabled state once a publish has succeeded. The seam-joined radii, divider,
+ * and busy spinner live in SplitButton.module.css. */
 .publishPrimaryButton {
     min-width: 86px;
-    border-top-right-radius: 0;
-    border-bottom-right-radius: 0;
 }
 
-.publishPrimaryButton[data-publish-state="success"]:disabled {
+.publishPrimaryButton[data-state="success"]:disabled {
     opacity: 0.82;
 }
 
 .publishMenuTrigger {
     width: 26px;
-    border-top-left-radius: 0;
-    border-bottom-left-radius: 0;
-    box-shadow: inset 1px 0 var(--overlay-5);
-}
-
-.publishToast {
-    position: absolute;
-    top: calc(100% + 6px);
-    right: 0;
-    background: var(--bg-surface);
-    border: 1px solid color-mix(in srgb, var(--danger) 40%, transparent);
-    border-radius: 6px;
-    padding: var(--space-xs) var(--space-m);
-    font-size: var(--text-xs);
-    color: var(--danger-lighter);
-    white-space: nowrap;
-    z-index: 201;
-    box-shadow: 0 4px 12px var(--scrim-40);
-}
-
-.publishToastStatus {
-    border-color: color-mix(in srgb, var(--success) 35%, transparent);
-    color: var(--success);
-}
-
-/* ── Spinner animation ────────────────────────────────────────────────────── */
-@keyframes instaticSpin {
-    to {
-        transform: rotate(360deg);
-    }
-}
-
-.spinIcon {
-    animation: instaticSpin 0.8s linear infinite;
 }
 
 @media (max-width: 760px) {
@@ -301,13 +259,6 @@
         align-content: center;
         row-gap: var(--space-4xs);
         padding: var(--space-4xs) var(--space-s);
-    }
-
-    .siteName,
-    .siteNameSkeleton,
-    .siteFavicon,
-    .workspaceToolbarItems {
-        order: 1;
     }
 
     .siteName {
@@ -337,7 +288,6 @@
 
     .adminLink,
     .activeSection {
-        order: 2;
         justify-content: center;
         width: 30px;
         min-width: 30px;
@@ -360,10 +310,6 @@
     .workspaceToolbarItems {
         animation: none;
         transition: none;
-    }
-
-    .spinIcon {
-        animation: none;
     }
 }
 

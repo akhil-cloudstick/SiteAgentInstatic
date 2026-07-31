@@ -156,12 +156,12 @@
 }
 
 .variant-ghost:hover {
-    background: var(--bg-surface-4);
+    background: var(--overlay-10);
     color: var(--text);
 }
 
 .variant-ghost:active {
-    background: var(--bg-surface);
+    background: var(--overlay-20);
     color: var(--text);
 }
 
@@ -172,6 +172,19 @@
 .variant-ghost[data-danger-hover="true"]:active {
     background: transparent;
     color: var(--text);
+}
+
+/* tone="danger" on a ghost button: a constant slight red tint (foreground
+   only, no box) so inline destructive controls — e.g. the remove-scale trash —
+   read as dangerous at rest, then take a soft tinted background on hover. */
+.variant-ghost[data-tone="danger"] {
+    color: var(--danger);
+}
+
+.variant-ghost[data-tone="danger"]:hover,
+.variant-ghost[data-tone="danger"]:active {
+    background: var(--danger-10);
+    color: var(--danger-light);
 }
 
 /* ── Variant: primary — MMS Approval-Green CTA ────────────────────────────── */
@@ -190,22 +203,22 @@
 
 /* ── Variant: secondary ───────────────────────────────────────────────────── */
 .variant-secondary {
-    background: var(--bg-surface-2);
+    background: var(--overlay-10);
     color: var(--text-muted);
 }
 
 .variant-secondary:hover {
-    background: var(--bg-surface-3);
+    background: var(--overlay-20);
     color: var(--text);
 }
 
 .variant-secondary:active {
-    background: var(--bg-surface);
+    background: var(--overlay-30);
 }
 
 .variant-secondary[data-active="true"],
 .variant-secondary[aria-pressed="true"] {
-    background: var(--bg-surface);
+    background: var(--overlay-20);
     color: var(--text);
 }
 
