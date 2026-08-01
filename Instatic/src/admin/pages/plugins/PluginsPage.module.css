@@ -68,6 +68,52 @@
     gap: var(--space-px);
 }
 
+/* ── Control-room summary tiles (redesign Screen 5) ─────────────────── */
+.summaryTiles {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: var(--space-m);
+    margin: 0 0 var(--space-l);
+}
+
+.summaryTile {
+    display: grid;
+    gap: var(--space-2xs);
+    padding: var(--space-l);
+    background: var(--bg-surface-2);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--card-radius);
+}
+
+.summaryTile[data-tone='attention'] {
+    border-color: var(--warning-30);
+    background: var(--warning-10);
+}
+
+.summaryLabel {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-s);
+    font-size: var(--text-m);
+    font-weight: 600;
+    color: var(--text);
+}
+
+.summaryValue {
+    font-family: var(--font-display);
+    font-size: var(--text-4xl);
+    font-weight: 800;
+    line-height: 1;
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+}
+
+.summaryCaption {
+    margin: 0;
+    font-size: var(--text-xs);
+    color: var(--text-subtle);
+}
+
 /* Plugin admin page body — same gap rhythm as the Plugins list. The
    layout provides the page header (title + plugin name as description)
    so the inner content goes straight to the substantive UI. */

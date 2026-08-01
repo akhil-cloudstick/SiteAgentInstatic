@@ -9,6 +9,7 @@ import { ErrorBoundary, flattenErrorChain, logErrorChain } from '@ui/components/
 import { ToastProvider, pushToast } from '@ui/components/Toast'
 import '../styles/globals.css'
 import '../styles/remixicon/remixicon.css'
+import '../styles/fontawesome/fontawesome-solid.css'
 
 // `installPluginRuntime()` used to be called here, eagerly. That dragged
 // the whole plugin-host-hooks module (which imports `useEditorStore` from

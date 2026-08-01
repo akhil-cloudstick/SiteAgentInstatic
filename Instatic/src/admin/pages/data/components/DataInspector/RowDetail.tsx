@@ -1,7 +1,16 @@
 import { useEffect, useEffectEvent, useState, type ReactElement, type ReactNode } from 'react'
 import { Button } from '@ui/components/Button'
+import { Section } from '@ui/components/Section'
 import { ExternalLinkSolidIcon } from 'pixel-art-icons/icons/external-link-solid'
 import { LayoutSolidIcon } from 'pixel-art-icons/icons/layout-solid'
+import { CalendarSolidIcon } from 'pixel-art-icons/icons/calendar-solid'
+import { ReloadIcon } from 'pixel-art-icons/icons/reload'
+import { TargetSolidIcon } from 'pixel-art-icons/icons/target-solid'
+import { UsersSolidIcon } from 'pixel-art-icons/icons/users-solid'
+import { FileTextSolidIcon } from 'pixel-art-icons/icons/file-text-solid'
+import { DatabaseSolidIcon } from 'pixel-art-icons/icons/database-solid'
+import { SearchSolidIcon } from 'pixel-art-icons/icons/search-solid'
+import type { IconComponent } from 'pixel-art-icons/types'
 import { CellEditorRenderer } from '@admin/pages/data/components/DataGrid/cells/CellEditorRenderer'
 import { RelationPickerDialog } from '@admin/pages/data/components/RelationPickerDialog/RelationPickerDialog'
 import { useDataRowDraft } from '@admin/pages/data/hooks/useDataRowDraft'
@@ -61,14 +70,6 @@ function formatDate(iso: string | null | undefined): string {
   }
 }
 
-function statusPillClass(status: DataRow['status']): string {
-  switch (status) {
-    case 'published': return styles.statusPublished
-    case 'unpublished': return styles.statusUnpublished
-    default: return styles.statusDraft
-  }
-}
-
 function statusLabel(status: DataRow['status']): string {
   switch (status) {
     case 'published': return 'Published'
@@ -88,6 +89,52 @@ function primaryDisplayValue(row: DataRow, table: DataTable): string {
   const v = row.cells[table.primaryFieldId]
   if (typeof v === 'string' && v.length > 0) return v
   return row.id
+}
+
+// ---------------------------------------------------------------------------
+// Field grouping (record kinds only)
+//
+// The approved record inspector splits fields into progressive-disclosure
+// sections — "Core content", the table-specific details, and "SEO". This is a
+// presentation grouping derived from field id/type; it never changes which
+// fields are editable or how they persist. Empty groups are dropped.
+// ---------------------------------------------------------------------------
+
+const CORE_CONTENT_TYPES: ReadonlySet<DataField['type']> = new Set([
+  'richText',
+  'longText',
+  'pageTree',
+])
+
+interface FieldGroup {
+  key: 'core' | 'details' | 'seo'
+  title: string
+  icon: IconComponent
+  fields: DataField[]
+}
+
+function isSeoField(field: DataField): boolean {
+  return field.id.toLowerCase().startsWith('seo')
+}
+
+function groupRowFields(table: DataTable): FieldGroup[] {
+  const core: DataField[] = []
+  const details: DataField[] = []
+  const seo: DataField[] = []
+
+  for (const field of table.fields) {
+    if (isSeoField(field)) seo.push(field)
+    else if (field.id === table.primaryFieldId || CORE_CONTENT_TYPES.has(field.type)) core.push(field)
+    else details.push(field)
+  }
+
+  const detailsTitle = table.singularLabel ? `${table.singularLabel} details` : 'Details'
+  const groups: FieldGroup[] = [
+    { key: 'core', title: 'Core content', icon: FileTextSolidIcon, fields: core },
+    { key: 'details', title: detailsTitle, icon: DatabaseSolidIcon, fields: details },
+    { key: 'seo', title: 'SEO', icon: SearchSolidIcon, fields: seo },
+  ]
+  return groups.filter((group) => group.fields.length > 0)
 }
 
 // ---------------------------------------------------------------------------
@@ -114,13 +161,12 @@ function RowHeaderCard({
   onAction?: () => void
 }): ReactElement {
   return (
-    <div className={styles.rowHeaderCard}>
-      <div className={styles.rowHeaderTitleRow}>
-        <span className={styles.rowHeaderTitle}>{primaryValue || '(untitled)'}</span>
-        <span className={`${styles.statusPill} ${statusPillClass(status)}`}>
-          {statusLabel(status)}
-        </span>
-      </div>
+    <div className={styles.rowHeader}>
+      <span className={styles.rowHeaderTitle}>{primaryValue || '(untitled)'}</span>
+      <span className={styles.statusLine}>
+        <span className={styles.statusDot} data-status={status} aria-hidden="true" />
+        <span className={styles.statusText}>{statusLabel(status)}</span>
+      </span>
 
       <Button
         variant="primary"
@@ -141,25 +187,29 @@ function RowHeaderCard({
 // RowMetaBlock — created / updated / published / author summary.
 // ---------------------------------------------------------------------------
 
+function MetaItem({ icon: Icon, label, value }: {
+  icon: IconComponent
+  label: string
+  value: string
+}): ReactElement {
+  return (
+    <div className={styles.metaItem}>
+      <span className={styles.metaIcon} aria-hidden="true">
+        <Icon size={14} />
+      </span>
+      <span className={styles.metaKey}>{label}</span>
+      <span className={styles.metaValue}>{value}</span>
+    </div>
+  )
+}
+
 function RowMetaBlock({ row }: { row: DataRow }): ReactElement {
   return (
     <div className={styles.metaBlock}>
-      <div className={styles.metaItem}>
-        <span className={styles.metaKey}>Created</span>
-        <span className={styles.metaValue}>{formatDate(row.createdAt)}</span>
-      </div>
-      <div className={styles.metaItem}>
-        <span className={styles.metaKey}>Updated</span>
-        <span className={styles.metaValue}>{formatDate(row.updatedAt)}</span>
-      </div>
-      <div className={styles.metaItem}>
-        <span className={styles.metaKey}>Published</span>
-        <span className={styles.metaValue}>{formatDate(row.publishedAt)}</span>
-      </div>
-      <div className={styles.metaItem}>
-        <span className={styles.metaKey}>Author</span>
-        <span className={styles.metaValue}>{authorDisplayName(row)}</span>
-      </div>
+      <MetaItem icon={CalendarSolidIcon} label="Created" value={formatDate(row.createdAt)} />
+      <MetaItem icon={ReloadIcon} label="Updated" value={formatDate(row.updatedAt)} />
+      <MetaItem icon={TargetSolidIcon} label="Published" value={formatDate(row.publishedAt)} />
+      <MetaItem icon={UsersSolidIcon} label="Author" value={authorDisplayName(row)} />
     </div>
   )
 }
@@ -175,6 +225,7 @@ function DataRowForm({
   onSaveRow,
   resolveRow,
   canEdit,
+  grouped,
   onOpenEditor,
   onDraftStateChange,
 }: {
@@ -184,6 +235,9 @@ function DataRowForm({
   onSaveRow: (rowId: string, cells: DataRowCells) => Promise<DataRow>
   resolveRow: (rowId: string) => DataRow | null
   canEdit: boolean
+  /** Record kinds render fields inside progressive-disclosure Sections; plain
+   *  `data` tables keep the flat single-section layout. */
+  grouped: boolean
   /** Forwarded to PageTreeCell — opens the visual editor for this row. */
   onOpenEditor?: () => void
   onDraftStateChange?: (state: DataRowDraftState | null) => void
@@ -221,50 +275,75 @@ function DataRowForm({
     return () => onDraftStateChange?.(null)
   }, [draft.isDirty, draft.isSaving, draft.saveError, onDraftStateChange])
 
+  function renderField(field: DataField): ReactElement {
+    return (
+      <div key={field.id} className={styles.formGroup}>
+        {field.type !== 'repeater' && (
+          <>
+            <span className={styles.label}>{field.label}</span>
+            {field.description && (
+              <span className={styles.labelDescription}>{field.description}</span>
+            )}
+          </>
+        )}
+        <CellEditorRenderer
+          field={field}
+          value={draft.cells[field.id] ?? emptyCellValue(field)}
+          onChange={(next) => draft.setCell(field.id, next)}
+          onCommit={() => void draft.flush()}
+          context="detail"
+          readOnly={!canEdit}
+          rowId={row.id}
+          tables={tables}
+          resolveRelationTarget={resolveRow}
+          onOpenPicker={
+            field.type === 'relation'
+              ? () => setPickerState({ fieldId: field.id })
+              : undefined
+          }
+          onOpenEditor={field.type === 'pageTree' ? onOpenEditor : undefined}
+        />
+      </div>
+    )
+  }
+
+  const saveStatus = (draft.isSaving || draft.saveError) ? (
+    <div className={styles.saveStatus} aria-live="polite" aria-atomic="true">
+      {draft.isSaving && (
+        <span className={styles.savingText}>Saving…</span>
+      )}
+      {!draft.isSaving && draft.saveError && (
+        <span className={styles.saveErrorText} role="alert">{draft.saveError}</span>
+      )}
+    </div>
+  ) : null
+
+  const groups = grouped ? groupRowFields(table) : null
+
   return (
     <>
-      <div className={styles.section}>
-        {table.fields.map((field) => (
-          <div key={field.id} className={styles.formGroup}>
-            {field.type !== 'repeater' && (
-              <>
-                <span className={styles.label}>{field.label}</span>
-                {field.description && (
-                  <span className={styles.labelDescription}>{field.description}</span>
-                )}
-              </>
-            )}
-            <CellEditorRenderer
-              field={field}
-              value={draft.cells[field.id] ?? emptyCellValue(field)}
-              onChange={(next) => draft.setCell(field.id, next)}
-              onCommit={() => void draft.flush()}
-              context="detail"
-              readOnly={!canEdit}
-              rowId={row.id}
-              tables={tables}
-              resolveRelationTarget={resolveRow}
-              onOpenPicker={
-                field.type === 'relation'
-                  ? () => setPickerState({ fieldId: field.id })
-                  : undefined
-              }
-              onOpenEditor={field.type === 'pageTree' ? onOpenEditor : undefined}
-            />
-          </div>
-        ))}
-
-        {(draft.isSaving || draft.saveError) && (
-          <div className={styles.saveStatus} aria-live="polite" aria-atomic="true">
-            {draft.isSaving && (
-              <span className={styles.savingText}>Saving…</span>
-            )}
-            {!draft.isSaving && draft.saveError && (
-              <span className={styles.saveErrorText} role="alert">{draft.saveError}</span>
-            )}
-          </div>
-        )}
-      </div>
+      {groups ? (
+        <div className={styles.fieldSections}>
+          {groups.map((group, index) => (
+            <Section
+              key={group.key}
+              title={group.title}
+              icon={group.icon}
+              defaultOpen={group.key === 'details' || (group.key === 'core' && index === 0 && groups.length === 1)}
+            >
+              <div className={styles.sectionFields}>
+                {group.fields.map(renderField)}
+              </div>
+            </Section>
+          ))}
+          {saveStatus}
+        </div>
+      ) : (
+        <div className={styles.section}>
+          {table.fields.map(renderField)}
+          {saveStatus}
+        </div>
+      )}
 
       <RelationPickerDialog
         open={pickerState !== null}
@@ -363,9 +442,13 @@ export function RowDetail({
         onSaveRow={onSaveRow}
         resolveRow={resolveRow}
         canEdit={canEdit}
+        grouped={showHeader}
         onOpenEditor={formOpenEditor}
         onDraftStateChange={onDraftStateChange}
       />
+      {showHeader && (
+        <p className={styles.deselectHint}>Deselect the row to manage table fields.</p>
+      )}
     </>
   )
 }

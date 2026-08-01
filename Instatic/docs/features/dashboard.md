@@ -214,6 +214,8 @@ This is **per-user, not per-site** — every user has their own dashboard arrang
 
 New users start with a default layout (first-party widgets pre-positioned). `useDashboardLayout(...)` renders `DEFAULT_LAYOUT` immediately and swaps in the saved `dashboard-layout` preference only when one exists.
 
+**Versioned re-seed.** The saved layout carries a `version` (`DASHBOARD_LAYOUT_VERSION`). On load, `normalizeLayout` re-seeds a stored layout to the current `DEFAULT_LAYOUT` when its version is older than (or missing — pre-versioning saves count as `0`) the current one, OR when it still references a retired widget (`pages`/`storage`). The re-seeded layout is stamped with the current version and persisted on the next debounced save, so it self-heals **once**; the user's later customisations then stick. Bump `DASHBOARD_LAYOUT_VERSION` whenever `DEFAULT_LAYOUT`'s shape changes and you want every existing user's grid to adopt the new arrangement — editing `DEFAULT_LAYOUT` alone never reaches users who already have a saved layout.
+
 ---
 
 ## Stats endpoints

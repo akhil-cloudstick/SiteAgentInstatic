@@ -1,23 +1,26 @@
 /**
- * Posts widget — total post count + daily-publish histogram for the
- * last 28 days. Data comes from `usePostsStats()` (server-side
- * aggregated from `data_rows.published_at` across every
- * `kind: 'postType'` table).
+ * Posts widget — total post count + category caption + a scheduled
+ * footer. Data comes from `usePostsStats()` (server-side aggregated
+ * across every `kind: 'postType'` table).
  *
- * Skeleton: `loading={stats === null}` and the Widget primitive
+ * The approved MMSBUILD screen draws this block as a plain metric tile —
+ * value, caption, footer — with no chart, so the 28-day histogram this
+ * widget used to render was dropped. `daily28` still ships in the
+ * endpoint payload for any plugin tile that wants it.
+ *
+ * Skeleton: `loading={loading}` and the Widget primitive
  * handles the rest.
  */
 import { PenSquareSolidIcon } from 'pixel-art-icons/icons/pen-square-solid'
-import { Bars, StatValue } from '@ui/components/charts'
+import { StatValue } from '@ui/components/charts'
 import type { DashboardWidgetRendererProps } from '@core/dashboard'
 import { Widget } from '@ui/components/Widget'
+import { WidgetPlaceholder } from './WidgetPlaceholder'
+import styles from './widgets.module.css'
 import { usePostsStats } from '../hooks/useDashboardStats'
 
-// Last 6 days of the histogram are highlighted as the "current week".
-const ACCENT_INDEXES = [22, 23, 24, 25, 26, 27]
-
 export function PostsWidget({ span, editing }: DashboardWidgetRendererProps) {
-  const stats = usePostsStats()
+  const { data: stats, loading } = usePostsStats()
   return (
     <Widget
       widgetId="posts"
@@ -26,7 +29,7 @@ export function PostsWidget({ span, editing }: DashboardWidgetRendererProps) {
       tint="peach"
       span={span}
       editing={editing}
-      loading={stats === null}
+      loading={loading}
     >
       {stats && (
         <>
@@ -38,8 +41,18 @@ export function PostsWidget({ span, editing }: DashboardWidgetRendererProps) {
                 : <span>Total · {stats.categories} categor{stats.categories === 1 ? 'y' : 'ies'}</span>
             )}
           />
-          <Bars data={stats.daily28} accentIndexes={ACCENT_INDEXES} />
+          <div className={styles.subFootRow}>
+            <span>{stats.scheduled} scheduled</span>
+          </div>
         </>
+      )}
+      {!loading && !stats && (
+        <WidgetPlaceholder
+          reason="unavailable"
+          icon="newspaper"
+          title="No posts yet"
+          detail="Your posts show up here once you add some."
+        />
       )}
     </Widget>
   )

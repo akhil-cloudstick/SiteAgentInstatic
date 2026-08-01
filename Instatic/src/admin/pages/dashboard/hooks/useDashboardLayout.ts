@@ -66,6 +66,12 @@ export interface DashboardItem {
 
 interface DashboardLayout {
   items: DashboardItem[]
+  /**
+   * Which shipped default-arrangement generation this layout descends from.
+   * Compared against `DASHBOARD_LAYOUT_VERSION` on load: a stored layout with
+   * an older (or missing) version is re-seeded to the current default ONCE.
+   */
+  version: number
   onboardingDismissed: boolean
   /**
    * Height (in pixels) of the bottom-docked Block library panel. The user
@@ -82,6 +88,18 @@ interface DashboardLayout {
  * a magic number duplicated across files.
  */
 export const GRID_ROW_HEIGHT = 70
+/**
+ * Current shipped default-arrangement generation. BUMP THIS whenever
+ * `DEFAULT_LAYOUT` changes shape (widths, positions, which widgets it seeds)
+ * and you want every existing user's saved grid to re-seed to the new default.
+ * A stored layout tagged with an older (or missing) version is re-seeded once
+ * on load; the next debounced save stamps the new version so it self-heals and
+ * the user's later customisations stick. v1 = MMSBUILD "Live Release Desk"
+ * (preview 8×5 / release 4×5 / changes 8×3 / preflight 4×3 / activity 12×2) —
+ * the release-desk redesign that widened "Changes" to sit flush against the
+ * readiness panel with no gap.
+ */
+export const DASHBOARD_LAYOUT_VERSION = 1
 /**
  * Fallback gap between cells in CUSTOMIZE mode. The wider gutter exposes the
  * full perimeter of every card so the 8px edge resize handles can be
@@ -175,20 +193,51 @@ const SAVE_DEBOUNCE_MS = 600
  * bad first impression. Plugins surface via the block picker, the
  * grid only seeds with widgets the host definitely has.
  */
+/**
+ * MMSBUILD "Live Release Desk" (redesign Screen 1). Fresh users land on the
+ * release-desk arrangement: a read-only live preview beside the release-progress
+ * stepper, then the change list beside the preflight checks, then the activity
+ * feed. Existing users keep their saved per-user layout (server-persisted) — a
+ * version/migration re-seed is a follow-up; every widget below is also reachable
+ * through the "Add block" picker. Grid map (12 cols): preview 8×5, release 4×5,
+ * changes 8×3, preflight 4×3, activity 12×2. At ≤980px the grid stacks in DOM
+ * order, which is already preview → release → changes → preflight → activity.
+ */
 const DEFAULT_LAYOUT: DashboardLayout = {
   items: [
-    { id: 'storage',   col: 1,  row: 1,  size: 12, rows: 4 },
-    { id: 'pages',     col: 1,  row: 5,  size: 3,  rows: 3 },
-    { id: 'posts',     col: 4,  row: 5,  size: 3,  rows: 3 },
-    { id: 'media',     col: 7,  row: 5,  size: 3,  rows: 3 },
-    { id: 'status',    col: 10, row: 5,  size: 3,  rows: 3 },
-    { id: 'activity',  col: 1,  row: 8,  size: 6,  rows: 5 },
-    { id: 'publish',   col: 7,  row: 8,  size: 6,  rows: 5 },
-    { id: 'plugins',   col: 1,  row: 13, size: 6,  rows: 5 },
-    { id: 'domain',    col: 7,  row: 13, size: 6,  rows: 3 },
+    { id: 'live-preview',     col: 1, row: 1, size: 8,  rows: 5 },
+    { id: 'release-progress', col: 9, row: 1, size: 4,  rows: 5 },
+    { id: 'changes',          col: 1, row: 6, size: 8,  rows: 3 },
+    { id: 'preflight',        col: 9, row: 6, size: 4,  rows: 3 },
+    { id: 'activity',         col: 1, row: 9, size: 12, rows: 2 },
   ],
+  version: DASHBOARD_LAYOUT_VERSION,
   onboardingDismissed: false,
   libraryHeight: LIBRARY_DEFAULT_HEIGHT,
+}
+
+/**
+ * Is this layout still the shipped default arrangement?
+ *
+ * The reference implementation switches between two completely different
+ * layout engines on exactly this question: the fixed release-desk grid
+ * while the layout is untouched, and the free 12-column grid once the
+ * user has moved / resized / added anything. We mirror that, so a fresh
+ * dashboard is pixel-identical to the approved screen and a customised
+ * one keeps every drag-and-drop affordance.
+ */
+export function isDefaultDashboardLayout(items: readonly DashboardItem[]): boolean {
+  if (items.length !== DEFAULT_LAYOUT.items.length) return false
+  return DEFAULT_LAYOUT.items.every((expected) => {
+    const actual = items.find((item) => item.id === expected.id)
+    return (
+      actual !== undefined &&
+      actual.col === expected.col &&
+      actual.row === expected.row &&
+      actual.size === expected.size &&
+      actual.rows === expected.rows
+    )
+  })
 }
 
 // ---------------------------------------------------------------------------
@@ -295,9 +344,43 @@ function clampLibraryHeight(value: number | undefined): number {
   return Math.max(LIBRARY_MIN_HEIGHT, Math.min(LIBRARY_MAX_HEIGHT, Math.round(value)))
 }
 
+/**
+ * Widgets retired from the dashboard. Used two ways: their presence in a
+ * stored layout marks it as a stale arrangement (see `normalizeLayout`),
+ * and they're hidden from the "Add block" picker (see `DashboardPage`).
+ *
+ * Currently EMPTY. `pages` and `storage` used to sit here, but the
+ * approved MMSBUILD screen lists both in its block library, and both now
+ * render in the reference's own design — so hiding them was the drift,
+ * not the feature. Add an id back here to retire a widget again; the
+ * stale-layout check below degrades to a no-op while the set is empty
+ * (the version check still re-seeds).
+ */
+export const RETIRED_WIDGET_IDS = new Set<string>([])
+
 function normalizeLayout(pref: DashboardLayoutPreference): DashboardLayout {
+  // Re-seed the whole grid to the clean release-desk default when the stored
+  // layout is stale, in either of two ways:
+  //   • Its version is older than (or missing, i.e. predates) the current
+  //     shipped arrangement — this is the general mechanism: bump
+  //     DASHBOARD_LAYOUT_VERSION whenever DEFAULT_LAYOUT's shape changes and
+  //     every user's grid re-seeds ONCE. This is what closes the stale
+  //     "narrow Changes block sitting apart from the readiness panel" gap for
+  //     users whose saved layout already migrated to the new widget ids (so
+  //     the retired-widget check below no longer catches them).
+  //   • It still references a retired widget (pages/storage) — a pre-reskin
+  //     arrangement carrying the old widths/positions.
+  // Either way we return DEFAULT_LAYOUT (stamped with the current version); the
+  // next debounced save persists it, so this self-heals once and the user's
+  // later customisations stick. Onboarding-dismissed state is preserved.
+  const storedVersion = typeof pref.version === 'number' ? pref.version : 0
+  const referencesRetired = pref.items.some((item) => RETIRED_WIDGET_IDS.has(item.id))
+  if (storedVersion < DASHBOARD_LAYOUT_VERSION || referencesRetired) {
+    return { ...DEFAULT_LAYOUT, onboardingDismissed: pref.onboardingDismissed }
+  }
   return {
     items: pref.items.map((item, idx) => normalizeItem(item, idx)),
+    version: DASHBOARD_LAYOUT_VERSION,
     onboardingDismissed: pref.onboardingDismissed,
     libraryHeight: clampLibraryHeight(pref.libraryHeight),
   }

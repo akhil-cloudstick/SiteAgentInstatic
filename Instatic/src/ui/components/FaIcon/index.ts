@@ -1,0 +1,1 @@
+export { FaIcon } from './FaIcon'

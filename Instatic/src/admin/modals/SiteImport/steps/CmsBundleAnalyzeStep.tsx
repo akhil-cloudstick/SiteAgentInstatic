@@ -69,7 +69,7 @@ export function CmsBundleAnalyzeStep({
   if (state.previewLoading || state.previewError || !state.preview) {
     return (
       <div className={styles.step}>
-        <ImportStepper current="review" />
+        <ImportStepper current="review" variant="bundle" />
         <div className={styles.statusBlock}>
           {state.previewLoading && (
             <p className={styles.statusText} aria-live="polite">
@@ -190,7 +190,7 @@ export function CmsBundleAnalyzeStep({
 
   return (
     <div className={styles.step}>
-      <ImportStepper current="review" />
+      <ImportStepper current="review" variant="bundle" />
 
       <div className={styles.layout}>
         <aside className={styles.nav}>

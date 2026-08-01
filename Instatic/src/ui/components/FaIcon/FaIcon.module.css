@@ -1,0 +1,22 @@
+/* FaIcon — box geometry for the vendored Font Awesome Solid webfont.
+ *
+ * Mirrors `RemixIcon.module.css`: the glyph size travels as a
+ * `--fa-size` custom property so the module owns width/height/font-size
+ * and call sites never write inline styles beyond that one variable.
+ *
+ * The reference screen sizes its glyphs purely with `font-size` and lets
+ * them sit on the text baseline inside flex rows, so the box is
+ * `inline-flex` + centred rather than a fixed square — that keeps
+ * multi-glyph rows (e.g. the 8px status dots next to 13px labels)
+ * aligned exactly as the reference renders them.
+ */
+
+.icon {
+    --fa-size: 16px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: var(--fa-size);
+    line-height: 1;
+    flex-shrink: 0;
+}

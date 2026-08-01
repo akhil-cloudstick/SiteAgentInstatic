@@ -76,12 +76,15 @@ export function CanvasModeToggle({ scriptStatus, onRefreshScripts, peek = false 
           onClick={stopCanvasInteraction}
         >
       <div role="tablist" aria-label="Canvas view" className={styles.tablist}>
-        <Tooltip content="Design mode (multi-breakpoint canvas)">
+        {/* Guided mode names (redesign Screen 7): the multi-breakpoint design
+            canvas is "Responsive review"; the single real-size editable frame
+            is "Live edit". Behaviour + test ids are unchanged. */}
+        <Tooltip content="Responsive review (multi-breakpoint canvas)">
           <button
             type="button"
             role="tab"
             aria-selected={view === 'design'}
-            aria-label="Design"
+            aria-label="Responsive review"
             data-testid="canvas-mode-toggle-design"
             className={cn(styles.tab, view === 'design' && styles.tabActive)}
             onClick={() => setView('design')}
@@ -89,12 +92,12 @@ export function CanvasModeToggle({ scriptStatus, onRefreshScripts, peek = false 
             <CursorMinimalSolidIcon size={14} aria-hidden="true" />
           </button>
         </Tooltip>
-        <Tooltip content="Live mode (single real-size editable frame)">
+        <Tooltip content="Live edit (single real-size editable frame)">
           <button
             type="button"
             role="tab"
             aria-selected={view === 'live'}
-            aria-label="Live"
+            aria-label="Live edit"
             data-testid="canvas-mode-toggle-live"
             className={cn(styles.tab, view === 'live' && styles.tabActive)}
             onClick={() => setView('live')}

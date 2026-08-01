@@ -35,6 +35,12 @@ export interface UploadItem {
   progress: number
   status: UploadStatus
   error: string | null
+  /**
+   * Non-blocking soft-limit warning (10–49 MB) retained from `checkSizeLimit`.
+   * The file still uploads; the queue surfaces this as an advisory. `null` for
+   * files under the soft threshold. Hard-limit (≥50 MB) files fail via `error`.
+   */
+  warning: string | null
   /** Persisted asset on success — passed back so the queue can link to it. */
   asset: CmsMediaAsset | null
   /** Target folder id at enqueue time, or null for unfiled. */
@@ -236,6 +242,9 @@ export function useUploadQueue({
         progress: 0,
         status: sizeCheck.ok ? 'queued' : 'failed',
         error: sizeCheck.ok ? null : sizeCheck.message ?? `${file.name} exceeds the upload size limit`,
+        warning: sizeCheck.ok && sizeCheck.level === 'soft'
+          ? sizeCheck.message ?? 'Large file — may slow the editor'
+          : null,
         asset: null,
         folderId,
         startedAt: Date.now(),

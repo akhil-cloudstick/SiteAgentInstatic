@@ -4,11 +4,10 @@
  * any specific table has been selected.
  *
  * Mirrors the chrome of `DataGrid.tsx` 1:1 — the rounded card surface,
- * the two-row toolbar (title placeholder + search placeholder + Add row
- * placeholder, then chip filter row), and the column-track skeleton
- * grid — so the transition into the real DataGrid (which has its own
- * row-loading skeleton with the actual schema) reads as a single
- * continuous "loading" state, not two competing skeletons.
+ * the single-row toolbar (search placeholder + chip filter placeholders),
+ * and the column-track skeleton grid — so the transition into the real
+ * DataGrid (which has its own row-loading skeleton with the actual schema)
+ * reads as a single continuous "loading" state, not two competing skeletons.
  *
  * Column count is generic (6 fields) because the table schema isn't
  * known yet. Once a table is selected, the real DataGrid takes over
@@ -42,36 +41,23 @@ export function DataGridSkeleton() {
 
   return (
     <div className={styles.gridWrapper} aria-busy="true" aria-label="Loading data tables">
-      {/* Toolbar — matches `.toolbar` / `.toolbarTop` / `.toolbarBottom` */}
+      {/* Toolbar — matches the real single-row `.toolbar`: search on the left,
+          status/view chips on the right. */}
       <div className={styles.toolbar}>
-        <div className={styles.toolbarTop}>
-          <div className={styles.titleBlock}>
-            {/* Title placeholder — sized to roughly match a typical table name
-                ("Posts" / "Pages" / etc.) so the swap-in is barely visible. */}
-            <Skeleton width={92} height={16} />
-            <Skeleton width={60} height={12} />
-          </div>
-          <span className={styles.spacer} />
-          <div className={styles.searchWrap}>
-            <Skeleton width="100%" height={28} radius={6} />
-          </div>
-          {/* Add row button placeholder. */}
-          <Skeleton width={88} height={28} radius={6} />
+        <div className={styles.searchWrap}>
+          <Skeleton width="100%" height={28} radius={6} />
         </div>
-        <div className={styles.toolbarBottom}>
-          <div className={styles.viewChips}>
-            {/* Chip placeholders — five pills (All / Published / Drafts /
-                Archived / Scheduled) is the most common shape on post-types. */}
-            {Array.from({ length: 5 }, (_, i) => (
-              <Skeleton
-                key={`chip-${i}`}
-                width={64 + (i % 3) * 10}
-                height={24}
-                radius={999}
-              />
-            ))}
-          </div>
-        </div>
+        <span className={styles.toolbarSpacer} />
+        {/* Chip placeholders — three pills (All / Published / Drafts) is the
+            common shape on post-types. */}
+        {Array.from({ length: 3 }, (_, i) => (
+          <Skeleton
+            key={`chip-${i}`}
+            width={64 + (i % 3) * 10}
+            height={28}
+            radius={999}
+          />
+        ))}
       </div>
 
       {/* Scrollable grid area */}

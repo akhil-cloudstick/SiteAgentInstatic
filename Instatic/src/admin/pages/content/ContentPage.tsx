@@ -149,7 +149,6 @@ export function ContentPage() {
     featuredMediaId: draft.featuredMediaId,
     setFeaturedMediaId: draft.setFeaturedMediaId,
     insertBodyMedia: (attrs) => bodyEditorRef.current?.insertMedia(attrs),
-    entries: workspace.entries,
   })
 
   const publicPath = workspace.selectedCollection && draft.slug
@@ -470,6 +469,8 @@ export function ContentPage() {
             publicPath={publicPath}
             canSaveDraft={canEditSelectedEntry}
             canPublish={canPublishSelectedEntry}
+            contentMode={contentMode}
+            onContentModeChange={setContentMode}
             onSaveDraft={() => void draft.handleSaveDraft()}
             onPublish={() => {
               if (workspace.selectedEntry) void handlePublishEntry(workspace.selectedEntry)
@@ -499,7 +500,6 @@ export function ContentPage() {
                 canEditEntry={(entry) => canEditContentEntry(permissionUser, entry)}
                 canMoveEntry={(entry) => canMoveRows && canEditContentEntry(permissionUser, entry)}
                 canPublishEntry={(entry) => canPublishContentEntry(permissionUser, entry)}
-                getFeaturedMediaAssetForEntry={mediaPicker.getFeaturedMediaAssetForEntry}
                 onSelectCollection={workspace.selectCollection}
                 onSelectEntry={handleSelectEntry}
                 entryActions={{
@@ -546,7 +546,6 @@ export function ContentPage() {
             focusTitleSignal={focusTitleSignal}
             focusBodySignal={focusBodySignal}
             contentMode={contentMode}
-            onContentModeChange={setContentMode}
             onTitleChange={draft.setTitle}
             onTitleEnter={() => setFocusBodySignal((n) => n + 1)}
             onBodyChange={draft.setBody}

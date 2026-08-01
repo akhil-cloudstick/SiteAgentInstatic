@@ -1,10 +1,12 @@
 import { useState, type KeyboardEvent, type MouseEvent } from 'react'
 import { Button } from '@ui/components/Button'
 import { EmptyState } from '@ui/components/EmptyState'
+import { SearchBar } from '@ui/components/SearchBar'
 import { Skeleton } from '@ui/components/Skeleton'
 import { cn } from '@ui/cn'
 import { BookOpenSolidIcon } from 'pixel-art-icons/icons/book-open-solid'
 import { BookPlusSolidIcon } from 'pixel-art-icons/icons/book-plus-solid'
+import { ChevronRightIcon } from 'pixel-art-icons/icons/chevron-right'
 import { CopySolidIcon } from 'pixel-art-icons/icons/copy-solid'
 import { Copy2SolidIcon } from 'pixel-art-icons/icons/copy-2-solid'
 import { ExternalLinkSolidIcon } from 'pixel-art-icons/icons/external-link-solid'
@@ -14,10 +16,8 @@ import { MoveIcon } from 'pixel-art-icons/icons/move'
 import { Settings2SolidIcon } from 'pixel-art-icons/icons/settings-2-solid'
 import { UploadIcon } from 'pixel-art-icons/icons/upload'
 import { readTitleCell } from '@core/data/cells'
-import type { CmsMediaAsset } from '@core/persistence'
 import type { DataTable, DataRow, UpdateDataTableInput } from '@core/data/schemas'
 import { ExplorerItemContextMenu, type ExplorerContextMenuItem } from '@site/explorer-actions'
-import { pickVariantUrl } from '@admin/pages/media/utils/variants'
 import explorerStyles from '../../../site/panels/SiteExplorerPanel/SiteExplorerPanel.module.css'
 import { Panel } from '@admin/shared/Panel'
 import { ContentCollectionSettingsDialog } from '@content/components/ContentCollectionSettingsDialog/ContentCollectionSettingsDialog'
@@ -52,13 +52,6 @@ interface ContentExplorerPanelProps {
   canEditEntry: (entry: DataRow) => boolean
   canMoveEntry: (entry: DataRow) => boolean
   canPublishEntry: (entry: DataRow) => boolean
-  /**
-   * Resolves the entry's `featuredMedia` cell to a loaded media asset, when
-   * one is available. Returns `null` while the asset list hasn't loaded yet,
-   * when the cell is empty, or when the referenced asset can't be found —
-   * the row falls back to the default file icon in any of those cases.
-   */
-  getFeaturedMediaAssetForEntry: (entry: DataRow) => CmsMediaAsset | null
   onSelectCollection: (tableId: string) => void
   onSelectEntry: (entry: DataRow) => void
   /**
@@ -92,10 +85,13 @@ function keyboardMenuPosition(element: HTMLElement) {
   }
 }
 
-function entryAuthorLabel(entry: DataRow): string {
-  if (entry.author?.displayName) return entry.author.displayName
-  if (entry.author?.email) return entry.author.email
-  return 'Unknown author'
+/** Compact "30 Jul"-style date for an entry row's status line. Uses the
+ *  published date when live, else the last-updated date. */
+function entryDateLabel(entry: DataRow): string {
+  const iso = entry.publishedAt ?? entry.updatedAt
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return ''
+  return date.toLocaleDateString(undefined, { day: 'numeric', month: 'short' })
 }
 
 export function ContentExplorerPanel({
@@ -112,7 +108,6 @@ export function ContentExplorerPanel({
   canEditEntry,
   canMoveEntry,
   canPublishEntry,
-  getFeaturedMediaAssetForEntry,
   onSelectCollection,
   onSelectEntry,
   entryActions,
@@ -133,9 +128,16 @@ export function ContentExplorerPanel({
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
   const [renameTarget, setRenameTarget] = useState<ContentExplorerContextTarget | null>(null)
   const [settingsTarget, setSettingsTarget] = useState<DataTable | null>(null)
+  const [search, setSearch] = useState('')
   const entryListLabel = selectedCollection?.pluralLabel || 'Entries'
   const singularLabel = selectedCollection?.singularLabel || 'entry'
   const newEntryLabel = `New ${singularLabel.toLowerCase()}`
+  // Client-side title filter for the entry list (redesign Screen 2). The
+  // collection count stays unfiltered — it reflects the whole collection.
+  const query = search.trim().toLowerCase()
+  const filteredEntries = query
+    ? entries.filter((entry) => readTitleCell(entry.cells).toLowerCase().includes(query))
+    : entries
 
   function collectionForEntry(entry: DataRow): DataTable | null {
     return collections.find((collection) => collection.id === entry.tableId) ?? selectedCollection
@@ -297,8 +299,29 @@ export function ContentExplorerPanel({
         ariaLabel="Content Explorer"
         testId="content-explorer-panel"
         onClose={onClose}
+        headerActions={(
+          <Button
+            variant="secondary"
+            size="xs"
+            onClick={createEntry}
+            disabled={!selectedCollectionId || !canCreateEntry}
+            aria-label={newEntryLabel}
+            tooltip={newEntryLabel}
+          >
+            <FilePlusSolidIcon size={13} aria-hidden="true" />
+            <span>{newEntryLabel}</span>
+          </Button>
+        )}
       >
         {error && <p className={styles.error} role="alert">{error}</p>}
+
+          <SearchBar
+            className={styles.explorerSearch}
+            value={search}
+            onValueChange={setSearch}
+            placeholder="Search content"
+            aria-label="Search content"
+          />
 
           <section className={explorerStyles.section} aria-label="Collections">
             <div className={explorerStyles.sectionHeader}>
@@ -354,8 +377,11 @@ export function ContentExplorerPanel({
                 >
                   <BookOpenSolidIcon size={14} aria-hidden="true" />
                   <span className={explorerStyles.rowLabel}>{collection.name}</span>
-                  <span className={explorerStyles.rowMeta}>
-                    {collection.id === selectedCollectionId ? entries.length : ''}
+                  <span className={styles.collectionRowMeta}>
+                    {collection.id === selectedCollectionId && (
+                      <span>{entries.length}</span>
+                    )}
+                    <ChevronRightIcon size={12} aria-hidden="true" />
                   </span>
                 </button>
               ))}
@@ -364,30 +390,21 @@ export function ContentExplorerPanel({
 
           <section className={explorerStyles.section} aria-label={entryListLabel}>
             <div className={explorerStyles.sectionHeader}>
-              <h2 className={explorerStyles.sectionTitle}>{entryListLabel}</h2>
+              <h2 className={explorerStyles.sectionTitle}>Entries</h2>
               {!loading && (
-                <span className={explorerStyles.sectionCount}>{entries.length}</span>
+                <span className={explorerStyles.sectionCount}>{filteredEntries.length}</span>
               )}
-              <Button
-                variant="ghost"
-                size="xs"
-                iconOnly
-                onClick={createEntry}
-                disabled={!selectedCollectionId || !canCreateEntry}
-                aria-label={newEntryLabel}
-                tooltip={newEntryLabel}
-              >
-                <FilePlusSolidIcon size={13} aria-hidden="true" />
-              </Button>
             </div>
 
             {loading ? (
               <ContentEntriesLoading />
             ) : entries.length === 0 ? (
               <EmptyState compact title="No entries yet." />
+            ) : filteredEntries.length === 0 ? (
+              <EmptyState compact title="No matching entries." />
             ) : (
               <div className={explorerStyles.rows}>
-                {entries.map((entry) => (
+                {filteredEntries.map((entry) => (
                   <button
                     key={entry.id}
                     type="button"
@@ -400,12 +417,19 @@ export function ContentExplorerPanel({
                     onContextMenu={(event) => openContextMenu({ kind: 'entry', entry }, event)}
                     onKeyDown={(event) => openKeyboardContextMenu({ kind: 'entry', entry }, event)}
                   >
-                    <EntryRowPreview asset={getFeaturedMediaAssetForEntry(entry)} />
                     <span className={styles.entryTitleStack}>
                       <span className={styles.entryTitle}>{readTitleCell(entry.cells)}</span>
-                      <span className={styles.entryAuthor} aria-hidden="true">{entryAuthorLabel(entry)}</span>
+                      <span className={styles.entryStatusLine}>
+                        <span
+                          className={styles.statusDot}
+                          data-status={entry.status}
+                          aria-hidden="true"
+                        />
+                        <span className={styles.entryStatusText}>{entry.status}</span>
+                        <span aria-hidden="true">·</span>
+                        <span>{entryDateLabel(entry)}</span>
+                      </span>
                     </span>
-                    <span className={explorerStyles.rowMeta}>{entry.status}</span>
                   </button>
                 ))}
               </div>
@@ -459,43 +483,11 @@ export function ContentExplorerPanel({
   )
 }
 
-// Target CSS width for the row preview slot. Matches the column width used
-// by `.entryRow` in ContentPage.module.css and drives `pickVariantUrl` so
-// the browser fetches a tile-sized variant instead of the full-size original.
-const ENTRY_PREVIEW_CSS_WIDTH = 28
-
-function EntryRowPreview({ asset }: { asset: CmsMediaAsset | null }) {
-  // Restricted to images — the user-facing request is specifically "if the
-  // post has a featured image, display it as the thumbnail instead of the
-  // icon". Non-image featured media (video, document, …) keeps the existing
-  // file icon so the row layout stays predictable.
-  const isImage = asset?.mimeType.startsWith('image/') ?? false
-  const previewUrl = isImage ? pickVariantUrl(asset!, ENTRY_PREVIEW_CSS_WIDTH) : null
-  return (
-    <span className={styles.entryRowPreview} aria-hidden="true">
-      {previewUrl ? (
-        <img
-          className={styles.entryRowImage}
-          src={previewUrl}
-          alt=""
-          loading="lazy"
-          decoding="async"
-        />
-      ) : (
-        <FileTextSolidIcon size={14} />
-      )}
-    </span>
-  )
-}
-
 function ContentEntriesLoading() {
-  // Skeleton entry row mirrors the real `.entryRow` chrome 1:1:
-  //   - 28 × 28 thumbnail preview slot
-  //   - title + author stack (two lines)
-  //   - status meta on the right
-  // The wrapper is the same `.row` + `.entryRow` button skeleton so
-  // padding / hover ring / border-radius match the loaded state and
-  // there's no visual shift when entries swap in.
+  // Skeleton entry row mirrors the real `.entryRow` chrome: a two-line
+  // title + status·date stack (no thumbnail). Same `.row` + `.entryRow`
+  // button skeleton so padding / hover ring / radius match the loaded
+  // state and there's no visual shift when entries swap in.
   return (
     <div
       className={explorerStyles.rows}
@@ -509,13 +501,9 @@ function ContentEntriesLoading() {
           className={cn(explorerStyles.row, styles.entryRow)}
           aria-hidden="true"
         >
-          <Skeleton width={28} height={28} radius={4} />
           <span className={styles.entryTitleStack}>
             <Skeleton width={`${60 + (i % 3) * 12}%`} height={12} />
             <Skeleton width={`${40 + (i % 2) * 14}%`} height={10} />
-          </span>
-          <span className={explorerStyles.rowMeta}>
-            <Skeleton width={48} height={10} radius={999} />
           </span>
         </div>
       ))}

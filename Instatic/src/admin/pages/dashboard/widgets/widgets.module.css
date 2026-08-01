@@ -1,10 +1,58 @@
 /**
  * Shared utilities for first-party dashboard widgets — small helpers that
  * would otherwise be repeated as inline styles across every widget body.
+ *
+ * The release-desk tiles (live preview, release progress, changes,
+ * preflight, recent activity) are transcribed 1:1 from the approved
+ * MMSBUILD screen library (`screens/dashboard/src/styles.css`). Their
+ * metrics are px-exact on purpose — the acceptance bar for this screen is
+ * a pixel match against the reference in both themes — while every colour
+ * still resolves through an `--mms-*` token so light / dark flips itself.
  */
 
-.fillBottom {
-    margin-top: auto;
+/* ── Per-card inset ────────────────────────────────────────────────────
+ *
+ * The reference gives each card its own padding and its own heading→body
+ * gap. Both travel as custom properties (read by `.widget` / `.body` in
+ * `Widget.module.css`) rather than as competing `padding` declarations,
+ * so the result never depends on which stylesheet the bundler emits
+ * first. */
+.cardPreview {
+    --widget-pad: 20px 23px 18px;
+    --widget-body-gap: 14px;
+}
+
+.cardRelease {
+    --widget-pad: 20px 28px 18px;
+    --widget-body-gap: 8px;
+}
+
+.cardChanges {
+    --widget-pad: 16px 27px 13px;
+    --widget-body-gap: 6px;
+}
+
+/* `.count-badge` — the change count beside the card title. */
+.countBadge {
+    display: inline-grid;
+    min-width: 24px;
+    height: 24px;
+    place-items: center;
+    border-radius: 6px;
+    background: color-mix(in srgb, var(--mms-orange) 14%, var(--mms-surface));
+    color: var(--mms-orange);
+    font-size: 13px;
+    font-weight: 650;
+}
+
+.cardPreflight {
+    --widget-pad: 16px 27px 13px;
+    --widget-body-gap: 5px;
+}
+
+.cardActivity {
+    --widget-pad: 14px 27px 12px;
+    --widget-body-gap: 7px;
 }
 
 .axisRow {
@@ -16,7 +64,10 @@
     margin-top: var(--space-3xs);
 }
 
-/* ── List-style widgets (Top pages, Publish queue) ────────────────── */
+/* ── List-style widgets (Publish lineup) ──────────────────────────────
+ *
+ * `.lineup-entry` in the reference: a bottom-anchored row of path + status
+ * pill + relative time, all 11px on muted ink. */
 .wlist {
     list-style: none;
     display: grid;
@@ -29,15 +80,10 @@
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
-    gap: var(--space-m);
-    padding: var(--space-m) 0;
-    border-top: 1px solid var(--border);
-    font-size: var(--text-m);
-    color: var(--text);
-}
-
-.wlist li:first-child {
-    border-top: 0;
+    gap: 10px;
+    padding: var(--space-s) 0;
+    font-size: 11px;
+    color: var(--mms-text-muted);
 }
 
 .wlistTitle {
@@ -50,81 +96,137 @@
 }
 
 .wlistMeta {
-    font-family: var(--font-mono);
-    font-size: var(--text-xs);
-    color: var(--text-subtle);
+    font-size: 11px;
+    color: var(--mms-text-muted);
     display: inline-flex;
     align-items: center;
-    gap: var(--space-s);
+    gap: 10px;
 }
 
 .wlistPath {
     font-family: var(--font-mono);
-    font-size: var(--text-xs);
-    color: var(--text-disabled);
+    font-size: 11px;
+    color: var(--mms-text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .deltaSpacing {
     margin-left: var(--space-s);
 }
 
-/* ── Activity feed ─────────────────────────────────────────────────── */
+/* ── Recent activity (`.activity-list`) ────────────────────────────────
+ *
+ * Four equal columns across a short 136px strip, separated by hairline
+ * rules rather than a timeline rail. Each column is a 22px marker gutter
+ * plus a body: the absolute timestamp on top, then avatar + "<name>
+ * <verb>" with the target on its own muted second line. The newest event
+ * gets the green circle-check marker; the rest get flat grey discs. */
 .feed {
     display: grid;
-    gap: 0;
-    margin-top: auto;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    margin: 0;
+    padding: 0;
+    list-style: none;
 }
 
 .feedRow {
+    position: relative;
     display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto;
+    min-width: 0;
+    grid-template-columns: 22px minmax(0, 1fr);
+    gap: 9px;
+    padding: 5px 16px 0 0;
+}
+
+.feedRow + .feedRow {
+    padding-left: 16px;
+    border-left: 1px solid var(--mms-border);
+}
+
+.feedMarker {
+    display: block;
+    padding-top: 3px;
+    font-size: 15px;
+    color: var(--mms-text-muted);
+}
+
+.feedMarkerActive {
+    color: var(--mms-action);
+}
+
+.feedTimestamp {
+    display: block;
+    margin-bottom: 5px;
+    font-size: 10.5px;
+    color: var(--mms-text-muted);
+}
+
+/* Actor row: 34px avatar + "<name> <verb>" with the target underneath. */
+.feedEntry {
+    display: grid;
+    min-width: 0;
+    grid-template-columns: 34px minmax(0, 1fr);
     align-items: center;
-    gap: var(--space-m);
-    padding: var(--space-m) 0;
-    border-top: 1px solid var(--border);
+    gap: 9px;
+    font-size: 11px;
+    line-height: 1.3;
+    color: var(--mms-text-muted);
 }
 
-.feedRow:first-child {
-    border-top: 0;
-}
-
-/* System-initiated audit events (no actor user) render with a small
- * cog icon in the same 22px slot the shared <UserAvatar> primitive
- * occupies for real users. Circular to match UserAvatar's pill
- * geometry so the column reads as a single avatar rail regardless of
- * row type. */
+/* `.activity-avatar` — both the real <UserAvatar> and the system fallback
+   share this well so the two never differ by a pixel. The descendant
+   selector is deliberate: it has to out-specify `UserAvatar`'s own
+   single-class `.root` rule, which paints a neutral grey circle. */
+.feedEntry .feedAvatar,
 .feedSystemAvatar {
-    width: 22px;
-    height: 22px;
-    border-radius: 999px;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
     display: grid;
     place-items: center;
-    background: var(--bg-surface-2);
-    border: 1px solid var(--border);
-    color: var(--text-muted);
+    background: var(--mms-surface-tint);
+    border: 1px solid color-mix(in srgb, var(--mms-yellow) 45%, var(--mms-border));
+    color: var(--mms-success);
+    font-size: 11px;
+    font-weight: 700;
     flex-shrink: 0;
+    overflow: hidden;
+}
+
+/* UserAvatar derives its initials size from `--avatar-size` (0.4×); the
+   reference pins them at 11px regardless of the 34px well. */
+.feedEntry .feedAvatar > * {
+    font-size: 11px;
 }
 
 .feedBody {
-    font-size: var(--text-s);
-    color: var(--text);
-    white-space: nowrap;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+/* Actor name leads the row in bold, full-strength ink. */
+.feedActor {
+    font-weight: 700;
+    color: var(--mms-text);
+}
+
+/* The audit target ("Section: Hero") drops to its own clipped line. */
+.feedTarget {
+    display: block;
+    margin-top: 2px;
     overflow: hidden;
     text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
-.feedBody em {
+.feedTarget em {
     font-style: normal;
-    color: var(--text-subtle);
 }
 
-.feedBody code {
+.feedTarget code {
     font-family: var(--font-mono);
-    font-size: var(--text-xs);
-    color: var(--text-bright);
-    background: var(--overlay-10);
-    padding: var(--space-px) var(--space-3xs);
-    border-radius: 3px;
+    font-size: 10px;
 }
 
 .feedTime {
@@ -139,6 +241,68 @@
     padding: var(--space-l) 0;
 }
 
+/* `.activity-card .compact-link` — pinned to the card's bottom-right
+   corner, outside the four columns, as a small green-outline chip. */
+.cardActivity .viewAllBtn {
+    position: absolute;
+    right: 14px;
+    bottom: 8px;
+    display: inline-flex;
+    height: auto;
+    min-height: 44px;
+    align-items: center;
+    gap: 8px;
+    padding: 0 11px;
+    border: 1px solid var(--mms-action);
+    border-radius: 8px;
+    background: transparent;
+    color: var(--mms-action-strong);
+    font-size: 12px;
+    font-weight: 650;
+}
+
+.cardActivity .viewAllBtn:hover {
+    background: color-mix(in srgb, var(--mms-action) 7%, var(--mms-surface));
+    border-color: var(--mms-action);
+    color: var(--mms-action-strong);
+}
+
+@media (max-width: 980px) {
+    .feed {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px 0;
+    }
+
+    .feedRow:nth-child(3) {
+        padding-left: 0;
+        border-left: 0;
+    }
+}
+
+@media (max-width: 620px) {
+    .feed {
+        grid-template-columns: 1fr;
+        gap: 0;
+    }
+
+    .feedRow,
+    .feedRow + .feedRow,
+    .feedRow:nth-child(3) {
+        min-height: 72px;
+        padding: 10px 0;
+        border-top: 1px solid var(--mms-border);
+        border-left: 0;
+    }
+
+    .cardActivity .viewAllBtn {
+        position: static;
+        margin-top: 10px;
+        align-self: flex-start;
+        padding: 0 5px;
+        border: 0;
+    }
+}
+
 /* ── Plugin list row ───────────────────────────────────────────────── */
 .pluginRow {
     display: grid;
@@ -146,8 +310,9 @@
     gap: var(--space-m);
     align-items: center;
     padding: var(--space-m) 0;
-    border-top: 1px solid var(--border);
-    font-size: var(--text-s);
+    border-top: 1px solid var(--mms-border);
+    font-size: 12px;
+    color: var(--mms-text);
 }
 
 .pluginRow:first-of-type {
@@ -158,11 +323,11 @@
     width: 28px;
     height: 28px;
     border-radius: 7px;
-    background: var(--bg-surface);
-    border: 1px solid var(--border);
+    background: var(--mms-surface-tint);
+    border: 1px solid var(--mms-border);
     display: grid;
     place-items: center;
-    color: var(--text-muted);
+    color: var(--mms-action-strong);
     overflow: hidden;
 }
 
@@ -179,7 +344,7 @@
 }
 
 .pluginName {
-    color: var(--text);
+    color: var(--mms-text);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -188,8 +353,8 @@
 .pluginName small {
     display: block;
     font-family: var(--font-mono);
-    font-size: var(--text-2xs);
-    color: var(--text-disabled);
+    font-size: 10px;
+    color: var(--mms-text-muted);
     margin-top: var(--space-4xs);
 }
 
@@ -202,44 +367,45 @@
 }
 
 .dotGreen {
-    background: var(--success);
+    background: var(--mms-action);
 }
 
 .dotAmber {
-    background: var(--warning);
+    background: var(--mms-orange);
 }
 
 .dotMuted {
-    background: var(--text-disabled);
+    background: var(--mms-text-muted);
 }
 
-/* ── Badges (queued / live / draft) ────────────────────────────────── */
+/* ── Badges (queued / live / draft) ──────────────────────────────────
+ *
+ * `.lineup-entry span` — a small uppercase capsule on a 12%-tinted fill. */
 .badge {
     display: inline-flex;
     align-items: center;
     gap: var(--space-3xs);
-    padding: var(--space-4xs) var(--space-s);
+    padding: 4px 8px;
     border-radius: 999px;
-    font-size: var(--text-2xs);
-    font-weight: 600;
+    font-size: 10px;
+    font-weight: 750;
     letter-spacing: 0.04em;
     text-transform: uppercase;
-    font-family: var(--font-mono);
 }
 
 .badgeDraft {
-    background: var(--overlay-10);
-    color: var(--text-subtle);
+    background: color-mix(in srgb, var(--mms-text-muted) 12%, var(--mms-surface));
+    color: var(--mms-text-muted);
 }
 
 .badgeLive {
-    background: var(--success-10);
-    color: var(--success);
+    background: color-mix(in srgb, var(--mms-action) 12%, var(--mms-surface));
+    color: var(--mms-action-strong);
 }
 
 .badgeQueued {
-    background: var(--warning-10);
-    color: var(--warning);
+    background: color-mix(in srgb, var(--mms-yellow) 22%, var(--mms-surface));
+    color: var(--mms-warning);
 }
 
 /* "PUBLISHED" pill — success tone, sibling of `.badgeLive` but
@@ -248,18 +414,20 @@
    the live site" — visually distinct from the warning-tone scheduled
    pill so the eye scans the lineup at a glance. */
 .badgePublished {
-    background: var(--success-10);
-    color: var(--success);
+    background: color-mix(in srgb, var(--mms-action) 12%, var(--mms-surface));
+    color: var(--mms-action-strong);
 }
 
-/* ── Pages / posts / status row utilities ──────────────────────────── */
+/* ── Pages / posts / status row utilities ──────────────────────────────
+ *
+ * `.metric-footer` — the bottom-anchored "0 drafts · 0 scheduled" pair. */
 .subFootRow {
     margin-top: auto;
     display: flex;
-    gap: var(--space-2xl);
+    gap: 18px;
     font-family: var(--font-mono);
-    font-size: var(--text-xs);
-    color: var(--text-subtle);
+    font-size: 11px;
+    color: var(--mms-text-muted);
 }
 
 .statusRow {
@@ -267,7 +435,7 @@
     align-items: center;
     justify-content: space-between;
     padding: var(--space-m) 0;
-    border-top: 1px solid var(--border);
+    border-top: 1px solid var(--mms-border);
 }
 
 .statusRow:first-of-type {
@@ -278,8 +446,8 @@
     display: flex;
     align-items: center;
     gap: var(--space-s);
-    font-size: var(--text-s);
-    color: var(--text);
+    font-size: 12px;
+    color: var(--mms-text);
 }
 
 .statusGrid {
@@ -292,7 +460,7 @@
 .domainName {
     font-family: var(--font-mono);
     font-size: var(--text-l);
-    color: var(--text-bright);
+    color: var(--mms-text);
     margin-top: var(--space-4xs);
 }
 
@@ -302,8 +470,8 @@
     flex-direction: column;
     gap: var(--space-xs);
     font-family: var(--font-mono);
-    font-size: var(--text-xs);
-    color: var(--text-subtle);
+    font-size: 11px;
+    color: var(--mms-text-muted);
 }
 
 .domainList > div {
@@ -312,60 +480,763 @@
 }
 
 .domainOk {
-    color: var(--success);
+    color: var(--mms-success);
 }
 
-/* ── Media thumbnail grid ──────────────────────────────────────────── */
-.mediaGrid {
-    margin-top: auto;
-    display: grid;
-    grid-template-columns: repeat(8, 1fr);
-    gap: var(--space-px);
-    padding-top: var(--space-l);
-}
-
-.mediaCell {
-    aspect-ratio: 1;
-    border-radius: 6px;
-    background: var(--bg-surface-3);
-}
-
-.mediaCellAccent {
-    background: var(--accent-4);
-    opacity: 0.6;
-}
-
-.mediaCellEmpty {
-    background: var(--bg-surface);
-}
-
-/* Cell that holds a real image thumbnail. The cell is rendered as a
-   Button primitive so clicking it opens the MediaViewerWindow — these
-   overrides strip the default Button chrome (fixed height, padding,
-   gap, min-width) so the tile reads as a pure square thumbnail. The
-   <img> inside fills the cell with `object-fit: cover`; the rounded
-   corners + background match the decorative cells so a partial fill
-   (fewer than 16 thumbs) blends with the decorative remainder. */
-.mediaCellThumb {
-    aspect-ratio: 1;
-    height: auto;
+/* ── Storage breakdown (`.storage-widget progress` + `.storage-key`) ───
+ *
+ * The reference uses a native <progress> track plus a wrapped legend of
+ * coloured squares, NOT a segmented bar. */
+.storageBar {
     width: 100%;
-    min-width: 0;
-    padding: 0;
-    gap: 0;
-    border-radius: 6px;
+    height: 9px;
+    margin-top: auto;
     overflow: hidden;
-    background: var(--bg-surface);
-    transition: transform 120ms ease;
+    border: 0;
+    border-radius: 999px;
+    background: var(--mms-surface-tint);
+    accent-color: var(--mms-orange);
 }
 
-.mediaCellThumb:hover {
-    transform: scale(1.04);
+.storageBar::-webkit-progress-bar {
+    border-radius: 999px;
+    background: var(--mms-surface-tint);
 }
 
-.mediaCellThumbImg {
+.storageBar::-webkit-progress-value {
+    border-radius: 999px;
+    background: var(--mms-orange);
+}
+
+.storageBar::-moz-progress-bar {
+    border-radius: 999px;
+    background: var(--mms-orange);
+}
+
+.storageKey {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 14px;
+    margin: 9px 0 0;
+    padding: 0;
+    color: var(--mms-text-muted);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    list-style: none;
+}
+
+.storageKey li {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* Swatch colours, verbatim from the reference's `.storage-key` rules. */
+.storageKeyImages,
+.storageKeyDatabase {
+    color: var(--mms-orange);
+}
+
+.storageKeyVideos {
+    color: var(--mms-storage-video);
+}
+
+.storageKeyDocuments {
+    color: var(--mms-storage-document);
+}
+
+.storageKeyPlugins {
+    color: var(--mms-action);
+}
+
+/* The label text stays muted; only the square takes the category colour. */
+.storageKey li > span {
+    color: var(--mms-text-muted);
+}
+
+/* ── Publish lineup (`.lineup-entry`) ──────────────────────────────── */
+.lineupEntry {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: 10px;
+    margin-top: auto;
+    color: var(--mms-text-muted);
+    font-size: 11px;
+}
+
+.lineupEntry code {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: var(--font-mono);
+    color: var(--mms-text-muted);
+}
+
+/* ── Widget empty state (`.widget-empty`) ──────────────────────────── */
+.widgetEmpty {
+    display: grid;
+    flex: 1 1 auto;
+    place-content: center;
+    justify-items: center;
+    gap: 7px;
+    color: var(--mms-text-muted);
+    text-align: center;
+}
+
+.widgetEmptyIcon {
+    margin-bottom: 4px;
+}
+
+.widgetEmptyTitle {
+    color: var(--mms-text);
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.widgetEmptyDetail {
+    font-size: 11px;
+}
+
+/* ── Media chips (`.media-samples`) ────────────────────────────────────
+ *
+ * Overlapping 38px rounded squares with a surface-coloured ring, so the
+ * row reads as a stack. Real thumbnails fill them where the host has
+ * media; the icon fallback keeps the same box. */
+.mediaSamples {
+    display: flex;
+    align-items: center;
+    margin-top: auto;
+}
+
+.mediaSamples > * {
+    display: grid;
+    width: 38px;
+    height: 38px;
+    min-width: 0;
+    flex: 0 0 38px;
+    padding: 0;
+    place-items: center;
+    overflow: hidden;
+    border: 2px solid var(--mms-surface);
+    border-radius: 10px;
+    background: var(--mms-surface-tint);
+    color: var(--mms-action-strong);
+}
+
+.mediaSamples > * + * {
+    margin-left: -6px;
+}
+
+.mediaSampleImg {
     width: 100%;
     height: 100%;
     object-fit: cover;
     display: block;
+}
+
+/* ── Live Release Desk widgets (Screen 1) ─────────────────────────── */
+
+/* `.live-label` — green dot + "Live", sitting opposite the card title. */
+.liveBadge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 650;
+    color: var(--mms-action-strong);
+    text-transform: capitalize;
+}
+
+/* `.preview-stage` — the bordered viewport that swallows the remaining card
+   height. NOT aspect-ratio-bound on desktop: the reference stretches it to
+   fill whatever is left between the heading and the control row, which is
+   what makes the 463px card read correctly. */
+.previewStage {
+    min-width: 0;
+    min-height: 0;
+    flex: 1 1 auto;
+    display: flex;
+    overflow: hidden;
+    border: 1px solid var(--mms-border-strong);
+    border-radius: 12px;
+    background: var(--mms-surface-raised);
+}
+
+/* Mobile: the stage stays full-bleed and centres a phone-width column, with
+   hairlines down both sides — `.preview-stage.show-mobile` in the reference. */
+.previewStage[data-device='mobile'] {
+    justify-content: center;
+}
+
+.previewFrame {
+    position: relative;
+    width: 100%;
+    min-width: 0;
+    overflow: hidden;
+    /* Defaults until JS measures the frame: iframe fills the frame 1:1. Once
+       measured, JS sets these so the iframe renders at a fixed logical viewport
+       (--pv-w) and is scaled (--pv-scale) to fit — see LivePreviewWidget. */
+    --pv-w: 100%;
+    --pv-h: 100%;
+    --pv-scale: 1;
+}
+
+.previewStage[data-device='mobile'] .previewFrame {
+    width: 196px;
+    flex: 0 0 196px;
+    border-right: 1px solid var(--mms-border-strong);
+    border-left: 1px solid var(--mms-border-strong);
+}
+
+.previewFrame:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+}
+
+/* The iframe is INTERACTIVE: the operator can scroll and click inside it like a
+   real embedded browser (not a static tile). It renders at a FIXED logical
+   viewport (--pv-w × --pv-h) so the page uses its real responsive breakpoint
+   (Desktop 1440 / Mobile 375), then scales down to fit the frame — so Mobile
+   shows the true mobile layout, never a cropped desktop with a horizontal
+   scrollbar. The page scrolls within this viewport window. */
+.previewIframe {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: var(--pv-w);
+    height: var(--pv-h);
+    transform: scale(var(--pv-scale));
+    transform-origin: top left;
+    border: 0;
+}
+
+.previewFallback {
+    position: absolute;
+    inset: 0;
+    background: var(--canvas-placeholder-bg);
+}
+
+/* Friendly empty state shown when the site root has nothing published yet —
+   replaces the raw server error page inside the tile. */
+.previewEmpty {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-content: center;
+    justify-items: center;
+    gap: var(--space-2xs);
+    text-align: center;
+    padding: var(--space-l);
+    background: var(--bg-surface-3);
+    color: var(--text-muted);
+}
+
+.previewEmptyTitle {
+    margin: 0;
+    font-size: var(--text-m);
+    font-weight: 600;
+    color: var(--text);
+}
+
+.previewEmptyHint {
+    margin: 0;
+    font-size: var(--text-xs);
+    color: var(--text-subtle);
+    max-width: 32ch;
+}
+
+/* `.preview-controls` — a fixed 44px band under the stage. */
+.previewControls {
+    display: flex;
+    flex: 0 0 44px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+    margin-top: 17px;
+}
+
+/* `.segmented` — ONE bordered capsule with a hairline between the two
+   halves, not two separate buttons. */
+.deviceToggle {
+    display: inline-flex;
+    min-width: 0;
+    height: 44px;
+    overflow: hidden;
+    border: 1px solid var(--mms-border);
+    border-radius: var(--mms-control-radius);
+    background: var(--mms-surface);
+}
+
+.previewActions {
+    display: flex;
+    gap: 14px;
+    margin-left: auto;
+}
+
+/* Live-preview control buttons. Scoped under `.previewControls` so they win
+   over the Button primitive's variant classes; colours are all tokens so
+   light + dark resolve automatically. */
+.previewControls .segBtn {
+    display: inline-flex;
+    min-width: 108px;
+    height: 44px;
+    min-height: 44px;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
+    padding: 0 14px;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: var(--mms-text);
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.previewControls .segBtn + .segBtn {
+    border-left: 1px solid var(--mms-border);
+}
+
+.previewControls .segBtn:hover {
+    background: color-mix(in srgb, var(--mms-surface-tint) 55%, transparent);
+    color: var(--mms-text);
+}
+
+/* Active segment — a warm-tan (light) / deep-navy (dark) control face. */
+.previewControls .segBtnActive,
+.previewControls .segBtnActive:hover {
+    background: var(--mms-surface-tint);
+    color: var(--mms-text);
+}
+
+/* `.secondary-button` / `.outline-button` — 44px tall, 158px wide minimum. */
+.previewControls .actionBtn {
+    display: inline-flex;
+    min-width: 158px;
+    height: auto;
+    min-height: 44px;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 0 18px;
+    border: 1px solid var(--mms-border);
+    border-radius: var(--mms-control-radius);
+    background: var(--mms-surface);
+    color: var(--mms-text);
+    font-size: 14px;
+    font-weight: 650;
+}
+
+.previewControls .actionBtn:hover {
+    border-color: var(--mms-border-strong);
+    background: var(--mms-surface-raised);
+    color: var(--mms-text);
+}
+
+/* Green outline action ("Edit site" / "Publish first page") — border + text +
+   icon all inherit the MMS green; identical in both themes. */
+.previewControls .actionBtnEdit {
+    border-color: var(--mms-action);
+    background: transparent;
+    color: var(--mms-action-strong);
+}
+
+.previewControls .actionBtnEdit:hover {
+    background: color-mix(in srgb, var(--mms-action) 7%, var(--mms-surface));
+    border-color: var(--mms-action);
+    color: var(--mms-action-strong);
+}
+
+/* ── Release progress stepper (`.release-list`) ────────────────────────
+ *
+ * Reference geometry: each stage is an 82px row; the connector hairline
+ * runs from just under the 27px number circle down past the row edge, so
+ * consecutive stages read as one continuous rail. The list itself is
+ * vertically centred in whatever height is left above the CTA. */
+.stepper {
+    list-style: none;
+    display: grid;
+    flex: 1 1 auto;
+    align-content: center;
+    gap: 0;
+    margin: 0 0 10px;
+    padding: 0;
+}
+
+.step {
+    position: relative;
+    display: grid;
+    min-height: 82px;
+    grid-template-columns: 28px 52px minmax(0, 1fr) 28px;
+    align-items: center;
+    gap: 13px;
+}
+
+.stepRail {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    place-items: center;
+}
+
+.stepNum {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    place-items: center;
+    width: 27px;
+    height: 27px;
+    border-radius: 50%;
+    font-size: 12px;
+    font-weight: 720;
+    font-variant-numeric: tabular-nums;
+    background: var(--mms-surface);
+    border: 1px solid var(--mms-border-strong);
+    color: var(--mms-text-muted);
+}
+
+.step[data-state='complete'] .stepNum,
+.step[data-state='current'] .stepNum {
+    background: var(--mms-action);
+    border-color: var(--mms-action);
+    color: var(--on-accent);
+}
+
+/* `.release-list li::after` — the connector. Anchored to the row (not the
+   rail cell) so it can overshoot into the gap between rows. */
+.stepLine {
+    position: absolute;
+    z-index: 0;
+    top: 48px;
+    bottom: -14px;
+    left: 13px;
+    width: 1px;
+    background: var(--mms-border-strong);
+}
+
+.step[data-state='complete'] .stepLine {
+    background: var(--mms-action);
+}
+
+.stepIcon {
+    display: grid;
+    place-items: center;
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    border: 1px solid var(--mms-border-strong);
+    background: var(--mms-surface);
+    color: var(--mms-text);
+    font-size: 18px;
+}
+
+.step[data-state='complete'] .stepIcon {
+    border-color: color-mix(in srgb, var(--mms-action) 58%, var(--mms-border));
+    background: color-mix(in srgb, var(--mms-action) 10%, var(--mms-surface));
+}
+
+.step[data-state='current'] .stepIcon {
+    border-color: color-mix(in srgb, var(--mms-yellow) 62%, var(--mms-border));
+    background: var(--mms-surface-tint);
+}
+
+.stepBody {
+    display: grid;
+    min-width: 0;
+    gap: 4px;
+}
+
+.stepLabel {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--mms-text);
+}
+
+.stepDetail {
+    font-size: 12px;
+    line-height: 1.25;
+    color: var(--mms-text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.step[data-state='complete'] .stepDetail {
+    color: var(--mms-success);
+}
+
+/* `.stage-state` — a single 19px glyph, not a filled badge: a green
+   circle-check when done, an amber ring-dot for the live stage, a flat
+   grey disc for anything still ahead. */
+.stepMarker {
+    display: grid;
+    place-items: center;
+    font-size: 19px;
+    color: var(--mms-text-muted);
+}
+
+.step[data-state='complete'] .stepMarker {
+    color: var(--mms-action);
+}
+
+.step[data-state='current'] .stepMarker {
+    color: var(--mms-yellow);
+}
+
+/* Not-applicable stage (client approval, when no approval workflow is
+ * configured) — a dashed number ring so it reads as "not required" rather
+ * than a blocking pending step. */
+.step[data-state='na'] .stepNum {
+    border-style: dashed;
+}
+
+/* `.release-cta` — full-width filled green primary, pinned to the card
+   bottom at exactly 44px. */
+.cardRelease .releaseCta {
+    display: inline-flex;
+    width: 100%;
+    flex: 0 0 44px;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    height: auto;
+    min-height: 44px;
+    padding: 0 18px;
+    border: 1px solid var(--mms-action);
+    border-radius: var(--mms-control-radius);
+    background: var(--mms-action);
+    color: var(--on-accent);
+    font-size: 14px;
+    font-weight: 650;
+}
+
+.cardRelease .releaseCta:hover {
+    border-color: var(--mms-action-strong);
+    background: var(--mms-action-strong);
+    color: var(--on-accent);
+}
+
+/* ── Preflight checklist (`.preflight-list`) ───────────────────────────
+ *
+ * 36px rows split by a hairline UNDER each entry (not above), a 26px
+ * round icon well, and a right-aligned 11px value in the status colour. */
+.readinessList {
+    list-style: none;
+    display: grid;
+    gap: 0;
+    margin: 0;
+    padding: 0;
+}
+
+.readinessRow {
+    display: grid;
+    min-height: 36px;
+    grid-template-columns: 30px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 8px;
+    border-bottom: 1px solid var(--mms-border);
+    font-size: 12px;
+}
+
+.readinessRow:last-child {
+    border-bottom: 0;
+}
+
+.readinessCheck {
+    display: grid;
+    place-items: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: var(--mms-surface-raised);
+    font-size: 11px;
+    color: var(--mms-success);
+}
+
+/* Warn: a real check that isn't satisfied yet (e.g. unpublished changes).
+ * NA: no adapter behind the row — muted, so it never reads as a passing check. */
+.readinessRow[data-status='warn'] .readinessCheck {
+    color: var(--mms-warning);
+}
+
+.readinessRow[data-status='na'] .readinessCheck {
+    color: var(--mms-text-muted);
+}
+
+.readinessLabel {
+    color: var(--mms-text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.readinessValue {
+    font-size: 11px;
+    font-weight: 680;
+    text-align: right;
+    color: var(--mms-success);
+}
+
+.readinessRow[data-status='warn'] .readinessValue {
+    color: var(--mms-warning);
+}
+
+.readinessRow[data-status='na'] .readinessValue {
+    color: var(--mms-text-muted);
+}
+
+/* ── Change manifest (`.change-list`) ──────────────────────────────────
+ *
+ * 58px rows on a five-track grid: icon well, title/location pair, status
+ * chip, timestamp, chevron. Hairline under every row except the last. */
+.changeList {
+    display: grid;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.changeRow {
+    display: grid;
+    min-height: 58px;
+    grid-template-columns: 42px minmax(0, 1fr) 68px 116px 44px;
+    align-items: center;
+    gap: 12px;
+    border-bottom: 1px solid var(--mms-border);
+}
+
+.changeRow:last-child {
+    border-bottom: 0;
+}
+
+.changeIcon {
+    display: grid;
+    width: 38px;
+    height: 38px;
+    place-items: center;
+    border-radius: 9px;
+    background: var(--mms-surface-tint);
+    color: var(--mms-text);
+}
+
+.changeCopy {
+    display: grid;
+    min-width: 0;
+    gap: 2px;
+}
+
+.changeTitle,
+.changeLocation {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.changeTitle {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--mms-text);
+}
+
+.changeLocation,
+.changeTime {
+    font-size: 11px;
+    color: var(--mms-text-muted);
+}
+
+/* Status chip. The reference tints it yellow with green ink; `removed`
+   has no sample there, so it borrows the danger tone rather than reading
+   as an ordinary edit. */
+.changeStatus {
+    justify-self: start;
+    padding: 4px 9px;
+    border-radius: 6px;
+    background: color-mix(in srgb, var(--mms-yellow) 17%, var(--mms-surface));
+    color: var(--mms-action-strong);
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.changeRow[data-kind='removed'] .changeStatus {
+    background: color-mix(in srgb, var(--mms-danger) 12%, var(--mms-surface));
+    color: var(--mms-danger);
+}
+
+.changeList .changeOpen {
+    display: grid;
+    width: 44px;
+    height: 44px;
+    min-width: 0;
+    padding: 0;
+    place-items: center;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: var(--mms-text-muted);
+}
+
+.changeList .changeOpen:hover {
+    background: transparent;
+    color: var(--mms-text);
+}
+
+@media (max-width: 620px) {
+    .changeRow {
+        min-height: 78px;
+        grid-template-columns: 38px minmax(0, 1fr) 44px;
+        gap: 10px;
+    }
+
+    .changeStatus {
+        grid-column: 2;
+        justify-self: start;
+        margin-top: -18px;
+    }
+
+    .changeTime {
+        display: none;
+    }
+
+    .changeList .changeOpen {
+        grid-column: 3;
+        grid-row: 1 / span 2;
+    }
+}
+
+/* ── Honest empty state (`.empty-state`) ───────────────────────────────
+ *
+ * Used by the Changes tile — Instatic has no per-version change manifest
+ * endpoint yet, so the card renders the reference's own "no manifest"
+ * state rather than inventing rows. */
+.emptyState {
+    display: grid;
+    height: 100%;
+    max-width: 320px;
+    margin: 0 auto;
+    place-content: center;
+    justify-items: center;
+    gap: 7px;
+    text-align: center;
+    color: var(--mms-text-muted);
+}
+
+/* Size comes from the `<FaIcon size={24}>` prop — declaring `font-size`
+   here too would race it on stylesheet order (both are single-class). */
+.emptyIcon {
+    margin-bottom: 3px;
+    color: var(--mms-text-muted);
+}
+
+.emptyTitle {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--mms-text);
+}
+
+.emptyDetail {
+    margin: 0;
+    font-size: 12px;
+    color: var(--mms-text-muted);
 }

@@ -264,3 +264,56 @@ export interface StorageStats {
   totalBytes: number
   dialect: 'sqlite' | 'postgres'
 }
+
+// ---------------------------------------------------------------------------
+// Change manifest ("Changes in this version")
+// ---------------------------------------------------------------------------
+
+/**
+ * One row in the dashboard "Changes in this version" widget.
+ *
+ * The approved MMSBUILD screen shows a per-version change list: an icon
+ * well, a title + location pair, an Added/Updated status chip, and a
+ * timestamp. There is no dedicated revision-manifest table in Instatic,
+ * so the manifest is DERIVED from `audit_events` — every operational
+ * event recorded since the most recent `publish` event is, by
+ * definition, a change that is in the draft but not yet live.
+ *
+ * That makes the list real (no fabricated rows) without inventing a new
+ * table: the same audit trail that powers Recent activity, sliced by the
+ * publish boundary and projected into change-shaped rows.
+ *
+ *   • `kind`      — drives the status chip ("Added" / "Updated" /
+ *                   "Removed"), derived from the action's verb.
+ *   • `icon`      — Font Awesome Solid glyph name WITHOUT the `fa-`
+ *                   prefix, picked per action so the icon well matches
+ *                   the reference (`file-lines`, `image`, `font`, …).
+ *   • `title`     — "Updated hero headline"-style summary.
+ *   • `location`  — the secondary line: resolved route path, collection
+ *                   name, or plugin id.
+ */
+export interface ChangeManifestEntry {
+  id: string
+  kind: 'added' | 'updated' | 'removed'
+  icon: string
+  title: string
+  location: string
+  createdAt: string
+}
+
+/**
+ * Response for `GET /admin/api/cms/dashboard/changes`.
+ *
+ *   • `rows`  — newest first, capped at the widget's visible window.
+ *   • `total` — how many changes are in this version overall (may exceed
+ *               `rows.length`); drives the count badge beside the title.
+ *   • `since` — ISO timestamp of the publish this manifest is measured
+ *               from, or `null` when the site has never been published
+ *               (in which case every recorded change is "in this
+ *               version").
+ */
+export interface ChangeManifestStats {
+  rows: ChangeManifestEntry[]
+  total: number
+  since: string | null
+}

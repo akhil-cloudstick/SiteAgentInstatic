@@ -317,13 +317,8 @@ export function DataGrid({
   return (
     <div className={styles.gridWrapper}>
       <DataGridToolbar
-        table={table}
-        totalCount={rows.length}
-        loading={loading}
-        readOnly={readOnly}
         query={query}
         onQueryChange={setQuery}
-        onAddRow={onAddRow}
         hasPublishWorkflow={hasPublishWorkflow}
         statusViewOrder={statusViewOrder}
         statusFilter={statusFilter}
@@ -398,6 +393,14 @@ export function DataGrid({
               )
             })}
           </div>
+        </div>
+      )}
+
+      {!loading && error == null && (
+        <div className={styles.gridFooter}>
+          {isFiltered
+            ? `${rowCount} of ${rows.length} ${rows.length === 1 ? 'record' : 'records'}`
+            : `${rows.length} ${rows.length === 1 ? 'record' : 'records'}`}
         </div>
       )}
 

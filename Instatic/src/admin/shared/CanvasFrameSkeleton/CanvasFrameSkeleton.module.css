@@ -26,6 +26,11 @@
   min-height: 100vh;
   overflow: hidden;
   background: var(--bg-surface);
+  /* Border delineates the sheet from the page. In dark, `--bg-surface` is the
+   * same flat navy as the page body, so without a border the frame is
+   * invisible; in light it stops the frame reading as a plain, edgeless sheet. */
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
   box-shadow: var(--canvas-chrome-shadow);
 }
 

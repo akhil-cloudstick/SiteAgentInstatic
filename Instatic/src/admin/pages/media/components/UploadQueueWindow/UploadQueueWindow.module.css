@@ -71,6 +71,14 @@
   word-break: break-word;
 }
 
+/* Non-blocking soft-limit advisory (10–49 MB) — the file still uploads. */
+.warning {
+  font-size: var(--text-2xs);
+  color: var(--warning-text);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .progressBar {
   display: block;
   height: 3px;

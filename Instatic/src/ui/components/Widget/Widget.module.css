@@ -14,12 +14,16 @@
        height and the grid would still allocate the full row, leaving
        the visible card stranded at the top of an empty cell. */
     height: 100%;
-    background: var(--bg-surface-2);
-    /* Borderless tile look — the 1px grid gap on the darker parent
-       surface visually separates cards (see DashboardGrid.module.css). */
-    border: 0;
-    border-radius: var(--card-radius);
-    padding: var(--space-3xl) var(--space-3xl) var(--space-2xl);
+    /* `.card` in the approved MMSBUILD screen: warm-white surface, 1px warm
+       hairline, 14px radius, clipped content — and no hover state, because
+       the cards are not interactive surfaces there. */
+    background: var(--mms-surface);
+    border: 1px solid var(--mms-border);
+    border-radius: var(--mms-card-radius);
+    color: var(--mms-text);
+    /* Per-card inset — default `17px 20px` (the reference's metric/list
+       tiles); release-desk cards override `--widget-pad` on themselves. */
+    padding: var(--widget-pad);
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -29,42 +33,52 @@
         box-shadow 150ms ease;
 }
 
-.widget:hover {
-    /* No border to recolour — lift the surface tone instead. Stays
-       achromatic per the editor's design-token policy. */
-    background: var(--bg-surface-3);
-}
-
+/* Customize mode — the reference tints each card's hairline warm-orange
+   (`.is-customizing .layout-item > .card`) rather than swapping the border
+   for a dashed one, so the grid keeps its geometry while editing. */
 .editing {
     cursor: grab;
-    /* Subtle inset outline replaces the previous dashed border so
-       customise mode is still legible without breaking the borderless
-       look (CSS box-shadow doesn't affect layout the way a border
-       would). */
-    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent-3) 18%, transparent);
+    border-color: color-mix(in srgb, var(--mms-orange) 38%, var(--mms-border));
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--mms-orange) 9%, transparent);
 }
 
 .editing:hover {
-    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent-3) 40%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--mms-orange) 26%, transparent);
 }
 
+/* `.card-heading` in the reference: a single flex row, 14px gutter, no
+   bottom margin of its own — the body owns the gap via `--widget-body-gap`. */
 .head {
     display: flex;
+    min-width: 0;
     align-items: center;
     justify-content: space-between;
-    gap: var(--space-s);
-    margin-bottom: var(--space-m);
+    gap: 14px;
+}
+
+/* Content area fills the remaining card height and SCROLLS when the content is
+   taller than the tile — so long lists (e.g. Recent activity) are never cropped
+   at the bottom. */
+.body {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    margin-top: var(--widget-body-gap);
+    overflow-y: auto;
 }
 
 .title {
     display: flex;
     align-items: center;
     gap: var(--space-s);
-    font-size: var(--text-xs);
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.07em;
-    color: var(--text-subtle);
+    /* `.card h2` in the approved screen — 17px / 720 / 1.25, tightened
+       tracking. Px-exact because the reference is px-exact. */
+    font-size: 17px;
+    font-weight: 720;
+    line-height: 1.25;
+    letter-spacing: -0.015em;
+    color: var(--mms-text);
 }
 
 .dot {
@@ -78,31 +92,6 @@
     display: flex;
     align-items: center;
     gap: var(--space-3xs);
-}
-
-.menu {
-    width: 22px;
-    height: 22px;
-    display: grid;
-    place-items: center;
-    border-radius: 6px;
-    background: transparent;
-    border: 0;
-    color: var(--text-disabled);
-    cursor: pointer;
-    opacity: 0;
-    transition:
-        opacity 120ms ease,
-        background 120ms ease;
-}
-
-.widget:hover .menu {
-    opacity: 1;
-}
-
-.menu:hover {
-    background: var(--overlay-10);
-    color: var(--text);
 }
 
 .handle {
@@ -124,7 +113,7 @@
  * the real Widget chrome's tint-dot + title row so the layout slot
  * reads as "loading" instead of an empty hole. */
 .dotPlaceholder {
-    background: var(--bg-surface-3);
+    background: var(--skeleton-fill);
 }
 
 .titlePlaceholder {
@@ -137,12 +126,12 @@
     width: 84px;
     height: 9px;
     border-radius: var(--radius-sm);
-    background-color: var(--bg-surface-3);
+    background-color: var(--skeleton-fill);
     background-image: linear-gradient(
         90deg,
-        var(--bg-surface-3) 0%,
-        var(--bg-surface-4) 50%,
-        var(--bg-surface-3) 100%
+        var(--skeleton-fill) 0%,
+        var(--skeleton-sheen) 50%,
+        var(--skeleton-fill) 100%
     );
     background-size: 200% 100%;
     background-repeat: no-repeat;

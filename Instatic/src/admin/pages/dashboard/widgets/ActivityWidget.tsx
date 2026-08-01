@@ -9,11 +9,16 @@
  * *operational* changes to the site.
  */
 import { DashboardSolidIcon } from 'pixel-art-icons/icons/dashboard-solid'
-import { SettingsCogSolidIcon } from 'pixel-art-icons/icons/settings-cog-solid'
 import type { ReactNode } from 'react'
 import type { DashboardWidgetRendererProps } from '@core/dashboard'
 import { UserAvatar } from '@admin/shared/UserAvatar'
+import { useCurrentAdminUser } from '@admin/sessionContext'
+import { hasCapability } from '@admin/access'
+import { useNavigate } from '@admin/lib/routing'
+import { queuePendingAction } from '@admin/spotlight/pendingAction'
 import { Widget } from '@ui/components/Widget'
+import { Button } from '@ui/components/Button'
+import { FaIcon } from '@ui/components/FaIcon'
 import { cn } from '@ui/cn'
 import {
   useRecentActivityStats,
@@ -22,13 +27,19 @@ import {
 import styles from './widgets.module.css'
 
 /**
- * Diameter of the actor avatar in the feed row. Picked to fit the
- * existing 22px-tall row chrome without changing line-height. The
- * `<UserAvatar>` primitive double-scales the requested size for the
- * Gravatar URL, so a 22px CSS avatar fetches a 44px image — crisp on
- * retina.
+ * Diameter of the actor avatar in the timeline node. Sized to the approved
+ * Recent-activity design (avatar sits left of the actor name). The
+ * `<UserAvatar>` primitive double-scales the requested size for the Gravatar
+ * URL, so a 34px CSS avatar fetches a 68px image — crisp on retina.
  */
-const AVATAR_SIZE = 22
+const AVATAR_SIZE = 34
+
+/**
+ * The strip shows only the newest events as equal, non-scrolling columns —
+ * four fits the full-width tile cleanly. The server returns more; we cap here
+ * and "View all activity" links to the full audit log.
+ */
+const MAX_TIMELINE_ITEMS = 4
 
 /**
  * Pick the verb that fronts each row body. The server has already
@@ -105,100 +116,138 @@ function actionVerb(action: string): string {
   }
 }
 
-function renderBody(entry: DashboardActivityEntry): ReactNode {
-  const verb = actionVerb(entry.action)
-  if (entry.targetCode) {
-    return (
-      <>
-        {verb} <code>{entry.targetCode}</code>
-      </>
-    )
-  }
-  if (entry.targetText) {
-    return (
-      <>
-        {verb} <em>{entry.targetText}</em>
-      </>
-    )
-  }
-  return verb
+/**
+ * The audit target ("Section: Hero" in the reference) drops to its own
+ * clipped second line under the actor row. Returns `null` when the event
+ * carries no target, in which case the node is a single line.
+ */
+function renderTarget(entry: DashboardActivityEntry): ReactNode {
+  if (entry.targetCode) return <code>{entry.targetCode}</code>
+  if (entry.targetText) return <em>{entry.targetText}</em>
+  return null
 }
 
 /**
- * Short relative-time label sized for the widget's narrow column.
- *
- *   < 1m         → "now"
- *   < 60m        → "<n>m"
- *   < 24h        → "<n>h"
- *   < 7d         → "<n>d"
- *   < 30d        → "yest." / "<n>d"
- *   anything else → coarse "MMM D" date
- *
- * Strictly past-only — `audit_events` are stamped at write time, so
- * a future timestamp would mean clock skew; in that case we just
- * render "now" rather than a misleading "in 3h".
+ * Absolute timestamp for a timeline node — "Today, 11:24 AM",
+ * "Yesterday, 4:02 PM", or "Mar 3, 9:15 AM" for older events. Matches the
+ * approved Recent-activity design (sans, mixed-case), rather than the mono
+ * relative label the other widgets use.
  */
-function formatRelative(iso: string): string {
+function formatActivityTime(iso: string): string {
   const ts = Date.parse(iso)
   if (Number.isNaN(ts)) return ''
-  const deltaMs = Date.now() - ts
-  if (deltaMs < 0) return 'now'
+  const date = new Date(ts)
+  // Uppercase the meridiem ("11:24 am" → "11:24 AM") to match the design; some
+  // locales lower-case it by default.
+  const time = date
+    .toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+    .replace(/\s?([ap]\.?m\.?)$/i, (_m, meridiem: string) => ` ${meridiem.toUpperCase()}`)
 
-  const min = deltaMs / 60_000
-  if (min < 1) return 'now'
-  if (min < 60) return `${Math.round(min)}m`
+  const now = new Date()
+  if (date.toDateString() === now.toDateString()) return `Today, ${time}`
 
-  const hr = min / 60
-  if (hr < 24) return `${Math.round(hr)}h`
+  const yesterday = new Date(now)
+  yesterday.setDate(now.getDate() - 1)
+  if (date.toDateString() === yesterday.toDateString()) return `Yesterday, ${time}`
 
-  const day = hr / 24
-  if (day < 2) return 'yest.'
-  if (day < 30) return `${Math.round(day)}d`
-
-  return new Date(ts).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+  const day = date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+  return `${day}, ${time}`
 }
 
 export function ActivityWidget({ span, editing }: DashboardWidgetRendererProps) {
-  const stats = useRecentActivityStats()
+  const { data: stats, loading } = useRecentActivityStats()
+  const navigate = useNavigate()
+  const currentUser = useCurrentAdminUser()
   const rows = stats?.rows ?? []
-  const isLoading = stats === null
+  const isLoading = loading
   const isEmpty = !isLoading && rows.length === 0
+
+  // The full audit log lives in Users → Audit (same `audit.read` capability
+  // the activity endpoint requires). Unrestricted sessions (no current user)
+  // always see it; otherwise gate on the capability so we never link to a tab
+  // the viewer can't open.
+  const canReadAudit = !currentUser || hasCapability(currentUser, 'audit.read')
+
+  function viewAllActivity(): void {
+    // Deep-link to the Audit tab via the cross-workspace pending-action bus —
+    // the Users page reads this on mount and selects the Audit tab.
+    queuePendingAction('users.viewAudit')
+    navigate('/admin/users')
+  }
 
   return (
     <Widget
       widgetId="activity"
-      title="Activity"
+      title="Recent activity"
       icon={DashboardSolidIcon}
       tint="peach"
       span={span}
       editing={editing}
+      className={styles.cardActivity}
       loading={isLoading}
     >
-      <div className={styles.feed}>
-        {isEmpty && (
-          <p className={cn(styles.feedTime, styles.feedEmpty)}>
-            Nothing has happened yet — edits, publishes, and plugin changes
-            will appear here.
-          </p>
-        )}
-        {!isLoading && !isEmpty && rows.map((r) => (
-          <div key={r.id} className={styles.feedRow}>
-            {r.actor ? (
-              <UserAvatar
-                user={r.actor}
-                size={AVATAR_SIZE}
-                alt={`Avatar for ${r.actor.displayName || r.actor.email}`}
-              />
-            ) : (
-              <span className={styles.feedSystemAvatar} title="System" aria-hidden="true">
-                <SettingsCogSolidIcon size={12} />
-              </span>
-            )}
-            <span className={styles.feedBody}>{renderBody(r)}</span>
-            <span className={styles.feedTime}>{formatRelative(r.createdAt)}</span>
-          </div>
-        ))}
-      </div>
+      {isEmpty ? (
+        <p className={cn(styles.feedTime, styles.feedEmpty)}>
+          Nothing yet — your recent changes show up here.
+        </p>
+      ) : (
+        <>
+          <ol className={styles.feed}>
+            {rows.slice(0, MAX_TIMELINE_ITEMS).map((r, i) => {
+              const target = renderTarget(r)
+              return (
+                <li key={r.id} className={styles.feedRow}>
+                  {/* Newest event is the green circle-check; the rest are
+                      flat grey discs — `.timeline-dot` in the reference. */}
+                  <span
+                    className={cn(styles.feedMarker, i === 0 && styles.feedMarkerActive)}
+                    aria-hidden="true"
+                  >
+                    <FaIcon name={i === 0 ? 'circle-check' : 'circle'} size={15} />
+                  </span>
+                  <div>
+                    <time className={styles.feedTimestamp} dateTime={r.createdAt}>
+                      {formatActivityTime(r.createdAt)}
+                    </time>
+                    <span className={styles.feedEntry}>
+                      {r.actor ? (
+                        <UserAvatar
+                          user={r.actor}
+                          size={AVATAR_SIZE}
+                          initialsOnly
+                          className={styles.feedAvatar}
+                          alt={`Avatar for ${r.actor.displayName || r.actor.email}`}
+                        />
+                      ) : (
+                        <span className={styles.feedSystemAvatar} title="System" aria-hidden="true">
+                          <FaIcon name="gear" size={14} />
+                        </span>
+                      )}
+                      <span className={styles.feedBody}>
+                        <strong className={styles.feedActor}>
+                          {r.actor ? r.actor.displayName || r.actor.email : 'System'}
+                        </strong>{' '}
+                        {actionVerb(r.action)}
+                        {target && <small className={styles.feedTarget}>{target}</small>}
+                      </span>
+                    </span>
+                  </div>
+                </li>
+              )
+            })}
+          </ol>
+          {canReadAudit && (
+            <Button
+              variant="ghost"
+              className={styles.viewAllBtn}
+              onClick={viewAllActivity}
+            >
+              View all activity
+              <FaIcon name="arrow-right" size={14} />
+            </Button>
+          )}
+        </>
+      )}
     </Widget>
   )
 }

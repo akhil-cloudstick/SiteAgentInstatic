@@ -1,7 +1,6 @@
 import type { CSSProperties, MouseEvent as ReactMouseEvent, ReactElement } from 'react'
 import { ArrowDownIcon } from 'pixel-art-icons/icons/arrow-down'
 import type { DataField } from '@core/data/schemas'
-import { getFieldIcon } from '@admin/pages/data/utils/fieldIcons'
 import styles from './DataGrid.module.css'
 
 interface DataGridHeaderCellProps {
@@ -57,15 +56,7 @@ export function DataGridHeaderCell({
       aria-sort={sortDir === 'asc' ? 'ascending' : sortDir === 'desc' ? 'descending' : 'none'}
       onClick={() => onClickHeader?.(field.id)}
     >
-      <span className={styles.headerIcon} aria-hidden="true">
-        {getFieldIcon(field.type)({ size: 11 })}
-      </span>
       <span className={styles.headerLabel}>{field.label}</span>
-      {field.required && (
-        <span className={styles.requiredIndicator} aria-hidden="true" title="Required">
-          *
-        </span>
-      )}
       <span className={styles.headerSort} aria-hidden="true">
         <ArrowDownIcon size={10} />
       </span>

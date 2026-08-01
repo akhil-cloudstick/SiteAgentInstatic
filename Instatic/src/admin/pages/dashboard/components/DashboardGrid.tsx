@@ -34,7 +34,7 @@ import {
   useDraggable,
   useDroppable,
 } from '@dnd-kit/core'
-import { PlusIcon } from 'pixel-art-icons/icons/plus'
+import { FaIcon } from '@ui/components/FaIcon'
 import type { DashboardWidgetDefinition } from '@core/dashboard'
 import { Button } from '@ui/components/Button'
 import { WidgetSkeleton } from '@ui/components/Widget'
@@ -230,7 +230,7 @@ export function DashboardGrid({
         >
           <span className={styles.addInner}>
             <span className={styles.addIcon}>
-              <PlusIcon size={14} />
+              <FaIcon name="plus" size={14} />
             </span>
             <span className={styles.addLabel}>Add block</span>
           </span>

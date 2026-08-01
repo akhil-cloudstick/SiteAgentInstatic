@@ -1,20 +1,24 @@
 /* AccountMenuButton — toolbar avatar trigger + account dropdown
  *
- * Achromatic to match the rest of the editor chrome (Guideline #356,
- * achromatic-color-policy.test.ts). Tones lean on `--bg-surface-*` and
- * `--text*` tokens — no hardcoded hex.
+ * The trigger carries the MMS identity green as a ring + tint (color used as
+ * identity, per the two-layer color model) so the avatar reads as the account
+ * anchor in the toolbar. The dropdown itself stays achromatic. All colors come
+ * from `--accent-1` / `--bg-surface-*` / `--text*` tokens — no hardcoded hex.
  */
 
+/* Matches the reference header's `.avatar-button`: a 44px round target with a
+ * 1px identity-green ring, transparent face, and the deeper green ink for the
+ * initials. */
 .trigger {
-    width: 28px;
-    height: 28px;
+    width: 44px;
+    height: 44px;
     padding: 0;
     border-radius: 999px;
-    border: 1px solid var(--border);
-    background: var(--bg-surface-2);
-    color: var(--text);
-    font-size: var(--text-xs);
-    font-weight: 750;
+    border: 1px solid var(--toolbar-accent);
+    background: transparent;
+    color: var(--toolbar-accent-strong);
+    font-size: var(--text-m);
+    font-weight: 650;
     line-height: 1;
     display: inline-flex;
     align-items: center;
@@ -28,20 +32,25 @@
 }
 
 /* The avatar nested inside the trigger already paints its own circle. Hide
- * the inner ring so we don't end up with a double border, and let the
- * button's own background show through behind the identicon. */
+ * the inner ring so we don't end up with a double border, let the button's
+ * green tint show through behind the identicon, and inherit the green so the
+ * initials fallback renders in the identity color. */
 .triggerAvatar {
     border: none;
     background: transparent;
+    color: var(--toolbar-accent-strong);
 }
 
+/* The reference paints no fill on the avatar, but a hover/open affordance is
+ * still required on an interactive control — so it uses the same identity
+ * green as the ring rather than a new colour. */
 .trigger:hover {
-    background: var(--bg-surface-3);
+    background: color-mix(in srgb, var(--toolbar-accent) 20%, transparent);
 }
 
 .trigger[data-active="true"] {
-    background: var(--bg-surface-3);
-    border-color: var(--border);
+    background: color-mix(in srgb, var(--toolbar-accent) 20%, transparent);
+    border-color: var(--toolbar-accent);
 }
 
 .trigger:focus-visible {

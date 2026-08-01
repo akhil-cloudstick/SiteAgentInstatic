@@ -10,6 +10,7 @@
  * grid owns its own toolbar so the visual language stays consistent across
  * all three kinds.
  */
+import type { ReactNode } from 'react'
 import { DatabaseSolidIcon } from 'pixel-art-icons/icons/database-solid'
 import { EmptyState } from '@ui/components/EmptyState'
 import { DataGrid } from '../DataGrid/DataGrid'
@@ -27,6 +28,8 @@ import styles from './DataCanvas.module.css'
 interface DataCanvasProps {
   table: DataTable | null
   tables: DataTable[]
+  /** Workbench header (breadcrumb + actions) rendered above the grid card. */
+  header?: ReactNode
   rows: DataRow[]
   loading: boolean
   /**
@@ -67,6 +70,7 @@ interface DataCanvasProps {
 export function DataCanvas({
   table,
   tables,
+  header,
   rows,
   loading,
   loadingTables,
@@ -119,24 +123,27 @@ export function DataCanvas({
 
   return (
     <section className={`${canvasStyles.canvas} ${styles.canvas}`} aria-label={`${table.pluralLabel} data grid`}>
-      <DataGrid
-        table={table}
-        rows={rows}
-        tables={tables}
-        selectedRowId={selectedRowId}
-        loading={loading}
-        error={error}
-        readOnly={!canEdit}
-        onSelectRow={onSelectRow}
-        onAddRow={rowCreationSupported ? onAddRow : undefined}
-        onEditInContent={onEditInContent}
-        onDuplicateRow={canCreate && rowCreationSupported ? onDuplicateRow : undefined}
-        onOpenInSiteEditor={onOpenInSiteEditor}
-        onOpenRow={onOpenRow}
-        onDeleteRow={canDelete ? onDeleteRow : undefined}
-        onSetRowStatus={canEdit ? onSetRowStatus : undefined}
-        onExportRows={canExport ? onExportRows : undefined}
-      />
+      {header}
+      <div className={styles.gridArea}>
+        <DataGrid
+          table={table}
+          rows={rows}
+          tables={tables}
+          selectedRowId={selectedRowId}
+          loading={loading}
+          error={error}
+          readOnly={!canEdit}
+          onSelectRow={onSelectRow}
+          onAddRow={rowCreationSupported ? onAddRow : undefined}
+          onEditInContent={onEditInContent}
+          onDuplicateRow={canCreate && rowCreationSupported ? onDuplicateRow : undefined}
+          onOpenInSiteEditor={onOpenInSiteEditor}
+          onOpenRow={onOpenRow}
+          onDeleteRow={canDelete ? onDeleteRow : undefined}
+          onSetRowStatus={canEdit ? onSetRowStatus : undefined}
+          onExportRows={canExport ? onExportRows : undefined}
+        />
+      </div>
     </section>
   )
 }

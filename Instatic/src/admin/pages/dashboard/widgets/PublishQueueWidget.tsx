@@ -73,9 +73,9 @@ function formatRelative(iso: string | null): string {
 }
 
 export function PublishQueueWidget({ span, editing }: DashboardWidgetRendererProps) {
-  const stats = usePublishLineupStats()
+  const { data: stats, loading } = usePublishLineupStats()
   const rows = stats?.rows ?? []
-  const isLoading = stats === null
+  const isLoading = loading
   const isEmpty = !isLoading && rows.length === 0
 
   return (
@@ -90,21 +90,16 @@ export function PublishQueueWidget({ span, editing }: DashboardWidgetRendererPro
     >
       {isEmpty && (
         <p className={cn(styles.feedTime, styles.feedEmpty)}>
-          Nothing in the lineup yet — schedule, publish, or draft a row to
-          see it here.
+          Nothing published or scheduled yet.
         </p>
       )}
       {!isLoading && !isEmpty && (
         <ul className={styles.wlist}>
           {rows.map((r) => (
-            <li key={r.id}>
-              <span className={styles.wlistTitle}>
-                <span className={styles.wlistPath}>{r.path}</span>
-              </span>
-              <span className={styles.wlistMeta}>
-                <span className={`${styles.badge} ${badgeClass(r.status)}`}>{badgeLabel(r.status)}</span>
-                <span>{formatRelative(r.at)}</span>
-              </span>
+            <li key={r.id} className={styles.lineupEntry}>
+              <code>{r.path}</code>
+              <span className={`${styles.badge} ${badgeClass(r.status)}`}>{badgeLabel(r.status)}</span>
+              <time>{formatRelative(r.at)}</time>
             </li>
           ))}
         </ul>

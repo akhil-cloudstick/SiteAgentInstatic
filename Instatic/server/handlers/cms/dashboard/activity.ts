@@ -85,13 +85,19 @@ export async function readRecentActivity(db: DbClient): Promise<RecentActivitySt
 }
 
 /**
- * `login.*` and `logout` events live in Account → Sign-in history. The
- * dashboard Activity widget is about *operational* changes to the site,
- * so we skip them — they would otherwise drown out the signal on a
- * busy login day.
+ * Events that don't belong in the dashboard's operator-facing change feed:
+ *   • `login.*` / `logout` — sign-in events; they live in Account → Sign-in
+ *     history and would drown out the signal on a busy login day.
+ *   • `ai.*` — AI credential / default / chat / connector chatter (e.g.
+ *     `ai.chat.started` / `ai.chat.completed`). These are AI-assistant
+ *     operations, not changes to the published site; they belong in
+ *     AI → Audit. Surfacing them here reads as implementation noise
+ *     ("ai chat started") rather than an operator-facing change.
+ * The Activity widget is about *operational* changes to the site, so we
+ * skip all of the above.
  */
 function isDashboardActivityNoise(action: AuditAction): boolean {
-  return action.startsWith('login.') || action === 'logout'
+  return action.startsWith('login.') || action === 'logout' || action.startsWith('ai.')
 }
 
 /**

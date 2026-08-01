@@ -17,8 +17,8 @@ beforeEach(resetAppearanceState)
 afterEach(resetAppearanceState)
 
 describe('editor appearance preferences', () => {
-  it('defaults to dark theme and default text size without changing density', () => {
-    expect(readEditorSelectPreference('theme')).toBe('dark')
+  it('defaults to light theme and default text size without changing density', () => {
+    expect(readEditorSelectPreference('theme')).toBe('light')
     expect(readEditorSelectPreference('textScale')).toBe('default')
     expect(readEditorSelectPreference('density')).toBe('compact')
   })

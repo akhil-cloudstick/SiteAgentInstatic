@@ -29,7 +29,7 @@
  * stays `null` outside an editing surface.
  */
 import { Button } from '@ui/components/Button'
-import { ExternalLinkSolidIcon } from 'pixel-art-icons/icons/external-link-solid'
+import { FaIcon } from '@ui/components/FaIcon'
 import { useAdminUi } from '@admin/state/adminUi'
 
 export function OpenLivePageButton() {
@@ -38,9 +38,11 @@ export function OpenLivePageButton() {
   const tooltip = activeLivePath ? 'Open live page' : 'Open live site'
 
   return (
+    // Round 44px header button — see ThemeToggleButton for the shared spec.
     <Button
       variant="ghost"
-      size="sm"
+      size="lg"
+      shape="pill"
       iconOnly
       aria-label={tooltip}
       tooltip={tooltip}
@@ -49,7 +51,7 @@ export function OpenLivePageButton() {
         window.open(target, '_blank', 'noopener,noreferrer')
       }}
     >
-      <ExternalLinkSolidIcon size={16} aria-hidden="true" />
+      <FaIcon name="arrow-up-right-from-square" size={17} />
     </Button>
   )
 }

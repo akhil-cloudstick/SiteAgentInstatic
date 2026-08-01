@@ -2,6 +2,11 @@
    dynamic custom property on the element); this module owns the geometry. */
 .icon {
     font-size: var(--ri-size);
+    /* Pin the icon to the webfont's single (normal) weight. Without this the
+       glyph inherits its parent's font-weight — inside bold text (e.g. the
+       toolbar nav labels at 600/700) the browser faux-bolds the single-weight
+       icon font, thickening every stroke. Icons must never be faux-bolded. */
+    font-weight: normal;
     width: var(--ri-size);
     height: var(--ri-size);
     line-height: 1;

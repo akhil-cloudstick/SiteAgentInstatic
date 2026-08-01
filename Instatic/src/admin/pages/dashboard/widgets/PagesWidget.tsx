@@ -14,10 +14,11 @@ import { StatValue, Delta } from '@ui/components/charts'
 import type { DashboardWidgetRendererProps } from '@core/dashboard'
 import { Widget } from '@ui/components/Widget'
 import { usePagesStats } from '../hooks/useDashboardStats'
+import { WidgetPlaceholder } from './WidgetPlaceholder'
 import styles from './widgets.module.css'
 
 export function PagesWidget({ span, editing }: DashboardWidgetRendererProps) {
-  const stats = usePagesStats()
+  const { data: stats, loading } = usePagesStats()
   return (
     <Widget
       widgetId="pages"
@@ -26,7 +27,7 @@ export function PagesWidget({ span, editing }: DashboardWidgetRendererProps) {
       tint="lilac"
       span={span}
       editing={editing}
-      loading={stats === null}
+      loading={loading}
     >
       {stats && (
         <>
@@ -46,6 +47,14 @@ export function PagesWidget({ span, editing }: DashboardWidgetRendererProps) {
             <span>{stats.scheduled} scheduled</span>
           </div>
         </>
+      )}
+      {!loading && !stats && (
+        <WidgetPlaceholder
+          reason="unavailable"
+          icon="file-lines"
+          title="No pages yet"
+          detail="Your published pages and drafts show up here."
+        />
       )}
     </Widget>
   )

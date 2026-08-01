@@ -62,6 +62,14 @@ const DashboardLayoutSchema = Type.Object({
   items: Type.Array(DashboardItemSchema),
   onboardingDismissed: Type.Boolean(),
   /**
+   * Which shipped default-arrangement generation this saved layout descends
+   * from. Optional on the wire so pre-versioning saved layouts (no field)
+   * still parse — the hook treats a missing version as 0 and re-seeds it to
+   * the current default. Bumped whenever we ship a new default grid so every
+   * user re-seeds ONCE. See `DASHBOARD_LAYOUT_VERSION` in the hook.
+   */
+  version: Type.Optional(Type.Number()),
+  /**
    * Height (in pixels) of the bottom-docked Block library panel. Persisted
    * per-user so the panel sticks to the same height across reloads and
    * devices. Optional on the wire so existing saved layouts (without the

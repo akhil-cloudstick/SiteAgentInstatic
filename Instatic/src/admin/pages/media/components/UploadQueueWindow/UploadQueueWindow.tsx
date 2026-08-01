@@ -142,6 +142,9 @@ function UploadRow({ item, onRetry, onRemove, onReveal }: UploadRowProps) {
         {item.error && (
           <span className={styles.error} role="alert">{item.error}</span>
         )}
+        {item.warning && !item.error && (
+          <span className={styles.warning} role="status">{item.warning}</span>
+        )}
         <span className={styles.progressBar} aria-hidden="true">
           <span
             className={styles.progressFill}

@@ -217,8 +217,6 @@ export function AdminCanvasLayout() {
             lazy mount gates on `previewOpen` so the chunk loads only when the
             user actually opens preview. */}
         <Toolbar
-          siteName={siteName}
-          faviconUrl={faviconUrl}
           section="site"
           adminNavigationSlot={(
             <AdminSectionNavigation

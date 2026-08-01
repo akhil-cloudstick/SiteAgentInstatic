@@ -12,7 +12,7 @@
  * mutation refresh callback live here.
  */
 import { useEffect, useEffectEvent, useState } from 'react'
-import { peekPendingAction } from '@admin/spotlight/pendingAction'
+import { peekPendingAction, consumePendingAction } from '@admin/spotlight/pendingAction'
 import { Button } from '@ui/components/Button'
 import { AdminPageLayout } from '@admin/layouts/AdminPageLayout'
 import { hasCapability } from '@admin/access'
@@ -58,10 +58,20 @@ export function UsersPage() {
       peekPendingAction('users.newRole') && availableTabs.includes('roles')
     const invitePending =
       peekPendingAction('users.invite') && availableTabs.includes('users')
-    if (!newRolePending && !invitePending) return
+    // "View all activity" (from the dashboard Activity widget) deep-links to
+    // the Audit tab. Unlike invite/newRole — which the receiving tab consumes
+    // to open a dialog — there is no follow-up action here, so we consume it
+    // right after selecting the tab.
+    const viewAuditPending =
+      peekPendingAction('users.viewAudit') && availableTabs.includes('audit')
+    if (!newRolePending && !invitePending && !viewAuditPending) return
     queueMicrotask(() => {
       if (newRolePending) setTab('roles')
       else if (invitePending) setTab('users')
+      else if (viewAuditPending) {
+        setTab('audit')
+        consumePendingAction('users.viewAudit')
+      }
     })
   })
   useEffect(() => {

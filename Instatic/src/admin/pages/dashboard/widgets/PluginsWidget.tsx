@@ -5,14 +5,14 @@
  * dashboard's data hooks and unblocks as soon as `installed_plugins`
  * has been scanned.
  *
- * Skeleton: `loading={stats === null}` — the Widget primitive renders
+ * Skeleton: `loading` comes from the hook's own flag — the Widget renders
  * the universal skeleton body while loading; we gate the real rows
  * on `stats &&` so they never see a null value.
  */
 import { PlugSolidIcon } from 'pixel-art-icons/icons/plug-solid'
 import type { DashboardWidgetRendererProps } from '@core/dashboard'
 import { Widget } from '@ui/components/Widget'
-import { cn } from '@ui/cn'
+import { FaIcon } from '@ui/components/FaIcon'
 import { usePluginsStats, type DashboardPluginRow } from '../hooks/useDashboardStats'
 import styles from './widgets.module.css'
 
@@ -29,8 +29,8 @@ function stateLabel(state: DashboardPluginRow['state']): string {
 }
 
 export function PluginsWidget({ span, editing }: DashboardWidgetRendererProps) {
-  const stats = usePluginsStats()
-  const isLoading = stats === null
+  const { data: stats, loading } = usePluginsStats()
+  const isLoading = loading
   const plugins = stats?.rows ?? []
   const isEmpty = !isLoading && plugins.length === 0
 
@@ -46,9 +46,13 @@ export function PluginsWidget({ span, editing }: DashboardWidgetRendererProps) {
     >
       <div>
         {isEmpty && (
-          <p className={cn(styles.feedTime, styles.feedEmpty)}>
-            No plugins installed yet.
-          </p>
+          <div className={styles.widgetEmpty} role="status">
+            <FaIcon name="cube" size={24} className={styles.widgetEmptyIcon} />
+            <strong className={styles.widgetEmptyTitle}>No plugins installed yet</strong>
+            <span className={styles.widgetEmptyDetail}>
+              Install only the extensions this site needs.
+            </span>
+          </div>
         )}
         {!isLoading && plugins.map((p) => (
           <div key={p.id} className={styles.pluginRow}>

@@ -659,6 +659,11 @@ export function LiveCanvas({
 
   return (
     <div className={styles.shell} data-testid="content-live-canvas">
+      {!readOnly && (
+        <span className={styles.editingLabel} aria-hidden="true">
+          Editing article content
+        </span>
+      )}
       <iframe
         ref={setIframeEl}
         srcDoc={preview.html}

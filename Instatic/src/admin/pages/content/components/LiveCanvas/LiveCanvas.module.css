@@ -1,22 +1,40 @@
-/* `.shell` is positioned absolutely inside the canvas's `.documentScroll`
- * so the iframe fills every available pixel — Live mode is meant to
- * feel like the published page, edge-to-edge, with no spurious chrome.
- * The `.documentScroll` parent already supplies the 20px inline padding,
- * which is fine for the Write surface but undesirable for Live; we
- * override it with a negative margin so the iframe runs to the edge.
- */
+/* `.shell` is positioned absolutely inside the canvas's `.documentScroll`.
+ * The redesign frames the Live surface (green "editing" edge + corner label)
+ * rather than bleeding it edge-to-edge, so we keep the parent's inline
+ * padding for horizontal inset and add a small top/bottom inset. */
 .shell {
     position: absolute;
-    inset: 0;
-    margin-inline: calc(var(--space-4xl) * -1);
+    inset: var(--space-m) 0;
 }
 
+/* Green focus edge — signals the iframe is a live *editing* surface, not a
+ * passive preview. Matches the approved Screen 2 mock. */
 .frame {
     display: block;
     width: 100%;
     height: 100%;
-    border: 0;
+    border: 2px solid var(--success);
+    border-radius: var(--panel-radius);
     background: var(--bg-body);
+}
+
+/* Corner tab reading "Editing article content" (mock Screen 2). Sits on the
+ * frame's top-left corner; hidden in read-only mode. */
+.editingLabel {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 3;
+    display: inline-flex;
+    align-items: center;
+    padding: var(--space-3xs) var(--space-s);
+    border-top-left-radius: var(--panel-radius);
+    border-bottom-right-radius: var(--radius-sm);
+    background: var(--success);
+    color: var(--on-accent);
+    font-size: var(--text-2xs);
+    font-weight: 650;
+    line-height: 1.2;
 }
 
 .loading {

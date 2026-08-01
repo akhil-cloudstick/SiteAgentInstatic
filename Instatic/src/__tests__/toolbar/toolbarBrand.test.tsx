@@ -1,11 +1,10 @@
-import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
+import { afterEach, describe, expect, it } from 'bun:test'
 import React, { type ReactNode } from 'react'
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { cleanup, render, screen, within } from '@testing-library/react'
 import { MemoryRouter } from '@admin/lib/routing'
 import { Toolbar } from '@site/toolbar/Toolbar'
 import { AdminSessionProvider } from '@admin/session'
 import { StepUpProvider } from '@admin/shared/StepUp'
-import { useAdminUi } from '@admin/state/adminUi'
 import type { CmsCurrentUser } from '@core/persistence'
 
 const now = '2026-06-10T10:00:00.000Z'
@@ -52,12 +51,10 @@ function Wrapper({ children }: { children: ReactNode }) {
   )
 }
 
-function renderToolbarBrand(props: { siteName: string | null; faviconUrl?: string | null }) {
+function renderToolbar() {
   render(
     <Wrapper>
       <Toolbar
-        siteName={props.siteName}
-        faviconUrl={props.faviconUrl ?? null}
         adminNavigationSlot={<span data-testid="toolbar-nav-slot" />}
         rightSlot={<span data-testid="toolbar-right-slot" />}
       />
@@ -65,66 +62,42 @@ function renderToolbarBrand(props: { siteName: string | null; faviconUrl?: strin
   )
 
   const toolbar = screen.getByTestId('toolbar')
-  const brand = within(toolbar).getByTestId('toolbar-site-brand')
+  const brand = within(toolbar).getByTestId('toolbar-brand')
   return { toolbar, brand }
 }
 
-beforeEach(() => {
-  localStorage.clear()
-  useAdminUi.setState({ activeLivePath: null })
-})
-
 afterEach(() => {
-  useAdminUi.setState({ activeLivePath: null })
   cleanup()
 })
 
 describe('Toolbar brand mark', () => {
-  it('shows a skeleton while the site name is loading', () => {
-    const { toolbar, brand } = renderToolbarBrand({
-      siteName: null,
-      faviconUrl: null,
-    })
+  it('renders the fixed MMSBUILD product lockup', () => {
+    const { brand } = renderToolbar()
 
-    expect(brand.tagName).toBe('SPAN')
-    expect(brand.textContent).toBe('')
-    expect(brand.getAttribute('aria-hidden')).toBe('true')
-    expect(brand.hasAttribute('role')).toBe(false)
-    expect(within(toolbar).queryByText('Untitled Site')).toBeNull()
+    // Fixed product lockup — a link, not the per-site name. The approved
+    // screen reference bakes the mascot + wordmark into one artwork, so the
+    // link itself carries the accessible name rather than a text node.
+    expect(brand.tagName).toBe('A')
+    expect(brand.getAttribute('aria-label')).toBe('MMSBUILD')
   })
 
-  it('shows the site name when the site has no configured favicon', () => {
-    const { toolbar, brand } = renderToolbarBrand({
-      siteName: 'Studio Site',
-      faviconUrl: null,
-    })
+  it('shows the themed lockup artwork from public assets, marked decorative', () => {
+    const { brand } = renderToolbar()
 
-    expect(brand.tagName).toBe('SPAN')
-    expect(brand.textContent).toBe('Studio Site')
-    expect(brand.getAttribute('aria-label')).toBe('Site: Studio Site')
-    expect(within(toolbar).queryByRole('img', { name: 'Site: Studio Site' })).toBeNull()
+    const mark = brand.querySelector('img')
+    // Light is the default theme in this harness; the dark asset is drawn
+    // larger, hence the intrinsic size travels with the source.
+    expect(mark?.getAttribute('src')).toBe('/mmsbuild-logo-light.png')
+    expect(mark?.getAttribute('width')).toBe('141')
+    expect(mark?.getAttribute('height')).toBe('25')
+    // The link carries the accessible name, so the artwork is decorative.
+    expect(mark?.getAttribute('alt')).toBe('')
+    expect(mark?.getAttribute('aria-hidden')).toBe('true')
   })
 
-  it('prefers the site favicon from settings when present', () => {
-    const { brand } = renderToolbarBrand({
-      siteName: 'Configured Site',
-      faviconUrl: '/uploads/site-favicon.svg',
-    })
+  it('links the brand through to the dashboard', () => {
+    const { brand } = renderToolbar()
 
-    expect(brand.tagName).toBe('IMG')
-    expect(brand.getAttribute('src')).toBe('/uploads/site-favicon.svg')
-    expect(brand.getAttribute('alt')).toBe('Site: Configured Site')
-  })
-
-  it('shows the configured favicon site name in the shared tooltip', async () => {
-    const { brand } = renderToolbarBrand({
-      siteName: 'Tooltip Site',
-      faviconUrl: '/uploads/site-favicon.svg',
-    })
-
-    fireEvent.mouseEnter(brand)
-
-    expect((await screen.findByRole('tooltip')).textContent).toBe('Tooltip Site')
-    expect(brand.hasAttribute('title')).toBe(false)
+    expect(brand.getAttribute('href')).toBe('/admin/dashboard')
   })
 })

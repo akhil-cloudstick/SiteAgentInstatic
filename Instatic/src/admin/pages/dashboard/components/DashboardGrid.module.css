@@ -17,11 +17,9 @@
 
 .gridLayout {
     --row-h: 70px;
-    /* Hairline divider. The grid sits
-       on `--bg-surface` (darker) while each card is `--bg-surface-2`
-       (lighter), so the gap reveals the parent and reads as a
-       borderless tile divider. */
-    --gap: var(--space-px);
+    /* 14px gutter — `--dashboard-gap` in the approved screen, which separates
+       cards rather than using a 1px hairline. */
+    --gap: var(--mms-dashboard-gap);
     display: grid;
     grid-template-columns: repeat(12, 1fr);
     grid-auto-rows: var(--row-h);
@@ -55,11 +53,14 @@
 }
 
 .editing {
-    /* Widen the gutter while customising so each card has breathing
-       room around its edges. JS snap math reads the computed `--gap`
-       value so drag/drop geometry stays in sync with the fluid token. */
-    --gap: var(--space-2xl);
-    outline-color: color-mix(in srgb, var(--accent-3) 18%, transparent);
+    /* The reference keeps the same 14px gutter in customize mode and marks
+       the surface with a warm dashed frame instead (`.is-customizing`). JS
+       snap math reads the computed `--gap` so drag/drop geometry stays in
+       sync either way. */
+    --gap: var(--mms-dashboard-gap);
+    outline-color: color-mix(in srgb, var(--mms-orange) 45%, transparent);
+    outline-offset: 8px;
+    border-radius: 18px;
     /* `--grid-min-height` is set inline by GridSurface in customize
        mode — extra empty rows below the lowest widget so the user has
        drop zones when dragging from the block library. View mode
@@ -96,7 +97,7 @@
 }
 
 .dropTarget {
-    outline: 1px dashed var(--accent-3);
+    outline: 1px dashed var(--mms-orange);
     outline-offset: 4px;
     border-radius: 16px;
 }
@@ -174,7 +175,7 @@
     position: absolute;
     top: 50%;
     left: 50%;
-    background: var(--accent-3);
+    background: var(--mms-orange);
     border-radius: 2px;
     transform: translate(-50%, -50%);
     opacity: 0;
@@ -283,10 +284,10 @@
  */
 .dropPreview {
     position: absolute;
-    background: var(--accent-3);
+    background: var(--mms-orange);
     opacity: 0.18;
     border-radius: 16px;
-    border: 1px dashed color-mix(in srgb, var(--accent-3) 55%, transparent);
+    border: 1px dashed color-mix(in srgb, var(--mms-orange) 55%, transparent);
     pointer-events: none;
     z-index: 1;
     transition:
@@ -325,8 +326,8 @@
     background: transparent;
     border: 0;
     border-radius: 16px;
-    box-shadow: inset 0 0 0 1px var(--border-muted);
-    color: var(--text-subtle);
+    box-shadow: inset 0 0 0 1px var(--mms-border);
+    color: var(--mms-text-muted);
     cursor: pointer;
     transition:
         color 120ms ease,
@@ -337,9 +338,9 @@
 }
 
 .addWidget:hover {
-    color: var(--text-bright);
-    background: var(--overlay-5);
-    box-shadow: inset 0 0 0 1px var(--text-subtle);
+    color: var(--mms-action-strong);
+    background: var(--mms-surface-tint);
+    box-shadow: inset 0 0 0 1px var(--mms-border-strong);
 }
 
 .addInner {
@@ -352,11 +353,11 @@
     width: 36px;
     height: 36px;
     border-radius: 10px;
-    background: var(--bg-surface);
-    border: 1px solid var(--border);
+    background: var(--mms-surface);
+    border: 1px solid var(--mms-border);
     display: grid;
     place-items: center;
-    color: var(--text-muted);
+    color: var(--mms-text-muted);
 }
 
 .addLabel {

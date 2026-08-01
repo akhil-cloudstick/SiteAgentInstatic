@@ -14,13 +14,10 @@
 import { useEffect, useEffectEvent, useRef, useState, type CSSProperties, type MouseEvent } from 'react'
 import { Button } from '@ui/components/Button'
 import { Skeleton } from '@ui/components/Skeleton'
-import { TagPill } from '@ui/components/TagPill'
 import { railAccent, railTintVar } from '@ui/railAccent'
-import type { PillAccent } from '@ui/pillAccent'
 import { DatabaseSolidIcon } from 'pixel-art-icons/icons/database-solid'
+import { LockSolidIcon } from 'pixel-art-icons/icons/lock-solid'
 import { PlusIcon } from 'pixel-art-icons/icons/plus'
-import { ArrowDownIcon } from 'pixel-art-icons/icons/arrow-down'
-import { UploadIcon } from 'pixel-art-icons/icons/upload'
 import { useWorkspaceLayout } from '@admin/state/workspaceLayout'
 import { Panel } from '@admin/shared/Panel'
 import { SidebarResizeHandle } from '@admin/shared/SidebarResizeHandle'
@@ -45,14 +42,8 @@ interface DataSidebarProps {
   onOpenTableSettings: (tableId: string) => void
   onDeleteTable: (table: DataTableListItem) => void
   onCreateTable: () => void
-  /** Opens the ExportDialog in the parent. */
-  onOpenExport: () => void
-  /** Opens the canonical Site Import modal in the parent. */
-  onOpenImport: () => void
   canCreateTable: boolean
   canManage: boolean
-  canExport: boolean
-  canImport: boolean
 }
 
 interface TableContextMenuState {
@@ -61,13 +52,16 @@ interface TableContextMenuState {
   tableId: string
 }
 
-const TABLE_KIND_ACCENT: Record<DataTableListItem['kind'], PillAccent> = {
-  page: 'a',
-  postType: 'b',
-  component: 'c',
-  data: 'd',
-  layout: 'l',
-}
+// Structurally-managed kinds are edited in the Site editor, not the Data grid,
+// so the sidebar marks them with a lock — matching the approved mock (Pages,
+// Components, Layouts locked; Posts, a `postType`, stays unlocked because it is
+// authored in Content). Presentation only: it mirrors, not enforces, the
+// server-side create/rename/delete gates.
+const STRUCTURE_LOCKED_KINDS: ReadonlySet<DataTableListItem['kind']> = new Set([
+  'page',
+  'component',
+  'layout',
+])
 
 // ---------------------------------------------------------------------------
 // Component
@@ -82,12 +76,8 @@ export function DataSidebar({
   onOpenTableSettings,
   onDeleteTable,
   onCreateTable,
-  onOpenExport,
-  onOpenImport,
   canCreateTable,
   canManage,
-  canExport,
-  canImport,
 }: DataSidebarProps) {
   const sidebarRef = useRef<HTMLElement | null>(null)
   const tableListRef = useRef<HTMLDivElement | null>(null)
@@ -127,10 +117,7 @@ export function DataSidebar({
 
   function renderTableButton(table: DataTableListItem) {
     const selected = table.id === selectedTableId
-    const kindLabel = table.kind === 'postType' ? 'post-type'
-      : table.kind === 'page' ? 'page'
-      : table.kind === 'component' ? 'component'
-      : 'data'
+    const locked = STRUCTURE_LOCKED_KINDS.has(table.kind)
     return (
       <Button
         key={table.id}
@@ -146,14 +133,15 @@ export function DataSidebar({
         onContextMenuCapture={(event) => openTableContextMenu(table, event)}
         className={styles.tableButton}
       >
+        {/* Leading marker slot — a green dot on the active table (matches the
+            mock), kept a fixed width on every row so the database icons stay
+            column-aligned whether or not the dot is showing. */}
+        <span className={styles.tableSelectedDot} data-visible={selected || undefined} aria-hidden="true" />
         <DatabaseSolidIcon size={13} aria-hidden="true" />
         <span className={styles.tableLabel}>{table.pluralLabel}</span>
-        <TagPill
-          label={kindLabel}
-          accent={TABLE_KIND_ACCENT[table.kind]}
-          size="xs"
-          className={styles.tableKindBadge}
-        />
+        {locked && (
+          <LockSolidIcon size={12} className={styles.tableLockIcon} aria-hidden="true" />
+        )}
       </Button>
     )
   }
@@ -241,34 +229,6 @@ export function DataSidebar({
             title="Data tables"
             body="bare"
             onClose={() => setDataSidebarCollapsed(true)}
-            headerActions={
-              <>
-                {canExport && (
-                  <Button
-                    variant="ghost"
-                    size="xs"
-                    iconOnly
-                    aria-label="Export site"
-                    tooltip="Export site"
-                    onClick={onOpenExport}
-                  >
-                    <ArrowDownIcon size={13} aria-hidden="true" />
-                  </Button>
-                )}
-                {canImport && (
-                  <Button
-                    variant="ghost"
-                    size="xs"
-                    iconOnly
-                    aria-label="Import site"
-                    tooltip="Import site"
-                    onClick={onOpenImport}
-                  >
-                    <UploadIcon size={13} aria-hidden="true" />
-                  </Button>
-                )}
-              </>
-            }
           >
             <div
               ref={tableListRef}

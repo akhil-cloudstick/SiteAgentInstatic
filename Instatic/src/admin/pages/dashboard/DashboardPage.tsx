@@ -47,15 +47,15 @@ import {
   type DragMoveEvent,
   type DragStartEvent,
 } from '@dnd-kit/core'
-import { PlusIcon } from 'pixel-art-icons/icons/plus'
-import { LayoutSolidIcon } from 'pixel-art-icons/icons/layout-solid'
-import { ZapSolidIcon } from 'pixel-art-icons/icons/zap-solid'
-import { ChevronRightIcon } from 'pixel-art-icons/icons/chevron-right'
+import { createPortal } from 'react-dom'
+import { FaIcon } from '@ui/components/FaIcon'
 import { AdminPageLayout } from '@admin/layouts/AdminPageLayout'
-import { useAuthenticatedAdminUser } from '@admin/sessionContext'
+import { useAdminUi } from '@admin/state/adminUi'
 import { useAdminNavigate } from '@admin/lib/useAdminNavigate'
 import { Button } from '@ui/components/Button'
+import { ContextMenu, ContextMenuItem } from '@ui/components/ContextMenu'
 import { FloatingActionBar } from '@ui/components/FloatingActionBar'
+import { WidgetSkeleton } from '@ui/components/Widget'
 import { cn } from '@ui/cn'
 import type { DashboardWidgetDefinition } from '@core/dashboard'
 import {
@@ -63,22 +63,22 @@ import {
   GRID_ROW_HEIGHT,
   MAX_COLS,
   hasOverlapAt,
+  isDefaultDashboardLayout,
   readDashboardGridGap,
+  RETIRED_WIDGET_IDS,
   snapToCell,
   useDashboardLayout,
   type DashboardItem,
 } from './hooks/useDashboardLayout'
 import { useDashboardWidgets } from './hooks/useDashboardWidgets'
-import { useOnboardingState } from './hooks/useOnboardingState'
 import { registerFirstPartyDashboardWidgets } from './widgets'
-import { OnboardingPanel } from './components/OnboardingPanel'
 import {
   BlockLibrary,
   LIBRARY_DRAG_PREFIX,
   LIBRARY_DROP_ID,
 } from './components/BlockLibrary'
 import { DashboardGrid } from './components/DashboardGrid'
-import { RangeTabs } from '@ui/components/RangeTabs'
+import { getCmsPublishStatus } from '@core/persistence'
 import styles from './DashboardPage.module.css'
 import gridStyles from './components/DashboardGrid.module.css'
 
@@ -88,8 +88,6 @@ import gridStyles from './components/DashboardGrid.module.css'
 // `useInstalledEditorPlugins.ts` — so plugin widgets registered at boot
 // already have an icon mapping by the time their `activate()` runs.
 registerFirstPartyDashboardWidgets()
-
-type RangeKey = 'today' | '7d' | '30d' | 'all'
 
 /** Default rows used when the library drops a new widget. Matches the
  *  preview tile's row count in `BlockLibrary.tsx`. */
@@ -119,18 +117,37 @@ const PROXIMITY_MIN_SCALE = 0.32
  */
 const PILL_FOOTPRINT_PX = 72
 
-function greetingFor(displayName: string | null | undefined): string {
-  const hour = new Date().getHours()
-  const time = hour < 12 ? 'morning' : hour < 18 ? 'afternoon' : 'evening'
-  const name = displayName?.split(' ')[0] ?? 'there'
-  return `Good ${time}, ${name}.`
+/** "Last published <date>" from the real publish status, or a plain fallback. */
+function formatLastPublished(iso: string | undefined): string {
+  if (!iso) return 'Not published yet'
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return 'Not published yet'
+  return `Last published ${date.toLocaleString(undefined, {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  })}`
 }
 
 export function DashboardPage() {
-  const currentUser = useAuthenticatedAdminUser()
   const navigate = useAdminNavigate()
+  const siteName = useAdminUi((s) => s.siteName)
+
+  // Real publish state for the header pills (Site is live / Changes ready /
+  // Last published) — no fabricated data.
+  const [publishStatus, setPublishStatus] = useState<
+    Awaited<ReturnType<typeof getCmsPublishStatus>> | null
+  >(null)
+  useEffect(() => {
+    let cancelled = false
+    void getCmsPublishStatus()
+      .then((status) => { if (!cancelled) setPublishStatus(status) })
+      .catch((err) => { console.error('[dashboard] publish status load failed:', err) })
+    return () => { cancelled = true }
+  }, [])
   const widgets = useDashboardWidgets()
-  const { facts, refresh: refreshOnboarding } = useOnboardingState()
   const layoutApi = useDashboardLayout()
   const {
     layout,
@@ -139,13 +156,29 @@ export function DashboardPage() {
     removeWidget,
     resize,
     resizeRows,
-    dismissOnboarding,
     setLibraryHeight,
   } = layoutApi
 
   const [editing, setEditing] = useState(false)
   const [libraryOpen, setLibraryOpenRaw] = useState(false)
-  const [range, setRange] = useState<RangeKey>('today')
+  // Secondary "dashboard options" overflow — keeps Customize + Add block out of
+  // the header's primary action row so "New page" reads as the single primary
+  // job (audit P2-#6). Once customize mode is on, the FloatingActionBar takes
+  // over with its own Add block + Done controls.
+  const [deskMenuOpen, setDeskMenuOpen] = useState(false)
+  const deskMenuRef = useRef<HTMLButtonElement | null>(null)
+
+  // Close the overflow menu when the page scrolls. The shared ContextMenu
+  // otherwise stays glued to its trigger and reprojects on scroll, so it
+  // reads as "stuck" following the header. Native dropdowns dismiss on
+  // outside scroll instead — capture phase catches a scroll on any nested
+  // scroller (the dashboard body), and the 2-item menu never scrolls itself.
+  useEffect(() => {
+    if (!deskMenuOpen) return
+    const close = () => setDeskMenuOpen(false)
+    window.addEventListener('scroll', close, true)
+    return () => window.removeEventListener('scroll', close, true)
+  }, [deskMenuOpen])
 
   // Deferred mount of non-critical dashboard children — drag-and-drop
   // surfaces (BlockLibrary, DragOverlay), the FloatingActionBar, and the
@@ -273,8 +306,6 @@ export function DashboardPage() {
   // memo needed: this is a plain alias, not a derived array.
   const visibleItems = layout.items
 
-  const showOnboarding = !layout.onboardingDismissed && !facts.loading
-
   /**
    * One-copy model: the library only shows widgets that are NOT already
    * on the dashboard. The filter is computed here (not inside
@@ -286,7 +317,7 @@ export function DashboardPage() {
    */
   const availableWidgets = (() => {
     const active = new Set(layout.items.map((i) => i.id))
-    return widgets.filter((w) => !active.has(w.id))
+    return widgets.filter((w) => !active.has(w.id) && !RETIRED_WIDGET_IDS.has(w.id))
   })()
 
   function handleDragStart(event: DragStartEvent) {
@@ -488,6 +519,25 @@ export function DashboardPage() {
     moveWidget(rawId, target.col, target.row)
   }
 
+  /**
+   * The default view renders the approved release-desk structure rather
+   * than the 12-column customize grid. As soon as the user touches the
+   * layout (or opens customize mode) we hand over to the draggable grid.
+   */
+  const showReleaseDesk = !editing && isDefaultDashboardLayout(layout.items)
+
+  /**
+   * Render one release-desk tile at its fixed span. Falls back to the
+   * skeleton chrome while a definition is still registering, so the desk
+   * never paints an empty hole.
+   */
+  function renderDeskWidget(id: string, span: number) {
+    const def = definitionsById.get(id)
+    if (!def) return <WidgetSkeleton widgetId={id} span={span} />
+    const Render = def.render
+    return <Render span={span} editing={false} />
+  }
+
   // The DragOverlay renders a portal-rooted visual at the pointer. We
   // resolve which kind of source is active (existing cell vs. library
   // preview) so the overlay reads as the same tile the user picked up,
@@ -496,64 +546,91 @@ export function DashboardPage() {
   const overlayContent = renderOverlay(activeId, visibleItems, definitionsById, proximityScale)
 
   return (
-    <AdminPageLayout
-      workspace="dashboard"
-      title={greetingFor(currentUser.displayName)}
-      description="Your site at a glance — content, activity, storage and plugins. Configure the grid to surface exactly what you watch."
-      actions={(
-        <>
-          <Button variant="ghost" size="sm">
-            <ZapSolidIcon size={11} aria-hidden="true" /> Publish all
-          </Button>
-          <Button variant="primary" onClick={() => navigate('/admin/site')}>
-            <PlusIcon size={12} aria-hidden="true" /> New page
-          </Button>
-        </>
-      )}
-    >
-      <div className={styles.crumbs}>
-        <span>Admin</span>
-        <ChevronRightIcon size={9} aria-hidden="true" />
-        <span className={styles.crumbsCurrent}>Dashboard</span>
-      </div>
-
-      {mounted && showOnboarding && (
-        <OnboardingPanel facts={facts} onDismiss={dismissOnboarding} onFrameworkImported={refreshOnboarding} />
-      )}
-
-      <div className={styles.gridHeader}>
-        <div className={styles.gridHeaderLeft}>
-          <h2>Overview</h2>
-          <span className={styles.gridCount}>
-            {String(visibleItems.length).padStart(2, '0')} blocks
-          </span>
+    <AdminPageLayout workspace="dashboard" mode="dashboard">
+      {/* Live Release Desk header — site name + real publish-state pills, then
+          the actions. (Customize + Add block stay reachable for the grid.) */}
+      <header className={styles.desk}>
+        <div className={styles.deskLead}>
+          <h1 className={styles.deskTitle}>{siteName ?? 'Dashboard'}</h1>
+          <div className={styles.deskStatus}>
+            <span
+              className={cn(
+                styles.pill,
+                publishStatus?.hasPublishedVersion ? styles.pillLive : styles.pillMuted,
+              )}
+            >
+              <FaIcon name="circle" size={8} className={styles.pillDot} />
+              {publishStatus?.hasPublishedVersion ? 'Site is live' : 'Not published'}
+            </span>
+            {publishStatus && !publishStatus.draftMatchesPublished && (
+              <span className={cn(styles.pill, styles.pillChanges)}>
+                <FaIcon name="circle" size={8} className={styles.pillDot} />
+                Changes ready
+              </span>
+            )}
+            <span className={styles.deskDivider} aria-hidden="true">·</span>
+            <span className={styles.deskMeta}>
+              {formatLastPublished(publishStatus?.lastPublishedAt)}
+            </span>
+          </div>
         </div>
-        <div className={styles.gridHeaderRight}>
-          <RangeTabs<RangeKey>
-            value={range}
-            options={[
-              { value: 'today', label: 'Today' },
-              { value: '7d', label: '7d' },
-              { value: '30d', label: '30d' },
-              { value: 'all', label: 'All' },
-            ]}
-            onChange={setRange}
-            ariaLabel="Time range"
-          />
+        <div className={styles.deskActions}>
+          {/* Green OUTLINE, not a filled CTA — in the approved screen the only
+              filled green button is the release card's primary action. */}
           <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => setEditing((v) => !v)}
-            pressed={editing}
+            variant="ghost"
+            className={styles.newPageButton}
+            onClick={() => navigate('/admin/site')}
           >
-            <LayoutSolidIcon size={11} aria-hidden="true" />
-            {editing ? 'Done' : 'Customize'}
+            <FaIcon name="plus" size={14} /> New page
           </Button>
-          <Button variant="ghost" size="sm" onClick={() => setLibraryOpen(true)}>
-            <PlusIcon size={11} aria-hidden="true" /> Add block
+          <Button
+            ref={deskMenuRef}
+            variant="ghost"
+            iconOnly
+            className={styles.overflowButton}
+            aria-label="Dashboard options"
+            aria-haspopup="menu"
+            aria-expanded={deskMenuOpen}
+            active={deskMenuOpen}
+            onClick={() => setDeskMenuOpen((v) => !v)}
+          >
+            <FaIcon name="ellipsis" size={17} />
           </Button>
+          {deskMenuOpen && typeof document !== 'undefined' && createPortal(
+            <ContextMenu
+              ariaLabel="Dashboard options"
+              onClose={() => setDeskMenuOpen(false)}
+              anchorRef={deskMenuRef}
+              side="bottom"
+              align="end"
+              menuClassName={styles.deskMenu}
+            >
+              <ContextMenuItem
+                className={styles.deskMenuItem}
+                onClick={() => {
+                  setDeskMenuOpen(false)
+                  setEditing((v) => !v)
+                }}
+              >
+                <FaIcon name="table-cells-large" size={14} />
+                <span>{editing ? 'Exit customize' : 'Customize layout'}</span>
+              </ContextMenuItem>
+              <ContextMenuItem
+                className={styles.deskMenuItem}
+                onClick={() => {
+                  setDeskMenuOpen(false)
+                  setLibraryOpen(true)
+                }}
+              >
+                <FaIcon name="plus" size={14} />
+                <span>Add block</span>
+              </ContextMenuItem>
+            </ContextMenu>,
+            document.body,
+          )}
         </div>
-      </div>
+      </header>
 
       <DndContext
         sensors={sensors}
@@ -577,16 +654,38 @@ export function DashboardPage() {
         // manually before initiating the drag.
         autoScroll={false}
       >
-        <DashboardGrid
-          items={visibleItems}
-          definitions={definitionsById}
-          editing={editing}
-          onResize={resize}
-          onResizeRows={resizeRows}
-          onAddBlock={() => setLibraryOpen(true)}
-          gridRef={gridRef}
-          dropTarget={dropTarget}
-        />
+        {/* Two layout engines, exactly as the approved screen ships them:
+            the fixed release desk while the layout is untouched, and the
+            free 12-column grid once the user customises it or turns on
+            customize mode. The desk's `1.82fr / minmax(340px, 1fr)` split
+            is not expressible on a 12-column integer grid, which is why
+            the reference keeps both. */}
+        {showReleaseDesk ? (
+          <div className={styles.deskGrid} aria-label="Release desk">
+            <div className={styles.deskTop}>
+              {renderDeskWidget('live-preview', 8)}
+              {renderDeskWidget('release-progress', 4)}
+            </div>
+            <div className={styles.deskMiddle}>
+              {renderDeskWidget('changes', 8)}
+              {renderDeskWidget('preflight', 4)}
+            </div>
+            <div className={styles.deskActivity}>
+              {renderDeskWidget('activity', 12)}
+            </div>
+          </div>
+        ) : (
+          <DashboardGrid
+            items={visibleItems}
+            definitions={definitionsById}
+            editing={editing}
+            onResize={resize}
+            onResizeRows={resizeRows}
+            onAddBlock={() => setLibraryOpen(true)}
+            gridRef={gridRef}
+            dropTarget={dropTarget}
+          />
+        )}
 
         {/* Library — split internally into two surfaces:
             • Expanded panel: lifecycle tied to `panelOpen` only, with
@@ -637,20 +736,24 @@ export function DashboardPage() {
       {mounted && <FloatingActionBar
         open={editing && !libraryOpen && activeId === null}
         ariaLabel="Customize dashboard"
-        label={<><strong>Customize mode</strong> — drag, resize, or add blocks.</>}
+        className={styles.customizeBar}
+        label={(
+          <>
+            <FaIcon name="grip" size={13} className={styles.customizeGrip} />
+            <span><strong>Customize mode</strong> — drag, resize, or add blocks.</span>
+          </>
+        )}
       >
         <Button
           variant="ghost"
-          size="sm"
-          shape="pill"
+          className={styles.customizeAction}
           onClick={() => setLibraryOpen(true)}
         >
-          <PlusIcon size={11} aria-hidden="true" /> Add block
+          <FaIcon name="plus" size={12} /> Add block
         </Button>
         <Button
           variant="ghost"
-          size="sm"
-          shape="pill"
+          className={cn(styles.customizeAction, styles.customizeActionDone)}
           onClick={() => setEditing(false)}
         >
           Done

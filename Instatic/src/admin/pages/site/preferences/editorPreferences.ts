@@ -238,9 +238,26 @@ export function applyEditorAppearancePreferencesToDocument(
   doc: Document,
   prefs: EditorAppearancePreferences,
 ): void {
-  doc.documentElement.setAttribute('data-editor-density', prefs.density)
-  doc.documentElement.setAttribute('data-editor-theme', prefs.theme)
-  doc.documentElement.setAttribute('data-editor-text-scale', prefs.textScale)
+  const root = doc.documentElement
+  // Switch the theme ATOMICALLY. `theme-switching` (see globals.css) kills all
+  // transitions for the switch frame, so every element — buttons, cards, text —
+  // re-colours in the SAME frame instead of some animating behind others. The
+  // forced reflow flushes the repaint synchronously (also fixes scroll-container
+  // rounded corners keeping the old colour). Transitions are restored two frames
+  // later so normal hover/focus animations keep working.
+  root.classList.add('theme-switching')
+  root.setAttribute('data-editor-density', prefs.density)
+  root.setAttribute('data-editor-theme', prefs.theme)
+  root.setAttribute('data-editor-text-scale', prefs.textScale)
+  // Force a synchronous style/layout flush → immediate repaint of everything.
+  void root.offsetHeight
+  if (typeof requestAnimationFrame !== 'undefined') {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => root.classList.remove('theme-switching'))
+    })
+  } else {
+    root.classList.remove('theme-switching')
+  }
 }
 
 export function useEditorAppearancePreferences(): EditorAppearancePreferences {

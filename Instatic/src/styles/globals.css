@@ -43,6 +43,17 @@
     src: url("@fontsource/atkinson-hyperlegible/files/atkinson-hyperlegible-latin-700-normal.woff2")
         format("woff2");
 }
+/* Inter — the MMS Design System's own UI face (its colors_and_type.css loads
+   Inter). Used for the toolbar navigation labels so they match the MMS
+   reference exactly, while the rest of the admin keeps Nunito Sans. */
+@font-face {
+    font-family: "Inter Variable";
+    font-style: normal;
+    font-display: swap;
+    font-weight: 100 900;
+    src: url("@fontsource-variable/inter/files/inter-latin-wght-normal.woff2")
+        format("woff2-variations");
+}
 
 /*
  * Global CSS custom properties - design tokens for the admin/editor UI.
@@ -56,6 +67,8 @@
        reading = Atkinson Hyperlegible, mono = Roboto Mono. */
     --font-sans: "Nunito Sans Variable", "Segoe UI", Roboto, system-ui, sans-serif;
     --font-display: "Nunito Variable", "Nunito Sans Variable", system-ui, sans-serif;
+    /* Toolbar navigation labels — MMS reference uses Inter. */
+    --font-nav: "Inter Variable", "Segoe UI", Roboto, system-ui, sans-serif;
     --font-read: "Atkinson Hyperlegible", "Nunito Sans Variable", system-ui, sans-serif;
     --font-mono: "Roboto Mono Variable", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
         "Liberation Mono", monospace;
@@ -111,12 +124,83 @@
     --space-12xl: clamp(84px, calc(75.086px + 2.286vw), 108px);
 
     /* Surfaces — MMS "cream is the canvas, white cards" model. */
-    --bg-body: #f8f1df;
-    --bg-surface: #ffffff;
-    --bg-surface-2: #f2ead3;
-    --bg-surface-3: #ede3cb;
-    --bg-surface-4: #e4d8ba;
-    --bg-surface-5: #d8ceb7;
+    /* Sampled from 01-dashboard-light-approved-warm.png: near-white surfaces
+       with only a whisper of warmth (page #fdfbf6, cards #fefcf8) — NOT the
+       heavy cream/tan the ramp used before. */
+    --bg-body: #fdfbf6;
+    --bg-surface: #fffefb;
+    --bg-surface-2: #fefcf8;
+    --bg-surface-3: #f6f2ea;
+    --bg-surface-4: #efe9dc;
+    --bg-surface-5: #e6dfce;
+
+    /* Selected "control face" — a segment/toggle that is pressed reads as a step
+       DARKER than its surroundings (warm tan on the cream cards). The dark
+       companion goes deeper than the body navy. Text on it stays `--text`. */
+    --seg-active-bg: #e6dfce;
+
+    /* Skeleton shimmer fill (base + moving sheen). In light these map to the
+       warm-tan surface steps so loaders read as before. In dark the surface
+       ladder is a single flat navy, so skeletons switch to cream-alpha overlay
+       fills (see the dark block) to stay visible. */
+    --skeleton-fill: #f6f2ea;
+    --skeleton-sheen: #efe9dc;
+
+    /* ── MMS release-desk palette ──────────────────────────────────────
+       Verbatim from the approved MMSBUILD screen library (Dashboard
+       screen, `screens/dashboard/src/styles.css`). The Dashboard is a
+       pixel-matched reproduction of that screen, so it reads these
+       tokens directly instead of the generic ramp above — the two
+       differ by a few points of warmth on every surface and the whole
+       point of the reskin is that the Dashboard matches the reference
+       exactly. Everything outside the Dashboard keeps using the
+       generic tokens. */
+    --mms-bg: #fbf7ea;
+    --mms-workspace: #fdfbf6;
+    --mms-surface: #fffdf5;
+    --mms-surface-raised: #fff9e8;
+    --mms-surface-tint: #f6edcf;
+    --mms-border: #e8ddbd;
+    --mms-border-strong: #d9d1ba;
+    --mms-text: #082a38;
+    --mms-text-muted: #53656b;
+    --mms-action: #1ba957;
+    --mms-action-strong: #0c8f45;
+    --mms-success: #157c41;
+    --mms-yellow: #f3c94f;
+    --mms-orange: #f28c28;
+    --mms-warning: #a96008;
+    --mms-danger: #c64539;
+    /* Storage-breakdown swatches — the two categories the reference gives
+       their own hue (images / database / plugins reuse the palette). */
+    --mms-storage-video: #26708a;
+    --mms-storage-document: #ca9204;
+
+    --mms-shadow-menu: 0 18px 48px rgba(8, 39, 49, 0.16);
+    --mms-shadow-toolbar: 0 12px 34px rgba(0, 20, 30, 0.28);
+
+    /* Release-desk geometry (px-exact, mirrors the reference screen). */
+    /* The approved screen sets Inter on `:root` and draws EVERY Dashboard
+       string in it — heading, card titles, labels, captions. The rest of
+       the admin keeps Nunito Sans / Nunito. */
+    --font-mms: "Inter Variable", Inter, ui-sans-serif, system-ui, -apple-system,
+        BlinkMacSystemFont, "Segoe UI", sans-serif;
+
+    --mms-dashboard-gutter: clamp(20px, 3.35vw, 50px);
+    --mms-dashboard-gap: 14px;
+    --mms-card-radius: 14px;
+    --mms-control-radius: 9px;
+
+    /* Default padding of a dashboard tile. The `<Widget>` primitive reads
+       this through `var(--widget-pad)`; each release-desk card overrides
+       it on its own element so the padding never depends on stylesheet
+       ordering between two equally-specific class selectors. */
+    --widget-pad: 17px 20px;
+
+    /* Gap between a dashboard tile's heading row and its body. Same
+       per-card-override rationale as `--widget-pad`; the reference screen
+       uses 5–14px depending on the card. */
+    --widget-body-gap: 10px;
 
     /* Borders — MMS navy-alpha. */
     --border-subtle: rgba(8, 42, 56, 0.1);
@@ -128,7 +212,10 @@
     --text-bright: #082a38;
     --text: #082a38;
     --text-muted: #44515a;
-    --text-subtle: rgba(8, 42, 56, 0.55);
+    /* 0.65 alpha (was 0.55) keeps subtle text ~4.8:1 on the cream surfaces —
+       clears WCAG 1.4.3 (4.5:1 for normal text). At 0.55 small metadata text
+       (e.g. the activity timestamps) measured ~3.6:1 and failed. */
+    --text-subtle: rgba(8, 42, 56, 0.65);
     --text-disabled: rgba(8, 42, 56, 0.4);
 
     /* Overlay scale. On MMS light the "contrast direction" is navy (not white):
@@ -183,6 +270,31 @@
     --accent-10: #8a6d3b;
     --accent-10-10: rgba(138, 109, 59, 0.1);
 
+    /* Top navigation bar. The toolbar is a 1:1 replica of the approved MMS
+       dashboard screen's `.app-header`, so it reads the release-desk palette
+       above rather than the generic ramp: a warm hairline instead of the cool
+       `--border` used inside workspaces, the deeper green ink for the
+       active/hovered tab label, the brighter identity green for the tab
+       underline, and a warm tint behind hovered round header buttons.
+       The dark block redefines these four — the `--mms-*` set is light-only. */
+    /* Toolbar geometry — FIXED, not fluid. The reference specifies exact
+       pixels for the nav track; routing these through the fluid `--space-*`
+       ramp would drift the tabs off the approved mock at other viewports. */
+    --toolbar-tab-size: 14px;
+    --toolbar-pad-start: 28px;
+    --toolbar-pad-end: 20px;
+    --toolbar-nav-offset: 48px;
+    --toolbar-nav-gap: 4px;
+    --toolbar-tab-gap: 9px;
+    --toolbar-tab-pad: 11px;
+
+    --toolbar-bg: var(--mms-workspace);
+    --toolbar-text: var(--mms-text);
+    --toolbar-border: var(--mms-border);
+    --toolbar-accent: var(--mms-action);
+    --toolbar-accent-strong: var(--mms-action-strong);
+    --toolbar-hover-bg: var(--mms-surface-tint);
+
     /* Semantic state — MMS cue colors. Base tones darkened for WCAG AA on cream;
        -text tones are deepest for copy on the tinted backgrounds. */
     --danger: #c23a25;
@@ -203,6 +315,10 @@
     --success-bright: #0e8c45;
     --success-text: #0c6e37;
     --success-text-muted: #157a3e;
+    /* Foreground for content ON a solid accent/success fill (buttons, the
+       stepper's numbered/check circles). White in BOTH themes — the green
+       fill is the same in light and dark, so this must not flip. */
+    --on-accent: #ffffff;
     --success-10: rgba(27, 169, 87, 0.1);
     --success-20: rgba(27, 169, 87, 0.2);
     --success-30: rgba(27, 169, 87, 0.3);
@@ -340,6 +456,194 @@
     --canvas-live-scrim: rgba(248, 241, 223, 0.82);
 }
 
+/* ===========================================================================
+ * MMS DARK THEME — applied when the Theme preference is "Dark", which sets
+ * html[data-editor-theme="dark"] (see editorPreferences.ts + Settings ›
+ * Preferences › Theme, mirrored by the toolbar ThemeToggleButton). Light is
+ * the default :root (MMS cream) — no attribute needed.
+ *
+ * This block overrides ONLY the colour tokens; the type/space/radius/z scales
+ * inherit from :root. Because every admin/ui CSS module reads var(--token) and
+ * hardcoded hex is gated (css-token-policy.test.ts), redefining the tokens here
+ * re-themes the entire admin without touching a single component.
+ *
+ * Direction (per the MMSBUILD guide): keep MMS navy identity + warm cream text,
+ * green semantics unchanged, and separate background / card / raised levels —
+ * do NOT mechanically invert. In dark the two-layer overlay flips: the SOLID
+ * ink is warm cream (carets, active fills) while the ALPHA hover/skeleton fills
+ * are cream-alpha so they lift off the navy canvas.
+ * =========================================================================== */
+:root[data-editor-theme='dark'],
+[data-editor-theme='dark'] {
+    color-scheme: dark;
+
+    /* Surfaces — MMS navy ladder: body deepest, cards lifted, raised lighter. */
+    /* Sampled from 01-dashboard-dark-approved.png: a deep, near-flat navy
+       (#011e2e). Cards sit a hair above the page so the 1px grid gap still
+       separates them; hover/raised levels step up more. */
+    /* Single flat navy per the approved mock — every surface level is the same
+       #011e2e; tiles are separated by borders (var(--border)), not by lighter
+       fills. Only the top raised level keeps a whisper of lift so floating
+       menus/dropdowns still read as detached. */
+    --bg-body: #011e2e;
+    --bg-surface: #011e2e;
+    --bg-surface-2: #011e2e;
+    --bg-surface-3: #011e2e;
+    --bg-surface-4: #011e2e;
+    --bg-surface-5: #04242f;
+
+    /* Selected "control face" — deeper than the body navy so a pressed segment
+       reads as a solid dark pill (matches the approved live-preview toggle). */
+    --seg-active-bg: #00131d;
+
+    /* Skeletons can't use the flat-navy surface ladder here (every step is the
+       same #011e2e → zero contrast, invisible loaders). Use cream-alpha overlay
+       fills so shimmer bars lift off the navy canvas. */
+    --skeleton-fill: rgba(248, 241, 223, 0.06);
+    --skeleton-sheen: rgba(248, 241, 223, 0.13);
+
+    /* ── MMS release-desk palette (dark) ───────────────────────────────
+       The reference screen's `html[data-theme="dark"]` block, verbatim.
+       Note that yellow / orange / danger deliberately do NOT flip —
+       they are identity cues and stay identical in both themes. */
+    --mms-bg: #001e2d;
+    --mms-workspace: #001e2d;
+    --mms-surface: #082b38;
+    --mms-surface-raised: #103542;
+    --mms-surface-tint: #2b2c20;
+    --mms-border: rgba(248, 241, 223, 0.14);
+    --mms-border-strong: #31505a;
+    --mms-text: #f8f1df;
+    --mms-text-muted: #aebbb8;
+    --mms-action: #1cb05b;
+    --mms-action-strong: #15a24f;
+    --mms-success: #32c772;
+    --mms-warning: #f3c94f;
+    --mms-shadow-menu: 0 22px 56px rgba(0, 0, 0, 0.38);
+
+    /* Borders — MMS warm-cream alpha (guide anchor: rgb(248 241 223 / 12%)). */
+    --border-subtle: rgba(248, 241, 223, 0.08);
+    --border-muted: rgba(248, 241, 223, 0.12);
+    --border: rgba(248, 241, 223, 0.16);
+    --border-strong: rgba(248, 241, 223, 0.28);
+
+    /* Text — sampled title cream #eee9de; muted/subtle derived from it. */
+    --text-bright: #f4efe4;
+    --text: #eee9de;
+    --text-muted: #a7b4b1;
+    --text-subtle: rgba(238, 233, 222, 0.55);
+    --text-disabled: rgba(238, 233, 222, 0.38);
+
+    /* Overlay scale flips: SOLID ink is cream; ALPHA fills are cream-alpha so
+       hovers/skeletons lift off the navy canvas. Suffix = alpha x 100. */
+    --overlay: #f8f1df;
+    --overlay-5: rgba(248, 241, 223, 0.05);
+    --overlay-10: rgba(248, 241, 223, 0.09);
+    --overlay-20: rgba(248, 241, 223, 0.14);
+    --overlay-30: rgba(248, 241, 223, 0.2);
+    --overlay-40: rgba(248, 241, 223, 0.28);
+    --overlay-50: rgba(248, 241, 223, 0.36);
+    --overlay-60: rgba(248, 241, 223, 0.46);
+    --overlay-70: rgba(248, 241, 223, 0.58);
+    --overlay-80: rgba(248, 241, 223, 0.72);
+    --overlay-90: rgba(248, 241, 223, 0.86);
+
+    /* Scrim stays black (inherited) — deeper contrast for shadows/backdrops. */
+
+    /* Identity accents — lift the darker MMS hues so categorical tints read on
+       navy; green (accent-1) is unchanged. Alpha companions become subtle
+       glows on dark. */
+    --accent-1: #1ba957;
+    --accent-1-10: rgba(27, 169, 87, 0.16);
+    --accent-2: #4bb3cf;
+    --accent-2-10: rgba(75, 179, 207, 0.16);
+    --accent-3: #ff8a4d;
+    --accent-3-10: rgba(255, 138, 77, 0.16);
+    --accent-4: #f0654a;
+    --accent-4-10: rgba(240, 101, 74, 0.16);
+    --accent-5: #e0a83a;
+    --accent-5-10: rgba(224, 168, 58, 0.16);
+    --accent-6: #a883d6;
+    --accent-6-10: rgba(168, 131, 214, 0.16);
+    --accent-7: #3ec2c2;
+    --accent-7-10: rgba(62, 194, 194, 0.16);
+    --accent-8: #6fa8dc;
+    --accent-8-10: rgba(111, 168, 220, 0.16);
+    --accent-9: #e5548a;
+    --accent-9-10: rgba(229, 84, 138, 0.16);
+    --accent-10: #c2a878;
+    --accent-10-10: rgba(194, 168, 120, 0.16);
+
+    /* Top navigation bar on navy — the dark half of the same reference: a
+       cream-alpha hairline, a slightly brighter identity green for the tab
+       underline, a deeper green ink for the active/hovered label, and a warm
+       olive tint behind hovered round header buttons. */
+    --toolbar-bg: #001e2d;
+    --toolbar-text: #f8f1df;
+    --toolbar-border: rgba(248, 241, 223, 0.14);
+    --toolbar-accent: #1cb05b;
+    --toolbar-accent-strong: #15a24f;
+    --toolbar-hover-bg: #2b2c20;
+
+    /* Semantic state — bases brightened for AA on navy; -text tones become
+       LIGHT (copy on dark tinted fills). Alpha tints keep their light rgba. */
+    --danger: #f26d54;
+    --danger-light: #f0654a;
+    --danger-lighter: #f6a494;
+    --danger-text: #f6a999;
+    --warning: #ef8b3f;
+    --warning-text: #f0a86f;
+    --success: #1ba957;
+    --success-bright: #2fbe6c;
+    --success-text: #6fd79b;
+    --success-text-muted: #4fbd82;
+    --info-text: #7cc3d8;
+
+    /* Code syntax — GitHub Dark inspired (repainted for the navy canvas). */
+    --syntax-keyword: #ff7b72;
+    --syntax-entity: #d2a8ff;
+    --syntax-property: #7ee787;
+    --syntax-variable: #ffa657;
+    --syntax-string: #a5d6ff;
+    --syntax-constant: #79c0ff;
+    --syntax-comment: #8b949e;
+    --syntax-operator: #c9d1d9;
+    --syntax-invalid: #ffa198;
+
+    /* Charts — brighter series so they read on navy; green max hue unchanged. */
+    --chart-series-min: #4bb3cf;
+    --chart-series-min-glow: rgba(75, 179, 207, 0.32);
+    --chart-series-max: #2fbe6c;
+    --chart-series-max-glow: rgba(47, 190, 108, 0.32);
+
+    /* Shadows and focus — deep black casts on dark; green focus ring kept. */
+    --shadow-panel-inset-bottom: inset 0 -1px 0 rgba(0, 0, 0, 0.4);
+    --shadow-panel-drop: 0 16px 40px rgba(0, 0, 0, 0.5);
+    --shadow-input-focus:
+        inset 0 1px 2px rgba(0, 0, 0, 0.35), 0 0 0 3px rgba(27, 169, 87, 0.28);
+    --shadow-tooltip:
+        0 8px 24px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+
+    /* Keycap — dark navy faces (inverted from the cream light faces). */
+    --kbd-face-top: #16404b;
+    --kbd-face-bottom: #0e303a;
+    --kbd-face-top-hover: #1c4a56;
+    --kbd-face-bottom-hover: #143843;
+    --kbd-highlight: rgba(255, 255, 255, 0.06);
+    --kbd-inner-shadow: rgba(0, 0, 0, 0.4);
+    --kbd-edge: rgba(0, 0, 0, 0.5);
+    --kbd-drop: rgba(0, 0, 0, 0.4);
+
+    /* Canvas — deeper chrome shadow; navy live-mode scrim. Neon selection/hover
+       affordance rings are identity colours and stay constant across themes. */
+    --canvas-chrome-shadow: 0 12px 28px rgba(0, 0, 0, 0.5);
+    --canvas-live-scrim: rgba(7, 31, 41, 0.82);
+
+    /* Bespoke tints — warm MMS washes read fine on navy; nudge for depth. */
+    --plugins-hero-tint-a: rgba(27, 169, 87, 0.16);
+    --plugins-hero-tint-b: rgba(75, 179, 207, 0.14);
+}
+
 :root[data-editor-text-scale='small'],
 [data-editor-text-scale='small'] {
     --text-3xs: calc(var(--text-3xs-base) - 1px);
@@ -391,101 +695,6 @@
     --text-7xl: calc(var(--text-7xl-base) + 20px);
 }
 
-:root[data-editor-theme='light'],
-[data-editor-theme='light'] {
-    color-scheme: light;
-
-    /* Surfaces */
-    --bg-body: #e3e7ed;
-    --bg-surface: #ffffff;
-    --bg-surface-2: #f6f7f9;
-    --bg-surface-3: #eceff3;
-    --bg-surface-4: #e1e5ea;
-    --bg-surface-5: #d3d9e1;
-
-    /* Borders */
-    --border-subtle: #eef0f3;
-    --border-muted: #dce1e7;
-    --border: #cbd3dc;
-    --border-strong: #aeb8c5;
-
-    /* Text */
-    --text-bright: #111827;
-    --text: #1f2937;
-    --text-muted: #4b5563;
-    --text-subtle: #6b7280;
-    --text-disabled: #9ca3af;
-
-    /* Identity accents tuned as foregrounds for light surfaces. */
-    --accent-1: #047857;
-    --accent-1-10: rgba(4, 120, 87, 0.1);
-    --accent-2: #6d28d9;
-    --accent-2-10: rgba(109, 40, 217, 0.1);
-    --accent-3: #0369a1;
-    --accent-3-10: rgba(3, 105, 161, 0.1);
-    --accent-4: #9a3412;
-    --accent-4-10: rgba(154, 52, 18, 0.1);
-    --accent-5: #be123c;
-    --accent-5-10: rgba(190, 18, 60, 0.1);
-    --accent-6: #3f6212;
-    --accent-6-10: rgba(63, 98, 18, 0.1);
-    --accent-7: #713f12;
-    --accent-7-10: rgba(113, 63, 18, 0.1);
-    --accent-8: #0e7490;
-    --accent-8-10: rgba(14, 116, 144, 0.1);
-    --accent-9: #a21caf;
-    --accent-9-10: rgba(162, 28, 175, 0.1);
-    --accent-10: #b91c1c;
-    --accent-10-10: rgba(185, 28, 28, 0.1);
-
-    /* Foreground overlay scale. Suffix = alpha x 100. */
-    --overlay: #111827;
-    --overlay-5: rgba(17, 24, 39, 0.05);
-    --overlay-10: rgba(17, 24, 39, 0.1);
-    --overlay-20: rgba(17, 24, 39, 0.2);
-    --overlay-30: rgba(17, 24, 39, 0.3);
-    --overlay-40: rgba(17, 24, 39, 0.4);
-    --overlay-50: rgba(17, 24, 39, 0.5);
-    --overlay-60: rgba(17, 24, 39, 0.6);
-    --overlay-70: rgba(17, 24, 39, 0.7);
-    --overlay-80: rgba(17, 24, 39, 0.8);
-    --overlay-90: rgba(17, 24, 39, 0.9);
-
-    /* Semantic state text tuned for light surfaces. */
-    --danger-text: #991b1b;
-    --warning-text: #92400e;
-    --success-text: #047857;
-    --success-text-muted: #065f46;
-    --info-text: #4338ca;
-
-    /* Shadows and focus */
-    --shadow-panel-inset-bottom: inset 0 -1px 0 var(--overlay-10);
-    --shadow-panel-drop: 0 16px 42px rgba(15, 23, 42, 0.18);
-    --shadow-input-focus:
-        inset 0 0 4px rgba(15, 23, 42, 0.06),
-        inset 0 -4px 8px rgba(15, 23, 42, 0.08),
-        0 0 0 1px rgba(15, 23, 42, 0.14);
-
-    /* Keycap */
-    --kbd-face-top: #ffffff;
-    --kbd-face-bottom: #e5e7eb;
-    --kbd-face-top-hover: #f8fafc;
-    --kbd-face-bottom-hover: #dbe1e8;
-    --kbd-border: var(--border);
-    --kbd-text: var(--text-muted);
-    --kbd-highlight: rgba(255, 255, 255, 0.85);
-    --kbd-inner-shadow: rgba(15, 23, 42, 0.1);
-    --kbd-edge: rgba(15, 23, 42, 0.18);
-    --kbd-drop: rgba(15, 23, 42, 0.16);
-
-    /* Canvas chrome */
-    --canvas-chrome-shadow: 0 12px 28px rgba(15, 23, 42, 0.16);
-    --canvas-live-scrim: rgba(248, 250, 252, 0.84);
-
-    /* Bespoke surface tints */
-    --plugins-hero-tint-a: rgba(142, 230, 200, 0.18);
-    --plugins-hero-tint-b: rgba(155, 220, 255, 0.2);
-}
 
 /* Reduced motion support — Constraint from UX Guideline #189 */
 @media (prefers-reduced-motion: reduce) {
@@ -497,6 +706,18 @@
         transition-duration: 0.01ms !important;
         scroll-behavior: auto !important;
     }
+}
+
+/* Atomic theme switch — while `html.theme-switching` is set (added for one
+ * frame by applyEditorAppearancePreferencesToDocument), ALL transitions are
+ * killed so every element — surfaces, buttons, text, borders — re-colours in
+ * the SAME frame instead of some animating behind others. Normal hover/focus
+ * transitions resume the moment the class is removed. */
+html.theme-switching,
+html.theme-switching *,
+html.theme-switching *::before,
+html.theme-switching *::after {
+    transition: none !important;
 }
 
 /* Base reset */

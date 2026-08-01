@@ -120,7 +120,7 @@ export function ImportStep({
 
   return (
     <div className={styles.step}>
-      <ImportStepper current="import" allDone={done} />
+      <ImportStepper current="import" allDone={done} variant={mode === 'cms' ? 'bundle' : 'full'} />
 
       <div className={styles.body}>
         {failed ? (

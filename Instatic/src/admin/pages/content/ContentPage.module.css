@@ -132,30 +132,14 @@
     accent-color: var(--overlay);
 }
 
+/* Entry rows (redesign Screen 2): two-line rows — bold title over a
+ * "status · date" meta line. No thumbnail; the status dot carries the
+ * status colour. */
 .entryRow {
-    min-height: 38px;
-    /* Wider first column accommodates a 28px featured-media thumbnail without
-       reflowing the row when an entry has no featured image (the fallback
-       icon centers inside the same slot). */
-    grid-template-columns: 28px minmax(0, 1fr) auto;
-}
-
-.entryRowPreview {
-    display: grid;
-    width: 28px;
-    height: 28px;
-    place-items: center;
-    overflow: hidden;
-    border-radius: var(--radius-sm);
-    background: var(--bg-surface);
-    color: var(--text-subtle);
-}
-
-.entryRowImage {
-    display: block;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
+    min-height: 44px;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: center;
+    padding-block: var(--space-2xs);
 }
 
 .entryTitleStack {
@@ -164,17 +148,63 @@
     gap: var(--space-4xs);
 }
 
-.entryTitle,
-.entryAuthor {
+.entryTitle {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    color: var(--text);
+    font-size: var(--text-s);
+    font-weight: 650;
 }
 
-.entryAuthor {
+.entryStatusLine {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    gap: var(--space-2xs);
     color: var(--text-subtle);
     font-size: var(--text-2xs);
     line-height: 1.15;
+}
+
+.statusDot {
+    flex-shrink: 0;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--text-subtle);
+}
+
+.statusDot[data-status="published"] {
+    background: var(--success);
+}
+
+.statusDot[data-status="draft"] {
+    background: var(--warning);
+}
+
+.statusDot[data-status="scheduled"] {
+    background: var(--info-text);
+}
+
+.entryStatusText {
+    text-transform: capitalize;
+}
+
+/* Client-side search box above the collections / entries list. */
+.explorerSearch {
+    margin-bottom: var(--space-xs);
+}
+
+/* Collection row trailing meta: entry count (when selected) + chevron,
+ * matching the mock's "Posts  4  >". */
+.collectionRowMeta {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-4xs);
+    color: var(--text-subtle);
+    font-size: var(--text-xs);
+    line-height: 1;
 }
 
 /* Bespoke skeleton shapes (entriesSkeleton*, settingsSkeleton*) were
@@ -188,12 +218,85 @@
     gap: var(--space-xl);
     min-height: 0;
     overflow-y: auto;
-    padding: var(--space-m) var(--space-xl) var(--space-3xl);
+    padding: var(--space-m) var(--space-m) var(--space-3xl);
 }
 
 .settingsSkeleton {
     display: grid;
     gap: var(--space-m);
+}
+
+/* ── Post-settings disclosure sections (redesign Screen 2) ──────────────
+ * Each group is a bordered card (matches the approved mock) that collapses
+ * to just its summary row. Cards are spaced by the `.settingsBody` gap. */
+.settingsSection {
+    border: 1px solid var(--border);
+    border-radius: var(--panel-radius);
+    background: var(--bg-surface);
+    padding: var(--space-l) var(--space-xl);
+}
+
+.settingsSectionSummary {
+    display: flex;
+    align-items: center;
+    gap: var(--space-s);
+    cursor: pointer;
+    list-style: none;
+    user-select: none;
+    padding: var(--space-3xs) 0;
+}
+
+.settingsSectionSummary::-webkit-details-marker {
+    display: none;
+}
+
+.settingsSectionSummary:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+    border-radius: var(--radius-sm);
+}
+
+.settingsSectionTitle {
+    font-size: var(--text-s);
+    font-weight: 750;
+    color: var(--text);
+    margin-right: auto;
+}
+
+.settingsSectionChevron {
+    color: var(--text-subtle);
+    transition: transform 160ms ease;
+}
+
+.settingsSection[open] .settingsSectionChevron {
+    transform: rotate(180deg);
+}
+
+.settingsSectionBody {
+    display: grid;
+    gap: var(--space-l);
+    padding-top: var(--space-m);
+}
+
+/* Derived SEO summary chip (local computation, not a persisted status). */
+.seoBadge {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-3xs);
+    font-size: var(--text-2xs);
+    font-weight: 700;
+    padding: 2px var(--space-xs);
+    border-radius: var(--radius-sm);
+}
+
+.seoBadgeOk {
+    color: var(--success-text);
+    background: var(--success-10);
+}
+
+.seoBadgeWarn {
+    color: var(--warning-text);
+    background: var(--warning-10);
 }
 
 .field {
@@ -222,6 +325,21 @@
     color: var(--text);
     font-size: var(--text-s);
     font-weight: 700;
+}
+
+/* URL card: public path value + inline copy button (redesign Screen 2). */
+.urlValueRow {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    gap: var(--space-2xs);
+}
+
+.urlValueRow strong {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .authorRow {

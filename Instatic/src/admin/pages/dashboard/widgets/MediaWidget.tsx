@@ -16,6 +16,7 @@
  */
 import { useEffect, useState } from 'react'
 import { ImageSolidIcon } from 'pixel-art-icons/icons/image-solid'
+import { FaIcon } from '@ui/components/FaIcon'
 import { StatValue } from '@ui/components/charts'
 import type { DashboardWidgetRendererProps } from '@core/dashboard'
 import { Widget } from '@ui/components/Widget'
@@ -25,12 +26,11 @@ import { listCmsMediaAssets, type CmsMediaAsset } from '@core/persistence/cmsMed
 import { MediaViewerWindow } from '@admin/pages/media/components/MediaViewerWindow/MediaViewerWindow'
 import { useStandaloneMediaEditor } from '@admin/pages/media/hooks/useStandaloneMediaEditor'
 import { useMediaStats } from '../hooks/useDashboardStats'
+import { WidgetPlaceholder } from './WidgetPlaceholder'
 import styles from './widgets.module.css'
 
 // Indexes that get the accent tint vs. the muted surface in the
 // decorative empty state. Matches the original static design.
-const ACCENT_INDEXES = new Set([0, 5, 10, 15])
-const EMPTY_INDEXES = new Set([4, 8, 12])
 
 function formatSize(bytes: number): string {
   // Human-readable size — drops decimals for KB/MB but keeps one
@@ -42,8 +42,8 @@ function formatSize(bytes: number): string {
 }
 
 export function MediaWidget({ span, editing }: DashboardWidgetRendererProps) {
-  const stats = useMediaStats()
-  const isLoading = stats === null
+  const { data: stats, loading } = useMediaStats()
+  const isLoading = loading
   const count = stats?.count
   const totalBytes = stats?.totalBytes
   const thumbs = stats?.latestThumbs ?? []
@@ -126,62 +126,52 @@ export function MediaWidget({ span, editing }: DashboardWidgetRendererProps) {
           sub={<span>files · {formatSize(totalBytes ?? 0)}</span>}
         />
         {thumbs.length > 0 ? (
-          <div className={styles.mediaGrid}>
-            {/* Render up to 16 real thumbs via the srcset-aware <Image>
-                primitive. The widget reserves a fixed 8×2 grid; if the
-                host has fewer than 16 images we fill the remaining
-                cells with the decorative muted tile so the grid keeps
-                its rhythm. Each populated cell is a Button so the user
-                can click through to the asset viewer. */}
-            {Array.from({ length: 16 }, (_, i) => {
-              const thumb = thumbs[i]
-              if (!thumb) {
-                return (
-                  <span
-                    key={i}
-                    aria-hidden="true"
-                    className={`${styles.mediaCell} ${styles.mediaCellEmpty}`}
-                  />
-                )
-              }
-              return (
-                <Button
-                  key={thumb.id}
-                  variant="ghost"
-                  size="sm"
-                  className={styles.mediaCellThumb}
-                  onClick={() => openViewer(thumb.id)}
-                  aria-label={`Open ${thumb.altText || 'media asset'} in viewer`}
-                  tooltip="Open in viewer"
-                >
-                  <Image
-                    src={thumb.publicPath}
-                    variants={thumb.variants}
-                    alt={thumb.altText}
-                    sizes="80px"
-                    width={thumb.width ?? undefined}
-                    height={thumb.height ?? undefined}
-                    className={styles.mediaCellThumbImg}
-                  />
-                </Button>
-              )
-            })}
+          // `.media-samples` in the approved screen: a short row of
+          // overlapping 38px rounded squares, not a 16-cell mosaic. Real
+          // thumbnails fill them — same design, real data.
+          <div className={styles.mediaSamples} aria-label={`${count ?? 0} media files`}>
+            {thumbs.slice(0, 7).map((thumb) => (
+              <Button
+                key={thumb.id}
+                variant="ghost"
+                size="sm"
+                onClick={() => openViewer(thumb.id)}
+                aria-label={`Open ${thumb.altText || 'media asset'} in viewer`}
+                tooltip="Open in viewer"
+              >
+                <Image
+                  src={thumb.publicPath}
+                  variants={thumb.variants}
+                  alt={thumb.altText}
+                  sizes="38px"
+                  width={thumb.width ?? undefined}
+                  height={thumb.height ?? undefined}
+                  className={styles.mediaSampleImg}
+                />
+              </Button>
+            ))}
           </div>
         ) : (
-          // No media yet — render the original decorative mosaic.
-          <div className={styles.mediaGrid} aria-hidden="true">
-            {Array.from({ length: 16 }, (_, i) => {
-              const klass = ACCENT_INDEXES.has(i)
-                ? `${styles.mediaCell} ${styles.mediaCellAccent}`
-                : EMPTY_INDEXES.has(i)
-                  ? `${styles.mediaCell} ${styles.mediaCellEmpty}`
-                  : styles.mediaCell
-              return <span key={i} className={klass} />
-            })}
+          <div className={styles.mediaSamples} aria-hidden="true">
+            {['building', 'image', 'camera', 'mountain-sun', 'city', 'file-image', 'panorama'].map(
+              (icon) => (
+                <span key={icon}>
+                  <FaIcon name={icon} size={15} />
+                </span>
+              ),
+            )}
           </div>
         )}
         </>)}
-      </Widget>
+        {!loading && !stats && (
+        <WidgetPlaceholder
+          reason="unavailable"
+          icon="images"
+          title="No media yet"
+          detail="Images and files you upload show up here."
+        />
+      )}
+    </Widget>
 
       <MediaViewerWindow
         editor={viewerEditor}

@@ -33,18 +33,35 @@ interface UserAvatarProps {
    */
   alt?: string | null
   className?: string
+  /**
+   * Skip the uploaded / Gravatar image and always render the initials fallback.
+   * Used by the toolbar account trigger, which shows the identity-green initials
+   * rather than a photo so the avatar reads as the account anchor.
+   */
+  initialsOnly?: boolean
 }
 
-function deriveInitial(user: { displayName: string; email: string }): string {
+/**
+ * Up to two initials: the first letter of the first two name words
+ * (e.g. "Akhil Joshy" → "AK"), or the first two characters of a single-word
+ * name / email local-part (e.g. "admin@…" → "AD"). Always uppercased.
+ */
+function deriveInitials(user: { displayName: string; email: string }): string {
   const source = (user.displayName.trim() || user.email).trim()
   if (!source) return '?'
-  return source[0]?.toUpperCase() ?? '?'
+  const words = source.split(/\s+/).filter(Boolean)
+  if (words.length >= 2) {
+    const first = words[0]?.charAt(0) ?? ''
+    const second = words[1]?.charAt(0) ?? ''
+    return (first + second).toUpperCase()
+  }
+  return source.slice(0, 2).toUpperCase()
 }
 
-export function UserAvatar({ user, size, alt, className }: UserAvatarProps): ReactNode {
+export function UserAvatar({ user, size, alt, className, initialsOnly = false }: UserAvatarProps): ReactNode {
   const [imageFailed, setImageFailed] = useState(false)
   const url = resolveAvatarUrl(user, { size })
-  const showImage = url !== null && !imageFailed
+  const showImage = url !== null && !imageFailed && !initialsOnly
   const displayName = user.displayName.trim() || user.email
   const altText = alt === null ? '' : alt ?? `Avatar for ${displayName}`
 
@@ -65,7 +82,7 @@ export function UserAvatar({ user, size, alt, className }: UserAvatarProps): Rea
           onError={() => setImageFailed(true)}
         />
       ) : (
-        <span className={styles.initials}>{deriveInitial(user)}</span>
+        <span className={styles.initials}>{deriveInitials(user)}</span>
       )}
     </span>
   )

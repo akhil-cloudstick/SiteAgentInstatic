@@ -10,7 +10,7 @@ import type { DataTable, DataRow } from '@core/data/schemas'
 import { CanvasNotch, type CanvasNotchAction } from '@site/canvas/CanvasNotch'
 import canvasStyles from '../../../site/canvas/CanvasRoot.module.css'
 import type { TiptapBodyEditorHandle } from '@content/TiptapBodyEditor'
-import { ContentModeToggle, type ContentMode } from '../ContentModeToggle/ContentModeToggle'
+import type { ContentMode } from '../ContentModeToggle/ContentModeToggle'
 import styles from '../../ContentPage.module.css'
 
 const TiptapBodyEditor = lazy(() =>
@@ -47,7 +47,6 @@ interface ContentDocumentCanvasProps {
    * with inline editing wired up to the same body markdown.
    */
   contentMode: ContentMode
-  onContentModeChange: (mode: ContentMode) => void
   onTitleChange: (value: string) => void
   onTitleEnter: () => void
   onBodyChange: (markdown: string) => void
@@ -70,7 +69,6 @@ export const ContentDocumentCanvas = forwardRef<TiptapBodyEditorHandle, ContentD
       focusTitleSignal,
       focusBodySignal,
       contentMode,
-      onContentModeChange,
       onTitleChange,
       onTitleEnter,
       onBodyChange,
@@ -116,10 +114,6 @@ export const ContentDocumentCanvas = forwardRef<TiptapBodyEditorHandle, ContentD
         data-testid="content-canvas-root"
         className={cn(canvasStyles.canvas, styles.contentCanvas)}
       >
-        {selectedEntry && bodyEnabled && (
-          <ContentModeToggle mode={contentMode} onChange={onContentModeChange} />
-        )}
-
         {/* The insertion notch is meaningful only in Write mode — Live
             mode has its own block affordances inside the iframe. */}
         {showInsertNotch && contentMode === 'write' && (

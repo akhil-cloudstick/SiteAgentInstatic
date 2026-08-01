@@ -105,17 +105,17 @@ describe('AccountMenuButton', () => {
     })
   })
 
-  it('uses the first letter of the display name for the initials', () => {
+  it('uses up to two initials from the display name', () => {
     renderWithUser(makeUser({ displayName: 'Alice Admin' }))
     const trigger = screen.getByTestId('account-menu-trigger')
-    expect(trigger.textContent?.trim()).toBe('A')
+    expect(trigger.textContent?.trim()).toBe('AA')
     expect(trigger.getAttribute('aria-label')).toContain('Alice Admin')
   })
 
-  it('falls back to the email when displayName is empty', () => {
+  it('falls back to the email local-part when displayName is empty', () => {
     renderWithUser(makeUser({ displayName: '', email: 'me@example.com' }))
     const trigger = screen.getByTestId('account-menu-trigger')
-    expect(trigger.textContent?.trim()).toBe('M')
+    expect(trigger.textContent?.trim()).toBe('ME')
   })
 
   it('opens a dropdown with the user header and the three actions', () => {

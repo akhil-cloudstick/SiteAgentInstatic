@@ -7,13 +7,15 @@ import { LoaderIcon } from 'pixel-art-icons/icons/loader'
 import { SaveSolidIcon } from 'pixel-art-icons/icons/save-solid'
 import { SendSolidIcon } from 'pixel-art-icons/icons/send-solid'
 import type { IconComponent } from 'pixel-art-icons/types'
-import type { DataTable, DataRow } from '@core/data/schemas'
+import { dataTableHasField } from '@core/data/fields'
+import { POST_TYPE_FIELD_BODY, type DataTable, type DataRow } from '@core/data/schemas'
 import {
   PublishActionGroup,
   type PublishActionMenuItem,
   type PublishActionStatusTone,
 } from '@site/toolbar/PublishActionGroup'
 import { SchedulePublishDialog } from '@admin/modals/SchedulePublishDialog'
+import { ContentModeToggle, type ContentMode } from '../ContentModeToggle/ContentModeToggle'
 import type { SaveMessage } from '@content/hooks/useContentEntryDraft'
 
 interface ContentToolbarProps {
@@ -25,6 +27,10 @@ interface ContentToolbarProps {
   publicPath: string
   canSaveDraft: boolean
   canPublish: boolean
+  /** Write/Live canvas mode — hosted here so the toggle sits in the toolbar
+   *  (mock Screen 2) rather than floating on the canvas. */
+  contentMode: ContentMode
+  onContentModeChange: (mode: ContentMode) => void
   onSaveDraft: () => void
   onPublish: () => void
   onSchedule: (entry: DataRow) => void
@@ -160,11 +166,19 @@ export function ContentToolbar({
   publicPath,
   canSaveDraft,
   canPublish,
+  contentMode,
+  onContentModeChange,
   onSaveDraft,
   onPublish,
   onSchedule,
 }: ContentToolbarProps) {
   const entryLabel = (selectedCollection?.singularLabel ?? 'entry').toLowerCase()
+  // The Write/Live toggle only applies to entries whose collection has an
+  // editable body region — same gate the canvas uses to render the modes.
+  const bodyEnabled = selectedCollection
+    ? dataTableHasField(selectedCollection, POST_TYPE_FIELD_BODY)
+    : false
+  const showModeToggle = Boolean(selectedEntry) && bodyEnabled
   // Destructure the derived view state so the JSX below keeps reading like
   // a flat list of locals — the architecture gate at
   // contentAdmin.test.tsx:1664 also relies on literal `isCleanPublished` /
@@ -211,6 +225,9 @@ export function ContentToolbar({
 
   return (
     <>
+      {showModeToggle && (
+        <ContentModeToggle mode={contentMode} onChange={onContentModeChange} />
+      )}
       <PublishActionGroup
         statusLabel={isCleanPublished ? null : statusText}
         statusTone={statusTone}

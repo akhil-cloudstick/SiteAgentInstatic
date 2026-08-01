@@ -88,8 +88,14 @@ interface AdminPageLayoutProps {
   /**
    * `workspace` removes the centered document header and uses the available
    * canvas for a self-contained settings workspace with its own navigation.
+   *
+   * `dashboard` is the release-desk shell: the cream `--mms-bg` canvas
+   * (one step darker than the toolbar, per the approved MMSBUILD
+   * Dashboard screen), a 1400px content column inset by
+   * `--mms-dashboard-gutter`, and the reference's 34px / 23px vertical
+   * rhythm. Only `DashboardPage` uses it.
    */
-  mode?: 'page' | 'workspace'
+  mode?: 'page' | 'workspace' | 'dashboard'
   /** Page body. */
   children?: ReactNode
 }
@@ -122,8 +128,6 @@ export function AdminPageLayout({
   usePluginEventBridge(pluginBackgroundWorkEnabled)
 
   const appearance = useEditorAppearancePreferences()
-  const siteName = useAdminUi((s) => s.siteName)
-  const faviconUrl = useAdminUi((s) => s.siteFaviconUrl)
   const settingsOpen = useAdminUi((s) => s.settingsOpen)
 
   return (
@@ -134,8 +138,6 @@ export function AdminPageLayout({
       data-editor-text-scale={appearance.textScale}
     >
       <Toolbar
-        siteName={siteName}
-        faviconUrl={faviconUrl}
         section={workspace}
         adminNavigationSlot={(
           <AdminSectionNavigation

@@ -8,23 +8,25 @@
  * `settingsSlice.ts` + `uiSlice.ts`), so both stores stay in sync.
  */
 import { useAdminUi } from '@admin/state/adminUi'
-import { SettingsCogSolidIcon } from 'pixel-art-icons/icons/settings-cog-solid'
+import { FaIcon } from '@ui/components/FaIcon'
 import { Button } from '@ui/components/Button'
 
 export function SettingsButton() {
   const openSettings = useAdminUi((s) => s.openSettings)
 
   return (
+    // Round 44px header button — see ThemeToggleButton for the shared spec.
     <Button
       variant="ghost"
-      size="sm"
+      size="lg"
+      shape="pill"
       iconOnly
       aria-label="Open settings"
       tooltip="Settings"
       onClick={() => openSettings('general')}
       data-testid="toolbar-settings-btn"
     >
-      <SettingsCogSolidIcon size={16} aria-hidden="true" />
+      <FaIcon name="gear" size={17} />
     </Button>
   )
 }

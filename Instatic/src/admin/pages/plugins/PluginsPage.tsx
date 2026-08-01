@@ -123,6 +123,35 @@ export function PluginsPage() {
           />
         )}
 
+        {/* Control-room summary (redesign Screen 5). Every count is DERIVED
+            from the already-loaded `payload.plugins` — no second inventory, no
+            fabricated update/health metric. */}
+        {!loading && !pendingInstall && payload.plugins.length > 0 && (
+          <dl className={styles.summaryTiles} aria-label="Plugin overview">
+            <PluginSummaryTile
+              value={payload.plugins.length}
+              label="Installed"
+              caption="Total plugins installed"
+            />
+            <PluginSummaryTile
+              value={payload.plugins.filter((p) => p.lifecycleStatus === 'active').length}
+              label="Active"
+              caption="Currently running"
+            />
+            <PluginSummaryTile
+              value={payload.plugins.filter((p) => p.lifecycleStatus === 'error').length}
+              label="Needs attention"
+              caption="Parked or errored"
+              tone={payload.plugins.some((p) => p.lifecycleStatus === 'error') ? 'attention' : undefined}
+            />
+            <PluginSummaryTile
+              value={payload.plugins.filter((p) => p.lifecycleStatus === 'disabled').length}
+              label="Disabled"
+              caption="Installed but off"
+            />
+          </dl>
+        )}
+
         <div
           className={styles.pluginsList}
           aria-label="Installed plugins"
@@ -202,5 +231,27 @@ export function PluginsPage() {
         )}
       </div>
     </AdminPageLayout>
+  )
+}
+
+function PluginSummaryTile({
+  value,
+  label,
+  caption,
+  tone,
+}: {
+  value: number
+  label: string
+  caption: string
+  tone?: 'attention'
+}) {
+  return (
+    <div className={styles.summaryTile} data-tone={tone}>
+      <dt className={styles.summaryLabel}>
+        <span className={styles.summaryValue}>{value}</span>
+        {label}
+      </dt>
+      <dd className={styles.summaryCaption}>{caption}</dd>
+    </div>
   )
 }

@@ -21,10 +21,13 @@
  *                  Postgres `pg_database_size(current_database())`.
  */
 import { DatabaseSolidIcon } from 'pixel-art-icons/icons/database-solid'
-import { StackedBar, StatValue } from '@ui/components/charts'
+import { StatValue } from '@ui/components/charts'
 import type { DashboardWidgetRendererProps } from '@core/dashboard'
 import { Widget } from '@ui/components/Widget'
+import { FaIcon } from '@ui/components/FaIcon'
 import { useStorageStats } from '../hooks/useDashboardStats'
+import { WidgetPlaceholder } from './WidgetPlaceholder'
+import styles from './widgets.module.css'
 
 /**
  * Human-readable byte formatter — drops decimals for B/KB/MB and keeps
@@ -44,7 +47,7 @@ function dialectLabel(dialect: 'sqlite' | 'postgres'): string {
 }
 
 export function StorageWidget({ span, editing }: DashboardWidgetRendererProps) {
-  const stats = useStorageStats()
+  const { data: stats, loading } = useStorageStats()
   return (
     <Widget
       widgetId="storage"
@@ -53,7 +56,7 @@ export function StorageWidget({ span, editing }: DashboardWidgetRendererProps) {
       tint="sky"
       span={span}
       editing={editing}
-      loading={stats === null}
+      loading={loading}
     >
       {stats && (
         <>
@@ -61,46 +64,44 @@ export function StorageWidget({ span, editing }: DashboardWidgetRendererProps) {
             value={formatSize(stats.totalBytes)}
             sub={<span>used · {dialectLabel(stats.dialect)} · self-hosted</span>}
           />
-          {/* The breakdown bar is given `total = totalBytes` so the
-              segments stretch to fill the entire width — with no quota
-              there is no empty "remaining" tail. When totalBytes is 0
-              (fresh install, no media, no plugins, near-empty DB) we
-              fall back to `1` to avoid `NaN%` widths; every segment
-              value is also 0 in that case, so the bar simply renders
-              the empty-track background and the legend reads "0 B"
-              across the board. */}
-          <StackedBar
-            segments={[
-              {
-                label: 'Images',
-                value: stats.imageBytes,
-                color: 'var(--accent-4)',
-              },
-              {
-                label: 'Videos',
-                value: stats.videoBytes,
-                color: 'var(--accent-2)',
-              },
-              {
-                label: 'Documents',
-                value: stats.documentBytes,
-                color: 'var(--accent-5)',
-              },
-              {
-                label: 'Plugins',
-                value: stats.pluginBytes,
-                color: 'var(--accent-1)',
-              },
-              {
-                label: 'Database',
-                value: stats.databaseBytes,
-                color: 'var(--accent-3)',
-              },
-            ]}
-            total={stats.totalBytes > 0 ? stats.totalBytes : 1}
-            formatValue={(value) => formatSize(value)}
-          />
+          {/* The approved screen draws a single native <progress> track
+              plus a wrapped legend of coloured squares — not a segmented
+              bar. With no quota there is nothing to measure "used" against,
+              so the track is filled proportionally to the largest single
+              category; the legend carries the real per-category totals.
+              `max` falls back to 1 when the host is empty so the element
+              never renders a NaN-width fill. */}
+          <progress
+            className={styles.storageBar}
+            value={stats.totalBytes - stats.databaseBytes}
+            max={stats.totalBytes > 0 ? stats.totalBytes : 1}
+            aria-label={`${formatSize(stats.totalBytes)} used`}
+          >
+            {formatSize(stats.totalBytes)}
+          </progress>
+          <ul className={styles.storageKey} aria-label="Storage breakdown">
+            {[
+              { key: 'Images', bytes: stats.imageBytes, tone: styles.storageKeyImages },
+              { key: 'Videos', bytes: stats.videoBytes, tone: styles.storageKeyVideos },
+              { key: 'Documents', bytes: stats.documentBytes, tone: styles.storageKeyDocuments },
+              { key: 'Plugins', bytes: stats.pluginBytes, tone: styles.storageKeyPlugins },
+              { key: 'Database', bytes: stats.databaseBytes, tone: styles.storageKeyDatabase },
+            ].map((row) => (
+              <li key={row.key} className={row.tone}>
+                <FaIcon name="square" size={10} />
+                <span>{row.key} · {formatSize(row.bytes)}</span>
+              </li>
+            ))}
+          </ul>
         </>
+      )}
+      {!loading && !stats && (
+        <WidgetPlaceholder
+          reason="unavailable"
+          icon="hard-drive"
+          title="Nothing stored yet"
+          detail="Your files and content show up here as you add them."
+        />
       )}
     </Widget>
   )

@@ -26,8 +26,6 @@
 import { type CSSProperties, type ReactNode } from 'react'
 import type { IconComponent } from 'pixel-art-icons/types'
 import { DragAndDropSolidIcon } from 'pixel-art-icons/icons/drag-and-drop-solid'
-import { MoreHorizontalSolidIcon } from 'pixel-art-icons/icons/more-horizontal-solid'
-import { Button } from '@ui/components/Button'
 import { SkeletonBlock } from '@ui/components/Skeleton'
 import { cn } from '@ui/cn'
 import styles from './Widget.module.css'
@@ -72,6 +70,16 @@ export interface WidgetProps {
    * without each widget repeating the ARIA wiring.
    */
   loading?: boolean
+  /**
+   * Extra class on the card `<section>`. The release-desk tiles use it to
+   * set their own `--widget-pad` / `--widget-body-gap` — the approved
+   * MMSBUILD screen gives every card a different inset (live preview
+   * `20px 23px 18px`, release `20px 28px 18px`, changes / preflight
+   * `16px 27px 13px`, activity `14px 27px 12px`), and a custom property is
+   * the only way to vary it without two equally-specific `padding`
+   * declarations racing on stylesheet order.
+   */
+  className?: string
   children?: ReactNode
 }
 
@@ -138,52 +146,50 @@ function SkeletonBlockTitle() {
 export function Widget({
   widgetId,
   title,
-  icon: TitleIcon,
   tint,
   span,
   action,
   editing,
   loading = false,
+  className,
   children,
 }: WidgetProps) {
   const style: CSSProperties = {
     ['--tint' as string]: TINT_TOKEN[tint],
   }
 
+  // Give each tile a real heading so assistive tech can scan the dashboard by
+  // section, and label the card region with it — matching the reference's
+  // `<h2 id="…-title">` + `aria-labelledby` on every card.
+  const titleId = `widget-title-${widgetId}`
+
   return (
     <section
-      className={cn(styles.widget, editing && styles.editing)}
+      className={cn(styles.widget, editing && styles.editing, className)}
       style={style}
       data-widget={widgetId}
       data-span={span}
+      aria-labelledby={titleId}
       aria-busy={loading || undefined}
     >
       <header className={styles.head}>
-        <div className={styles.title}>
-          <span className={styles.dot} />
-          {TitleIcon && <TitleIcon size={11} aria-hidden="true" />}
-          <span>{title}</span>
-        </div>
+        <h2 id={titleId} className={styles.title}>
+          {title}
+        </h2>
         <div className={styles.headEnd}>
           {action}
-          {editing ? (
+          {/* No kebab: the reference's cards carry no per-card overflow menu.
+              The drag affordance appears in customize mode only. */}
+          {editing && (
             <span className={styles.handle} aria-hidden="true">
               <DragAndDropSolidIcon size={12} />
             </span>
-          ) : (
-            <Button
-              variant="ghost"
-              size="micro"
-              iconOnly
-              className={styles.menu}
-              aria-label={`${title} options`}
-            >
-              <MoreHorizontalSolidIcon size={12} />
-            </Button>
           )}
         </div>
       </header>
-      {loading ? <SkeletonBlock /> : children}
+      <div className={styles.body}>
+        {loading ? <SkeletonBlock /> : children}
+      </div>
     </section>
   )
 }

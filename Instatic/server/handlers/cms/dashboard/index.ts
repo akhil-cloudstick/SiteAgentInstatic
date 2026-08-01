@@ -8,6 +8,7 @@
  *   GET /admin/api/cms/dashboard/storage
  *   GET /admin/api/cms/dashboard/publish-lineup
  *   GET /admin/api/cms/dashboard/activity
+ *   GET /admin/api/cms/dashboard/changes
  *
  * One endpoint per dashboard widget data domain. Each runs only the
  * queries that domain needs, so:
@@ -49,6 +50,7 @@ import { readMediaStats } from './media'
 import { readPluginsStats } from './plugins'
 import { readPublishLineup } from './publishLineup'
 import { readRecentActivity } from './activity'
+import { readChangeManifest } from './changes'
 import { readStorageStats } from './storage'
 import type { DashboardRequestContext } from './types'
 
@@ -100,6 +102,13 @@ interface DashboardEndpoint {
 //                       dedicated audit endpoint (`audit.read`). Previous
 //                       behaviour leaked this to every authenticated user
 //                       via the dashboard — A2 fix.
+//
+//   changes             **Audit-class data** — the change manifest is a
+//                       projection of `audit_events` since the last
+//                       publish, so it inherits `audit.read`. It carries
+//                       no actor identity (unlike `activity`), but it
+//                       does expose which content changed and when, which
+//                       is the same class of signal.
 const DASHBOARD_READERS: Record<string, DashboardEndpoint> = {
   'pages':          { reader: readPagesStats,     capability: null },
   'posts':          { reader: readPostsStats,     capability: null },
@@ -108,6 +117,7 @@ const DASHBOARD_READERS: Record<string, DashboardEndpoint> = {
   'storage':        { reader: readStorageStats,   capability: null },
   'publish-lineup': { reader: readPublishLineup,  capability: null },
   'activity':       { reader: readRecentActivity, capability: 'audit.read' },
+  'changes':        { reader: readChangeManifest, capability: 'audit.read' },
 }
 
 export async function handleDashboardRoutes(

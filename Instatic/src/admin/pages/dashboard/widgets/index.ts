@@ -11,12 +11,16 @@
  */
 import { ActivityWidget } from './ActivityWidget'
 import { AiUsageWidget } from './AiUsageWidget'
+import { ChangesWidget } from './ChangesWidget'
 import { DomainWidget } from './DomainWidget'
+import { LivePreviewWidget } from './LivePreviewWidget'
 import { MediaWidget } from './MediaWidget'
 import { PagesWidget } from './PagesWidget'
 import { PluginsWidget } from './PluginsWidget'
 import { PostsWidget } from './PostsWidget'
+import { PreflightWidget } from './PreflightWidget'
 import { PublishQueueWidget } from './PublishQueueWidget'
+import { ReleaseProgressWidget } from './ReleaseProgressWidget'
 import { StatusWidget } from './StatusWidget'
 import { StorageWidget } from './StorageWidget'
 
@@ -28,6 +32,7 @@ import { DatabaseSolidIcon } from 'pixel-art-icons/icons/database-solid'
 import { FileTextSolidIcon } from 'pixel-art-icons/icons/file-text-solid'
 import { GlobeSolidIcon } from 'pixel-art-icons/icons/globe-solid'
 import { ImageSolidIcon } from 'pixel-art-icons/icons/image-solid'
+import { LayoutSolidIcon } from 'pixel-art-icons/icons/layout-solid'
 import { PenSquareSolidIcon } from 'pixel-art-icons/icons/pen-square-solid'
 import { PlugSolidIcon } from 'pixel-art-icons/icons/plug-solid'
 import { ZapSolidIcon } from 'pixel-art-icons/icons/zap-solid'
@@ -48,6 +53,51 @@ export function registerFirstPartyDashboardWidgets(): void {
   // can register its own dashboard tile via `api.dashboard.widgets.register(...)`.
   // The host stays widget-agnostic — installing a plugin is what puts an extra
   // tile on the dashboard.
+
+  // ── MMSBUILD "Live Release Desk" (Screen 1) tiles ──────────────────────
+  dashboardWidgetRegistry.register({
+    id: 'live-preview',
+    ownerId: 'core',
+    name: 'Live preview',
+    description: 'Read-only preview of the published site',
+    icon: LayoutSolidIcon,
+    defaultSize: 8,
+    tint: 'sky',
+    render: LivePreviewWidget,
+  })
+
+  dashboardWidgetRegistry.register({
+    id: 'release-progress',
+    ownerId: 'core',
+    name: 'Release progress',
+    description: 'Editing → preview → approval → published',
+    icon: CloudUploadSolidIcon,
+    defaultSize: 4,
+    tint: 'mint',
+    render: ReleaseProgressWidget,
+  })
+
+  dashboardWidgetRegistry.register({
+    id: 'changes',
+    ownerId: 'core',
+    name: 'Changes in this version',
+    description: 'Edits since the last publish',
+    icon: FileTextSolidIcon,
+    defaultSize: 8,
+    tint: 'lilac',
+    render: ChangesWidget,
+  })
+
+  dashboardWidgetRegistry.register({
+    id: 'preflight',
+    ownerId: 'core',
+    name: 'MMSBUILD preflight',
+    description: 'Domain, draft sync, plugin runtime, approval, and backup readiness',
+    icon: ZapSolidIcon,
+    defaultSize: 4,
+    tint: 'peach',
+    render: PreflightWidget,
+  })
 
   dashboardWidgetRegistry.register({
     id: 'pages',
@@ -89,7 +139,7 @@ export function registerFirstPartyDashboardWidgets(): void {
   dashboardWidgetRegistry.register({
     id: 'activity',
     ownerId: 'core',
-    name: 'Activity',
+    name: 'Recent activity',
     description: 'Recent edits & publishes',
     icon: DashboardSolidIcon,
     defaultSize: 4,

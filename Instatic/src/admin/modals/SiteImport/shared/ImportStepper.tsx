@@ -1,33 +1,49 @@
 /**
- * ImportStepper — the four-stage progress rail shared by the Super Import
- * wizard's Review and Import screens.
+ * ImportStepper — the progress rail shared by the Super Import wizard's Review
+ * and Import screens.
  *
  * One source of truth for the stage list and their visual states so the
  * Review (`AnalyzeStep`) and Import (`ImportStep`) screens stay in lockstep.
  * Stages before `current` render as done (checked); `current` is highlighted;
  * later stages are upcoming. Pass `allDone` on the final completion frame so
  * every stage — including Import — shows as done.
+ *
+ * Two shapes:
+ *   • `full` (manual file import): Drop → Review → Conflicts → Import.
+ *   • `bundle` (Share from OD / CMS bundle): Review → Import. That flow has no
+ *     drop step (the bundle arrives pre-loaded) and resolves conflicts inside
+ *     Review, so those stages are never shown.
  */
 import { CheckIcon } from 'pixel-art-icons/icons/check'
 import styles from './ImportStepper.module.css'
 
 type ImportStage = 'drop' | 'review' | 'conflicts' | 'import'
+type ImportStepperVariant = 'full' | 'bundle'
 
-const STAGES: { id: ImportStage; label: string }[] = [
-  { id: 'drop', label: 'Drop' },
-  { id: 'review', label: 'Review' },
-  { id: 'conflicts', label: 'Conflicts' },
-  { id: 'import', label: 'Import' },
-]
+const STAGES_BY_VARIANT: Record<ImportStepperVariant, { id: ImportStage; label: string }[]> = {
+  full: [
+    { id: 'drop', label: 'Drop' },
+    { id: 'review', label: 'Review' },
+    { id: 'conflicts', label: 'Conflicts' },
+    { id: 'import', label: 'Import' },
+  ],
+  bundle: [
+    { id: 'review', label: 'Review' },
+    { id: 'import', label: 'Import' },
+  ],
+}
 
 interface ImportStepperProps {
   /** The stage currently in progress. */
   current: ImportStage
+  /** Which stage list to render. Defaults to the full manual-import flow. */
+  variant?: ImportStepperVariant
   /** When true, every stage (including `current`) renders as done. */
   allDone?: boolean
 }
 
-export function ImportStepper({ current, allDone = false }: ImportStepperProps) {
+export function ImportStepper({ current, variant = 'full', allDone = false }: ImportStepperProps) {
+  const STAGES = STAGES_BY_VARIANT[variant]
   const currentIdx = STAGES.findIndex((s) => s.id === current)
   return (
     <ol className={styles.stepper} aria-label="Import progress">

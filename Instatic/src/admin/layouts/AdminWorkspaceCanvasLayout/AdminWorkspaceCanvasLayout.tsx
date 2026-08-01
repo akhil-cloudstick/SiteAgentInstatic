@@ -60,8 +60,6 @@ export function AdminWorkspaceCanvasLayout({
   usePluginEventBridge(pluginBackgroundWorkEnabled)
 
   const appearance = useEditorAppearancePreferences()
-  const adminUiSiteName = useAdminUi((s) => s.siteName)
-  const adminUiFaviconUrl = useAdminUi((s) => s.siteFaviconUrl)
   const settingsOpen = useAdminUi((s) => s.settingsOpen)
   const rightPanelCollapsed = useWorkspaceLayout((s) => s.rightPanel.collapsed)
   const setRightPanel = useWorkspaceLayout((s) => s.setRightPanel)
@@ -77,8 +75,6 @@ export function AdminWorkspaceCanvasLayout({
       data-editor-text-scale={appearance.textScale}
     >
       <Toolbar
-        siteName={adminUiSiteName}
-        faviconUrl={adminUiFaviconUrl}
         section={workspace}
         adminNavigationSlot={(
           <AdminSectionNavigation

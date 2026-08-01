@@ -9,13 +9,7 @@
  * module graph in.
  */
 import { useEffect, useState, useSyncExternalStore, type MouseEvent, type ReactNode } from 'react'
-import { ArticleSolidIcon } from 'pixel-art-icons/icons/article-solid'
-import { DashboardSolidIcon } from 'pixel-art-icons/icons/dashboard-solid'
-import { DatabaseSolidIcon } from 'pixel-art-icons/icons/database-solid'
-import { ImagesSolidIcon } from 'pixel-art-icons/icons/images-solid'
-import { LayoutSolidIcon } from 'pixel-art-icons/icons/layout-solid'
-import { PackageSolidIcon } from 'pixel-art-icons/icons/package-solid'
-import { UsersSolidIcon } from 'pixel-art-icons/icons/users-solid'
+import { FaIcon } from '@ui/components/FaIcon'
 import { listCmsPlugins } from '@core/persistence/cmsPlugins'
 import type { CmsCurrentUser } from '@core/persistence'
 import type { PluginAdminPageRoute } from '@core/plugin-sdk'
@@ -32,11 +26,12 @@ import type { AdminWorkspace } from '@admin/workspace'
 import toolbarStyles from '@site/toolbar/Toolbar.module.css'
 
 /**
- * Pixel-art icon used inside an admin nav link. Sized to match the
- * 11px nav-label cap-height — the 13px box leaves the icon visually
- * balanced with the text without crowding the 28px button track.
+ * Icon used inside an admin nav link. 17px is the reference dashboard
+ * screen's `.nav-item i { font-size: 17px }` — a touch larger than the
+ * `--text-l` label so the icon + label lockup stays balanced on the 60px
+ * header track.
  */
-const NAV_ICON_SIZE = 13
+const NAV_ICON_SIZE = 17
 
 interface AdminSectionNavigationProps {
   section: AdminWorkspace
@@ -128,7 +123,7 @@ export function AdminSectionNavigation({
       {canAccess('dashboard') && (
         <NavItem
           to="/admin/dashboard"
-          icon={<DashboardSolidIcon size={NAV_ICON_SIZE} aria-hidden="true" />}
+          icon={<FaIcon name="table-cells-large" size={NAV_ICON_SIZE} />}
           label="Dashboard"
           active={section === 'dashboard'}
           onNavigateStart={onWorkspaceNavigateStart}
@@ -137,7 +132,7 @@ export function AdminSectionNavigation({
       {canAccess('site') && (
         <NavItem
           to="/admin/site"
-          icon={<LayoutSolidIcon size={NAV_ICON_SIZE} aria-hidden="true" />}
+          icon={<FaIcon name="window-maximize" size={NAV_ICON_SIZE} />}
           label="Site"
           active={section === 'site'}
           onNavigateStart={onWorkspaceNavigateStart}
@@ -146,7 +141,7 @@ export function AdminSectionNavigation({
       {canAccess('content') && (
         <NavItem
           to="/admin/content"
-          icon={<ArticleSolidIcon size={NAV_ICON_SIZE} aria-hidden="true" />}
+          icon={<FaIcon name="file-lines" size={NAV_ICON_SIZE} />}
           label="Content"
           active={section === 'content'}
           onNavigateStart={onWorkspaceNavigateStart}
@@ -155,7 +150,7 @@ export function AdminSectionNavigation({
       {canAccess('data') && (
         <NavItem
           to="/admin/data"
-          icon={<DatabaseSolidIcon size={NAV_ICON_SIZE} aria-hidden="true" />}
+          icon={<FaIcon name="database" size={NAV_ICON_SIZE} />}
           label="Data"
           active={section === 'data'}
           onNavigateStart={onWorkspaceNavigateStart}
@@ -164,7 +159,7 @@ export function AdminSectionNavigation({
       {canAccess('media') && (
         <NavItem
           to="/admin/media"
-          icon={<ImagesSolidIcon size={NAV_ICON_SIZE} aria-hidden="true" />}
+          icon={<FaIcon name="image" size={NAV_ICON_SIZE} />}
           label="Media"
           active={section === 'media'}
           onNavigateStart={onWorkspaceNavigateStart}
@@ -179,7 +174,7 @@ export function AdminSectionNavigation({
       {canAccess('users') && (
         <NavItem
           to="/admin/users"
-          icon={<UsersSolidIcon size={NAV_ICON_SIZE} aria-hidden="true" />}
+          icon={<FaIcon name="user" size={NAV_ICON_SIZE} />}
           label="Users"
           active={section === 'users'}
           onNavigateStart={onWorkspaceNavigateStart}
@@ -191,7 +186,7 @@ export function AdminSectionNavigation({
           to={page.route}
           onNavigateStart={onWorkspaceNavigateStart}
         >
-          <PackageSolidIcon size={NAV_ICON_SIZE} aria-hidden="true" />
+          <FaIcon name="cube" size={NAV_ICON_SIZE} />
           <span>{page.navLabel ?? page.title}</span>
         </AdminRouteLink>
       ))}
@@ -262,7 +257,7 @@ function PluginsNavLink({
   if (active) {
     return (
       <span className={toolbarStyles.activeSection}>
-        <PackageSolidIcon size={NAV_ICON_SIZE} aria-hidden="true" />
+        <FaIcon name="cube" size={NAV_ICON_SIZE} />
         <span>Plugins</span>
         {dot}
       </span>
@@ -270,7 +265,7 @@ function PluginsNavLink({
   }
   return (
     <AdminRouteLink to="/admin/plugins" onNavigateStart={onNavigateStart}>
-      <PackageSolidIcon size={NAV_ICON_SIZE} aria-hidden="true" />
+      <FaIcon name="cube" size={NAV_ICON_SIZE} />
       <span>Plugins</span>
       {dot}
     </AdminRouteLink>

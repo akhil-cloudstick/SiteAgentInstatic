@@ -11,6 +11,14 @@
     min-height: 0;
 }
 
+/* Wraps the grid card so its `min-height: 100%` resolves against the space
+ * left below the workbench header instead of the whole canvas. */
+.gridArea {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+}
+
 .canvasEmpty {
     display: flex;
     align-items: center;

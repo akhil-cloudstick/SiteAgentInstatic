@@ -124,7 +124,9 @@ export function AccountMenuButton(): ReactNode {
         data-active={open ? 'true' : undefined}
         onClick={() => setOpen((current) => !current)}
       >
-        <UserAvatar user={user} size={26} alt={null} className={styles.triggerAvatar} />
+        {/* 32px inside the 44px ring: UserAvatar derives its initials from
+            `size * 0.4`, so 32 lands on the reference's 13px initials. */}
+        <UserAvatar user={user} size={32} initialsOnly alt={null} className={styles.triggerAvatar} />
       </Button>
       {open && typeof document !== 'undefined' && createPortal(
         <ContextMenu

@@ -14,6 +14,7 @@
 import { useEffect, useEffectEvent, useState, type FormEvent } from 'react'
 import { consumePendingAction } from '@admin/spotlight/pendingAction'
 import { Button } from '@ui/components/Button'
+import { Input } from '@ui/components/Input'
 import {
   DataTable,
   DataTableBody,
@@ -155,6 +156,17 @@ async function deleteUser(
 
 export function UsersTab({ data, canManageUsers }: UsersTabProps) {
   const { users, roles, defaultAssignableRoleId, setUsers, setError, refresh, error } = data
+  // Client-side roster search (redesign Screen 6) over the already-loaded
+  // collection — no new endpoint / parallel directory.
+  const [search, setSearch] = useState('')
+  const query = search.trim().toLowerCase()
+  const filteredUsers = query
+    ? users.filter(
+        (user) =>
+          displayUserName(user).toLowerCase().includes(query) ||
+          user.email.toLowerCase().includes(query),
+      )
+    : users
   const { runStepUp } = useStepUp()
   const [busy, setBusy] = useState(false)
   const [userForm, setUserForm] = useState<UserFormState>(() => ({
@@ -268,12 +280,23 @@ export function UsersTab({ data, canManageUsers }: UsersTabProps) {
               : `${users.length} account${users.length === 1 ? '' : 's'} with admin access.`}
           </p>
         </div>
-        {canManageUsers && (
-          <Button type="button" variant="primary" size="sm" onClick={openCreate}>
-            <PlusIcon size={14} aria-hidden="true" />
-            <span>Create User</span>
-          </Button>
-        )}
+        <div className={styles.sectionHeaderActions}>
+          {!data.loading && users.length > 0 && (
+            <Input
+              type="search"
+              aria-label="Search team members"
+              placeholder="Search team members…"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+            />
+          )}
+          {canManageUsers && (
+            <Button type="button" variant="primary" size="sm" onClick={openCreate}>
+              <PlusIcon size={14} aria-hidden="true" />
+              <span>Create User</span>
+            </Button>
+          )}
+        </div>
       </div>
       {data.loading ? (
         // Skeleton table — matches the real users table 1:1 (same
@@ -328,7 +351,7 @@ export function UsersTab({ data, canManageUsers }: UsersTabProps) {
             </DataTableRow>
           </DataTableHead>
           <DataTableBody>
-            {users.map((user) => {
+            {filteredUsers.map((user) => {
               const owner = isOwnerUser(user)
               const label = displayUserName(user)
               return (

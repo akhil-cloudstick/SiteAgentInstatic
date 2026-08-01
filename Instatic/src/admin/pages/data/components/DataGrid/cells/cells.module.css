@@ -304,6 +304,11 @@
   height: 6px;
   border-radius: 50%;
   flex-shrink: 0;
+  /* The dot fill is a user-defined option colour injected inline; it does not
+     follow the theme. A token ring keeps low-contrast colours (e.g. a near-navy
+     swatch on the dark surface, or near-white on cream) distinct from the
+     surface in both themes. */
+  box-shadow: 0 0 0 1px var(--border-strong);
 }
 
 .chipLabel {

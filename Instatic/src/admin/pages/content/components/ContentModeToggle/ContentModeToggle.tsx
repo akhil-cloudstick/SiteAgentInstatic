@@ -18,9 +18,6 @@
 
 import { type SyntheticEvent } from 'react'
 import { cn } from '@ui/cn'
-import { Tooltip } from '@ui/components/Tooltip'
-import { TextStartTIcon } from 'pixel-art-icons/icons/text-start-t'
-import { EyeSolidIcon } from 'pixel-art-icons/icons/eye-solid'
 import styles from './ContentModeToggle.module.css'
 
 export type ContentMode = 'write' | 'live'
@@ -46,32 +43,26 @@ export function ContentModeToggle({ mode, onChange }: ContentModeToggleProps) {
       data-testid="content-mode-toggle"
       onClick={stopCanvasInteraction}
     >
-      <Tooltip content="Write mode (plain editor surface)">
-        <button
-          type="button"
-          role="tab"
-          aria-selected={mode === 'write'}
-          aria-label="Write"
-          data-testid="content-mode-toggle-write"
-          className={cn(styles.tab, mode === 'write' && styles.tabActive)}
-          onClick={() => onChange('write')}
-        >
-          <TextStartTIcon size={14} aria-hidden="true" />
-        </button>
-      </Tooltip>
-      <Tooltip content="Live mode (edit inside the rendered template)">
-        <button
-          type="button"
-          role="tab"
-          aria-selected={mode === 'live'}
-          aria-label="Live"
-          data-testid="content-mode-toggle-live"
-          className={cn(styles.tab, mode === 'live' && styles.tabActive)}
-          onClick={() => onChange('live')}
-        >
-          <EyeSolidIcon size={14} aria-hidden="true" />
-        </button>
-      </Tooltip>
+      <button
+        type="button"
+        role="tab"
+        aria-selected={mode === 'write'}
+        data-testid="content-mode-toggle-write"
+        className={cn(styles.tab, mode === 'write' && styles.tabActive)}
+        onClick={() => onChange('write')}
+      >
+        Write
+      </button>
+      <button
+        type="button"
+        role="tab"
+        aria-selected={mode === 'live'}
+        data-testid="content-mode-toggle-live"
+        className={cn(styles.tab, mode === 'live' && styles.tabActive)}
+        onClick={() => onChange('live')}
+      >
+        Live
+      </button>
     </div>
   )
 }

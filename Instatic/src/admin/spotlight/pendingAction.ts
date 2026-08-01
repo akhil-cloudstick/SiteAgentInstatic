@@ -40,6 +40,7 @@ const PENDING_ACTION_TYPES = [
   'data.newTable',
   'users.invite',
   'users.newRole',
+  'users.viewAudit',
   'media.upload',
   'media.newFolder',
   'plugins.install',

@@ -25,12 +25,13 @@ export function buildDatabaseUrl(role, password) {
   return `postgres://${encodeURIComponent(role)}:${encodeURIComponent(password)}@${config.pgHost}:${config.pgPort}/${config.pgDb}`;
 }
 
-// TEMP (incident recovery): the canonical `dist` was left with a locked,
-// delete-pending `dist/runtime` on the network share and could not be rebuilt
-// in place. `dist_new` is a full, verified production build (identical config)
-// with a working runtime. Point tenants here until `dist` is restored, then
-// revert this to 'dist'.
-export const distDir = () => resolve(config.instaticDir, 'dist_new');
+// The canonical production bundle. (The earlier delete-pending lock on
+// `dist/runtime` — which forced a temporary `dist_new`/`dist_build*` workaround —
+// was cleared by killing the leaked processes that held it, so tenants serve the
+// clean `dist` again.) Rebuild flow: build to a scratch dir, then mirror it into
+// `dist` in place (robocopy /MIR) so the served folder updates without a
+// clear-gap and a browser refresh picks it up — no restart needed.
+export const distDir = () => resolve(config.instaticDir, 'dist');
 
 export function isRunning(slug) {
   return running.has(slug);

@@ -176,12 +176,12 @@ export const PREFERENCE_CATALOG = [
     type: 'select',
     category: 'editor',
     label: 'Theme',
-    description: 'Choose whether the admin interface uses the default dark chrome or a light theme.',
+    description: 'Switch the admin interface between the light (MMS cream) and dark (MMS navy) theme.',
     options: [
-      { value: 'dark',  label: 'Dark' },
       { value: 'light', label: 'Light' },
+      { value: 'dark',  label: 'Dark' },
     ],
-    default: 'dark',
+    default: 'light',
   },
   {
     id: 'density',

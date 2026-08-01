@@ -20,12 +20,30 @@
 
 .tableButton {
     gap: var(--space-xs);
-    padding-right: var(--space-3xs);
+    padding-right: var(--space-s);
     border-radius: var(--panel-radius);
 }
 
-.tableKindBadge {
-    border-radius: calc(var(--panel-radius) - var(--space-3xs));
+/* Fixed-width leading slot so table rows align whether or not the active
+ * green dot is shown. Transparent at rest; the success dot appears on the
+ * selected row only. */
+.tableSelectedDot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    background: transparent;
+}
+
+.tableSelectedDot[data-visible] {
+    background: var(--success);
+}
+
+/* Structure-locked tables (page / component / layout) — a quiet trailing
+ * lock, right-aligned after the flex-1 label. */
+.tableLockIcon {
+    color: var(--text-subtle);
+    flex-shrink: 0;
 }
 
 /* Skeleton row — mirrors the real `.tableButton` row's padding, gap

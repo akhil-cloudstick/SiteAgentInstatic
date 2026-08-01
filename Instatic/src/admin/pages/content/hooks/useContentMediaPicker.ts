@@ -3,8 +3,6 @@ import {
   listCmsMediaAssets,
   type CmsMediaAsset,
 } from '@core/persistence'
-import { readFeaturedMediaCell } from '@core/data/cells'
-import type { DataRow } from '@core/data/schemas'
 import { mediaTypeFromAsset } from '@content/utils/contentEntryUtils'
 import { useStandaloneMediaEditor } from '@admin/pages/media/hooks/useStandaloneMediaEditor'
 import type { MediaAssetEditor } from '@admin/pages/media/components/MediaViewerWindow/MediaViewerWindow'
@@ -26,12 +24,6 @@ interface UseContentMediaPickerOptions {
    * `insertMedia` imperative handle.
    */
   insertBodyMedia: (attrs: MediaAttributes) => void
-  /**
-   * Entries currently shown in the sidebar list. Any entry with a non-null
-   * `featuredMedia` cell triggers the asset list to load so the explorer can
-   * render the featured image as a row thumbnail.
-   */
-  entries: readonly DataRow[]
 }
 
 /**
@@ -48,7 +40,6 @@ export function useContentMediaPicker({
   featuredMediaId,
   setFeaturedMediaId,
   insertBodyMedia,
-  entries,
 }: UseContentMediaPickerOptions) {
   const [mediaAssets, setMediaAssets] = useState<CmsMediaAsset[]>([])
   const [mediaAssetsLoaded, setMediaAssetsLoaded] = useState(false)
@@ -65,16 +56,11 @@ export function useContentMediaPicker({
 
   const featuredMediaAsset = featuredMediaId ? assetsById.get(featuredMediaId) ?? null : null
 
-  // True when at least one shown entry references a featured media asset, so
-  // the explorer list can render a thumbnail. Combined with the active entry's
-  // own `featuredMediaId` so the right-rail preview also triggers a load.
+  // Fetch the asset list only when the selected entry has a featured media
+  // reference the right-rail preview needs to resolve. The picker modal
+  // mounts its own workspace, so we don't eagerly load assets just to open it.
   const needsAssetList = featuredMediaId !== null
-    || entries.some((entry) => readFeaturedMediaCell(entry.cells) !== null)
 
-  // Fetch the asset list once the page actually needs to resolve a featured
-  // media reference — either for the right-rail preview of the selected entry
-  // or for thumbnails in the sidebar list. The picker modal mounts its own
-  // workspace, so we don't need to eagerly load assets just to open the picker.
   useEffect(() => {
     if (!needsAssetList || mediaAssetsLoaded) return
     let cancelled = false
@@ -97,12 +83,6 @@ export function useContentMediaPicker({
       })
     return () => { cancelled = true }
   }, [needsAssetList, mediaAssetsLoaded])
-
-  const getFeaturedMediaAssetForEntry = (entry: DataRow): CmsMediaAsset | null => {
-    const mediaId = readFeaturedMediaCell(entry.cells)
-    if (!mediaId) return null
-    return assetsById.get(mediaId) ?? null
-  }
 
   const openMediaPicker = (kind: MediaPickerKind) => {
     setMediaPicker({ kind })
@@ -165,7 +145,6 @@ export function useContentMediaPicker({
     mediaError,
     mediaPicker,
     featuredMediaAsset,
-    getFeaturedMediaAssetForEntry,
     openMediaPicker,
     closeMediaPicker,
     pickMedia,

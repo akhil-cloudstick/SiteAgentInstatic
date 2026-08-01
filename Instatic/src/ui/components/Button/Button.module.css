@@ -190,7 +190,8 @@
 /* ── Variant: primary — MMS Approval-Green CTA ────────────────────────────── */
 .variant-primary {
     background: var(--success);
-    color: var(--bg-surface);
+    /* White on green in BOTH themes (not --bg-surface, which is navy in dark). */
+    color: var(--on-accent);
 }
 
 .variant-primary:hover {

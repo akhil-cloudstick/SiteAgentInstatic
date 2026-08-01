@@ -182,22 +182,64 @@ const DashboardActivityStatsSchema = looseObject({
 })
 type DashboardActivityStats = Static<typeof DashboardActivityStatsSchema>
 
+const DashboardChangeEntrySchema = looseObject({
+  id: Type.String(),
+  kind: Type.Union([
+    Type.Literal('added'),
+    Type.Literal('updated'),
+    Type.Literal('removed'),
+  ]),
+  icon: Type.String(),
+  title: Type.String(),
+  location: Type.String(),
+  createdAt: Type.String(),
+})
+export type DashboardChangeEntry = Static<typeof DashboardChangeEntrySchema>
+
+const DashboardChangesStatsSchema = looseObject({
+  rows: Type.Array(DashboardChangeEntrySchema),
+  total: Type.Number(),
+  since: Type.Union([Type.String(), Type.Null()]),
+})
+type DashboardChangesStats = Static<typeof DashboardChangesStatsSchema>
+
 // ---------------------------------------------------------------------------
 // Generic fetch hook factory
 // ---------------------------------------------------------------------------
 
 /**
+ * What a widget data hook hands back.
+ *
+ * `data` and `loading` are SEPARATE signals on purpose. Collapsing them
+ * into a single `T | null` (which this module used to do) makes
+ * "still fetching" and "the request failed" indistinguishable, so a
+ * widget whose endpoint 404s or 403s sits under a shimmer skeleton
+ * forever instead of telling the operator anything. The rule is:
+ *
+ *   loading            → skeleton
+ *   !loading && !data  → the widget's empty / unavailable state
+ *   !loading && data   → the real thing
+ */
+export interface DashboardResource<T> {
+  data: T | null
+  loading: boolean
+}
+
+/**
  * Generic per-domain fetcher over {@link useAsyncResource}: TypeBox boundary
- * validation via `apiRequest`, abort-on-unmount, and `swallowErrors` so any
- * failure leaves the value `null` and the widget keeps its skeleton.
+ * validation via `apiRequest`, abort-on-unmount, and `swallowErrors` so a
+ * failure leaves `data` null rather than throwing into the widget tree.
  *
  * Every request carries the viewer's IANA timezone (`tz`) so server readers
- * that bin timestamps per calendar day (the Posts histogram) bucket into the
- * operator's local day rather than UTC. Endpoints that don't bucket ignore it.
+ * that bin timestamps per calendar day bucket into the operator's local day
+ * rather than UTC. Endpoints that don't bucket ignore it.
  */
-function useDashboardEndpoint<S extends TSchema>(endpoint: string, schema: S): Static<S> | null {
+function useDashboardEndpoint<S extends TSchema>(
+  endpoint: string,
+  schema: S,
+): DashboardResource<Static<S>> {
   const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone
-  return useAsyncResource(
+  const resource = useAsyncResource(
     (signal) =>
       apiRequest(`/admin/api/cms/dashboard/${endpoint}`, {
         schema,
@@ -206,7 +248,8 @@ function useDashboardEndpoint<S extends TSchema>(endpoint: string, schema: S): S
       }),
     [endpoint, schema, timeZone],
     { swallowErrors: true },
-  ).data
+  )
+  return { data: resource.data, loading: resource.loading }
 }
 
 // ---------------------------------------------------------------------------
@@ -214,22 +257,22 @@ function useDashboardEndpoint<S extends TSchema>(endpoint: string, schema: S): S
 // ---------------------------------------------------------------------------
 
 /** Pages widget. Two cheap counts on `data_rows` for the system pages table. */
-export function usePagesStats(): DashboardPagesStats | null {
+export function usePagesStats(): DashboardResource<DashboardPagesStats> {
   return useDashboardEndpoint('pages', DashboardPagesStatsSchema)
 }
 
 /** Posts widget. One query per postType table + a 28-day histogram. */
-export function usePostsStats(): DashboardPostsStats | null {
+export function usePostsStats(): DashboardResource<DashboardPostsStats> {
   return useDashboardEndpoint('posts', DashboardPostsStatsSchema)
 }
 
 /** Media widget. Totals + 16 most-recent image thumbnails. */
-export function useMediaStats(): DashboardMediaStats | null {
+export function useMediaStats(): DashboardResource<DashboardMediaStats> {
   return useDashboardEndpoint('media', DashboardMediaStatsSchema)
 }
 
 /** Plugins widget. One scan of `installed_plugins`. */
-export function usePluginsStats(): DashboardPluginsStats | null {
+export function usePluginsStats(): DashboardResource<DashboardPluginsStats> {
   return useDashboardEndpoint('plugins', DashboardPluginsStatsSchema)
 }
 
@@ -238,16 +281,25 @@ export function usePluginsStats(): DashboardPluginsStats | null {
  * (image / video / other) + an `fs.stat` walk of `<uploadsDir>/plugins/`
  * + a dialect-aware database size query.
  */
-export function useStorageStats(): DashboardStorageStats | null {
+export function useStorageStats(): DashboardResource<DashboardStorageStats> {
   return useDashboardEndpoint('storage', DashboardStorageStatsSchema)
 }
 
 /** Publish Lineup widget. Three small queries against `data_rows`. */
-export function usePublishLineupStats(): DashboardPublishLineupStats | null {
+export function usePublishLineupStats(): DashboardResource<DashboardPublishLineupStats> {
   return useDashboardEndpoint('publish-lineup', DashboardPublishLineupStatsSchema)
 }
 
 /** Activity widget. The heaviest endpoint — a 50-row `audit_events` scan. */
-export function useRecentActivityStats(): DashboardActivityStats | null {
+export function useRecentActivityStats(): DashboardResource<DashboardActivityStats> {
   return useDashboardEndpoint('activity', DashboardActivityStatsSchema)
+}
+
+/**
+ * Changes widget. The per-version change manifest — `audit_events` sliced
+ * at the most recent `publish` boundary, so the list is everything sitting
+ * in the draft but not yet live.
+ */
+export function useChangeManifestStats(): DashboardResource<DashboardChangesStats> {
+  return useDashboardEndpoint('changes', DashboardChangesStatsSchema)
 }

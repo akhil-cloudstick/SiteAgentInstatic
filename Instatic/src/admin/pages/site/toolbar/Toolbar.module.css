@@ -1,83 +1,117 @@
 /* Toolbar — fixed top bar for the editor */
 
 /* ── Header bar ──────────────────────────────────────────────────────────── */
+/* Geometry mirrors the approved MMS dashboard screen reference 1:1 — a 60px
+ * track on the workspace tone, a warm hairline, and asymmetric side padding
+ * (28px lead-in for the brand, 20px trailer for the round buttons). Children
+ * space themselves (nav 48px off the brand, 4px between slots), so the header
+ * itself carries no gap. */
 .header {
     display: flex;
     align-items: center;
-    height: 36px;
-    padding: 0 var(--space-s);
-    gap: var(--space-4xs);
+    height: 60px;
+    padding: 0 var(--toolbar-pad-end) 0 var(--toolbar-pad-start);
+    gap: 0;
     flex-shrink: 0;
-    position: relative;
-    z-index: 30;
+    position: sticky;
+    top: 0;
+    z-index: 50;
     user-select: none;
-    background: var(--bg-body);
+    background: var(--toolbar-bg);
+    border-bottom: 1px solid var(--toolbar-border);
 }
 
-.siteName {
+/* ── Brand lockup ─────────────────────────────────────────────────────────
+ * The reference draws the brand as a single artwork (mascot + wordmark baked
+ * into one PNG), not a mascot image beside live text — so this ships the same
+ * two assets and the same box metrics. The dark asset is drawn slightly larger
+ * per the reference, which is why the two themes carry different dimensions. */
+.brand {
     display: inline-flex;
+    flex: 0 0 auto;
     align-items: center;
-    height: 28px;
-    max-width: 140px;
-    margin-right: var(--space-3xs);
-    padding: 0 var(--space-s);
-    overflow: hidden;
-    color: var(--text);
-    font-size: var(--text-xs);
-    font-weight: 700;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    flex-shrink: 0;
-}
-
-.siteNameSkeleton {
-    display: inline-flex;
-    align-items: center;
-    height: 28px;
-    width: 92px;
-    margin-right: var(--space-3xs);
-    padding: 0 var(--space-s);
-    flex-shrink: 0;
-}
-
-.siteFavicon {
-    display: block;
-    width: 20px;
-    height: 20px;
-    margin: 0 var(--space-xs) 0 var(--space-3xs);
-    object-fit: cover;
-    border-radius: var(--radius-sm);
-    flex-shrink: 0;
-    user-select: none;
-}
-
-.adminLink {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-xs);
-    height: 28px;
-    padding: 0 var(--space-s);
-    border-radius: var(--input-radius);
-    color: var(--text-subtle);
-    font-size: var(--text-xs);
-    font-weight: 700;
+    align-self: center;
+    min-height: 44px;
     text-decoration: none;
 }
 
-.adminLink:hover {
-    background: var(--bg-surface-2);
-    color: var(--text);
+.brandMark {
+    display: block;
+    width: 141px;
+    height: 25px;
+    object-fit: contain;
+    object-position: left center;
+    user-select: none;
+}
+
+:root[data-editor-theme="dark"] .brandMark,
+[data-editor-theme="dark"] .brandMark {
+    width: 148px;
+    height: 30px;
+}
+
+/* ── Primary navigation ───────────────────────────────────────────────────
+ * The nav row is a replica of the reference's `.desktop-nav`: it starts 48px
+ * after the brand, packs its tabs 4px apart, and stretches the full header
+ * track so each tab's underline can sit on the hairline. */
+.adminNav {
+    display: flex;
+    align-items: stretch;
+    align-self: stretch;
+    gap: var(--toolbar-nav-gap);
+    min-width: 0;
+    margin-left: var(--toolbar-nav-offset);
+}
+
+/* One nav tab. Inactive and active share every metric — only the ink weight,
+ * the colour, and the underline change — so switching workspaces never shifts
+ * the row. `--text-l` resolves to the reference's 14px at desktop widths while
+ * still honouring the editor text-scale preference. */
+.adminLink,
+.activeSection {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    align-self: stretch;
+    gap: var(--toolbar-tab-gap);
+    min-width: 86px;
+    min-height: 44px;
+    padding: 0 var(--toolbar-tab-pad);
+    color: var(--toolbar-text);
+    font-family: var(--font-nav);
+    font-size: var(--toolbar-tab-size);
+    font-weight: 560;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+/* Underline track — reserved on every tab (transparent until active) so the
+   indicator never changes the tab's box. Inset 8px each side, anchored to the
+   header's bottom edge to read as a tab indicator. */
+.adminLink::after,
+.activeSection::after {
+    content: "";
+    position: absolute;
+    left: 8px;
+    right: 8px;
+    bottom: 0;
+    height: 3px;
+    border-radius: 2px 2px 0 0;
+    background: transparent;
+}
+
+.adminLink:hover,
+.activeSection {
+    color: var(--toolbar-accent-strong);
 }
 
 .activeSection {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-xs);
-    height: 28px;
-    padding: 0 var(--space-s);
-    color: var(--text);
-    font-size: var(--text-xs);
-    font-weight: 700;
+    font-weight: 720;
+}
+
+.activeSection::after {
+    background: var(--toolbar-accent);
 }
 
 /* Plugins-error indicator dot — shown next to the Plugins nav label
@@ -101,7 +135,27 @@
     align-items: center;
     flex: 1;
     min-width: 0;
-    gap: var(--space-4xs);
+    margin-left: var(--space-m);
+    gap: var(--space-2xs);
+}
+
+/* ── Global trailer (theme · settings · open live · account) ───────────────
+ * The four controls that appear on every admin route. The reference renders
+ * them as 44px round buttons 4px apart with a warm tint on hover; the scope is
+ * this wrapper only, so the editor's zoom / publish controls in `rightSlot`
+ * keep their own compact sizing. */
+.headerTrailer {
+    display: flex;
+    align-items: center;
+    gap: var(--toolbar-nav-gap);
+    flex-shrink: 0;
+}
+
+/* `[type]` is always emitted by the Button primitive; including it lifts this
+ * rule above `.variant-ghost:hover` in Button.module.css without depending on
+ * stylesheet order. */
+.headerTrailer button[type]:hover {
+    background: var(--toolbar-hover-bg);
 }
 
 .spacer {
@@ -261,17 +315,29 @@
         padding: var(--space-4xs) var(--space-s);
     }
 
-    .siteName {
-        max-width: 104px;
-        margin-right: var(--space-4xs);
+    .brand {
+        height: 32px;
+        margin-right: var(--space-s);
     }
 
-    .siteNameSkeleton {
-        width: 84px;
-        margin-right: var(--space-4xs);
+    .brandMark {
+        width: 26px;
+        height: 26px;
+    }
+
+    .adminNav {
+        margin-left: var(--space-s);
+        gap: 0;
+    }
+
+    .adminLink,
+    .activeSection {
+        align-self: center;
+        height: 44px;
     }
 
     .workspaceToolbarItems {
+        margin-left: var(--space-2xs);
         justify-content: flex-end;
         flex: 1 1 0;
     }

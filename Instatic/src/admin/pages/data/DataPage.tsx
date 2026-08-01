@@ -35,6 +35,7 @@ import { SendSolidIcon } from 'pixel-art-icons/icons/send-solid'
 import { useDataWorkspace } from './hooks/useDataWorkspace'
 import { DataSidebar } from './components/DataSidebar/DataSidebar'
 import { DataCanvas } from './components/DataCanvas/DataCanvas'
+import { DataWorkbenchHeader } from './components/DataWorkbenchHeader/DataWorkbenchHeader'
 import { DataInspector } from './components/DataInspector/DataInspector'
 import { NewTableDialog } from './components/NewTableDialog/NewTableDialog'
 import type { DataRowDraftState } from './components/DataInspector/RowDetail'
@@ -329,6 +330,49 @@ export function DataPage() {
     />
   ) : undefined
 
+  // Whether new rows can be created here — mirrors DataCanvas's own gate so the
+  // workbench header's create action matches the grid's empty-state CTA. System
+  // tables (and field-less tables) are authored elsewhere, so no create action.
+  const rowCreationSupported = Boolean(
+    selectedTable && !selectedTable.system && selectedTable.fields.length > 0,
+  )
+
+  // The publish control (status + Publish + Save-draft menu) is unchanged — it
+  // just moves from the global toolbar into the workbench header so the header
+  // row matches the approved mock. Same handlers, same gates.
+  const publishActionGroup = selectedTable ? (
+    <PublishActionGroup
+      statusLabel={publishStatus.label}
+      statusTone={publishStatus.tone}
+      publishLabel={publishBusy ? 'Publishing' : !hasPublishableChanges ? 'Published' : 'Publish data'}
+      publishAriaLabel={!hasPublishableChanges ? 'Data published' : 'Publish data'}
+      publishTitle={!hasPublishableChanges ? 'Data published' : `Publish changes to ${selectedTable.pluralLabel}`}
+      publishState={publishBusy ? 'busy' : publishState === 'error' ? 'error' : !hasPublishableChanges ? 'success' : 'idle'}
+      publishBusy={publishBusy}
+      publishDisabled={!hasPublishableChanges || activeDraftDirty || isSavingDraft || publishBusy}
+      publishIcon={PublishDataIcon}
+      onPublish={handlePublishData}
+      menuItems={publishMenuItems}
+      menuLabel="Data publishing actions"
+      triggerLabel="More data publishing actions"
+    />
+  ) : null
+
+  const workbenchHeader = selectedTable ? (
+    <DataWorkbenchHeader
+      table={selectedTable}
+      publishSlot={publishActionGroup}
+      onOpenExport={() => openSiteExport({
+        activeTableId: workspace.selectedTableId,
+        initialScope: 'all',
+      })}
+      onOpenImport={openSiteImport}
+      canExport={canExport}
+      canImport={canImport}
+      onCreateRow={rowCreationSupported && canCreateRows ? () => { void handleAddRow() } : undefined}
+    />
+  ) : null
+
   // ---------------------------------------------------------------------------
   // Render
   // ---------------------------------------------------------------------------
@@ -337,23 +381,6 @@ export function DataPage() {
     <>
       <AdminWorkspaceCanvasLayout
         workspace="data"
-        toolbarRightSlot={selectedTable ? (
-          <PublishActionGroup
-            statusLabel={publishStatus.label}
-            statusTone={publishStatus.tone}
-            publishLabel={publishBusy ? 'Publishing' : !hasPublishableChanges ? 'Published' : 'Publish data'}
-            publishAriaLabel={!hasPublishableChanges ? 'Data published' : 'Publish data'}
-            publishTitle={!hasPublishableChanges ? 'Data published' : `Publish changes to ${selectedTable.pluralLabel}`}
-            publishState={publishBusy ? 'busy' : publishState === 'error' ? 'error' : !hasPublishableChanges ? 'success' : 'idle'}
-            publishBusy={publishBusy}
-            publishDisabled={!hasPublishableChanges || activeDraftDirty || isSavingDraft || publishBusy}
-            publishIcon={PublishDataIcon}
-            onPublish={handlePublishData}
-            menuItems={publishMenuItems}
-            menuLabel="Data publishing actions"
-            triggerLabel="More data publishing actions"
-          />
-        ) : null}
         contentSidebar={(
           <DataSidebar
             tables={workspace.tables}
@@ -364,21 +391,15 @@ export function DataPage() {
             onOpenTableSettings={handleOpenTableSettings}
             onDeleteTable={(table) => handleDeleteTable(table.id)}
             onCreateTable={() => setNewTableDialogOpen(true)}
-            onOpenExport={() => openSiteExport({
-              activeTableId: workspace.selectedTableId,
-              initialScope: 'all',
-            })}
-            onOpenImport={openSiteImport}
             canCreateTable={canManageCustomTables}
             canManage={canManageCustomTables}
-            canExport={canExport}
-            canImport={canImport}
           />
         )}
         contentCanvas={(
           <DataCanvas
             table={selectedTable}
             tables={workspace.tables}
+            header={workbenchHeader}
             rows={workspace.rows}
             loading={workspace.loadingRows}
             loadingTables={workspace.loadingTables}
