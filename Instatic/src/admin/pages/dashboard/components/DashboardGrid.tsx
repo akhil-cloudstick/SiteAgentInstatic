@@ -75,6 +75,8 @@ interface DashboardGridProps {
   onResize: (id: string, size: number) => void
   onResizeRows: (id: string, rows: number) => void
   onAddBlock: () => void
+  /** Ask the page to confirm removing a tile (customize mode only). */
+  onRequestRemove: (id: string, name: string) => void
   /**
    * Imperative ref to the grid's DOM root. The page uses it to read
    * `getBoundingClientRect()` during `onDragEnd` so it can snap library
@@ -112,6 +114,7 @@ export function DashboardGrid({
   onResize,
   onResizeRows,
   onAddBlock,
+  onRequestRemove,
   gridRef,
   dropTarget,
 }: DashboardGridProps) {
@@ -189,6 +192,7 @@ export function DashboardGrid({
               definition={def}
               onResize={onResize}
               onResizeRows={onResizeRows}
+              onRequestRemove={onRequestRemove}
             />
           )
         }
@@ -342,9 +346,17 @@ interface DraggableCellProps {
   definition: DashboardWidgetDefinition
   onResize: (id: string, size: number) => void
   onResizeRows: (id: string, rows: number) => void
+  /** Ask the page to confirm removing this tile. */
+  onRequestRemove: (id: string, name: string) => void
 }
 
-function DraggableCell({ item, definition, onResize, onResizeRows }: DraggableCellProps) {
+function DraggableCell({
+  item,
+  definition,
+  onResize,
+  onResizeRows,
+  onRequestRemove,
+}: DraggableCellProps) {
   const draggable = useDraggable({ id: item.id })
   const Render = definition.render
 
@@ -443,6 +455,28 @@ function DraggableCell({ item, definition, onResize, onResizeRows }: DraggableCe
       {...draggable.attributes}
     >
       <Render span={item.size} editing />
+
+      {/* Explicit remove affordance. `stopPropagation` on pointer-down
+          keeps dnd-kit's drag sensor from claiming the gesture — without
+          it, pressing the button starts a tile drag instead of a click. */}
+      <Button
+        variant="ghost"
+        iconOnly
+        className={styles.removeButton}
+        aria-label={`Remove ${definition.name} block`}
+        // No `tooltip` prop here on purpose: it wraps the Button in the
+        // Tooltip primitive, and this button is absolutely positioned
+        // against the cell — an extra wrapper would change what it
+        // anchors to. `aria-label` + `title` cover the same ground.
+        title={`Remove ${definition.name}`}
+        onPointerDown={(e) => e.stopPropagation()}
+        onClick={(e) => {
+          e.stopPropagation()
+          onRequestRemove(item.id, definition.name)
+        }}
+      >
+        <FaIcon name="trash-can" size={13} />
+      </Button>
 
       {/* 4 edge handles + 1 corner handle. The corner is stacked above
           the edges (z-index: 11 vs 10) so the small overlap area

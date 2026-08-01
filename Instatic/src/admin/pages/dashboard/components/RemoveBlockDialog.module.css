@@ -1,0 +1,136 @@
+/**
+ * RemoveBlockDialog — MMS skin over the shared `<Dialog>` primitive.
+ *
+ * The primitive paints itself from the generic `--bg-surface` / `--border`
+ * ramp, which is a couple of points cooler than the release desk's own
+ * `--mms-*` surfaces. On a Dashboard that is otherwise a pixel match for
+ * the approved screen, a dialog a shade off reads as a different app, so
+ * this repaints the container, header and footer from the MMS tokens.
+ *
+ * Every value is a token, so the light / dark flip is automatic — the
+ * dark block in `globals.css` redefines the same `--mms-*` names.
+ */
+
+.dialog {
+    border: 1px solid var(--mms-border);
+    border-radius: 16px;
+    background: var(--mms-surface);
+    color: var(--mms-text);
+    box-shadow: var(--mms-shadow-menu);
+    font-family: var(--font-mms);
+}
+
+.body {
+    background: var(--mms-surface);
+    color: var(--mms-text);
+}
+
+.footer {
+    border-top: 1px solid var(--mms-border);
+    background: var(--mms-surface-raised);
+}
+
+/* Lead paragraph — what is about to happen, in plain words. */
+.lead {
+    margin: 0 0 14px;
+    font-size: 14px;
+    line-height: 1.45;
+    color: var(--mms-text);
+}
+
+.leadName {
+    font-weight: 700;
+}
+
+/* Reassurance line. Removing a block is fully reversible (it goes back to
+   the block library), and saying so is what keeps the confirmation from
+   reading as scarier than it is. */
+.reassure {
+    margin: 0 0 18px;
+    font-size: 12px;
+    line-height: 1.45;
+    color: var(--mms-text-muted);
+}
+
+.label {
+    display: block;
+    margin-bottom: 7px;
+    font-size: 13px;
+    font-weight: 650;
+    color: var(--mms-text);
+}
+
+/* The word the user has to type, shown inline so it can be copied by eye. */
+.token {
+    padding: 2px 6px;
+    border-radius: 5px;
+    background: var(--mms-surface-tint);
+    color: var(--mms-action-strong);
+    font-weight: 700;
+}
+
+.field {
+    width: 100%;
+    min-height: 44px;
+    border-radius: var(--mms-control-radius);
+    border: 1px solid var(--mms-border-strong);
+    background: var(--mms-bg);
+    color: var(--mms-text);
+    font-family: var(--font-mms);
+    font-size: 14px;
+}
+
+.field:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+}
+
+/* ── Footer buttons ────────────────────────────────────────────────────
+ *
+ * Same 44px / 9px-radius control geometry as the rest of the release
+ * desk, so the dialog's actions read as part of the same system. */
+.cancelButton,
+.removeButton {
+    display: inline-flex;
+    height: auto;
+    min-height: 44px;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 0 18px;
+    border-radius: var(--mms-control-radius);
+    font-size: 14px;
+    font-weight: 650;
+}
+
+.cancelButton {
+    border: 1px solid var(--mms-border);
+    background: var(--mms-surface);
+    color: var(--mms-text);
+}
+
+.cancelButton:hover {
+    border-color: var(--mms-border-strong);
+    background: var(--mms-surface-raised);
+    color: var(--mms-text);
+}
+
+.removeButton {
+    border: 1px solid var(--mms-danger);
+    background: var(--mms-danger);
+    color: var(--on-accent);
+}
+
+.removeButton:hover:not(:disabled) {
+    border-color: var(--mms-danger);
+    background: color-mix(in srgb, var(--mms-danger) 82%, black);
+    color: var(--on-accent);
+}
+
+/* Disabled until the typed text matches — the whole point of the gate, so
+   it has to read as clearly inert rather than merely dimmed. */
+.removeButton:disabled {
+    border-color: var(--mms-border);
+    background: var(--mms-surface-tint);
+    color: var(--mms-text-muted);
+}

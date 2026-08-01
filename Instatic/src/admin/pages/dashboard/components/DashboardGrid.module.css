@@ -311,6 +311,54 @@
     }
 }
 
+/* ── Per-tile remove button (customize mode) ───────────────────────────
+ *
+ * Sits in the tile's top-right corner, over the card's own padding. Only
+ * rendered in customize mode. Before this existed the ONLY way to drop a
+ * block was to drag it onto the library pill, which nobody discovers. */
+.removeButton {
+    position: absolute;
+    z-index: 12;
+    top: 8px;
+    right: 8px;
+    display: grid;
+    width: 30px;
+    height: 30px;
+    min-width: 0;
+    padding: 0;
+    place-items: center;
+    border: 1px solid var(--mms-border);
+    border-radius: 50%;
+    background: var(--mms-surface);
+    color: var(--mms-text-muted);
+    opacity: 0;
+    transition:
+        opacity 120ms ease,
+        color 120ms ease,
+        border-color 120ms ease,
+        background 120ms ease;
+}
+
+/* Revealed on hover/focus so a resting customize grid stays calm, but
+   never hidden from keyboards. */
+.cell:hover .removeButton,
+.removeButton:focus-visible {
+    opacity: 1;
+}
+
+.removeButton:hover {
+    border-color: var(--mms-danger);
+    background: color-mix(in srgb, var(--mms-danger) 10%, var(--mms-surface));
+    color: var(--mms-danger);
+}
+
+/* Touch has no hover — keep the affordance permanently visible there. */
+@media (hover: none) {
+    .removeButton {
+        opacity: 1;
+    }
+}
+
 /* ── "Add block" cell ──────────────────────────────────────────────── */
 .addWidget {
     /* Mirrors the `.cell` defaults so the add-block tile is the same

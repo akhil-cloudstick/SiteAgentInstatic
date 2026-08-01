@@ -78,6 +78,7 @@ import {
   LIBRARY_DROP_ID,
 } from './components/BlockLibrary'
 import { DashboardGrid } from './components/DashboardGrid'
+import { RemoveBlockDialog } from './components/RemoveBlockDialog'
 import { getCmsPublishStatus } from '@core/persistence'
 import styles from './DashboardPage.module.css'
 import gridStyles from './components/DashboardGrid.module.css'
@@ -167,6 +168,17 @@ export function DashboardPage() {
   // over with its own Add block + Done controls.
   const [deskMenuOpen, setDeskMenuOpen] = useState(false)
   const deskMenuRef = useRef<HTMLButtonElement | null>(null)
+
+  /**
+   * Tile awaiting removal confirmation. Customize mode gives every tile a
+   * remove button; because that is one click from dropping an arrangement
+   * the user may have built deliberately, it routes through
+   * `<RemoveBlockDialog>` (type-to-confirm) rather than removing outright.
+   * `null` when no dialog is open.
+   */
+  const [pendingRemoval, setPendingRemoval] = useState<
+    { id: string; name: string } | null
+  >(null)
 
   // Close the overflow menu when the page scrolls. The shared ContextMenu
   // otherwise stays glued to its trigger and reprojects on scroll, so it
@@ -682,6 +694,7 @@ export function DashboardPage() {
             onResize={resize}
             onResizeRows={resizeRows}
             onAddBlock={() => setLibraryOpen(true)}
+            onRequestRemove={(id, name) => setPendingRemoval({ id, name })}
             gridRef={gridRef}
             dropTarget={dropTarget}
           />
@@ -759,6 +772,15 @@ export function DashboardPage() {
           Done
         </Button>
       </FloatingActionBar>}
+
+      <RemoveBlockDialog
+        blockName={pendingRemoval?.name ?? null}
+        onCancel={() => setPendingRemoval(null)}
+        onConfirm={() => {
+          if (pendingRemoval) removeWidget(pendingRemoval.id)
+          setPendingRemoval(null)
+        }}
+      />
     </AdminPageLayout>
   )
 }

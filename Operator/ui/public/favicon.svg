@@ -1,7 +1,0 @@
-<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <rect width="256" height="256" rx="56" fill="#0e1216"/>
-  <rect x="20" y="20" width="216" height="216" rx="44" fill="#161b22"/>
-  <text x="128" y="132" text-anchor="middle" dominant-baseline="central"
-        font-family="Segoe UI, Roboto, Helvetica, Arial, sans-serif"
-        font-size="150" font-weight="700" fill="#58a6ff">S</text>
-</svg>

@@ -19,7 +19,16 @@ const isSettings = path.endsWith('/settings');
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  {/* MMS mascot icon set — the same files the CMS admin serves, so the
+      console shares one identity in the tab strip and on a pinned
+      home-screen. Hrefs MUST carry `base` for the same reason nav links
+      do (see the note above): a base-less "/favicon.ico" escapes the
+      operator and falls through the gateway to a tenant instance. */}
+  <link rel="icon" href={`${base}favicon.ico`} sizes="any" />
+  <link rel="icon" type="image/png" sizes="32x32" href={`${base}favicon-32x32.png`} />
+  <link rel="icon" type="image/png" sizes="16x16" href={`${base}favicon-16x16.png`} />
+  <link rel="apple-touch-icon" href={`${base}apple-touch-icon.png`} />
+  <meta name="theme-color" content="#f8f1df" />
   <title>{title} · {BRAND_NAME}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
