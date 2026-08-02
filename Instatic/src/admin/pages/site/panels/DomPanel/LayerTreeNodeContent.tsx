@@ -1,7 +1,8 @@
 import type { MouseEventHandler, ReactNode } from 'react'
 import { EyeOffSolidIcon } from 'pixel-art-icons/icons/eye-off-solid'
 import { TreeChevron, TreeIconSlot, TreeLabel, TreeLabelGroup } from '@site/ui/Tree'
-import { ModuleIcon } from '@site/ui/ModuleIcon'
+import { FaIcon } from '@ui/components/FaIcon'
+import { moduleGlyph } from '@site/sidebars/PageOutlinePanel/moduleGlyph'
 import { TagPill } from '@ui/components/TagPill'
 import styles from './TreeNode.module.css'
 
@@ -47,12 +48,13 @@ export function LayerTreeNodeContent({
       />
 
       {showIcon && (
-        <TreeIconSlot iconSize={11} iconColor="var(--text-disabled)">
-          <ModuleIcon
-            moduleId={moduleId}
-            size={11}
-            color="var(--text-disabled)"
-          />
+        // The SAME glyph resolution the Page outline uses (`moduleGlyph`), at
+        // the reference's 15px in `currentColor`. The module registry's own
+        // icon is the generic square the old dev tree drew — using it here is
+        // what made a layer row look like a different component from the
+        // outline row directly above it.
+        <TreeIconSlot iconSize={15} iconColor="currentColor">
+          <FaIcon name={moduleGlyph(moduleId, displayName)} size={15} />
         </TreeIconSlot>
       )}
 
@@ -67,7 +69,17 @@ export function LayerTreeNodeContent({
               className={styles.tagPill}
             />
           )}
-          <TreeLabel>
+          {/* The Site screen hides the tag pill (the approved row is icon +
+              name), so the HTML tag travels in the tooltip instead of being
+              dropped. */}
+          {/* The Site screen hides the tag pill and class chip (the approved
+              row is icon + name + `⋯`), so both travel in the tooltip rather
+              than being dropped. */}
+          <TreeLabel
+            title={[displayName, htmlTag && `<${htmlTag}>`, classSelectorChip]
+              .filter(Boolean)
+              .join(' · ')}
+          >
             {displayName}
           </TreeLabel>
           {showClasses && classSelectorChip && (

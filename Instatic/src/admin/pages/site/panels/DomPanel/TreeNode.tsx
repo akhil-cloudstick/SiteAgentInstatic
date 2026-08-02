@@ -33,6 +33,8 @@ import { useDraggable } from '@dnd-kit/core'
 import { useExpansionStore, useIsNodeExpanded } from './DomTreeContext'
 import { useDomPanelDndContext } from './DomPanelDndContext'
 import { LayerNodeContextMenu } from './LayerNodeContextMenu'
+import { Button } from '@ui/components/Button'
+import { FaIcon } from '@ui/components/FaIcon'
 import { Input } from '@ui/components/Input'
 import { cn } from '@ui/cn'
 import {
@@ -405,6 +407,27 @@ export const TreeNode = memo(function TreeNode({ nodeId, depth, editable = true 
             />
           ) : undefined}
         />
+
+        {/* Row actions — the approved screen's `⋯`. Right-click already opens
+            this menu; the button makes it discoverable and gives the row the
+            same trailing action the Page outline has. */}
+        {editable && !isRenaming && (
+          <Button
+            variant="ghost"
+            size="xs"
+            iconOnly
+            className={styles.rowMenuButton}
+            aria-label={`Actions for ${displayName}`}
+            onClick={(event) => {
+              event.stopPropagation()
+              const rect = event.currentTarget.getBoundingClientRect()
+              setContextMenu({ x: rect.left, y: rect.bottom })
+            }}
+            onPointerDown={(event) => event.stopPropagation()}
+          >
+            <FaIcon name="ellipsis" size={13} />
+          </Button>
+        )}
       </TreeRow>
 
       {/* Children — role="group" as required by WAI-ARIA tree pattern */}

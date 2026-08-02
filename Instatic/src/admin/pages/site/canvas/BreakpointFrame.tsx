@@ -35,6 +35,7 @@ import { useEditorPermissions } from '@site/editorPermissionsContext'
 import { useEditorStore } from '@site/store/store'
 import { clientPointToEditorDoc } from './canvasDomGeometry'
 import { closestReadonlyRegion } from './readonlyRegion'
+import { useReviewFrameScale } from './useReviewFrameScale'
 import styles from './BreakpointFrame.module.css'
 
 interface BreakpointFrameProps {
@@ -47,6 +48,8 @@ interface BreakpointFrameProps {
   templateContext?: TemplateRenderDataContext
   /** Opt-in runtime scripts injected into this frame; empty/undefined = none. */
   runtimeScripts?: InjectableRuntimeScript[]
+  /** Responsive Review's fixed grid layout: scale to fit, scroll inside. */
+  reviewLayout?: boolean
 }
 
 export function BreakpointFrame({
@@ -58,6 +61,7 @@ export function BreakpointFrame({
   onActivate,
   templateContext,
   runtimeScripts,
+  reviewLayout = false,
 }: BreakpointFrameProps) {
   // --bp-width drives both label width and viewport width via CSS (dynamic value)
   const bpStyle = { '--bp-width': `${breakpoint.width}px` } as CSSProperties
@@ -75,6 +79,9 @@ export function BreakpointFrame({
   // `getBoundingClientRect()` call. State (not ref) so the overlay re-renders
   // when the iframe mounts.
   const [iframeEl, setIframeEl] = useState<HTMLIFrameElement | null>(null)
+  // Responsive Review sizes the frame from its grid column, not from the
+  // breakpoint width, so the whole page fits without panning.
+  const reviewScale = useReviewFrameScale(viewportRef, breakpoint.width, reviewLayout)
   const [activationHintPoint, setActivationHintPoint] = useState<CursorTooltipPoint | null>(null)
   const [readonlyHint, setReadonlyHint] = useState<{ text: string; point: CursorTooltipPoint } | null>(null)
 
@@ -149,6 +156,8 @@ export function BreakpointFrame({
   return (
     <div
       className={cn(styles.frameWrapper, isDimmed && styles.frameWrapperDimmed)}
+      // Drives the approved screen's green ring on the active review frame.
+      data-active={isActive ? 'true' : undefined}
       data-breakpoint-dimmed={isDimmed ? 'true' : undefined}
       data-testid={`canvas-frame-${breakpoint.id}`}
       style={bpStyle}
@@ -172,16 +181,23 @@ export function BreakpointFrame({
             {breakpoint.label}
             <span className={styles.pxBadge}>{breakpoint.width}px</span>
           </Button>
+          {/* The reference labels this action in words on the companion
+              frames ("Open full-size") rather than as a glyph — it is the one
+              way out of a shrunken frame, so it should read as an offer. The
+              active frame is already full-size, so it keeps the icon. */}
           <Button
             variant="ghost"
             size="sm"
-            iconOnly
+            iconOnly={!reviewLayout || isActive}
+            className={reviewLayout && !isActive ? styles.openFull : undefined}
             onClick={handleOpenLive}
             tooltip={`Open ${breakpoint.label} in live mode`}
             aria-label={`Open ${breakpoint.label} breakpoint in live mode`}
             data-testid={`canvas-frame-live-${breakpoint.id}`}
           >
-            <ArrowsScaleIcon size={14} aria-hidden="true" />
+            {reviewLayout && !isActive
+              ? 'Open full-size'
+              : <ArrowsScaleIcon size={14} aria-hidden="true" />}
           </Button>
           <Button
             variant="ghost"
@@ -218,6 +234,13 @@ export function BreakpointFrame({
         data-breakpoint-id={breakpoint.id}
         className={styles.viewport}
       >
+        {/* In Responsive Review the frame is scaled to fit its fixed grid
+            column and scrolls inside it. `getBoundingClientRect` accounts for
+            the transform, so the selection overlay needs no extra maths. */}
+        <div
+          className={reviewLayout ? styles.scaler : undefined}
+          style={reviewLayout ? ({ '--frame-scale': reviewScale } as CSSProperties) : undefined}
+        >
         <IframeFrameSurface
           ref={handleIframeRef}
           breakpointId={breakpoint.id}
@@ -234,6 +257,7 @@ export function BreakpointFrame({
             </CanvasBreakpointContext.Provider>
           </CanvasTemplateContext.Provider>
         </IframeFrameSurface>
+        </div>
 
         {/* Selection / hover rings — rendered in the parent document but
             positioned over the iframe. The overlay handles the iframe-rect

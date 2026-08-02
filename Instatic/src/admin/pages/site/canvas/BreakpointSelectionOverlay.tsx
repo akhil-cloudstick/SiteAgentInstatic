@@ -71,17 +71,17 @@
 
 import { use, useEffect, useEffectEvent, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { useEditorStore } from '@site/store/store'
-import { styleRuleSelector } from '@core/page-tree'
+import { useEditorStore, selectActiveCanvasPage } from '@site/store/store'
+import { registry } from '@core/module-engine'
+import { getNodeDisplayName, styleRuleSelector } from '@core/page-tree'
 import { useEditorPermissions } from '@site/editorPermissionsContext'
 import { useShallow } from 'zustand/react/shallow'
 import { Button } from '@ui/components/Button'
 import { cn } from '@ui/cn'
-import { CopyPlusSolidIcon } from 'pixel-art-icons/icons/copy-plus-solid'
-import { TrashSolidIcon } from 'pixel-art-icons/icons/trash-solid'
-import { HandGrabSolidIcon } from 'pixel-art-icons/icons/hand-grab-solid'
 import { CanvasViewportActionsContext } from './CanvasContexts'
 import { CanvasInsertModuleButton } from './CanvasInsertModuleButton'
+import { LayerNodeContextMenu } from '@site/panels/DomPanel/LayerNodeContextMenu'
+import { FaIcon } from '@ui/components/FaIcon'
 import { useCanvasReorderDrag } from './useCanvasReorderDrag'
 import { useCanvasTreeLadderOverlay } from './CanvasTreeLadderOverlay'
 import { CanvasNodeElementCache } from './canvasNodeLookup'
@@ -148,6 +148,43 @@ export function BreakpointSelectionOverlay({
   // subscription stable when the array reference changes but its contents
   // are equal (matters because selectedNodeIds is a new array every set call).
   const selectedNodeIds = useEditorStore(useShallow((s) => s.selectedNodeIds))
+  const selectedNodeId = useEditorStore((s) => s.selectedNodeId)
+  // "Editing <Name> component" — the approved screen's ring tab. Reads the
+  // same display name the Layers tree and the inspector header show, so the
+  // three never disagree about what a node is called.
+  const editingLabel = useEditorStore((s) => {
+    if (!s.selectedNodeId) return null
+    const node = selectActiveCanvasPage(s)?.nodes[s.selectedNodeId]
+    if (!node) return null
+    const name = getNodeDisplayName(node, registry.get(node.moduleId), s.site?.visualComponents)
+    return `Editing ${name} component`
+  })
+  /**
+   * "Open component" is only meaningful for a Visual Component instance —
+   * that is the only selection that HAS a component to open. The button stays
+   * in place for every selection (the approved screen always shows it) and
+   * says why it is unavailable rather than vanishing.
+   */
+  const openComponentVcId = useEditorStore((s) => {
+    if (!s.selectedNodeId) return null
+    const node = selectActiveCanvasPage(s)?.nodes[s.selectedNodeId]
+    if (node?.moduleId !== 'base.visual-component-ref') return null
+    const componentId = (node.props as Record<string, unknown> | undefined)?.['componentId']
+    return typeof componentId === 'string' ? componentId : null
+  })
+  /** The reference names this "Insert into slot" when the target is a slot. */
+  const insertLabel = useEditorStore((s) => {
+    if (!s.selectedNodeId) return 'Insert'
+    const node = selectActiveCanvasPage(s)?.nodes[s.selectedNodeId]
+    return node?.moduleId === 'base.slot-instance' ? 'Insert into slot' : 'Insert'
+  })
+  const setActiveDocument = useEditorStore((s) => s.setActiveDocument)
+  const [toolbarMenu, setToolbarMenu] = useState<{ x: number; y: number } | null>(null)
+
+  function openSelectedComponent(): void {
+    if (!openComponentVcId) return
+    setActiveDocument({ kind: 'visualComponent', vcId: openComponentVcId })
+  }
   // `hoveredBreakpointId === null` means "global hover" — i.e. the hover did
   // not originate from a specific breakpoint frame on the canvas (e.g. it was
   // triggered by hovering a row in the DOM panel). In that case every frame
@@ -376,42 +413,80 @@ export function BreakpointSelectionOverlay({
       // reselects the element behind). Same pattern as CanvasNotch.
       onClick={(event) => event.stopPropagation()}
     >
+      {/* The approved screen's `.selection-toolbar`: Open component · Insert ·
+          Duplicate · More, as labelled actions rather than a row of icon-only
+          buttons. Delete and the drag grip moved into the "More" menu — the
+          same `LayerNodeContextMenu` the Layers tree uses — so a destructive
+          action is no longer one mis-click away from Duplicate. */}
       <Button
         variant="secondary"
         size="xs"
-        iconOnly
-        aria-label="Drag selected layers"
-        tooltip="Drag selected layers"
-        className={cn(styles.selectionToolbarButton, styles.dragToolbarButton)}
-        onPointerDown={reorderDrag.handlePointerDown}
+        aria-label="Open component in canvas"
+        tooltip={openComponentVcId
+          ? 'Open this Visual Component in the canvas'
+          : 'Only a Visual Component instance can be opened in the canvas'}
+        disabled={!openComponentVcId}
+        className={styles.selectionToolbarButton}
+        onClick={openSelectedComponent}
       >
-        <HandGrabSolidIcon size={13} color="var(--text)" />
+        <FaIcon name="arrow-up-right-from-square" size={13} />
+        <span className={styles.selectionToolbarLabel}>Open component</span>
       </Button>
-      <CanvasInsertModuleButton buttonClassName={styles.selectionToolbarButton} />
+
+      <CanvasInsertModuleButton
+        buttonClassName={styles.selectionToolbarButton}
+        label={insertLabel}
+        labelClassName={styles.selectionToolbarLabel}
+      />
 
       <Button
         variant="secondary"
         size="xs"
-        iconOnly
         aria-label="Duplicate selected layers"
         tooltip="Duplicate selected layers"
         className={styles.selectionToolbarButton}
         onClick={duplicateSelectedLayers}
       >
-        <CopyPlusSolidIcon size={13} color="var(--text)" />
+        <FaIcon name="copy" size={13} />
+        <span className={styles.selectionToolbarLabel}>Duplicate</span>
       </Button>
+
       <Button
         variant="secondary"
         size="xs"
         iconOnly
-        tone="danger"
-        aria-label="Delete selected layers"
-        tooltip="Delete selected layers"
+        aria-label="More component actions"
+        tooltip="More actions"
         className={styles.selectionToolbarButton}
-        onClick={deleteSelectedLayers}
+        onClick={(event) => {
+          const rect = event.currentTarget.getBoundingClientRect()
+          setToolbarMenu({ x: rect.left, y: rect.bottom })
+        }}
       >
-        <TrashSolidIcon size={13} color="var(--danger-light)" />
+        <FaIcon name="ellipsis-vertical" size={13} />
       </Button>
+
+      {/* Everything that no longer has its own button — delete, rename, wrap,
+          copy/cut/paste, "Insert module here" — via the SAME menu the Layers
+          tree uses, so a node behaves identically wherever it is acted on. */}
+      {toolbarMenu && selectedNodeId && (
+        <LayerNodeContextMenu
+          x={toolbarMenu.x}
+          y={toolbarMenu.y}
+          nodeId={selectedNodeId}
+          onClose={() => setToolbarMenu(null)}
+          onDelete={() => { deleteSelectedLayers(); setToolbarMenu(null) }}
+          onDuplicate={() => { duplicateSelectedLayers(); setToolbarMenu(null) }}
+          onRename={() => setToolbarMenu(null)}
+          onWrapInContainer={() => {
+            useEditorStore.getState().wrapNode(selectedNodeId, 'base.container')
+            setToolbarMenu(null)
+          }}
+          onCopy={() => { useEditorStore.getState().copyNode(selectedNodeId); setToolbarMenu(null) }}
+          onCut={() => { useEditorStore.getState().cutNode(selectedNodeId); setToolbarMenu(null) }}
+          onPaste={() => { useEditorStore.getState().pasteNode(selectedNodeId); setToolbarMenu(null) }}
+        />
+      )}
     </div>
   ) : null
 
@@ -440,6 +515,12 @@ export function BreakpointSelectionOverlay({
           className={cn(styles.ring, styles.selection)}
           data-canvas-selection-ring="true"
           data-node-id={id}
+          // The approved screen tags the selected element with
+          // "Editing <Name> component". Only the anchor carries it, so a
+          // multi-selection doesn't stack labels; the CSS renders it as a
+          // ::before so the RAF measure loop stays untouched.
+          data-selection-anchor={id === selectedNodeId ? 'true' : undefined}
+          data-editing-label={id === selectedNodeId && editingLabel ? editingLabel : undefined}
         />
       ))}
       {showHover && hoverRingNodeId && (

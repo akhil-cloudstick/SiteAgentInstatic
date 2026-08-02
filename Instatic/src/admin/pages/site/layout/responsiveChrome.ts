@@ -1,6 +1,13 @@
 import { useEffect, useState } from 'react'
 
-const NARROW_EDITOR_CHROME_QUERY = '(max-width: 900px)'
+/**
+ * Below this width the Site workspace becomes canvas-first: the outline and
+ * inspector stop being columns and move into the bottom dock's labelled
+ * drawers. 1100px, not the old 900px, because that is where the approved
+ * MMSBUILD screen makes the switch — its three-panel editor is never scaled
+ * down, it is re-composed.
+ */
+const NARROW_EDITOR_CHROME_QUERY = '(max-width: 1100px)'
 
 export function isNarrowEditorChromeViewport(): boolean {
   return typeof window !== 'undefined' && window.matchMedia(NARROW_EDITOR_CHROME_QUERY).matches

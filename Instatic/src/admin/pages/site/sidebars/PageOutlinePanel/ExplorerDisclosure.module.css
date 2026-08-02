@@ -1,0 +1,106 @@
+/**
+ * Transcribed from the approved Site screen's `.advanced-block`,
+ * `.advanced-toggle`, `.advanced-shortcuts` and `.advanced-tools`
+ * (screens/site/src/styles.css).
+ */
+.block {
+    margin-top: auto;
+    border: 1px solid var(--mms-border);
+    border-radius: var(--site-radius);
+    background: var(--mms-surface);
+}
+
+.toggle {
+    display: flex;
+    width: 100%;
+    min-height: 48px;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 12px;
+    border: 0;
+    border-radius: var(--site-radius);
+    background: transparent;
+    font-weight: 650;
+    text-align: left;
+}
+
+/* Collapsed: the four Explorer tabs as a compact icon-over-label strip. */
+.shortcuts {
+    display: grid;
+    border-top: 1px solid var(--mms-border);
+    grid-template-columns: repeat(4, 1fr);
+}
+
+.shortcut {
+    display: grid;
+    min-width: 0;
+    min-height: 48px;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: var(--mms-text-muted);
+    font-size: 9px;
+    gap: 3px;
+    place-items: center;
+}
+
+.shortcut[data-selected='true'] {
+    color: var(--mms-action-strong);
+}
+
+.shortcut i {
+    font-size: 13px;
+}
+
+/* Four tracks in a ~250px column leaves ~60px each — the labels must clip
+   rather than push the strip wider than its block. */
+.shortcut span {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Expanded: the full tool grid. */
+.grid {
+    display: grid;
+    padding: 12px;
+    gap: 8px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.tool {
+    display: flex;
+    min-width: 0;
+    min-height: 48px;
+    align-items: center;
+    padding: 0 10px;
+    border: 1px solid var(--mms-border);
+    border-radius: var(--site-control-radius);
+    background: var(--mms-surface-raised);
+    gap: 8px;
+    font-size: 12px;
+    text-align: left;
+}
+
+/* Icons must not shrink, labels must not spill. "Dependencies" is the longest
+   label and was overflowing its tile before this. */
+.tool i {
+    flex: 0 0 auto;
+}
+
+.toolLabel {
+    min-width: 0;
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.tool[data-selected='true'] {
+    border-color: var(--mms-action);
+    background: var(--mms-surface-green);
+    color: var(--mms-action-strong);
+    font-weight: 650;
+}

@@ -1,0 +1,282 @@
+/**
+ * Transcribed from the approved Site screen's `.workspace-toolbar`,
+ * `.breadcrumb`, `.segmented`, `.mode-control`, `.device-control` and
+ * `.zoom-control` (screens/site/src/styles.css), including the per-mode grid
+ * geometry in `.mode-live` / `.mode-focus` / `.mode-review`.
+ *
+ * Values are px because the reference is px-exact and the acceptance bar is a
+ * pixel match; colours are tokens so the light/dark flip is automatic.
+ */
+.toolbar {
+    position: relative;
+    z-index: 40;
+    display: grid;
+    width: 100%;
+    height: var(--site-toolbar-height);
+    align-items: center;
+    border-bottom: 1px solid var(--mms-border);
+    background: var(--mms-workspace);
+    grid-template-columns: minmax(220px, 1fr) auto minmax(220px, 1fr);
+    font-family: var(--font-mms);
+}
+
+.breadcrumb {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    padding: 0 25px;
+    gap: 12px;
+    font-size: 13px;
+    white-space: nowrap;
+}
+
+.breadcrumb i {
+    color: var(--mms-border-strong);
+}
+
+.breadcrumb span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ── The shared segmented shell ─────────────────────────────────────────── */
+
+.modeControl,
+.deviceControl {
+    display: inline-flex;
+    min-height: 44px;
+    overflow: hidden;
+    border: 1px solid var(--mms-border);
+    border-radius: var(--site-control-radius);
+    background: var(--mms-surface-tint);
+}
+
+.segment {
+    display: inline-flex;
+    min-width: 44px;
+    min-height: 44px;
+    align-items: center;
+    justify-content: center;
+    padding: 0 17px;
+    border: 0;
+    border-right: 1px solid var(--mms-border);
+    border-radius: 0;
+    background: transparent;
+    gap: 8px;
+    font-size: 13px;
+    white-space: nowrap;
+}
+
+.modeControl > .segment:last-child,
+.deviceControl > .segment:last-child {
+    border-right: 0;
+}
+
+.segment[data-selected='true'] {
+    background: var(--mms-surface-raised);
+    box-shadow: inset 0 0 0 1px var(--mms-selected-inset);
+    color: var(--mms-action-strong);
+    font-weight: 720;
+}
+
+/* Label over hint, stacked and centred. The reference achieved this with a
+   negative margin, which overlapped the neighbouring segment as soon as the
+   label length changed — a real grid keeps them locked together. */
+.segmentText {
+    display: grid;
+    min-width: 0;
+    justify-items: center;
+    line-height: 1.15;
+}
+
+.segmentLabel {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.segmentHint {
+    max-width: 100%;
+    overflow: hidden;
+    color: var(--mms-text-muted);
+    font-size: 10px;
+    font-weight: 500;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.zoomControl {
+    display: inline-flex;
+    min-height: 44px;
+    align-items: center;
+    border: 1px solid var(--mms-border);
+    border-radius: var(--site-control-radius);
+    background: transparent;
+}
+
+.zoomControl > * {
+    min-width: 44px;
+    min-height: 44px;
+}
+
+/* ── Layout: identical in all three modes ───────────────────────────────────
+   The approved screen gives each mode its own offsets, which makes the mode
+   strip and the viewport strip jump horizontally when you switch modes — the
+   controls you are aiming at move out from under the cursor. One layout for
+   all three: breadcrumb left, mode strip centred, viewport/zoom right. The
+   only thing that changes between modes is the panel track widths below. */
+
+.modeControl {
+    justify-self: center;
+    grid-column: 2;
+}
+
+.modeControl .segment {
+    min-width: 132px;
+    padding: 0 12px;
+}
+
+.deviceControl,
+.zoomControl {
+    justify-self: end;
+    margin-right: 25px;
+    grid-column: 3;
+}
+
+.deviceControl .segment {
+    min-width: 104px;
+}
+
+/* ── Responsive ─────────────────────────────────────────────────────────── */
+
+@media (max-width: 1399px) and (min-width: 1101px) {
+    .modeControl .segment {
+        min-width: 0;
+        padding: 0 10px;
+    }
+
+    .deviceControl .segment {
+        min-width: 0;
+        padding: 0 10px;
+    }
+}
+
+/* Below 1100px the reference stacks the row: breadcrumb + viewport on top,
+   the mode strip centred underneath. */
+@media (max-width: 1100px) {
+    .toolbar,
+    .toolbar[data-mode='live'],
+    .toolbar[data-mode='focus'],
+    .toolbar[data-mode='review'] {
+        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-rows: 42px 56px;
+    }
+
+    .breadcrumb {
+        padding: 0 14px;
+        grid-column: 1;
+        grid-row: 1;
+    }
+
+    .toolbar .modeControl,
+    .toolbar[data-mode='live'] .modeControl,
+    .toolbar[data-mode='focus'] .modeControl,
+    .toolbar[data-mode='review'] .modeControl {
+        display: inline-flex;
+        width: auto;
+        max-width: calc(100vw - 168px);
+        justify-self: center;
+        margin: 0;
+        grid-column: 1 / -1;
+        grid-row: 2;
+    }
+
+    .modeControl .segment {
+        min-width: 88px;
+        padding: 0 11px;
+    }
+
+    .modeControl .segment i,
+    .segmentHint {
+        display: none;
+    }
+
+    .toolbar .deviceControl,
+    .toolbar[data-mode='live'] .deviceControl,
+    .toolbar[data-mode='focus'] .deviceControl,
+    .toolbar .zoomControl,
+    .toolbar[data-mode='review'] .zoomControl {
+        display: inline-flex;
+        width: auto;
+        justify-self: end;
+        margin: 0 10px 0 0;
+        grid-column: 2;
+        grid-row: 1;
+    }
+
+    .deviceControl .segment {
+        min-width: 44px;
+        padding: 0 11px;
+    }
+
+    .deviceControl .segment span {
+        display: none;
+    }
+}
+
+@media (max-width: 620px) {
+    .toolbar,
+    .toolbar[data-mode='live'],
+    .toolbar[data-mode='focus'],
+    .toolbar[data-mode='review'] {
+        grid-template-columns: 1fr;
+        grid-template-rows: 44px 60px;
+    }
+
+    .breadcrumb {
+        display: none;
+    }
+
+    .toolbar .modeControl,
+    .toolbar[data-mode='live'] .modeControl,
+    .toolbar[data-mode='focus'] .modeControl,
+    .toolbar[data-mode='review'] .modeControl {
+        width: calc(100vw - 20px);
+        max-width: none;
+        margin: 0;
+        grid-column: 1;
+        grid-row: 2;
+    }
+
+    .modeControl .segment {
+        min-width: 0;
+        flex: 1;
+        padding: 0 5px;
+        font-size: 10px;
+    }
+
+    .toolbar .deviceControl,
+    .toolbar[data-mode='live'] .deviceControl,
+    .toolbar[data-mode='focus'] .deviceControl {
+        display: grid;
+        width: 300px;
+        justify-self: center;
+        margin: 0;
+        grid-column: 1;
+        grid-row: 1;
+        grid-template-columns: repeat(3, 1fr);
+    }
+
+    .toolbar .zoomControl,
+    .toolbar[data-mode='review'] .zoomControl {
+        justify-self: center;
+        margin: 0;
+        grid-column: 1;
+        grid-row: 1;
+    }
+
+    .deviceControl .segment {
+        padding: 0 8px;
+    }
+}

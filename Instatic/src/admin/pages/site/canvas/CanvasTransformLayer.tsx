@@ -27,6 +27,8 @@ interface CanvasTransformLayerProps {
   templateContext?: TemplateRenderDataContext
   /** Opt-in runtime scripts injected into every frame; empty/undefined = none. */
   runtimeScripts?: InjectableRuntimeScript[]
+  /** Lay the frames out as the approved Responsive Review grid (no panning). */
+  reviewLayout?: boolean
   /** React 19: ref is a regular prop on function components. */
   ref?: Ref<HTMLDivElement>
 }
@@ -40,12 +42,24 @@ export function CanvasTransformLayer({
   onBreakpointActivate,
   templateContext,
   runtimeScripts,
+  reviewLayout = false,
   ref,
 }: CanvasTransformLayerProps) {
-  const framedBreakpoints: Breakpoint[] = []
+  const previewable: Breakpoint[] = []
   for (const breakpoint of breakpoints) {
-    if (breakpoint.previewFrame !== false) framedBreakpoints.push(breakpoint)
+    if (breakpoint.previewFrame !== false) previewable.push(breakpoint)
   }
+  /**
+   * Responsive Review reads widest-first — Desktop, Tablet, Mobile — as the
+   * approved MMSBUILD screen does. The persisted order is narrowest-first
+   * (`DEFAULT_BREAKPOINTS` starts at mobile/375), which put Mobile on the left
+   * and read backwards against the reference.
+   *
+   * Presentation only: storage order is untouched, so Settings › Viewport
+   * contexts still lists and reorders them exactly as authored.
+   */
+  const framedBreakpoints = [...previewable].sort((a, b) => b.width - a.width)
+
   const fallbackBreakpoints = framedBreakpoints.length > 0 ? framedBreakpoints : DEFAULT_BREAKPOINTS
 
   return (
@@ -56,7 +70,13 @@ export function CanvasTransformLayer({
       // useCanvas during active gestures — not permanently — to avoid wrapping
       // the whole subtree into one oversized layer backing that leaves content
       // blank at scale/low zoom. See WILL_CHANGE_RELEASE_MS in useCanvas.ts.
-      className={styles.transformLayer}
+      // Responsive Review is a FIXED grid, not a pannable plane: the approved
+      // screen puts the three contexts in `3.34fr / 1.4fr / 1fr` columns that
+      // stay put, each frame scrolling inside its own box. The transform-layer
+      // flow (absolute, gap-separated, dragged by useCanvas) is only used when
+      // that layout is off.
+      className={reviewLayout ? styles.reviewGrid : styles.transformLayer}
+      data-review-layout={reviewLayout ? 'true' : undefined}
     >
       {page ? (
         // Only breakpoints flagged for a preview frame render an iframe on the
@@ -80,6 +100,7 @@ export function CanvasTransformLayer({
             onActivate={onBreakpointActivate}
             templateContext={templateContext}
             runtimeScripts={runtimeScripts}
+            reviewLayout={reviewLayout}
           />
         ))
       ) : (

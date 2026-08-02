@@ -25,6 +25,7 @@ import { useEditorStore } from '@site/store/store'
 import { MinusIcon } from 'pixel-art-icons/icons/minus'
 import { PlusIcon } from 'pixel-art-icons/icons/plus'
 import { Button } from '@ui/components/Button'
+import { cn } from '@ui/cn'
 import styles from './Toolbar.module.css'
 
 /**
@@ -45,7 +46,15 @@ function getCanvasCenter(): { x: number; y: number } | null {
 
 const LIVE_ZOOM_REASON = 'Live mode always shows 100% zoom.'
 
-export function ZoomControls() {
+interface ZoomControlsProps {
+  /**
+   * Extra class for the group shell. The Site workspace toolbar passes the
+   * reference's bordered segmented shell; other callers keep the bare group.
+   */
+  className?: string
+}
+
+export function ZoomControls({ className }: ZoomControlsProps = {}) {
   // Subscribe only to zoom + view — no re-render when other canvas state changes
   const zoom = useEditorStore((s) => s.zoom)
   const isLive = useEditorStore((s) => s.canvasView === 'live')
@@ -74,7 +83,7 @@ export function ZoomControls() {
       role="group"
       aria-label="Canvas navigation"
       data-testid="toolbar-zoom-controls"
-      className={styles.zoomGroup}
+      className={cn(styles.zoomGroup, className)}
     >
       {/* Zoom out */}
       <Button

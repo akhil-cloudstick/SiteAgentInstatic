@@ -61,6 +61,22 @@ interface CanvasSlice {
   /** Current canvas render mode — 'design' (multi-breakpoint canvas) or 'live' (single real-size editable frame) */
   canvasView: CanvasView
   /**
+   * Section Focus — the id of the top-level page section the author is
+   * concentrating on, or null when Focus is off.
+   *
+   * Focus is an EPHEMERAL PRESENTATION STATE over the same live canvas, the
+   * same selection and the same document — deliberately not a second editor.
+   * Nothing here changes the page tree, history, or persistence: the canvas
+   * reads this id, stamps two data attributes into the editable iframes, and
+   * CSS dims the sibling sections. That is why entering and leaving Focus
+   * preserves scroll position, selection, the undo stack and the unsaved
+   * draft — nothing unmounts and nothing is written to the document.
+   *
+   * Only meaningful while `canvasView === 'live'`; switching to 'design'
+   * (Responsive Review) clears it.
+   */
+  sectionFocusNodeId: string | null
+  /**
    * When true, the site's runtime scripts are bundled and injected into the
    * editable canvas iframes (both 'design' and 'live' views), so authored
    * behaviour runs in-place while the page stays editable. Opt-in (default
@@ -93,6 +109,12 @@ interface CanvasSlice {
   setActivePage: (pageId: string) => void
   setCanvasMode: (mode: CanvasMode) => void
   setCanvasView: (view: CanvasView) => void
+  /**
+   * Enter Section Focus on `nodeId`, or leave it with null. Callers pass the
+   * TOP-LEVEL section (a direct child of the page root) — `WorkspaceToolbar`
+   * resolves that from the current selection.
+   */
+  setSectionFocus: (nodeId: string | null) => void
   /** Toggle (or set) whether runtime scripts run inside the editable iframes. */
   setRunScripts: (run: boolean) => void
   /** Toggle whether a breakpoint's design-canvas frame is collapsed to its slim header. */
@@ -129,6 +151,7 @@ export const createCanvasSlice: EditorStoreSliceCreator<CanvasSlice> = (set, get
   previousActivePageId: null,
   canvasMode: 'select',
   canvasView: 'design',
+  sectionFocusNodeId: null,
   runScripts: false,
   collapsedBreakpointIds: [],
   agentSnapshotCaptureRequest: null,
@@ -153,7 +176,13 @@ export const createCanvasSlice: EditorStoreSliceCreator<CanvasSlice> = (set, get
 
   setCanvasMode: (mode) => set({ canvasMode: mode }),
 
-  setCanvasView: (view) => set({ canvasView: view }),
+  // Responsive Review is the multi-frame design canvas; Section Focus only
+  // makes sense over the single real-size frame, so leaving 'live' drops it.
+  setCanvasView: (view) => set(
+    view === 'live' ? { canvasView: view } : { canvasView: view, sectionFocusNodeId: null },
+  ),
+
+  setSectionFocus: (sectionFocusNodeId) => set({ sectionFocusNodeId }),
 
   setRunScripts: (run) => set({ runScripts: run }),
 

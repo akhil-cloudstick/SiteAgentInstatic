@@ -1,16 +1,17 @@
-import { lazy, Suspense, useRef, type CSSProperties } from 'react'
+import { lazy, Suspense, useRef, type CSSProperties, type ReactNode } from 'react'
 import { useEditorStore } from '@site/store/store'
-import type { LeftSidebarPanelId } from '@site/store/slices/uiSlice'
+import type { ExplorerPanelTab, LeftSidebarPanelId } from '@site/store/slices/uiSlice'
 import { AgentStoreProvider } from '@admin/ai/AgentStoreContext'
 import { FrameworkPanel } from '@site/panels/FrameworkPanel'
 import { ExplorerPanel } from '@site/panels/ExplorerPanel'
 import { DependenciesPanel } from '@site/panels/DependenciesPanel'
-import { PanelRail } from '@site/sidebars/PanelRail'
+import { PageOutlinePanel } from '@site/sidebars/PageOutlinePanel'
 import { PluginEditorPanel } from '@site/panels/PluginEditorPanel'
 import { SelectorsPanel } from '@site/panels/SelectorsPanel'
 import { FrameworkChangeConfirmProvider } from '@admin/shared/dialogs/FrameworkChangeConfirmDialog'
 import { VCDeletionConfirmProvider } from '@admin/shared/dialogs/VCDeletionConfirmDialog'
 import { SidebarResizeHandle } from '@admin/shared/SidebarResizeHandle'
+import { selectSiteWorkspaceMode, type SiteWorkspaceMode } from '@site/siteWorkspaceMode'
 import {
   PanelResizeHandle,
   useDraggablePanel,
@@ -69,6 +70,14 @@ interface LeftSidebarProps {
  * and is dropped from the rail (and its panel mount) when `editable=false`.
  */
 const READ_ONLY_RAIL_IDS: ReadonlySet<LeftSidebarPanelId> = new Set(['explorer'])
+/** Column heading per Explorer tab — the tab IS the thing being shown. */
+const EXPLORER_TAB_HEADINGS: Record<ExplorerPanelTab, string> = {
+  layers: 'Layers',
+  site: 'Site files',
+  code: 'Code',
+  media: 'Media',
+}
+
 const PANEL_RESIZE_LABELS: Record<HostedLeftPanelId, string> = {
   explorer: 'Explorer',
   selectors: 'Selectors',
@@ -83,7 +92,9 @@ export function LeftSidebar({
   canUseAiChat = true,
 }: LeftSidebarProps) {
   const sidebarRef = useRef<HTMLElement | null>(null)
+  const siteMode = useEditorStore(selectSiteWorkspaceMode)
   const activePanel = useEditorStore(selectActiveLeftSidebarPanel)
+  const explorerTab = useEditorStore((s) => s.explorerPanelTab)
   const activePluginPanelId = useEditorStore((s) => s.activePluginPanelId)
   const leftSidebarWidth = useEditorStore((s) => s.leftSidebarWidth)
   const leftSidebarMode = useEditorStore((s) => s.leftSidebarMode)
@@ -134,9 +145,24 @@ export function LeftSidebar({
     onToggleMode: togglePanelMode,
   } as const
 
+  // The Site workspace is ONE column: the outline and every switchable panel
+  // share the same track, so the panel must not add width on top of it.
+  const isSiteColumn = workspace === 'site' && !railOnly
+  const siteColumnShowsPanel = sidebarOpen && !panelFloating
+  // The column's heading follows what is actually showing in it, so switching
+  // to Layers retitles the column rather than leaving "Page outline" above a
+  // layer tree.
+  const activePanelHeading = effectivePluginPanelId !== null
+    ? 'Plugin panel'
+    : effectiveActivePanel === 'explorer'
+      ? EXPLORER_TAB_HEADINGS[explorerTab]
+      : effectiveActivePanel
+        ? PANEL_RESIZE_LABELS[effectiveActivePanel]
+        : null
+
   const style = {
-    '--left-sidebar-panel-width': `${panelWidth}px`,
-    '--left-sidebar-panel-layout-width': `${panelExpanded ? leftSidebarWidth : 0}px`,
+    '--left-sidebar-panel-width': `${isSiteColumn ? 0 : panelWidth}px`,
+    '--left-sidebar-panel-layout-width': `${isSiteColumn ? 0 : (panelExpanded ? leftSidebarWidth : 0)}px`,
   } as CSSProperties
 
   return (
@@ -144,6 +170,7 @@ export function LeftSidebar({
       ref={sidebarRef}
       className={styles.sidebar}
       data-testid="left-sidebar"
+      data-workspace={workspace}
       data-expanded={panelExpanded ? 'true' : 'false'}
       data-rail-only={railOnly ? 'true' : undefined}
       data-active-panel={effectivePluginPanelId !== null
@@ -151,20 +178,35 @@ export function LeftSidebar({
         : effectiveActivePanel ?? 'none'}
       style={style}
     >
-      <PanelRail
-        workspace={workspace}
-        editable={editable}
-        canUseAiChat={canUseAiChat}
-        railOnly={railOnly}
-      />
+      {/* ONE column, not two. The Site workspace's left column shows the Page
+          outline by default and swaps its body for whichever panel the Explorer
+          disclosure selects (Layers, Site files, Code, Media, Framework, …).
+          The disclosure itself stays pinned at the foot, so the switcher is
+          always reachable whatever is showing above it.
 
+          Other workspaces (Content / Media) have no page tree to outline, so
+          they keep the bare panel slot and their own icon rail. */}
       <FrameworkChangeConfirmProvider>
       <VCDeletionConfirmProvider>
+        <SiteColumn
+          enabled={isSiteColumn}
+          mode={siteMode}
+          showsPanel={siteColumnShowsPanel}
+          heading={activePanelHeading}
+        >
         <div
           ref={panelFloating ? setPanelRef : undefined}
-          className={cn(styles.panelSlot, panelFloating && styles.panelSlotFloating)}
+          className={cn(
+            styles.panelSlot,
+            panelFloating && styles.panelSlotFloating,
+            // Inside the Site column the slot is a normal flex child that fills
+            // the space above the disclosure, not an absolutely-positioned
+            // second column beside the outline.
+            isSiteColumn && !panelFloating && styles.panelSlotInColumn,
+          )}
           data-testid="left-sidebar-panel-slot"
           data-mode={leftSidebarMode}
+          hidden={isSiteColumn && !panelFloating && !siteColumnShowsPanel}
           inert={panelVisible ? undefined : true}
           style={panelFloating ? { ...panelPositionStyle, ...panelSizeStyle } : undefined}
         >
@@ -173,7 +215,7 @@ export function LeftSidebar({
               editing tools; each respects its own read-only state internally
               (e.g. TreeNode disables drag + context menu via `editable`). */}
           <div className={styles.panelMount} hidden={effectiveActivePanel !== 'explorer'}>
-            <ExplorerPanel editable={editable} {...dockablePanelProps} />
+            <ExplorerPanel editable={editable} hideTabs={isSiteColumn} {...dockablePanelProps} />
           </div>
           {/* Editor-only panels — only mounted when the caller can perform
               structural edits. Mounting them for non-editors would expose
@@ -210,6 +252,7 @@ export function LeftSidebar({
             />
           )}
         </div>
+        </SiteColumn>
         {canUseAiChat && (
           /* The AI assistant stays independent from the hosted left panel so
              users can keep Layers visible while following a conversation.
@@ -224,7 +267,22 @@ export function LeftSidebar({
       </VCDeletionConfirmProvider>
       </FrameworkChangeConfirmProvider>
 
-      {panelExpanded && (
+      {/* The Site column is always resizable — it is always showing something
+          (the outline, or a panel), unlike the other workspaces where the
+          handle only makes sense while a panel is open. Dragging writes
+          `--site-left-track` so the column, the workspace toolbar's grid and
+          the panel slot all move together off one variable. */}
+      {isSiteColumn ? (
+        <SidebarResizeHandle
+          side="left"
+          width={leftSidebarWidth}
+          targetRef={sidebarRef}
+          cssVariable="--site-left-track"
+          layoutCssVariable="--site-left-track"
+          ariaLabel="Resize left sidebar"
+          onResize={setLeftSidebarWidth}
+        />
+      ) : panelExpanded && (
         <SidebarResizeHandle
           side="left"
           width={leftSidebarWidth}
@@ -236,6 +294,34 @@ export function LeftSidebar({
         />
       )}
     </aside>
+  )
+}
+
+/**
+ * The Site workspace's single left column.
+ *
+ * Wraps the panel mounts in `PageOutlinePanel` so a switched-to panel renders
+ * IN PLACE of the outline list — same column, same heading, same disclosure
+ * below. Other workspaces render the mounts bare, beside their own icon rail.
+ */
+function SiteColumn({
+  enabled,
+  mode,
+  showsPanel,
+  heading,
+  children,
+}: {
+  enabled: boolean
+  mode: SiteWorkspaceMode
+  showsPanel: boolean
+  heading: string | null
+  children: ReactNode
+}) {
+  if (!enabled) return children
+  return (
+    <PageOutlinePanel mode={mode} hidden={showsPanel} toolHeading={heading}>
+      {children}
+    </PageOutlinePanel>
   )
 }
 

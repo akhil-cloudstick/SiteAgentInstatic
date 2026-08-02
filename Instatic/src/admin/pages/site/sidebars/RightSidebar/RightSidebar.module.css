@@ -31,6 +31,20 @@
     overflow: hidden;
 }
 
+/* One inspector, one shell, in all three Site modes.
+ *
+ * The approved screen gives Responsive Review a narrower track (316px vs the
+ * 280px of Live edit) but the SAME panel — same heading, same tab strip, same
+ * body. Sizing it from `--site-right-track` keeps the inspector identical
+ * everywhere and lets only the track width change with the mode, instead of
+ * Review growing a different-looking panel of its own.
+ */
+.sidebar[data-site-track='true'] {
+    --right-sidebar-panel-width: var(--site-right-track);
+    background: var(--mms-workspace);
+    border-left: 1px solid var(--mms-border);
+}
+
 @media (prefers-reduced-motion: reduce) {
     .sidebar {
         transition: none;

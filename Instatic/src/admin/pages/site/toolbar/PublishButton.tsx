@@ -35,9 +35,20 @@ interface PublishButtonProps {
   enabled?: boolean
   onSave?: () => void | Promise<void>
   saveStatus?: PersistenceSaveStatus
+  /**
+   * Why publishing is unavailable, shown in the button's tooltip. The Site
+   * shell passes the capability / draft-channel reason so a disabled Publish
+   * explains itself instead of just looking broken.
+   */
+  blockedReason?: string
 }
 
-export function PublishButton({ enabled = true, onSave, saveStatus }: PublishButtonProps) {
+export function PublishButton({
+  enabled = true,
+  onSave,
+  saveStatus,
+  blockedReason,
+}: PublishButtonProps) {
   const site = useEditorStore((s) => s.site)
   const siteId = useEditorStore((s) => s.site?.id ?? null)
   const activePage = useEditorStore(selectActivePage)
@@ -49,7 +60,6 @@ export function PublishButton({ enabled = true, onSave, saveStatus }: PublishBut
   const [scheduleDialogOpen, setScheduleDialogOpen] = useState(false)
   const statusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const isStatusSaving = saveStatus?.state === 'saving'
-  const saveError = saveStatus?.state === 'error' ? saveStatus.message ?? 'Save failed' : null
 
   useEffect(() => {
     return () => {
@@ -148,25 +158,6 @@ export function PublishButton({ enabled = true, onSave, saveStatus }: PublishBut
     state === 'error' ? 'Retry publish' :
     'Publish'
 
-  const status =
-    saveError ? {
-      label: 'Draft save failed',
-      tone: 'danger' as const,
-      ariaLabel: saveError,
-    } :
-    isStatusSaving || isSaving ? {
-      label: 'Saving draft',
-      tone: 'neutral' as const,
-    } :
-    hasUnsavedChanges ? {
-      label: 'Unsaved draft',
-      tone: 'warning' as const,
-    } :
-    {
-      label: 'Draft saved',
-      tone: 'success' as const,
-    }
-
   const PublishIcon =
     isPublishing ? LoaderIcon :
     state === 'published' ? CheckIcon :
@@ -174,6 +165,16 @@ export function PublishButton({ enabled = true, onSave, saveStatus }: PublishBut
     CloudUploadSolidIcon
 
   const menuItems: PublishActionMenuItem[] = [
+    {
+      // The approved screen names this "Publish full site" in the menu to make
+      // the blast radius explicit next to the per-page Schedule action below.
+      id: 'publish-full-site',
+      label: 'Publish full site',
+      icon: CloudUploadSolidIcon,
+      disabled: disabled || state === 'published',
+      onSelect: handlePublish,
+      testId: 'toolbar-publish-full-site-action',
+    },
     {
       id: 'save-draft',
       label: 'Save draft',
@@ -197,7 +198,7 @@ export function PublishButton({ enabled = true, onSave, saveStatus }: PublishBut
     },
     {
       id: 'preview',
-      label: 'Preview page',
+      label: 'Preview draft',
       icon: EyeSolidIcon,
       disabled: !site,
       onSelect: () => openPreview(),
@@ -210,13 +211,18 @@ export function PublishButton({ enabled = true, onSave, saveStatus }: PublishBut
 
   return (
     <>
+      {/* No `statusLabel`: the Site header carries its own SyncStatusButton,
+          which is a richer read of the same draft state — a second pill glued
+          to Publish would say the same thing twice. Content still uses the
+          inline pill, so PublishActionGroup keeps supporting it. */}
       <PublishActionGroup
-        statusLabel={state === 'published' ? null : status.label}
-        statusTone={status.tone}
-        statusAriaLabel={status.ariaLabel}
         publishLabel={label}
         publishAriaLabel={state === 'published' ? 'Published' : 'Publish site'}
-        publishTitle={state === 'published' ? 'Published' : 'Publish site'}
+        publishTitle={
+          blockedReason && disabled ? blockedReason
+          : state === 'published' ? 'Published'
+          : 'Publish the full draft site'
+        }
         publishState={state === 'publishing' ? 'busy' : state === 'published' ? 'success' : state}
         publishBusy={isPublishing}
         publishDisabled={disabled || state === 'published'}

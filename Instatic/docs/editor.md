@@ -276,7 +276,7 @@ src/admin/pages/site/
 │   └── clipboard/              ← copy/cut/paste serializers
 │
 ├── canvas/                     ← canvas rendering (see below)
-├── sidebars/                   ← LeftSidebar, RightSidebar, PanelRail
+├── sidebars/                   ← LeftSidebar, RightSidebar, PageOutlinePanel
 ├── panels/                     ← per-panel implementations (DomPanel, PropertiesPanel, ...)
 ├── property-controls/          ← right-panel form controls
 ├── module-picker/              ← module inserter modal + compact context-menu picker
@@ -333,7 +333,7 @@ The store is composed of **12 slices**, each created by a factory in `store/slic
 |------------------------|----------------------------------------------------------------------------|
 | `siteSlice`            | `SiteDocument` (pages, nodes, breakpoints, settings, classes, files). The page tree itself. |
 | `selectionSlice`       | `selectedNodeId`, `hoveredNodeId`                                          |
-| `canvasSlice`          | Zoom, pan, `activeBreakpointId`, `activeConditionId`, `canvasMode` ('select'|'pan'|'insert'), `canvasView` ('design'|'live'), `runScripts` |
+| `canvasSlice`          | Zoom, pan, `activeBreakpointId`, `activeConditionId`, `canvasMode` ('select'|'pan'|'insert'), `canvasView` ('design'|'live'), `sectionFocusNodeId`, `runScripts` |
 | `uiSlice`              | Site editor panel visibility, unsaved-changes flag, insert picker, `componentizeEditorRequest` |
 | `classSlice`           | Style-rule CRUD, node ↔ class assignment, ambient selector creation         |
 | `filesSlice`           | `SiteFile` CRUD                                                            |
@@ -387,6 +387,20 @@ Selectors are pure reads. Mutations go through actions (`useEditorStore.getState
 `src/admin/pages/site/canvas/` is the rendering pipeline. Two key ideas:
 
 ### 1. Design mode and live mode
+
+### Left column and the panel switcher
+
+The Site workspace's permanent left column is `sidebars/PageOutlinePanel/` — the guided view of the page: its top-level sections (the direct children of the page root), a search box, per-row actions, and "Add section". Everything it shows is real page-tree data and every action routes through the existing store mutations, so a section added here is indistinguishable from one added in Layers.
+
+At its foot sits the **Explorer disclosure** (`ExplorerDisclosure.tsx`), which replaced the old vertical icon rail. Collapsed it shows four shortcuts (Layers / Site files / Code / Media — the Explorer panel's own tabs); expanded it shows the full tool grid including Framework, Selectors, Dependencies, AI authoring, and any plugin-registered panels. Only the trigger changed: it calls the same `setLeftSidebarPanel` / `setActivePluginPanel` / `setExplorerPanelTab` actions the rail called, so spotlight commands and `deriveSiteActiveLeftPanel` persistence resolve unchanged. `PanelRail` still exists and still serves the Content / Data / Media workspaces.
+
+Below 1100px (`layout/responsiveChrome.ts`) the three columns collapse into `layout/WorkspaceDock.tsx` — a bottom dock whose Outline / Properties / Advanced drawers host the *same* components as the desktop columns, so behaviour and permissions are identical at every width.
+
+### Canvas modes
+
+The Site workspace presents **three** modes in its toolbar — Live edit, Focus section, Responsive review — over **two** rendering surfaces. `selectSiteWorkspaceMode` (`src/admin/pages/site/siteWorkspaceMode.ts`) derives the mode from `canvasView` plus `sectionFocusNodeId`; there is deliberately no third store field.
+
+**Section Focus** is an ephemeral presentation state over the live surface, never a second editor. `SectionFocusPresenter` stamps `data-section-focus` on the iframe body and `data-section-focused` on the focused top-level section; the rule injected by `EditorChromeInjector` dims the siblings and drops their pointer events. Because the page tree, history and React tree are untouched, entering and leaving Focus preserves scroll position, selection, the undo stack and the unsaved draft.
 
 `CanvasRoot` switches between two rendering surfaces based on `canvasView`:
 
@@ -449,8 +463,10 @@ Why this matters: selection rings and the floating selection toolbar are portale
 | Toolbar (main bar)                    | 30      | `toolbar/Toolbar.module.css` |
 | PropertiesPanel (floating)            | 50      | `panels/PropertiesPanel/PropertiesPanel.module.css` |
 | AgentPanel (floating)                 | 50      | `panels/AgentPanel/AgentPanel.module.css` |
-| PanelRail                             | 55      | `sidebars/PanelRail/PanelRail.module.css` |
+| PanelRail (Content / Data / Media)     | 55      | `sidebars/PanelRail/PanelRail.module.css` |
+| WorkspaceDock + drawers (≤1100px)      | 80 / 95 | `layout/WorkspaceDock.module.css` |
 | LeftSidebar, RightSidebar             | 85      | `sidebars/{Left,Right}Sidebar/` |
+| PageOutlinePanel (Site left column)   | —       | `sidebars/PageOutlinePanel/` |
 | Undocked left-panel host              | 90      | `sidebars/LeftSidebar/LeftSidebar.module.css` |
 | CodeEditorPanel (floats over sidebars)| 95      | `code-editor/CodeEditorPanel.module.css` |
 | Toolbar popovers / dropdowns          | 201     | `toolbar/Toolbar.module.css` |

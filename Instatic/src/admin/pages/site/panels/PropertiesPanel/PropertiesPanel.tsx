@@ -42,6 +42,7 @@ import { MultiSelectionHeader } from './MultiSelectionInspector'
 import { MultiSelectorHeader } from './MultiSelectorInspector'
 import { type ClassPickerHandle } from './ClassPicker'
 import { useEditorStore } from '@site/store/store'
+import { selectSiteWorkspaceMode, type SiteWorkspaceMode } from '@site/siteWorkspaceMode'
 import { PanelHeader, PanelModeButton } from '@admin/shared/PanelHeader'
 import {
   PanelResizeHandle,
@@ -52,6 +53,13 @@ import { cn } from '@ui/cn'
 import styles from './PropertiesPanel.module.css'
 
 const DEFAULT_WIDTH = 360
+
+/** Per-mode inspector titles, verbatim from the approved Site screen. */
+const INSPECTOR_TITLES: Record<SiteWorkspaceMode, string> = {
+  live: 'Properties',
+  focus: 'Section settings',
+  review: 'Responsive settings',
+}
 
 type PanelVariant = 'floating' | 'docked'
 
@@ -75,6 +83,7 @@ export function PropertiesPanel({ variant = 'floating' }: PropertiesPanelProps) 
   usePropertiesPanelAutoOpen()
 
   const data = usePropertiesPanelData()
+  const siteMode = useEditorStore(selectSiteWorkspaceMode)
 
   // ── ClassPicker ref — for the locked-state 'Add class' CTA ────────────────
   const classPickerRef = useRef<ClassPickerHandle>(null)
@@ -168,9 +177,13 @@ export function PropertiesPanel({ variant = 'floating' }: PropertiesPanelProps) 
       </div>
 
       {/* ─── Shared Panel Header — drag handle + close button ─────────────── */}
+      {/* The approved screen retitles the inspector per mode — "Section
+          settings" while focused, "Responsive settings" in review — because
+          the same panel is answering a different question in each. The body
+          below is unchanged; only the framing moves. */}
       <PanelHeader
         panelId="properties"
-        title="Properties"
+        title={INSPECTOR_TITLES[siteMode]}
         titleContent={(
           <HeaderTitleContent
             selectedSelectorClass={data.selectedSelectorClass}

@@ -1,0 +1,39 @@
+/**
+ * Transcribed from the approved Site screen's `.peer-stack` / `.peer-stack img`
+ * (screens/site/src/styles.css). Values are px because the reference is
+ * px-exact; colours come from tokens so the light/dark flip is automatic.
+ */
+.stack {
+    display: flex;
+    min-width: 54px;
+    align-items: center;
+    padding-left: 8px;
+}
+
+.peer {
+    /* The -9px pull is what makes the discs overlap; the ring is the header's
+       own surface, so each avatar punches a hole in the one behind it. */
+    margin-left: -9px;
+    border: 2px solid var(--mms-workspace);
+}
+
+.overflow {
+    display: inline-grid;
+    width: 31px;
+    height: 31px;
+    margin-left: -9px;
+    border: 2px solid var(--mms-workspace);
+    border-radius: 50%;
+    background: var(--mms-surface-tint);
+    color: var(--mms-text-muted);
+    font-size: 11px;
+    font-weight: 650;
+    place-items: center;
+}
+
+/* The reference drops the stack below 1400px, where the nav needs the room. */
+@media (max-width: 1399px) {
+    .stack {
+        display: none;
+    }
+}

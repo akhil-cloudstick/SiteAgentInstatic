@@ -29,11 +29,14 @@ const TABS: ReadonlyArray<{ value: ExplorerPanelTab; label: string }> = [
 ]
 
 interface ExplorerPanelProps extends DockablePanelProps {
+  /** Hide the tab row when an outer switcher already provides it. */
+  hideTabs?: boolean
   /** Whether the caller can perform structural edits (drives DnD/insert). */
   editable?: boolean
 }
 
 export function ExplorerPanel({
+  hideTabs = false,
   editable = true,
   mode,
   dragHandleProps,
@@ -55,16 +58,22 @@ export function ExplorerPanel({
       dockLocation="left sidebar"
       body="bare"
     >
-      <div className={styles.tabsRow}>
-        <SegmentedControl<ExplorerPanelTab>
-          value={tab}
-          options={TABS}
-          onChange={setTab}
-          size="sm"
-          activeSurface="recessed"
-          fullWidth
-        />
-      </div>
+      {/* In the Site workspace the Explorer disclosure at the foot of the
+          column IS this switcher, so repeating the tabs here would show
+          Layers/Site/Code/Media twice in one panel. Other workspaces mount
+          this panel without a disclosure and keep their own tab row. */}
+      {!hideTabs && (
+        <div className={styles.tabsRow}>
+          <SegmentedControl<ExplorerPanelTab>
+            value={tab}
+            options={TABS}
+            onChange={setTab}
+            size="sm"
+            activeSurface="recessed"
+            fullWidth
+          />
+        </div>
+      )}
       <div className={styles.tabBody}>
         <div className={styles.tabMount} hidden={tab !== 'layers'}>
           <DomPanel editable={editable} />

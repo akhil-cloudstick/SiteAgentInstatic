@@ -21,10 +21,19 @@ import { useInsertInserterItem } from '@site/hooks/useInsertInserterItem'
 interface CanvasInsertModuleButtonProps {
   /** Class applied to the trigger button so it matches the toolbar chrome. */
   buttonClassName?: string
+  /**
+   * Visible label. The approved screen labels this action ("Insert", or
+   * "Insert into slot" when the selection is a slot) rather than showing a
+   * bare glyph. Omit for the icon-only variant used elsewhere.
+   */
+  label?: string
+  labelClassName?: string
 }
 
 export function CanvasInsertModuleButton({
   buttonClassName,
+  label,
+  labelClassName,
 }: CanvasInsertModuleButtonProps) {
   const [open, setOpen] = useState(false)
   const triggerRef = useRef<HTMLButtonElement>(null)
@@ -41,7 +50,7 @@ export function CanvasInsertModuleButton({
         ref={triggerRef}
         variant="secondary"
         size="xs"
-        iconOnly
+        iconOnly={label === undefined}
         aria-label="Insert module"
         aria-haspopup="dialog"
         aria-expanded={open}
@@ -50,6 +59,7 @@ export function CanvasInsertModuleButton({
         onClick={() => setOpen(true)}
       >
         <AppGridPlusGlyphIcon size={13} color="var(--text)" />
+        {label !== undefined && <span className={labelClassName}>{label}</span>}
       </Button>
 
       {open && (

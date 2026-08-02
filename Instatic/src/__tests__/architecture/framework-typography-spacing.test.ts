@@ -114,20 +114,24 @@ describe('architecture — typography / spacing panels', () => {
   })
 })
 
-describe('architecture — panel rail', () => {
-  const railSource = readSource('admin/pages/site/sidebars/PanelRail/PanelRail.tsx')
+describe('architecture — panel switcher', () => {
+  // The vertical icon rail was replaced by the Explorer disclosure at the foot
+  // of the Page outline (the approved MMSBUILD Site screen has no rail). The
+  // constraint being gated is unchanged: Colors / Typography / Spacing are one
+  // consolidated `framework` entry, never three.
+  const switcherSource = readSource(
+    'admin/pages/site/sidebars/PageOutlinePanel/ExplorerDisclosure.tsx',
+  )
 
-  // Colors / Typography / Spacing were consolidated into one Framework rail
-  // entry (tabs live inside the FrameworkPanel). The rail now exposes a single
-  // `framework` item via the colors-swatch catalog icon.
-  it('rail wires the Framework entry via the catalog icon import', () => {
-    expect(railSource).toContain("from 'pixel-art-icons/icons/colors-swatch-solid'")
+  it('exposes a single framework entry with a stable id', () => {
+    expect(switcherSource).toMatch(/id:\s*'framework'/)
+    expect(switcherSource).not.toMatch(/id:\s*'typography'/)
+    expect(switcherSource).not.toMatch(/id:\s*'spacing'/)
   })
 
-  it('rail exposes a single framework entry with a stable id', () => {
-    expect(railSource).toMatch(/id:\s*'framework'/)
-    expect(railSource).not.toMatch(/id:\s*'typography'/)
-    expect(railSource).not.toMatch(/id:\s*'spacing'/)
+  it('routes every tool through the shared left-sidebar panel actions', () => {
+    expect(switcherSource).toContain('setLeftSidebarPanel')
+    expect(switcherSource).toContain('setActivePluginPanel')
   })
 })
 

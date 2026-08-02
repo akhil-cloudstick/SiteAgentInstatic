@@ -1,0 +1,88 @@
+/**
+ * Transcribed from the approved Site screen's `.mobile-dock`, `.mobile-drawer`
+ * and `.drawer-heading` (screens/site/src/styles.css). The dock only exists
+ * below the reference's 1100px band — above it the three columns are real.
+ */
+.dock {
+    position: fixed;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 80;
+    display: none;
+    height: 62px;
+    padding-bottom: env(safe-area-inset-bottom);
+    border-top: 1px solid var(--mms-border);
+    background: var(--mms-workspace);
+    font-family: var(--font-mms);
+    grid-template-columns: repeat(3, 1fr);
+}
+
+.dockButton {
+    display: inline-flex;
+    min-height: 56px;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    gap: 8px;
+    font-size: 12px;
+}
+
+.dockButton[data-selected='true'] {
+    color: var(--mms-action-strong);
+}
+
+.drawer {
+    position: fixed;
+    top: var(--site-shell-height);
+    right: 0;
+    bottom: 62px;
+    z-index: 95;
+    display: none;
+    width: min(410px, 100vw);
+    flex-direction: column;
+    border-left: 1px solid var(--mms-border);
+    background: var(--mms-workspace);
+    box-shadow: -18px 0 48px var(--scrim-20);
+    font-family: var(--font-mms);
+}
+
+.drawerHeading {
+    display: flex;
+    min-height: 58px;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 12px 0 18px;
+    border-bottom: 1px solid var(--mms-border);
+}
+
+.drawerHeading strong {
+    font-size: 14px;
+}
+
+.drawerBody {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+    flex-direction: column;
+    overflow: auto;
+}
+
+@media (max-width: 1100px) {
+    .dock {
+        display: grid;
+    }
+
+    .drawer {
+        display: flex;
+    }
+}
+
+@media (max-width: 620px) {
+    .drawer {
+        width: 100vw;
+        border-left: 0;
+    }
+}

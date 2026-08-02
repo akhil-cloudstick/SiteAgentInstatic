@@ -157,6 +157,31 @@ function buildTokenBlock(parentDoc: Document): string {
  * Module-scope constant: stable across renders, not captured into closures.
  */
 const CHROME_RULES = `
+/* ── Section Focus ─────────────────────────────────────────────────────────
+ * The whole of Section Focus, visually. \`CanvasRoot\` stamps
+ * \`data-section-focus\` on the iframe body and \`data-section-focused\` on the
+ * focused top-level section; everything else dims and stops taking pointer
+ * events, so the author's attention — and their clicks — stay on one section.
+ *
+ * Doing it in CSS on two attributes is the reason Focus is free: the page tree
+ * is untouched, nothing re-renders or unmounts, so scroll position, selection,
+ * the undo stack and the unsaved draft all survive entering and leaving.
+ *
+ * \`> [data-node-id]\` only ever matches the body's direct children — the
+ * top-level sections. Nested nodes inside the focused section are unaffected
+ * and stay fully editable.
+ */
+body[data-section-focus] > [data-node-id]:not([data-section-focused]) {
+  opacity: 0.44;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  body[data-section-focus] > [data-node-id] {
+    transition: opacity 140ms ease;
+  }
+}
+
 /* ── CanvasModulePlaceholder ───────────────────────────────────────────────
  * Reproduced from CanvasModulePlaceholder.module.css using stable
  * data-attribute selectors (data-canvas-module-placeholder, data-variant,

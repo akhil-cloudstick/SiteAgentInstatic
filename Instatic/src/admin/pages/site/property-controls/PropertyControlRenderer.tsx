@@ -284,6 +284,11 @@ export function PropertyControlRenderer({
       data-category={category}
       data-override={isOverride ? 'true' : undefined}
       data-layout={layout}
+      // A control's VALUE is the tenant's own content, so its glyphs can never
+      // match the approved screen's staged demo text. The pixel-fidelity gate
+      // (`tests/e2e/site-fidelity.e2e.ts`) masks these regions and holds the
+      // surrounding chrome — box, label, spacing — to the reference.
+      data-fidelity-dynamic=""
     >
       {content}
     </div>

@@ -1,14 +1,15 @@
 /**
  * AccountMenuButton — toolbar avatar trigger + account dropdown.
  *
- * Sits next to `SettingsButton` in `Toolbar.tsx`. Renders a 28×28 circular
- * button showing the user's initials. Clicking opens a compact dropdown:
+ * The last item in `Toolbar.tsx`'s trailer. Renders a 28×28 circular button
+ * showing the user's initials. Clicking opens a compact dropdown:
  *
  *   ┌──────────────────────────────┐
  *   │ Display Name                 │
  *   │ email@example.com            │
  *   │ [OWNER]                      │
  *   ├──────────────────────────────┤
+ *   │ Settings                     │  → global Settings modal
  *   │ Account & security           │  → /admin/account (soft nav)
  *   │ Sign out                     │  → POST /logout, hard reload to /admin
  *   │ Sign out all devices         │  → POST /auth/logout-all, status inline
@@ -33,8 +34,10 @@ import {
   ContextMenuSeparator,
 } from '@ui/components/ContextMenu'
 import { SettingsCogSolidIcon } from 'pixel-art-icons/icons/settings-cog-solid'
+import { LockSolidIcon } from 'pixel-art-icons/icons/lock-solid'
 import { PowerOffIcon } from 'pixel-art-icons/icons/power-off'
 import { MonitorSolidIcon } from 'pixel-art-icons/icons/monitor-solid'
+import { useAdminUi } from '@admin/state/adminUi'
 import { useAuthenticatedAdminUser } from '@admin/sessionContext'
 import { useAdminNavigate } from '@admin/lib/useAdminNavigate'
 import { StepUpCancelledMessage, useStepUp } from '@admin/shared/StepUp'
@@ -48,6 +51,7 @@ const ACCOUNT_ROUTE = '/admin/account'
 export function AccountMenuButton(): ReactNode {
   const user = useAuthenticatedAdminUser()
   const navigate = useAdminNavigate()
+  const openSettings = useAdminUi((s) => s.openSettings)
   const { runStepUp } = useStepUp()
   const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState<null | 'logout' | 'logout-all'>(null)
@@ -146,6 +150,19 @@ export function AccountMenuButton(): ReactNode {
             </span>
           </header>
           <ContextMenuSeparator />
+          {/* Settings lost its dedicated toolbar gear in the MMSBUILD header
+              re-skin (the approved header has no gear). It lives here now —
+              same `adminUi.openSettings` action, same modal. */}
+          <ContextMenuItem
+            onClick={() => {
+              close()
+              openSettings('general')
+            }}
+            data-testid="account-menu-open-settings"
+          >
+            <SettingsCogSolidIcon size={12} aria-hidden="true" />
+            <span>Settings</span>
+          </ContextMenuItem>
           <ContextMenuItem
             onClick={() => {
               close()
@@ -153,7 +170,7 @@ export function AccountMenuButton(): ReactNode {
             }}
             data-testid="account-menu-go-to-account"
           >
-            <SettingsCogSolidIcon size={12} aria-hidden="true" />
+            <LockSolidIcon size={12} aria-hidden="true" />
             <span>Account &amp; security</span>
           </ContextMenuItem>
           <ContextMenuItem

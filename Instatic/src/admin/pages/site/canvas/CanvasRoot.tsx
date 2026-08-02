@@ -53,7 +53,7 @@ import { useCanvasLayerContextMenu } from './useCanvasLayerContextMenu'
 import { useCanvasKeyboardShortcuts } from './useCanvasKeyboardShortcuts'
 import { clientPointToEditorDoc } from './canvasDomGeometry'
 import { useConfirmDelete } from '@admin/shared/dialogs/ConfirmDeleteDialog'
-import { useEditorPreference, readEditorSelectPreference } from '@site/preferences/editorPreferences'
+import { useEditorPreference } from '@site/preferences/editorPreferences'
 import { useTemplatePreviewContext } from '@site/hooks/useTemplatePreviewContext'
 import styles from './CanvasRoot.module.css'
 
@@ -167,10 +167,12 @@ export function CanvasRoot({ editable = true }: CanvasRootProps) {
   // silently mutating transformRef while in preview, which would otherwise
   // make the design canvas visibly jump on the first interaction after
   // returning from preview.
-  const { bind, handleKeyDown: canvasKeyDown, panBy, centerOnBreakpointFrame } = useCanvas({
+  const { bind, handleKeyDown: canvasKeyDown, panBy } = useCanvas({
     canvasRootRef: canvasRef,
     transformLayerRef,
-    enabled: !isLive,
+    // Responsive Review is a fixed board — the frames do not move and each
+    // scrolls inside its own cell, so there is nothing to pan or zoom.
+    enabled: false,
   })
 
   // ─── Focus the chosen viewport frame: loading skeleton → page → switches ───
@@ -206,26 +208,13 @@ export function CanvasRoot({ editable = true }: CanvasRootProps) {
   // run. setTimeout fires regardless, and reading getBoundingClientRect forces
   // the layout we need synchronously. The cap is a safety valve for a breakpoint
   // that has no preview frame at all.
-  const canvasPageId = canvasPage?.id ?? null
-  useEffect(() => {
-    if (isLive) return
-
-    let timerId: ReturnType<typeof setTimeout> | undefined
-    let attempts = 0
-    const MAX_ATTEMPTS = 200 // ~3s at 16ms — frames are ready well within this
-    const RETRY_MS = 16
-    const tryCenter = () => {
-      // Loaded: the resolved active breakpoint. Skeleton (no page yet): the
-      // preferred default breakpoint, which is what active WILL resolve to.
-      const targetId = canvasPageId
-        ? useEditorStore.getState().activeBreakpointId
-        : readEditorSelectPreference('defaultBreakpoint')
-      if (centerOnBreakpointFrame(targetId) || attempts++ >= MAX_ATTEMPTS) return
-      timerId = setTimeout(tryCenter, RETRY_MS)
-    }
-    tryCenter()
-    return () => clearTimeout(timerId)
-  }, [canvasPageId, isLive, centerOnBreakpointFrame])
+  // NOTE: the design canvas used to pan itself to centre the active breakpoint
+  // frame on load, because the frames sat side-by-side on an infinite plane
+  // wider than the viewport. Responsive Review is now a fixed grid that fits
+  // all three contexts inside the canvas, so panning to "find" a frame would
+  // push the board off-centre — which is exactly the bug it caused: Desktop
+  // started halfway across the canvas with the companions scrolled out of
+  // sight. There is nothing left to centre, so the pass is gone.
 
   // ─── Modals & overlays ─────────────────────────────────────────────────────
 
@@ -522,6 +511,7 @@ export function CanvasRoot({ editable = true }: CanvasRootProps) {
                 onBreakpointActivate={setActiveBreakpoint}
                 templateContext={templatePreviewContext}
                 runtimeScripts={runtimeScripts}
+                reviewLayout
               />
             )}
           </ErrorBoundary>

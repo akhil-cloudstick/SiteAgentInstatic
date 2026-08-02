@@ -33,7 +33,6 @@ import { pluginRuntime } from '@core/plugins/runtime'
 import type { RegisteredPluginToolbarButton } from '@core/plugin-sdk'
 import { AccountMenuButton } from '@admin/shared/AccountMenuButton'
 import { OpenLivePageButton } from '@admin/shared/OpenLivePageButton'
-import { SettingsButton } from './SettingsButton'
 import { ThemeToggleButton } from './ThemeToggleButton'
 import { useEditorSelectPreference } from '@admin/pages/site/preferences/editorPreferences'
 import { Link } from '@admin/lib/routing'
@@ -67,10 +66,10 @@ interface ToolbarProps {
    */
   overlay?: ReactNode
   /**
-   * Content rendered immediately before the account menu. Both layouts
-   * own this region: AdminCanvasLayout fills it with zoom / publish /
-   * settings; AdminPageLayout passes any page-specific toolbar items
-   * followed by the SettingsButton.
+   * Content rendered immediately before the trailer. Both layouts own this
+   * region: AdminCanvasLayout fills it with presence / sync / preview /
+   * publish; AdminPageLayout passes any page-specific toolbar items. Settings
+   * is NOT here — it lives in the account menu (see the trailer below).
    */
   rightSlot?: ReactNode
 }
@@ -211,11 +210,12 @@ export function Toolbar({
 
           {/* ── Right section — caller-owned ─────────────────────────────── */}
           {rightSlot}
-          {/* SettingsButton + OpenLivePageButton + AccountMenuButton are the
+          {/* ThemeToggleButton + OpenLivePageButton + AccountMenuButton are the
               global toolbar trailer — always rendered regardless of `rightSlot`
-              or which layout mounted the toolbar. SettingsButton opens the
-              global Settings modal (it reads the tiny `adminUi` store, so it
-              never drags the editor toolchain into non-editor bundles);
+              or which layout mounted the toolbar. Settings used to have its own
+              gear here; the approved MMSBUILD header has no gear, so it moved
+              into the account menu (same `adminUi.openSettings` action, one
+              fewer round button competing with the avatar).
               OpenLivePageButton jumps to the live site in a new tab
               (deep-linking to the active page when one is open in the canvas,
               the site root elsewhere); AccountMenuButton is the account /
@@ -224,7 +224,6 @@ export function Toolbar({
               they live in the toolbar shell, not in any layout's right slot. */}
           <div className={styles.headerTrailer}>
             <ThemeToggleButton />
-            <SettingsButton />
             <OpenLivePageButton />
             <AccountMenuButton />
           </div>

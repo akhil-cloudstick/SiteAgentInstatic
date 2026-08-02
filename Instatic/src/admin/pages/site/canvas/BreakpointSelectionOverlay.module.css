@@ -79,21 +79,55 @@
    green selection ring and pink hover ring. Drawn imperatively (one per match)
    into a container under .ringLayer, so it inherits the same scoped/fixed
    positioning rules as .ring above. */
+/* "Editing <Name> component" — the approved screen's `.editing-label`, a green
+   tab tucked into the selection ring's top-left corner. Rendered as a ::before
+   on the ring so it inherits the ring's already-measured position and costs the
+   RAF loop nothing extra; the name arrives via a data attribute. */
+.selection[data-editing-label]::before {
+    position: absolute;
+    z-index: 8;
+    top: -1px;
+    left: -1px;
+    display: inline-flex;
+    min-height: 30px;
+    align-items: center;
+    padding: 0 11px;
+    border-radius: 0 0 5px;
+    background: var(--mms-action);
+    color: var(--on-accent);
+    content: attr(data-editing-label);
+    font-family: var(--font-mms);
+    font-size: 11px;
+    font-weight: 650;
+    white-space: nowrap;
+}
+
+/* Only the anchor node gets the tab — a multi-selection would otherwise stack
+   labels on top of each other. */
+.selection:not([data-selection-anchor="true"])::before {
+    content: none;
+}
+
 .selectorHighlight {
     box-shadow: var(--canvas-selector-ring);
 }
 
+/* Transcribed from the approved Site screen's `.selection-toolbar`: a single
+   48px bar of divided actions rather than a padded pill of round buttons. */
 .selectionToolbar {
     top: 0;
     left: 0;
     display: inline-flex;
+    min-height: 48px;
     align-items: center;
-    gap: var(--space-px);
-    padding: var(--space-4xs);
-    border-radius: 12px;
-    background: var(--bg-body);
-    box-shadow: var(--shadow-panel);
-    color: var(--text);
+    overflow: hidden;
+    padding: 0;
+    border: 1px solid var(--mms-border-strong);
+    border-radius: var(--site-radius);
+    background: var(--mms-surface-raised);
+    box-shadow: var(--mms-shadow-menu);
+    color: var(--mms-text);
+    gap: 0;
     pointer-events: auto;
     /* Sits inside the canvas root's coordinate space (clipped by its
    * overflow: hidden) so it cannot bleed over sidebars, modals, or
@@ -119,8 +153,15 @@
 }
 
 .selectionToolbarButton {
-    border-radius: 9px;
-    aspect-ratio: 1;
+    min-width: 44px;
+    min-height: 48px;
+    border-radius: 0;
+    border-right: 1px solid var(--mms-border);
+    aspect-ratio: auto;
+}
+
+.selectionToolbar > .selectionToolbarButton:last-child {
+    border-right: 0;
 }
 
 .selectionToolbarButton svg {

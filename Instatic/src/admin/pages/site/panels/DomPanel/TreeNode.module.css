@@ -54,3 +54,38 @@
 .dragSource {
     opacity: 0.46;
 }
+
+/* ── Site screen ─────────────────────────────────────────────────────────
+ * The approved MMSBUILD left panel draws a layer row as icon + name (+ its
+ * row action). The tag pill and the visibility checkbox are editor scaffolding
+ * the reference has no equivalent for, and they are what made these rows read
+ * as a different component from the page outline directly above them.
+ *
+ * Nothing is lost: `LayerTreeNodeContent` puts the HTML tag and class names in
+ * the row's `title`, the class chip stays (muted) because a node's class is
+ * how you know which selector you are about to edit, and hidden/locked state
+ * still shows through `.indicator`.
+ */
+:global([data-editor-screen='site']) .tagPill {
+    display: none;
+}
+
+/* The approved row is icon + name + `⋯`, with nothing between the name and the
+   trailing action. The class still reaches the user through the row tooltip
+   and, in full, through the Selectors panel and the inspector's class picker. */
+:global([data-editor-screen='site']) .classChip {
+    display: none;
+}
+
+/* The row's trailing `⋯`, matching the Page outline's `.row-menu`: a 44px
+   target pinned to the right edge of the row. */
+.rowMenuButton {
+    display: grid;
+    width: 44px;
+    height: 44px;
+    flex: 0 0 44px;
+    margin-left: auto;
+    border: 0;
+    background: transparent;
+    place-items: center;
+}

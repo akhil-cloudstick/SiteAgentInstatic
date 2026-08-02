@@ -21,6 +21,7 @@ docs/
 │
 ├── features/                   ← "what X is and how it works" (per-feature)
 │   ├── plugin-system.md            ← plugin SDK, sandbox, lifecycle, permissions
+│   ├── presence.md                 ← who has a workspace open + the draft-state pill
 │   ├── publisher.md                ← page tree → static HTML/CSS pipeline
 │   ├── visual-components.md        ← VCs, slots, params, instantiation
 │   ├── content-storage.md          ← data_tables + data_rows (the universal store)

@@ -41,7 +41,9 @@ import type { TemplateRenderDataContext } from '@core/templates/dynamicBindings'
 import { CanvasComposedTree } from './CanvasComposedTree'
 import { BreakpointSelectionOverlay } from './BreakpointSelectionOverlay'
 import { CanvasBreakpointContext, CanvasTemplateContext } from './CanvasContexts'
+import { FaIcon } from '@ui/components/FaIcon'
 import { IframeFrameSurface, type IframeFrameSurfaceHandle } from './IframeFrameSurface'
+import { SectionFocusPresenter } from './SectionFocusPresenter'
 import type { InjectableRuntimeScript } from './useRuntimeScriptBuild'
 import { CanvasFrameSkeleton } from '@admin/shared/CanvasFrameSkeleton'
 import styles from './CanvasLiveSurface.module.css'
@@ -177,6 +179,10 @@ export function CanvasLiveSurface({
               <CanvasTemplateContext.Provider value={templateContext}>
                 <CanvasBreakpointContext.Provider value={activeBreakpoint.id}>
                   <CanvasComposedTree page={page} />
+                  {/* Section Focus is live-only, so it is mounted here rather
+                      than in IframeFrameSurface — the agent's offscreen
+                      snapshot frame must never render dimmed. */}
+                  <SectionFocusPresenter />
                 </CanvasBreakpointContext.Provider>
               </CanvasTemplateContext.Provider>
             </IframeFrameSurface>
@@ -198,6 +204,14 @@ export function CanvasLiveSurface({
 
           <div className={styles.widthBadge} aria-hidden="true">
             {Math.round(effectiveWidth)}px
+          </div>
+
+          {/* The approved screen's `.zoom-badge`: live edit is always real
+              size, and the padlock says so rather than offering a zoom
+              control that would refuse to do anything. */}
+          <div className={styles.zoomBadge} data-testid="canvas-live-zoom-badge">
+            <FaIcon name="lock" size={11} />
+            <span>100%</span>
           </div>
         </div>
       ) : (

@@ -54,6 +54,32 @@
     font-size: var(--text-2xs);
 }
 
+/* ── Site screen ─────────────────────────────────────────────────────────
+ * The approved MMSBUILD inspector stacks every field — label above a
+ * full-width control — at 11px/620 labels with 13px spacing, and gives each
+ * control a 44px target. The generic two-column 100px/1fr row at ~10px is
+ * denser than the reference and was the main reason the right panel still
+ * read as "the old style".
+ */
+:global([data-editor-screen='site']) .controlWrapper {
+    gap: 7px;
+    grid-template-columns: 1fr;
+}
+
+:global([data-editor-screen='site']) .labelRow {
+    min-height: 0;
+    color: var(--mms-text);
+    font-size: 11px;
+    font-weight: 620;
+}
+
+:global([data-editor-screen='site']) .labelUnit,
+:global([data-editor-screen='site']) .description {
+    color: var(--mms-text-muted);
+    font-size: 9px;
+    font-weight: 450;
+}
+
 .labelError {
     color: var(--danger-light);
     font-size: var(--text-2xs);

@@ -38,8 +38,14 @@
  * No env vars, no API keys, no endpoint configuration required (Constraint #385).
  */
 import { Toolbar } from '@admin/pages/site/toolbar/Toolbar'
-import { ZoomControls } from '@admin/pages/site/toolbar/ZoomControls'
+import { WorkspaceToolbar } from '@admin/pages/site/toolbar/WorkspaceToolbar'
 import { PublishButton } from '@admin/pages/site/toolbar/PublishButton'
+import { PreviewButton } from '@admin/pages/site/toolbar/PreviewButton'
+import { SyncStatusButton } from '@admin/pages/site/toolbar/SyncStatusButton'
+import { PresencePeerStack } from '@admin/shared/PresencePeerStack'
+import { usePresence, type PresenceConnectionState } from '@admin/pages/site/hooks/usePresence'
+import { selectSiteWorkspaceMode } from '@admin/pages/site/siteWorkspaceMode'
+import { LEFT_SIDEBAR_DEFAULT_WIDTH } from '@admin/state/workspaceLayout'
 import { useEditorAppearancePreferences } from '@admin/pages/site/preferences/editorPreferences'
 import { usePersistence } from '@admin/pages/site/hooks/usePersistence'
 import { useSiteEditorUrlSync } from '@admin/pages/site/hooks/useSiteEditorUrlSync'
@@ -58,7 +64,7 @@ import {
 import { LazyChunkBoundary } from '@admin/lib/LazyChunkBoundary'
 import { prewarmedLazy } from '@admin/lib/prewarmedLazy'
 import styles from './AdminCanvasLayout.module.css'
-import { lazy, Suspense, useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState, type CSSProperties } from 'react'
 import { useCurrentAdminUser } from '@admin/sessionContext'
 import {
   canEditContent as accessCanEditContent,
@@ -192,6 +198,14 @@ export function AdminCanvasLayout() {
   // on every render).
   const appearance = useEditorAppearancePreferences()
 
+  // Live edit / Focus section / Responsive review — derived, never stored.
+  const siteMode = useEditorStore(selectSiteWorkspaceMode)
+  const leftSidebarWidth = useEditorStore((s) => s.leftSidebarWidth)
+
+  // Who else has this site open, and whether our own channel is healthy. Feeds
+  // the header's peer stack and the sync pill; both render real state only.
+  const presence = usePresence('site')
+
   const loadError = !site && persistence.saveStatus.state === 'error'
     ? persistence.saveStatus.message ?? 'Reload the admin page and try again.'
     : null
@@ -206,6 +220,20 @@ export function AdminCanvasLayout() {
     <EditorPermissionsProvider value={permissions}>
       <div
         className={styles.shell}
+        // `data-editor-screen` scopes the Site screen's own `--mms-*` palette
+        // and its per-mode geometry (see the site block in globals.css); the
+        // Dashboard keeps the generic set. `data-site-mode` drives the shell /
+        // toolbar heights and the three panel-track widths the reference
+        // specifies per mode.
+        data-editor-screen="site"
+        data-site-mode={siteMode}
+        // Once the user drags the left column, their width overrides the
+        // mode's approved track. Set here rather than on the sidebar because
+        // the workspace toolbar's grid reads the same variable — both must
+        // move together or the toolbar stops lining up with the panel edge.
+        style={leftSidebarWidth !== LEFT_SIDEBAR_DEFAULT_WIDTH
+          ? ({ '--site-left-track': `${leftSidebarWidth}px` } as CSSProperties)
+          : undefined}
         data-editor-density={appearance.density}
         data-editor-theme={appearance.theme}
         data-editor-text-scale={appearance.textScale}
@@ -232,15 +260,31 @@ export function AdminCanvasLayout() {
           )}
           rightSlot={(
             <>
-              <ZoomControls />
+              {/* Reference header order: peers → sync → Preview → Publish.
+                  Zoom is NOT here — it belongs to the workspace toolbar row
+                  below, and only in Responsive Review. */}
+              <PresencePeerStack peers={presence.peers} />
+              <SyncStatusButton
+                connection={presence.connection}
+                saveStatus={persistence.saveStatus}
+              />
+              <PreviewButton />
               <PublishButton
-                enabled={canPublishPages}
+                enabled={canPublishPages && presence.connection !== 'offline'
+                  && presence.connection !== 'failed'}
                 onSave={canSaveSite ? persistence.saveSite : undefined}
                 saveStatus={persistence.saveStatus}
+                blockedReason={blockedPublishReason(canPublishPages, presence.connection)}
               />
             </>
           )}
         />
+
+        {/* ── Workspace toolbar (second row) ───────────────────────────────
+            Breadcrumb · mode control · viewport control (zoom in Review).
+            Sits between the global header and the editor body, exactly as the
+            reference does, and is the single owner of the three modes. */}
+        <WorkspaceToolbar mode={siteMode} />
 
         {loadEditorBody ? (
           <LazyChunkBoundary
@@ -272,6 +316,21 @@ export function AdminCanvasLayout() {
       </div>
     </EditorPermissionsProvider>
   )
+}
+
+/**
+ * Why Publish is disabled, in the reference's own words. Publishing while the
+ * draft channel is down would push a draft we can't confirm is current, so the
+ * button states the reason instead of failing silently.
+ */
+function blockedPublishReason(
+  canPublishPages: boolean,
+  connection: PresenceConnectionState,
+): string | undefined {
+  if (!canPublishPages) return 'Publishing requires publish access'
+  if (connection === 'offline') return 'Publishing waits for draft synchronization'
+  if (connection === 'failed') return 'Publishing is blocked while the draft channel is failing'
+  return undefined
 }
 
 function usePostPaintEditorBodyGate(): boolean {

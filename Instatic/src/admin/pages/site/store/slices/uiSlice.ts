@@ -26,7 +26,12 @@ export type FrameworkPanelTab = 'home' | 'colors' | 'typography' | 'spacing'
  *   - `media`  — asset library (MediaExplorerPanel)
  */
 export type ExplorerPanelTab = 'layers' | 'site' | 'code' | 'media'
-const PROPERTIES_PANEL_DEFAULT_WIDTH = 360
+/**
+ * Docked inspector width before the user drags the handle. The Site workspace
+ * treats this value as "never sized by the user" and lets the approved
+ * per-mode track win instead (see RightSidebar).
+ */
+export const PROPERTIES_PANEL_DEFAULT_WIDTH = 360
 
 /**
  * Active document descriptor — tracks which canvas document is open.

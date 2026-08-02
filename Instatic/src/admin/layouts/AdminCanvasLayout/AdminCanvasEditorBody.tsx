@@ -5,7 +5,7 @@ import {
   useSensor,
   useSensors,
 } from '@dnd-kit/core'
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, useState } from 'react'
 import { CanvasRoot } from '@admin/pages/site/canvas'
 import { CodeEditorPanel, CodeEditorSkeleton } from '@admin/pages/site/code-editor'
 import { useActiveLivePath } from '@admin/pages/site/hooks/useActiveLivePath'
@@ -16,6 +16,7 @@ import { LeftSidebar } from '@admin/pages/site/sidebars/LeftSidebar'
 import { RightSidebar } from '@admin/pages/site/sidebars/RightSidebar'
 import { selectRightSidebarExpanded, useEditorStore } from '@admin/pages/site/store/store'
 import { useNarrowEditorChrome } from '@site/layout/responsiveChrome'
+import { WorkspaceDock, type WorkspaceDrawer } from '@site/layout/WorkspaceDock'
 import { ConfirmDeleteProvider } from '@admin/shared/dialogs/ConfirmDeleteDialog'
 import { Dialog } from '@ui/components/Dialog'
 import { Button } from '@ui/components/Button'
@@ -60,6 +61,9 @@ export function AdminCanvasEditorBody({
   const importHtmlModalOpen = useEditorStore((s) => s.importHtmlModalOpen)
   const hasRightSidebar = rightSidebarExpanded
   const narrowChrome = useNarrowEditorChrome()
+  // Which bottom drawer is open on narrow viewports. Local UI state: it has no
+  // meaning above 1100px and should not be persisted into the editor layout.
+  const [drawer, setDrawer] = useState<WorkspaceDrawer | null>(null)
 
   // Site Explorer organization hooks into this outer DndContext. DomPanel has
   // its own nested DndContext for DOM tree reordering, isolated by dnd-kit.
@@ -89,13 +93,17 @@ export function AdminCanvasEditorBody({
             Plugin uninstall is intentionally *not* gated on that preference
             and uses its own dedicated `PluginRemoveDialog` instead. */}
         <ConfirmDeleteProvider>
-          <div className={styles.editorBody}>
-            <LeftSidebar
-              workspace="site"
-              editable={canEditDraftSite}
-              canUseAiChat={canUseAiChat}
-              railOnly={hasRightSidebar && narrowChrome}
-            />
+          <div className={styles.editorBody} data-narrow-chrome={narrowChrome ? 'true' : undefined}>
+            {/* Below the reference's 1100px band the columns collapse into the
+                bottom dock's drawers, so the desktop sidebars are not mounted
+                at all — `WorkspaceDock` mounts the same components instead. */}
+            {!narrowChrome && (
+              <LeftSidebar
+                workspace="site"
+                editable={canEditDraftSite}
+                canUseAiChat={canUseAiChat}
+              />
+            )}
             <div
               className={cn(styles.canvasStage, hasRightSidebar && styles.canvasStageRightSidebarOpen)}
               data-right-sidebar-expanded={hasRightSidebar ? 'true' : 'false'}
@@ -116,11 +124,27 @@ export function AdminCanvasEditorBody({
                   gated `sitePropertiesExpanded` selector.
                 - `'hidden'`:    Site viewer with no `pages.draft.save`
                   capability. */}
-            <RightSidebar
-              key="site"
-              mode={canSaveSite ? 'site' : 'hidden'}
-            />
+            {!narrowChrome && (
+              <RightSidebar
+                key="site"
+                mode={canSaveSite ? 'site' : 'hidden'}
+              />
+            )}
           </div>
+
+          {narrowChrome && (
+            <WorkspaceDock
+              drawer={drawer}
+              onDrawerChange={setDrawer}
+              advancedContent={(
+                <LeftSidebar
+                  workspace="site"
+                  editable={canEditDraftSite}
+                  canUseAiChat={canUseAiChat}
+                />
+              )}
+            />
+          )}
         </ConfirmDeleteProvider>
       </DndContext>
 

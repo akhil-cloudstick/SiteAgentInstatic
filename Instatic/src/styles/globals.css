@@ -644,6 +644,164 @@
     --plugins-hero-tint-b: rgba(75, 179, 207, 0.14);
 }
 
+/* ===========================================================================
+ * MMS SITE SCREEN — `[data-editor-screen='site']`
+ *
+ * The approved MMSBUILD screen library ships TWO pixel-matched screens with
+ * slightly different warmth: the Dashboard ("Live Release Desk") and the Site
+ * workspace ("Guided Site Workspace"). Their `--mms-*` palettes are close but
+ * not equal — Site runs a cooler, whiter surface ladder and a deeper green.
+ * The generic `--mms-*` set above is the DASHBOARD's, verbatim, and the
+ * Dashboard is signed off against it.
+ *
+ * So the Site screen re-declares ONLY the values that differ, transcribed
+ * verbatim from `screens/site/src/styles.css`, scoped to the Site shell. Both
+ * screens then match their own reference and neither drifts the other. Every
+ * token declared here also exists in the generic set unless marked NEW.
+ *
+ * Geometry lives here too (shell/toolbar heights, panel tracks) because the
+ * reference specifies exact pixels per mode and three separate CSS modules
+ * (AdminCanvasLayout, LeftSidebar, RightSidebar) have to agree on them.
+ * =========================================================================== */
+[data-editor-screen='site'] {
+    /* Surfaces — Site runs whiter/cooler than the Dashboard's cream. */
+    --mms-workspace: #fffdf8;
+    --mms-surface: #fffef9;
+    --mms-surface-raised: #ffffff;
+    --mms-surface-tint: #f4f5ed;
+    /* NEW — the tinted face behind a selected outline row / permission chip. */
+    --mms-surface-green: #eef6ef;
+
+    /* Ink + action — deeper green, slightly cooler muted text. */
+    --mms-text-muted: #5a6a70;
+    --mms-action: #15964e;
+    --mms-action-strong: #087b3d;
+    --mms-success: #137d43;
+    --mms-warning: #b06a0b;
+    /* NEW — tinted face behind destructive slot rows. */
+    --mms-danger-bg: #fff0ec;
+
+    /* NEW — the reference's 3px yellow focus ring and frame elevation. */
+    --mms-focus: 0 0 0 3px rgba(243, 201, 79, 0.78);
+    /* NEW — the 12%-green hairline the reference insets into a pressed
+       segment, so the selected face reads as lifted without a hard border. */
+    --mms-selected-inset: rgba(21, 150, 78, 0.12);
+    --mms-shadow-frame: 0 4px 16px rgba(8, 39, 49, 0.08);
+    /* NEW — the neutral gutter the canvas frames float on. */
+    --mms-canvas-bg: #ecebea;
+
+    /* Geometry — Live Edit / Responsive Review defaults. Section Focus shrinks
+       the shell, see the per-mode block below. `--site-*-track` are the
+       reference's panel widths; they seed the sidebars' initial width and are
+       superseded once the user drags a resize handle. */
+    --site-shell-height: 61px;
+    --site-toolbar-height: 69px;
+    --site-left-track: 305px;
+    --site-right-track: 280px;
+    --site-radius: 8px;
+    --site-control-radius: 7px;
+    --site-panel-pad: 20px;
+
+    /* Type. The approved screen sets Inter at a FIXED 13px base and sizes
+       everything off it. The admin's generic ramp is fluid (`clamp()`) and
+       lands 1–2px smaller at most widths, which is why the whole screen read
+       as too small against the reference. Pinning the steps inside the Site
+       scope makes the screen match at every viewport and removes the drift;
+       the rest of the admin keeps the fluid ramp. */
+    font-family: var(--font-mms);
+    font-size: 13px;
+
+    --text-3xs: 8px;
+    --text-2xs: 9px;
+    --text-xs: 10px;
+    --text-s: 11px;
+    --text-m: 12px;
+    --text-l: 13px;
+    --text-xl: 14px;
+    --text-2xl: 16px;
+    --text-3xl: 18px;
+    --text-4xl: 21px;
+    --text-5xl: 24px;
+
+    /* Canvas affordances. The neon green/pink rings were tuned for the old
+       dark-only editor and fight the cream canvas; the approved Site screen
+       draws selection as a 2px MMS-green border with a matching "Editing …"
+       tab. Hover keeps its own hue so the two states stay distinguishable. */
+    --canvas-selection-ring: inset 0 0 0 2px var(--mms-action);
+    --canvas-selection-ring-color: var(--mms-action);
+    --canvas-hover-ring: inset 0 0 0 1px rgba(21, 150, 78, 0.45);
+    --canvas-hover-ring-color: rgba(21, 150, 78, 0.45);
+}
+
+[data-editor-screen='site'][data-site-mode='focus'] {
+    --site-shell-height: 54px;
+    --site-toolbar-height: 56px;
+    --site-left-track: 275px;
+    --site-right-track: 380px;
+}
+
+[data-editor-screen='site'][data-site-mode='review'] {
+    --site-left-track: 250px;
+    --site-right-track: 316px;
+}
+
+[data-editor-theme='dark'] [data-editor-screen='site'],
+[data-editor-screen='site'][data-editor-theme='dark'] {
+    --mms-workspace: #062936;
+    --mms-surface: #082f3b;
+    --mms-surface-raised: #103a46;
+    --mms-surface-tint: #173f49;
+    --mms-surface-green: #123f30;
+
+    --mms-text-muted: #b4c1be;
+    --mms-action: #27ba66;
+    --mms-action-strong: #34cb73;
+    --mms-success: #32c772;
+    /* Warning flips to the identity yellow on navy (the burnt orange dies). */
+    --mms-warning: #f3c94f;
+    --mms-danger: #ff8d7f;
+    --mms-danger-bg: #402825;
+
+    --mms-shadow-frame: 0 8px 24px rgba(0, 0, 0, 0.25);
+    --mms-canvas-bg: #071c24;
+    --mms-selected-inset: rgba(39, 186, 102, 0.16);
+}
+
+/* The reference narrows every track between 1101–1399px rather than letting
+   the three-panel editor scale down. Same source file, same values. */
+@media (max-width: 1399px) and (min-width: 1101px) {
+    [data-editor-screen='site'] {
+        --site-left-track: 255px;
+        --site-right-track: 292px;
+    }
+
+    [data-editor-screen='site'][data-site-mode='focus'] {
+        --site-left-track: 245px;
+        --site-right-track: 330px;
+    }
+
+    [data-editor-screen='site'][data-site-mode='review'] {
+        --site-left-track: 235px;
+        --site-right-track: 290px;
+    }
+}
+
+@media (max-width: 1100px) {
+    [data-editor-screen='site'],
+    [data-editor-screen='site'][data-site-mode='focus'] {
+        --site-shell-height: 58px;
+        --site-toolbar-height: 98px;
+    }
+}
+
+@media (max-width: 620px) {
+    [data-editor-screen='site'],
+    [data-editor-screen='site'][data-site-mode='focus'] {
+        --site-shell-height: 56px;
+        --site-toolbar-height: 104px;
+    }
+}
+
 :root[data-editor-text-scale='small'],
 [data-editor-text-scale='small'] {
     --text-3xs: calc(var(--text-3xs-base) - 1px);

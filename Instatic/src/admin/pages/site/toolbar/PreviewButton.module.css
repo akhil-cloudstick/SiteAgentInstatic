@@ -1,0 +1,26 @@
+/** Transcribed from the approved Site screen's `.preview-button`. */
+.button {
+    min-width: 82px;
+    min-height: 44px;
+    padding: 0 17px;
+    border-radius: 6px;
+    font-weight: 650;
+    gap: 8px;
+}
+
+.label {
+    font-size: 13px;
+}
+
+/* The reference collapses Preview to an icon-only 44px target below 1100px. */
+@media (max-width: 1100px) {
+    .button {
+        width: 44px;
+        min-width: 44px;
+        padding: 0;
+    }
+
+    .label {
+        display: none;
+    }
+}

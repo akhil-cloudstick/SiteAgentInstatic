@@ -1,0 +1,267 @@
+/**
+ * Transcribed from the approved Site screen's `.left-panel`, `.panel-heading`,
+ * `.search-field`, `.panel-kicker`, `.outline-list`, `.outline-row`,
+ * `.outline-select`, `.add-section` and `.viewport-context`
+ * (screens/site/src/styles.css), including the per-mode row geometry.
+ */
+.panel {
+    position: relative;
+    display: flex;
+    /* The approved screen fixes this track per mode; `--site-left-track` is
+       set on the shell by `data-site-mode` (see globals.css). */
+    width: var(--site-left-track);
+    flex: 0 0 var(--site-left-track);
+    min-width: 0;
+    min-height: 0;
+    flex-direction: column;
+    padding: 16px 15px 13px;
+    border-right: 1px solid var(--mms-border);
+    background: var(--mms-workspace);
+    font-family: var(--font-mms);
+    /* The column itself never scrolls — its body does, so the Explorer
+       disclosure stays pinned at the foot instead of scrolling away. */
+    overflow: hidden;
+}
+
+/* Collapses when a switched-to panel takes the column; the disclosure below
+   it does not, so the switcher is always reachable. */
+.body {
+    display: flex;
+    min-height: 0;
+    flex: 1;
+    flex-direction: column;
+    overflow: auto;
+    scrollbar-width: thin;
+}
+
+.body[hidden] {
+    display: none;
+}
+
+/* Holds the switched-to panel in the same flow the outline list occupies, so
+   Layers / Site files / Code / Media read as this column's content rather than
+   as a second panel stacked on top of it. */
+.toolRegion {
+    display: flex;
+    min-height: 0;
+    flex: 1;
+    flex-direction: column;
+    overflow: hidden;
+    margin: 0 -15px;
+}
+
+/* The hosted panels bring their own header (title + close). The column already
+   has one, so the inner chrome would be a second title bar over the same
+   content — exactly the "block over the menu" that broke the layout. */
+.toolRegion :global([data-panel]) > :global([role='toolbar']) {
+    display: none;
+}
+
+.toolRegion :global([data-panel]) {
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+}
+
+/* Narrow viewports render the same panel inside a bottom drawer, where the
+   border and the fixed track would fight the drawer's own chrome. */
+.panelDrawer {
+    composes: panel;
+    border-right: 0;
+    flex: 1;
+    width: 100%;
+}
+
+.heading {
+    display: flex;
+    min-height: 44px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.heading h2 {
+    margin: 0;
+    font-size: 16px;
+    letter-spacing: -0.015em;
+}
+
+.headingAction {
+    display: inline-flex;
+    min-height: 44px;
+    align-items: center;
+    justify-content: center;
+    padding: 0 10px;
+    border: 1px solid var(--mms-border);
+    border-radius: var(--site-control-radius);
+    background: var(--mms-surface-raised);
+    gap: 7px;
+    font-size: 12px;
+}
+
+.search {
+    min-height: 44px;
+    margin: 9px 0 13px;
+    border: 1px solid var(--mms-border-strong);
+    border-radius: var(--site-control-radius);
+    background: var(--mms-surface-raised);
+}
+
+.kicker {
+    margin: 0 0 8px;
+    color: var(--mms-text-muted);
+    font-size: 11px;
+}
+
+.outlineList {
+    display: grid;
+    gap: 2px;
+}
+
+.row {
+    display: grid;
+    min-height: 48px;
+    align-items: center;
+    border: 1px solid transparent;
+    border-radius: var(--site-control-radius);
+    grid-template-columns: minmax(0, 1fr) 44px;
+}
+
+/* Focus and Review add the reorder grip, so the row grows a leading track. */
+.panel[data-mode='focus'] .row,
+.panel[data-mode='review'] .row,
+.panelDrawer[data-mode='focus'] .row,
+.panelDrawer[data-mode='review'] .row {
+    grid-template-columns: 44px minmax(0, 1fr) 44px;
+}
+
+.row[data-selected='true'] {
+    border-color: var(--mms-action);
+    background: var(--mms-surface-green);
+    color: var(--mms-action-strong);
+}
+
+.rowSelect {
+    display: flex;
+    min-width: 0;
+    min-height: 46px;
+    align-items: center;
+    padding: 0 9px 0 12px;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    gap: 12px;
+    text-align: left;
+}
+
+.rowLabel {
+    overflow: hidden;
+    font-weight: 560;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.grip,
+.rowMenuButton {
+    display: grid;
+    width: 44px;
+    height: 44px;
+    border: 0;
+    background: transparent;
+    place-items: center;
+}
+
+.grip {
+    color: var(--mms-text-muted);
+}
+
+.emptyMessage {
+    margin: 8px 2px;
+    color: var(--mms-text-muted);
+    font-size: 11px;
+}
+
+.addSection {
+    display: inline-flex;
+    width: 100%;
+    min-height: 44px;
+    align-items: center;
+    justify-content: center;
+    margin-top: 11px;
+    border: 1px solid var(--mms-action);
+    border-radius: var(--site-control-radius);
+    background: transparent;
+    color: var(--mms-action-strong);
+    gap: 9px;
+    font-weight: 650;
+}
+
+/* Review mode's viewport-context block. */
+.viewportContext {
+    display: grid;
+    margin-top: 32px;
+    padding: 14px 4px 0;
+    border-top: 1px solid var(--mms-border);
+    gap: 6px;
+}
+
+.viewportContext h3 {
+    margin-bottom: 1px;
+    font-size: 14px;
+}
+
+.viewportContext p {
+    max-width: 176px;
+    margin-bottom: 8px;
+    color: var(--mms-text-muted);
+    font-size: 11px;
+    line-height: 1.55;
+}
+
+.viewportButton {
+    display: flex;
+    min-height: 48px;
+    align-items: center;
+    padding: 0 10px;
+    border: 1px solid var(--mms-border);
+    border-radius: var(--site-control-radius);
+    background: var(--mms-surface);
+    gap: 9px;
+    text-align: left;
+}
+
+.viewportButton[data-selected='true'] {
+    border-color: var(--mms-action);
+    background: var(--mms-surface-green);
+    color: var(--mms-action-strong);
+}
+
+/* Review renders the outline as a single bordered list rather than
+   free-standing rows — the reference's densest variant. */
+.panel[data-mode='review'] .outlineList {
+    overflow: hidden;
+    border: 1px solid var(--mms-border);
+    border-radius: var(--site-control-radius);
+    background: var(--mms-surface);
+    gap: 0;
+}
+
+.panel[data-mode='review'] .row {
+    min-height: 51px;
+    border-width: 0 0 1px;
+    border-color: var(--mms-border);
+    border-radius: 0;
+}
+
+.panel[data-mode='review'] .row:last-child {
+    border-bottom: 0;
+}
+
+.panel[data-mode='review'] .row[data-selected='true'] {
+    border: 1px solid var(--mms-action);
+    border-radius: 6px;
+}
+
+.panel[data-mode='review'] .rowSelect {
+    min-height: 49px;
+}

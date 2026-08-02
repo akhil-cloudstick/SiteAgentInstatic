@@ -45,3 +45,60 @@
 .transformLayer[data-animating='true'] {
   transition: transform 220ms cubic-bezier(0.4, 0, 0.2, 1);
 }
+
+/**
+ * Responsive Review — the approved screen's fixed frame grid.
+ *
+ * Transcribed from `.review-canvas`: three columns in a 3.34 / 1.4 / 1 ratio,
+ * 12px gutters, stretched to the surface height. Nothing here is transformed
+ * or panned — the frames stay put and each scrolls inside its own viewport,
+ * which is what makes Review feel like a comparison board rather than an
+ * infinite plane you have to hunt around.
+ */
+.reviewGrid {
+    position: static;
+    display: grid;
+    width: 100%;
+    height: 100%;
+    align-items: stretch;
+    padding: 9px 18px 18px;
+    gap: 12px;
+    grid-template-columns:
+        minmax(360px, 3.34fr)
+        minmax(180px, 1.4fr)
+        minmax(140px, 1fr);
+    overflow: hidden;
+    transform: none;
+}
+
+@media (max-width: 1399px) and (min-width: 1101px) {
+    .reviewGrid {
+        padding: 12px;
+        grid-template-columns:
+            minmax(330px, 2fr)
+            minmax(160px, 0.82fr)
+            minmax(130px, 0.66fr);
+    }
+}
+
+/* Below the reference's 1100px band the board scrolls sideways rather than
+   squeezing three frames into a phone width. */
+@media (max-width: 1100px) {
+    .reviewGrid {
+        overflow-x: auto;
+        grid-template-columns:
+            minmax(380px, 2fr)
+            minmax(190px, 0.9fr)
+            minmax(160px, 0.75fr);
+    }
+}
+
+/* At 620px only the active frame is shown — three columns is not a phone
+   layout, and the companions are unreadable at that width. */
+@media (max-width: 620px) {
+    .reviewGrid {
+        display: block;
+        padding: 0;
+        overflow: hidden;
+    }
+}

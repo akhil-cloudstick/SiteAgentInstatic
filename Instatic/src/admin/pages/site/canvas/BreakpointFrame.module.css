@@ -54,12 +54,113 @@
     opacity: 0.6;
 }
 
-/* Viewport frame — width driven by --bp-width CSS var */
+/* Viewport frame — width driven by --bp-width CSS var.
+ *
+ * The approved Site screen draws each review frame as a bordered, rounded card
+ * with a soft lift (`.frame-viewport`), and rings the ACTIVE context in the
+ * MMS green so which context you are editing is unambiguous when three sit
+ * side by side. */
 .viewport {
+    position: relative;
     width: var(--bp-width);
     min-height: 100vh;
-    background: var(--bg-surface);
-    box-shadow: 0 2px 12px var(--scrim-30);
     overflow: hidden;
-    position: relative;
+    border: 1px solid var(--mms-border-strong);
+    border-radius: var(--site-control-radius);
+    background: var(--mms-surface-raised);
+    box-shadow: var(--mms-shadow-frame);
+}
+
+.frameWrapper[data-active='true'] .viewport {
+    border: 2px solid var(--mms-action);
+}
+
+/* ── Responsive Review ───────────────────────────────────────────────────
+ * A grid cell rather than a free-floating frame on a pannable plane: fixed
+ * position, its own internal scroll, sized by the column instead of by the
+ * breakpoint width. */
+:global(.reviewGrid) > .frameWrapper {
+    display: grid;
+    min-width: 0;
+    min-height: 0;
+    flex-shrink: 1;
+    grid-template-rows: 34px minmax(0, 1fr);
+    /* `contain: paint` clips the frame's drop shadow to the wrapper box, which
+       erases the lift the reference gives each card. Layout containment is
+       still worth keeping. */
+    contain: layout;
+}
+
+:global(.reviewGrid) > .frameWrapper .labelRow {
+    width: auto;
+    min-width: 0;
+}
+
+:global(.reviewGrid) > .frameWrapper .viewport {
+    width: auto;
+    height: 100%;
+    /* The base rule pins `min-height: 100vh` so a lone frame fills the plane.
+       In the grid the cell decides the height, and 100vh would overflow it. */
+    min-width: 0;
+    min-height: 0;
+    /* Each frame scrolls inside its own box — the whole point of the board. */
+    overflow: auto;
+    /* The reference hides the frame scrollbars so three cards read as one
+       board rather than three scroll gutters. */
+    scrollbar-width: none;
+}
+
+:global(.reviewGrid) > .frameWrapper .viewport::-webkit-scrollbar {
+    display: none;
+}
+
+/* Scale-to-fit wrapper.
+ *
+ * `zoom`, NOT `transform: scale()`. A transform scales painted pixels but
+ * leaves the layout box alone, so the frame kept a 1440px-wide, full-height
+ * box inside a ~700px cell: the viewport scrolled a phantom area, content read
+ * as clipped, and the bordered frame the reference draws never appeared.
+ * `zoom` scales the layout box itself, so scroll extents, hit-testing and the
+ * frame box all behave — which is what `.frame-viewport { overflow: auto }`
+ * assumes.
+ *
+ * The iframe keeps its true breakpoint width, so its INTERNAL viewport is
+ * still 1440 / 768 / 375 CSS px and the site's own media queries fire exactly
+ * as they will when published. Only the outer presentation shrinks.
+ */
+.scaler {
+    width: var(--bp-width);
+    zoom: var(--frame-scale);
+}
+
+/* Frame heading in Responsive Review — `Desktop  1440 px` on the left, and
+   the companion frames' "Open full-size" as an underlined action on the right.
+   Transcribed from `.frame-heading` / `.frame-heading .open-full`. */
+:global(.reviewGrid) > .frameWrapper .labelRow {
+    justify-content: space-between;
+    gap: 4px;
+    font-family: var(--font-mms);
+}
+
+:global(.reviewGrid) > .frameWrapper .labelBtn {
+    flex: 0 1 auto;
+    min-height: 44px;
+    padding: 0 5px;
+    gap: 7px;
+    font-size: 10px;
+    font-weight: 700;
+}
+
+:global(.reviewGrid) > .frameWrapper .pxBadge {
+    color: var(--mms-text-muted);
+    font-weight: 450;
+    opacity: 1;
+}
+
+.openFull {
+    min-width: 90px;
+    justify-content: flex-end;
+    color: var(--mms-action-strong);
+    font-size: 10px;
+    text-decoration: underline;
 }

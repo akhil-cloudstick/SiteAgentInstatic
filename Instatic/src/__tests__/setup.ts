@@ -25,6 +25,14 @@ import { GlobalWindow } from 'happy-dom'
 // canvas previews.
 const happyWindow = new GlobalWindow({
   url: 'http://localhost/',
+  // happy-dom defaults to a 1024px viewport, which the Site editor now reads
+  // as a NARROW one: below 1100px it drops its three columns for the bottom
+  // dock's drawers (the approved MMSBUILD screen's canvas-first layout). The
+  // component tests are about the desktop editor, so declare a desktop
+  // viewport explicitly rather than letting a library default pick the mode.
+  // A test that wants the narrow chrome sets `window.innerWidth` itself.
+  width: 1440,
+  height: 900,
   settings: {
     disableCSSFileLoading: true,
     disableJavaScriptFileLoading: true,

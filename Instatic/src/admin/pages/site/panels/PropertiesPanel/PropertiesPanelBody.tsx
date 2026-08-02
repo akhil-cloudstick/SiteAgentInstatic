@@ -140,12 +140,21 @@ export function PropertiesPanelBody(props: PropertiesPanelBodyProps): React.Reac
 
   return (
     <div className={styles.nodeArea}>
-      <nav className={styles.nodeViewSwitcher} aria-label="Element options">
+      {/* Styled to the approved MMSBUILD inspector's tab bar (underlined active
+          tab, equal tracks). The LABELS stay honest: the reference's
+          Content/Layout/Style trio assumes one guided surface per tab, whereas
+          this inspector has two real surfaces — the style surface (which
+          already leads with the module's own parameters, anchored by the
+          category rail) and the raw HTML attribute editor. Renaming "Styles"
+          to "Content" would put the reference's word on the wrong surface. */}
+      <nav className={styles.nodeViewSwitcher} role="tablist" aria-label="Element options">
         <Button
           variant="ghost"
           size="xs"
+          role="tab"
           className={styles.nodeViewButton}
           active={activeNodeView === 'styles'}
+          aria-selected={activeNodeView === 'styles'}
           onClick={() => setActiveNodeView('styles')}
         >
           Styles
@@ -153,8 +162,10 @@ export function PropertiesPanelBody(props: PropertiesPanelBodyProps): React.Reac
         <Button
           variant="ghost"
           size="xs"
+          role="tab"
           className={styles.nodeViewButton}
           active={activeNodeView === 'attributes'}
+          aria-selected={activeNodeView === 'attributes'}
           onClick={() => setActiveNodeView('attributes')}
         >
           Attributes

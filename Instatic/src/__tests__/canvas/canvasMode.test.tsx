@@ -4,8 +4,11 @@
  * Covers:
  * - canvasView default + setCanvasView store action ('design' | 'live')
  * - runScripts default + setRunScripts store action
- * - CanvasModeToggle reflects + drives the store: Design/Live tabs, the
- *   Run-scripts toggle, and the inline breakpoint switcher (live only)
+ * - CanvasModeToggle reflects + drives store.runScripts (its Design/Live tabs
+ *   and inline breakpoint switcher moved to WorkspaceToolbar in the MMSBUILD
+ *   re-skin — see the WorkspaceToolbar block below)
+ * - WorkspaceToolbar drives the three modes (Live edit / Focus section /
+ *   Responsive review) and the viewport control
  * - useRuntimeScriptBuild signature contract: it builds only while enabled,
  *   does NOT rebuild on a node-tree edit (scripts don't depend on the tree),
  *   but DOES rebuild on a script-file edit, a packageJson change, or Refresh.
@@ -16,6 +19,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { CanvasModeToggle } from '@site/canvas/CanvasModeToggle'
+import { WorkspaceToolbar } from '@site/toolbar/WorkspaceToolbar'
 import { useRuntimeScriptBuild } from '@site/canvas/useRuntimeScriptBuild'
 import { useEditorStore } from '@site/store/store'
 import { normalizeSiteRuntimeConfig } from '@core/site-runtime'
@@ -76,27 +80,6 @@ describe('canvas view + run-scripts store state', () => {
 const NOOP = () => {}
 
 describe('CanvasModeToggle', () => {
-  it('renders both view tabs with the design tab pre-selected', () => {
-    render(<CanvasModeToggle scriptStatus="idle" onRefreshScripts={NOOP} />)
-    const design = screen.getByTestId('canvas-mode-toggle-design')
-    const live = screen.getByTestId('canvas-mode-toggle-live')
-    expect(design.getAttribute('aria-selected')).toBe('true')
-    expect(live.getAttribute('aria-selected')).toBe('false')
-  })
-
-  it('clicking Live switches the store to live mode', () => {
-    render(<CanvasModeToggle scriptStatus="idle" onRefreshScripts={NOOP} />)
-    fireEvent.click(screen.getByTestId('canvas-mode-toggle-live'))
-    expect(useEditorStore.getState().canvasView).toBe('live')
-  })
-
-  it('clicking Design switches the store back to design mode', () => {
-    act(() => useEditorStore.getState().setCanvasView('live'))
-    render(<CanvasModeToggle scriptStatus="idle" onRefreshScripts={NOOP} />)
-    fireEvent.click(screen.getByTestId('canvas-mode-toggle-design'))
-    expect(useEditorStore.getState().canvasView).toBe('design')
-  })
-
   it('the Run-scripts toggle reflects + drives store.runScripts', () => {
     render(<CanvasModeToggle scriptStatus="idle" onRefreshScripts={NOOP} />)
     const toggle = screen.getByTestId('canvas-run-scripts-toggle')
@@ -112,32 +95,85 @@ describe('CanvasModeToggle', () => {
     expect(screen.getByTestId('canvas-run-scripts-refresh')).toBeDefined()
   })
 
-  it('does not render inline breakpoint buttons in design mode', () => {
+})
+
+// ---------------------------------------------------------------------------
+// WorkspaceToolbar — the mode + viewport controls
+//
+// These used to live in CanvasModeToggle. The MMSBUILD re-skin moved them to
+// the toolbar row above the canvas, where the approved screen puts them, and
+// promoted the two canvas views into three named modes. The behaviour being
+// gated is the same: the controls reflect and drive the store.
+// ---------------------------------------------------------------------------
+
+describe('WorkspaceToolbar mode + viewport controls', () => {
+  it('renders the three modes with Live edit selected for the live canvas', () => {
     withRuntimeSite()
-    render(<CanvasModeToggle scriptStatus="idle" onRefreshScripts={NOOP} />)
-    expect(screen.queryByTestId('canvas-live-breakpoints')).toBeNull()
+    act(() => useEditorStore.getState().setCanvasView('live'))
+    render(<WorkspaceToolbar mode="live" />)
+
+    expect(screen.getByTestId('site-mode-live').getAttribute('aria-pressed')).toBe('true')
+    expect(screen.getByTestId('site-mode-focus').getAttribute('aria-pressed')).toBe('false')
+    expect(screen.getByTestId('site-mode-review').getAttribute('aria-pressed')).toBe('false')
   })
 
-  it('renders an inline breakpoint button per site breakpoint when live is active', () => {
-    const { breakpoints } = withRuntimeSite()
+  it('Responsive review switches the store to the design canvas', () => {
+    withRuntimeSite()
     act(() => useEditorStore.getState().setCanvasView('live'))
-    render(<CanvasModeToggle scriptStatus="idle" onRefreshScripts={NOOP} />)
+    render(<WorkspaceToolbar mode="live" />)
 
-    expect(screen.getByTestId('canvas-live-breakpoints')).toBeDefined()
+    fireEvent.click(screen.getByTestId('site-mode-review'))
+    expect(useEditorStore.getState().canvasView).toBe('design')
+  })
+
+  it('Live edit switches back to the live canvas and clears Section Focus', () => {
+    withRuntimeSite()
+    act(() => {
+      useEditorStore.getState().setCanvasView('live')
+      useEditorStore.getState().setSectionFocus('root')
+    })
+    render(<WorkspaceToolbar mode="focus" />)
+
+    fireEvent.click(screen.getByTestId('site-mode-live'))
+    expect(useEditorStore.getState().canvasView).toBe('live')
+    expect(useEditorStore.getState().sectionFocusNodeId).toBeNull()
+  })
+
+  it('leaving the live canvas clears Section Focus even via the store action', () => {
+    act(() => {
+      useEditorStore.getState().setCanvasView('live')
+      useEditorStore.getState().setSectionFocus('section-1')
+    })
+    act(() => useEditorStore.getState().setCanvasView('design'))
+    expect(useEditorStore.getState().sectionFocusNodeId).toBeNull()
+  })
+
+  it('renders a viewport button per site breakpoint outside Responsive review', () => {
+    const { breakpoints } = withRuntimeSite()
+    render(<WorkspaceToolbar mode="live" />)
     for (const bp of breakpoints) {
-      expect(screen.getByTestId(`canvas-live-breakpoint-${bp.id}`)).toBeDefined()
+      expect(screen.getByTestId(`site-viewport-${bp.id}`)).toBeDefined()
     }
   })
 
-  it('clicking an inline breakpoint button drives setActiveBreakpoint', () => {
+  it('clicking a viewport button drives setActiveBreakpoint', () => {
     const { breakpoints } = withRuntimeSite()
-    act(() => useEditorStore.getState().setCanvasView('live'))
-    render(<CanvasModeToggle scriptStatus="idle" onRefreshScripts={NOOP} />)
+    render(<WorkspaceToolbar mode="live" />)
 
     const initial = useEditorStore.getState().activeBreakpointId
     const target = breakpoints.find((bp) => bp.id !== initial) ?? breakpoints[0]
-    fireEvent.click(screen.getByTestId(`canvas-live-breakpoint-${target.id}`))
+    fireEvent.click(screen.getByTestId(`site-viewport-${target.id}`))
     expect(useEditorStore.getState().activeBreakpointId).toBe(target.id)
+  })
+
+  it('swaps the viewport control for the zoom group in Responsive review', () => {
+    const { breakpoints } = withRuntimeSite()
+    render(<WorkspaceToolbar mode="review" />)
+
+    expect(screen.getByTestId('toolbar-zoom-controls')).toBeDefined()
+    for (const bp of breakpoints) {
+      expect(screen.queryByTestId(`site-viewport-${bp.id}`)).toBeNull()
+    }
   })
 })
 

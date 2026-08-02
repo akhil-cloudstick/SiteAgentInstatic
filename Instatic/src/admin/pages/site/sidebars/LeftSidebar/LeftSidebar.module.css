@@ -2,7 +2,11 @@
     position: relative;
     z-index: 85;
     display: flex;
-    --left-sidebar-rail-width: 42px;
+    /* The Site workspace replaced the 42px icon rail with the full-width Page
+       outline column, whose width the approved screen fixes per mode
+       (`--site-left-track`). Content / Media still mount the bare panel slot
+       with no leading column, hence the 0px default. */
+    --left-sidebar-rail-width: 0px;
     --left-sidebar-panel-width: 0px;
     --left-sidebar-panel-layout-width: var(--left-sidebar-panel-width);
     --left-sidebar-panel-render-width: min(
@@ -64,6 +68,33 @@
 }
 
 .panelMount[hidden] {
+    display: none;
+}
+
+/* Site: one column. The outline and every switchable panel share this track,
+   so the panel slot adds no width of its own (LeftSidebar zeroes the panel
+   width vars) and instead stacks inside the column. */
+.sidebar[data-workspace='site'] {
+    --left-sidebar-rail-width: var(--site-left-track);
+    position: relative;
+}
+
+/* The panel slot as a member of the Site column rather than a layer floating
+   over it: a normal in-flow block that fills the region the outline list would
+   have occupied, between the column heading and the pinned disclosure. */
+.panelSlotInColumn {
+    position: static;
+    display: flex;
+    width: 100%;
+    min-height: 0;
+    flex: 1;
+    flex-direction: column;
+    overflow: hidden;
+    border: 0;
+    background: transparent;
+}
+
+.panelSlotInColumn[hidden] {
     display: none;
 }
 

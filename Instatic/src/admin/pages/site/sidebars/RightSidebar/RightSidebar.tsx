@@ -2,6 +2,7 @@ import { useRef, type CSSProperties } from 'react'
 import { selectRightSidebarExpanded, useEditorStore } from '@site/store/store'
 import { PropertiesPanel } from '@site/panels/PropertiesPanel'
 import { SidebarResizeHandle } from '@admin/shared/SidebarResizeHandle'
+import { PROPERTIES_PANEL_DEFAULT_WIDTH } from '@site/store/slices/uiSlice'
 import styles from './RightSidebar.module.css'
 
 /**
@@ -41,6 +42,10 @@ export function RightSidebar({ mode }: RightSidebarProps) {
   const isExpanded = mode === 'site' ? sitePropertiesExpanded : false
 
   const panelWidth = isExpanded ? propertiesPanel.width : 0
+  // `DEFAULT_PROPERTIES_PANEL_WIDTH` means "never dragged" — the mode's
+  // approved track wins until the user expresses a preference, after which
+  // their width is honoured in every mode.
+  const userSizedPanel = propertiesPanel.width !== PROPERTIES_PANEL_DEFAULT_WIDTH
 
   const style = {
     '--right-sidebar-panel-width': `${panelWidth}px`,
@@ -54,6 +59,10 @@ export function RightSidebar({ mode }: RightSidebarProps) {
       data-testid="right-sidebar"
       data-expanded={isExpanded ? 'true' : 'false'}
       data-mode={propertiesPanelMode}
+      // Take the width from the mode's approved track (280 / 380 / 316px)
+      // until the user drags the handle, so the inspector reads identically in
+      // Live edit, Focus section and Responsive review.
+      data-site-track={mode === 'site' && !userSizedPanel ? 'true' : undefined}
       style={style}
     >
       {isExpanded && (

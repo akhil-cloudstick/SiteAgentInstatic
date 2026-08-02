@@ -266,3 +266,27 @@
     -webkit-appearance: none;
     margin: 0;
 }
+
+/* ── Site screen ─────────────────────────────────────────────────────────
+ * The approved MMSBUILD inspector draws inputs as 44px, 6px-radius fields on
+ * the raised surface with a solid warm border — not the pill-radius,
+ * alpha-bordered transparent field the rest of the admin uses. Scoped to the
+ * Site screen so no other workspace shifts.
+ */
+:global([data-editor-screen='site']) .input {
+    min-height: 44px;
+    padding: 10px;
+    border: 1px solid var(--mms-border-strong);
+    border-radius: 6px;
+    background: var(--mms-surface-raised);
+    color: var(--mms-text);
+    font-family: var(--font-mms);
+    font-size: 13px;
+    font-weight: 430;
+}
+
+:global([data-editor-screen='site']) .input:focus,
+:global([data-editor-screen='site']) .input:focus-within {
+    background: var(--mms-surface-raised);
+    border-color: var(--mms-action);
+}

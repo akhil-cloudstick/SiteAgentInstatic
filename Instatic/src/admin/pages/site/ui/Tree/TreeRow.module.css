@@ -135,3 +135,62 @@
     font-size: var(--text-3xs);
     line-height: 1;
 }
+
+/* ── Site screen ─────────────────────────────────────────────────────────
+ * The approved MMSBUILD left panel draws every list row the same way — the
+ * page outline and the layer tree share one row language (`.outline-row` /
+ * `.outline-select`): a 48px row, a 12px gap between a 15px icon and a 560
+ * label, and a selected state that is a green-tinted card with a green border
+ * and green ink, not a grey wash.
+ *
+ * Applied here rather than in DomPanel so EVERY tree in the Site workspace —
+ * Layers, Site files, Code, Selectors — matches the reference, including
+ * nested rows at any depth, which inherit it by construction.
+ */
+:global([data-editor-screen='site']) .row {
+    --tree-row-h: 48px;
+
+    border: 1px solid transparent;
+    border-radius: var(--site-control-radius);
+    color: var(--mms-text);
+    font-family: var(--font-mms);
+    font-size: 13px;
+    font-weight: 560;
+    gap: 12px;
+}
+
+:global([data-editor-screen='site'][data-editor-density='comfortable']) .row {
+    --tree-row-h: 48px;
+    font-size: 13px;
+}
+
+:global([data-editor-screen='site']) .row:hover,
+:global([data-editor-screen='site']) .rowHovered {
+    background: var(--mms-surface-tint);
+    color: var(--mms-text);
+}
+
+:global([data-editor-screen='site']) .rowSelected {
+    border-color: var(--mms-action);
+    background: var(--mms-surface-green);
+    color: var(--mms-action-strong);
+}
+
+:global([data-editor-screen='site']) .label {
+    font-size: 13px;
+    font-weight: 560;
+}
+
+:global([data-editor-screen='site']) .iconSlot {
+    width: 17px;
+    font-size: 15px;
+}
+
+/* The reference row is icon + label + row action. A nested row keeps its
+   disclosure chevron — that is how you open the level below — but the
+   checkbox and tag pill are editor scaffolding the approved screen does not
+   draw, and they were what made these rows read as "the old style". The HTML
+   tag and class still reach the user through the row's tooltip. */
+:global([data-editor-screen='site']) .meta {
+    font-size: 9px;
+}
