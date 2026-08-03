@@ -68,7 +68,7 @@ const SITE_SCREEN_TSX = [
   'admin/pages/site/toolbar/Toolbar.tsx',
   'admin/pages/site/sidebars/PageOutlinePanel/PageOutlinePanel.tsx',
   'admin/pages/site/sidebars/PageOutlinePanel/ExplorerDisclosure.tsx',
-  'admin/pages/site/sidebars/PageOutlinePanel/moduleGlyph.ts',
+  'admin/pages/site/moduleGlyph.ts',
   'admin/pages/site/layout/WorkspaceDock.tsx',
   'admin/pages/site/canvas/CanvasLiveSurface.tsx',
 ] as const
@@ -161,13 +161,30 @@ describe.if(hasReference)('site screen fidelity — reference value audit', () =
       ['toolbar height', /--site-toolbar-height:\s*69px/],
       ['focus shell height', /--site-shell-height:\s*54px/],
       ['focus toolbar height', /--site-toolbar-height:\s*56px/],
-      ['focus left track', /--site-left-track:\s*275px/],
       ['focus right track', /--site-right-track:\s*380px/],
-      ['review left track', /--site-left-track:\s*250px/],
       ['review right track', /--site-right-track:\s*316px/],
     ]
     const missing = expected.filter(([, pattern]) => !pattern.test(globals)).map(([name]) => name)
     expect(missing).toEqual([])
+  })
+
+  /**
+   * The one deliberate departure from the reference: it narrows the outline
+   * column in Focus (275px) and Review (250px). Here the mode changes only what
+   * the column shows — a column that resizes itself as the mode changes reads
+   * as a glitch, and the width belongs to the author's resize handle. Pinned so
+   * a future "restore reference geometry" pass doesn't silently undo it.
+   */
+  it('keeps the left track mode-independent (a deliberate reference departure)', () => {
+    const globals = read('styles/globals.css')
+    const perModeBlocks = [...globals.matchAll(
+      /\[data-site-mode='(?:focus|review)'\]\s*\{([^}]*)\}/g,
+    )]
+    expect(perModeBlocks.length).toBeGreaterThan(0)
+    const offenders = perModeBlocks
+      .map((block) => block[1] ?? '')
+      .filter((body) => body.includes('--site-left-track'))
+    expect(offenders).toEqual([])
   })
 
   /**
@@ -200,6 +217,11 @@ describe.if(hasReference)('site screen fidelity — reference value audit', () =
       'fa-align-center', 'fa-align-right', 'fa-object-group', 'fa-panorama',
       'fa-images', 'fa-align-left', 'fa-link', 'fa-trash', 'fa-copy',
       'fa-circle-plus', 'fa-ellipsis-vertical', 'fa-arrow-up-right-from-square',
+      // The disclosure swaps chevron-down/chevron-up in the mock. We render ONE
+      // chevron-down and rotate it, because a glyph swap cannot be tweened and
+      // the reference's open/close read as a hard snap. Visually identical at
+      // both rest states; only the transition differs.
+      'fa-chevron-up',
       'fa-gear', 'fa-scissors', 'fa-star', 'fa-envelope', 'fa-quote-left',
       'fa-magnifying-glass', 'fa-sitemap', 'fa-square', 'fa-file-lines',
       'fa-database', 'fa-cube', 'fa-user', 'fa-window-maximize', 'fa-moon',

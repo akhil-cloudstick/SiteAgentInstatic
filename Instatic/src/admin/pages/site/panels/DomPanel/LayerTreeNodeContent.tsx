@@ -2,7 +2,7 @@ import type { MouseEventHandler, ReactNode } from 'react'
 import { EyeOffSolidIcon } from 'pixel-art-icons/icons/eye-off-solid'
 import { TreeChevron, TreeIconSlot, TreeLabel, TreeLabelGroup } from '@site/ui/Tree'
 import { FaIcon } from '@ui/components/FaIcon'
-import { moduleGlyph } from '@site/sidebars/PageOutlinePanel/moduleGlyph'
+import { moduleGlyph } from '@site/moduleGlyph'
 import { TagPill } from '@ui/components/TagPill'
 import styles from './TreeNode.module.css'
 

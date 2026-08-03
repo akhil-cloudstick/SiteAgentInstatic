@@ -289,10 +289,28 @@ export function createAgentSlice(
     isAgentConversationPending: false,
     isAgentProviderPending: false,
     agentComposerEpoch: 0,
+    agentComposerSeed: null,
 
     // ── UI actions ───────────────────────────────────────────────────────────
     openAgent() {
       set({ isAgentOpen: true })
+    },
+
+    seedAgentComposer(text: string) {
+      // Opening alongside the seed keeps this one action: the author picked
+      // "Edit with AI" on a block, so the assistant should already be showing
+      // with that block named when they start typing.
+      // Bumping the epoch remounts the composer, whose initializer picks the
+      // seed up as its starting draft (see AgentComposer).
+      set((s) => {
+        s.isAgentOpen = true
+        s.agentComposerSeed = text
+        s.agentComposerEpoch += 1
+      })
+    },
+
+    consumeAgentComposerSeed() {
+      set({ agentComposerSeed: null })
     },
 
     closeAgent() {
@@ -557,7 +575,28 @@ export function createAgentSlice(
         timestamp: Date.now(),
       }
 
-      set({ agentError: null, isAgentStreaming: true })
+      // Show the user's own turn IMMEDIATELY, before any awaiting.
+      //
+      // This used to be pushed after the chat POST resolved, which is behind a
+      // provider-update wait, a lazily-created conversation row (a round trip)
+      // and the request itself — 1–3s during which the composer had cleared
+      // and the thread showed nothing, so the message looked lost. Optimistic
+      // append plus `isAgentStreaming` gives instant feedback; every failure
+      // path below removes it again so a rejected send doesn't leave a ghost
+      // turn in the conversation.
+      set((state) => {
+        state.agentError = null
+        state.isAgentStreaming = true
+        state.agentMessages.push(userMsg)
+      })
+
+      /** Roll back the optimistic turn when the send never reached the server. */
+      const dropOptimisticUserMessage = () => {
+        set((state) => {
+          const index = state.agentMessages.findIndex((message) => message.id === userMsg.id)
+          if (index !== -1) state.agentMessages.splice(index, 1)
+        })
+      }
 
       const controller = new AbortController()
       _abortController = controller
@@ -571,7 +610,7 @@ export function createAgentSlice(
           _providerUpdateQueue,
           controller.signal,
         )
-        if (!providerReady) return { accepted: false }
+        if (!providerReady) { dropOptimisticUserMessage(); return { accepted: false } }
         if (
           intendedConversationId
           && (
@@ -579,7 +618,7 @@ export function createAgentSlice(
             || _confirmedProviderSelection.credentialId !== intendedCredentialId
             || _confirmedProviderSelection.modelId !== intendedModelId
           )
-        ) return { accepted: false }
+        ) { dropOptimisticUserMessage(); return { accepted: false } }
         const snapshot = config.buildSnapshot()
 
         // Lazily create the conversation row (staged picker values or scope
@@ -593,6 +632,7 @@ export function createAgentSlice(
         if (!conversationId) {
           const message = config.noProviderMessage
             ?? `No AI provider configured for the "${config.scope}" scope. Open /admin/ai/providers to add a credential, then /admin/ai/defaults to pick one.`
+          dropOptimisticUserMessage()
           set({ agentError: message })
           pushToast({ kind: 'error', title: "Couldn't send message", body: message })
           return { accepted: false }
@@ -621,8 +661,10 @@ export function createAgentSlice(
         }
 
         accepted = true
+        // The user's turn is already on screen (optimistically, above); only
+        // the assistant placeholder is added here, once the server has
+        // actually accepted the request.
         set((state) => {
-          state.agentMessages.push(userMsg)
           state.agentMessages.push(assistantMsg)
         })
         if (!res.body) throw new Error('Agent response has no body')
@@ -667,6 +709,10 @@ export function createAgentSlice(
               const message = state.agentMessages.find((item) => item.id === assistantId)
               failPendingToolCalls(message)
             })
+          } else {
+            // Stopped before the server took the turn — drop the optimistic
+            // message so a cancelled send leaves no trace in the thread.
+            dropOptimisticUserMessage()
           }
         } else {
           // Admin-only surface (capability gated) — show the actual
@@ -678,6 +724,10 @@ export function createAgentSlice(
           if (accepted) {
             surfaceAssistantError(set, assistantId, `Agent request failed: ${detail}`, '_(agent error)_')
           } else {
+            // Never accepted by the server, so the optimistic turn is a lie —
+            // remove it and keep the composer's draft (the composer only
+            // clears on `accepted`).
+            dropOptimisticUserMessage()
             set({ agentError: detail })
             pushToast({ kind: 'error', title: "Couldn't send message", body: detail })
           }

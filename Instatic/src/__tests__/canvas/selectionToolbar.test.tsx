@@ -291,7 +291,8 @@ describe('canvas selection toolbar', () => {
       expect(toolbar.style.top).toBe('-20px')
       expect(screen.getByRole('button', { name: 'Drag selected layers' })).toBeTruthy()
       expect(screen.getByRole('button', { name: 'Duplicate selected layers' })).toBeTruthy()
-      expect(screen.getByRole('button', { name: 'Delete selected layers' })).toBeTruthy()
+      // Delete moved behind "More" — see the approved selection-actions test.
+      expect(screen.getByRole('button', { name: 'More component actions' })).toBeTruthy()
     } finally {
       raf.restore()
       restoreRects()
@@ -335,8 +336,14 @@ describe('canvas selection toolbar', () => {
       />,
     )
 
+    // Delete now lives in the toolbar's "More" menu — the same
+    // LayerNodeContextMenu the Layers tree uses — rather than sitting one
+    // mis-click away from Duplicate.
     act(() => {
-      fireEvent.click(screen.getByRole('button', { name: 'Delete selected layers' }))
+      fireEvent.click(screen.getByRole('button', { name: 'More component actions' }))
+    })
+    act(() => {
+      fireEvent.click(screen.getByRole('menuitem', { name: /delete/i }))
     })
 
     const currentPage = useEditorStore.getState().site!.pages[0]
@@ -345,7 +352,7 @@ describe('canvas selection toolbar', () => {
     expect(useEditorStore.getState().selectedNodeIds).toEqual([])
   })
 
-  it('renders the insert-module action in the second toolbar position', () => {
+  it('renders the approved selection actions in order', () => {
     const { page } = createSelectedTextPage()
 
     render(
@@ -360,11 +367,17 @@ describe('canvas selection toolbar', () => {
     const toolbar = screen.getByRole('group', { name: 'Selection actions' })
     const buttons = Array.from(toolbar.querySelectorAll('button'))
     const labels = buttons.map((b) => b.getAttribute('aria-label'))
+    // The approved MMSBUILD screen's `.selection-toolbar`: Open component ·
+    // Insert · Duplicate · More. Delete moved into the "More" menu, so a
+    // destructive action is no longer one mis-click from Duplicate. The drag
+    // grip leads the row — it is not in the reference, but dragging a layer to
+    // reorder it has no other home.
     expect(labels).toEqual([
       'Drag selected layers',
+      'Open component in canvas',
       'Insert module',
       'Duplicate selected layers',
-      'Delete selected layers',
+      'More component actions',
     ])
   })
 

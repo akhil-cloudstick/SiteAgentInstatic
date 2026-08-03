@@ -452,10 +452,10 @@ export const createUiSlice: EditorStoreSliceCreator<UiSlice> = (set, get) => ({
 
   setLeftSidebarPanel: (panel) =>
     set((state) => {
-      if (panel === 'agent') {
-        state.isAgentOpen = true
-        return
-      }
+      // The AI assistant is a column occupant like every other panel — it used
+      // to float over the editor, so selecting it was additive. Now it takes
+      // the column, which means it clears the others and they clear it.
+      state.isAgentOpen = panel === 'agent'
       state.explorerPanelOpen = panel === 'explorer'
       state.selectorsPanelOpen = panel === 'selectors'
       state.frameworkPanelOpen = panel === 'framework'

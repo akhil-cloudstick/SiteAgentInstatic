@@ -210,6 +210,47 @@ function checkPage(html) {
       stillHidden.length ? `Hidden until JS runs → blank in the CMS canvas: ${[...new Set(stillHidden)].slice(0, 5).join(', ')} — content must be visible with CSS alone (see templateRule.md). The share auto-fix normally rewrites this.` : '');
   }
 
+  // 15) Every structural element is named. Instatic names a Layers row from the
+  // element's own markup (data-layer → meaningful class → id → aria-label →
+  // semantic tag). An element with none of those — or whose only class is layout
+  // plumbing (container/wrapper/row/grid) — falls back to the module name, so the
+  // tenant's Layers panel reads "Container" for the whole page and the AI editor,
+  // which addresses blocks by name, cannot tell the hero from the footer.
+  //
+  // GENERIC mirrors deriveNodeLabel in Instatic/src/core/htmlImport/nodeLabel.ts.
+  // WEAK goes further than the importer does on purpose: the importer will happily
+  // display "Reveal"/"Split" because a hook name still beats "Container", but the
+  // rule asks OD for a real name, so the checker flags them.
+  {
+    const GENERIC = new Set(['container', 'wrapper', 'wrap', 'inner', 'outer', 'row', 'col', 'column',
+      'columns', 'grid', 'flex', 'box', 'block', 'content', 'item', 'items', 'group', 'stack', 'holder',
+      'section', 'div', 'main', 'body', 'area', 'panel', 'left', 'right', 'top', 'bottom', 'center',
+      'centre', 'middle', 'clearfix', 'active', 'open', 'closed', 'show', 'hide', 'hidden', 'visible',
+      'small', 'large', 'dark', 'light', 'full', 'half']);
+    // Animation / layout hooks: they say how a block moves or stacks, not what it is.
+    const WEAK = new Set(['reveal', 'fade', 'fadein', 'fade-in', 'animate', 'animated', 'parallax',
+      'sticky', 'split', 'track', 'slide', 'scroll', 'marquee-track', 'carousel-track', 'overlay',
+      'media', 'copy', 'text', 'inner-wrap', 'card-body']);
+    const NAMED_TAGS = /^(?:header|footer|nav|main|aside|section|article|form|figure|figcaption|ul|ol|li|table)$/i;
+    const isName = (c) => c.length >= 2 && !GENERIC.has(c.toLowerCase()) && !WEAK.has(c.toLowerCase()) &&
+      !/^(?:is|has|js|u|no)-/i.test(c) && !/^_/.test(c) && !/\d/.test(c) && !/[:/[\]]/.test(c);
+
+    const body = html.match(/<body[\s\S]*?<\/body>/i)?.[0] || html;
+    const unnamed = [];
+    for (const m of body.matchAll(/<(div|section|article|aside|header|footer|nav|main)\b([^>]*)>/gi)) {
+      const [, tagName, attrs] = m;
+      if (NAMED_TAGS.test(tagName)) continue; // <header>/<section>/… name themselves
+      if (/\bdata-layer\s*=|\bid\s*=|\baria-label\s*=/i.test(attrs)) continue;
+      const classes = (attrs.match(/class\s*=\s*"([^"]*)"/i)?.[1] || '').split(/\s+/).filter(Boolean);
+      if (classes.some(isName)) continue;
+      unnamed.push(`<${tagName}${classes.length ? ` class="${classes.join(' ')}"` : ''}>`);
+    }
+    add('Every block is named (Layers panel)', unnamed.length ? 'WARN' : 'PASS',
+      unnamed.length
+        ? `${unnamed.length} element(s) have no meaningful name — they import as "Container" and the AI editor can't target them: ${[...new Set(unnamed)].slice(0, 5).join(', ')}. Give each a semantic class (hero, services-grid, service-card) or data-layer="…" (see templateRule.md)`
+        : '');
+  }
+
   return results;
 }
 

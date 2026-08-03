@@ -59,12 +59,24 @@ export const TextEditor: React.FC<ModuleComponentProps<TextStoredProps>> = ({
   }
 
   // Display: escaped text with newlines as <br>, matching the publisher.
-  const html = rawTextToBreakHtml(props.text || 'Text')
+  //
+  // An empty node renders EMPTY, exactly as it publishes. It used to fall back
+  // to the literal word "Text", which broke the same canvas/publish fidelity
+  // rule described above: decorative empty spans (a hamburger's bars, an icon
+  // button's inner span) rendered the word "Text" across the design, and the
+  // author saw content the published page would never contain.
+  //
+  // The affordance is kept as editor CHROME instead: `data-instatic-empty-text`
+  // lets `EditorChromeInjector` label the node on hover/selection only, so at
+  // rest the canvas shows the real page and the node is still findable.
+  const isEmpty = !props.text
+  const html = rawTextToBreakHtml(props.text ?? '')
   const Tag = tag as React.ElementType
   return React.createElement(Tag, {
     ...nodeWrapperProps,
     ...htmlAttributesForReact(props.htmlAttributes),
     className: mcClassName,
+    'data-instatic-empty-text': isEmpty ? '' : undefined,
     dangerouslySetInnerHTML: { __html: html },
   })
 }

@@ -63,9 +63,23 @@ export interface AgentSlice {
   isAgentProviderPending: boolean
   /** Remounts local composer drafts on explicit conversation replacement. */
   agentComposerEpoch: number
+  /**
+   * Text queued for the composer from outside it — currently the canvas /
+   * Layers "Edit with AI" action, which names the block the author picked.
+   *
+   * Naming the target matters: without it the model has to infer which section
+   * a prompt refers to, and a wrong guess edits the wrong part of the page.
+   * The composer drains this and clears it, so it is a one-shot handoff rather
+   * than a second source of truth for the draft.
+   */
+  agentComposerSeed: string | null
 
   openAgent(): void
   closeAgent(): void
+  /** Queue a mention (and open the assistant) — see `agentComposerSeed`. */
+  seedAgentComposer(text: string): void
+  /** Called by the composer once it has taken the seed. */
+  consumeAgentComposerSeed(): void
   toggleAgent(): void
   sendAgentMessage(content: AiUserContentBlock[]): Promise<{ accepted: boolean }>
   abortAgent(): void

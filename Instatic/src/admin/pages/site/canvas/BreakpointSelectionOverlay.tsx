@@ -415,9 +415,26 @@ export function BreakpointSelectionOverlay({
     >
       {/* The approved screen's `.selection-toolbar`: Open component · Insert ·
           Duplicate · More, as labelled actions rather than a row of icon-only
-          buttons. Delete and the drag grip moved into the "More" menu — the
-          same `LayerNodeContextMenu` the Layers tree uses — so a destructive
-          action is no longer one mis-click away from Duplicate. */}
+          buttons. Delete moved into the "More" menu — the same
+          `LayerNodeContextMenu` the Layers tree uses — so a destructive action
+          is no longer one mis-click away from Duplicate.
+
+          The drag grip leads the row. The reference has no grip, but dragging
+          a layer to reorder it on the canvas is a real capability with no
+          other home (the "More" menu can't host a drag), so it stays rather
+          than being dropped for pixel fidelity. */}
+      <Button
+        variant="secondary"
+        size="xs"
+        iconOnly
+        aria-label="Drag selected layers"
+        tooltip="Drag selected layers"
+        className={cn(styles.selectionToolbarButton, styles.dragToolbarButton)}
+        onPointerDown={reorderDrag.handlePointerDown}
+      >
+        <FaIcon name="grip-vertical" size={13} />
+      </Button>
+
       <Button
         variant="secondary"
         size="xs"

@@ -230,7 +230,7 @@ export async function* runToolLoop<TMessage>(
     // combined tool-result turn before re-POSTing.
     const results: TurnToolResult[] = []
     for (const call of turn.toolCalls) {
-      const tool = toolsByName.get(call.name)
+      const tool = resolveRequestedTool(call.name, toolsByName)
       const input = prepareToolInput(call, req)
       let output: AiToolOutput
       try {
@@ -394,4 +394,42 @@ function applyHeavyElision<TMessage>(
     )
     messages[m.index] = adapter.buildToolResultMessage(rebuilt)
   }
+}
+
+/**
+ * Resolve the tool a model asked for, tolerating small naming drift.
+ *
+ * Tools are advertised under their canonical scoped name (`site_insert_html`),
+ * but models sometimes echo back the unscoped stem (`insert_html`) or drift on
+ * separators/case. An exact-match-only lookup answers "Unknown tool", the model
+ * apologises and retries the same wrong name, and the turn burns provider
+ * rounds without ever doing the work.
+ *
+ * Fallbacks are applied in order and only when UNAMBIGUOUS — a fuzzy match that
+ * could mean two different tools is rejected, because silently running the
+ * wrong mutation on the user's site is far worse than reporting the error.
+ */
+function resolveRequestedTool(
+  requested: string,
+  toolsByName: Map<string, AiTool>,
+): AiTool | undefined {
+  const exact = toolsByName.get(requested)
+  if (exact) return exact
+
+  // Dropped scope prefix: `insert_html` → `site_insert_html`.
+  const suffixMatches = [...toolsByName.entries()]
+    .filter(([name]) => name.endsWith(`_${requested}`))
+    .map(([, tool]) => tool)
+  if (suffixMatches.length === 1) return suffixMatches[0]
+
+  // Separator / case drift: `siteInsertHTML`, `site-insert-html`.
+  const normalize = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, '')
+  const target = normalize(requested)
+  const fuzzyMatches = [...toolsByName.entries()]
+    .filter(([name]) => {
+      const normalized = normalize(name)
+      return normalized === target || normalized.endsWith(target)
+    })
+    .map(([, tool]) => tool)
+  return fuzzyMatches.length === 1 ? fuzzyMatches[0] : undefined
 }

@@ -28,7 +28,7 @@ const AgentPanel = lazy(() =>
   import('@site/panels/AgentPanel').then((module) => ({ default: module.AgentPanel })),
 )
 
-type HostedLeftPanelId = Exclude<LeftSidebarPanelId, 'agent'>
+type HostedLeftPanelId = LeftSidebarPanelId
 
 function selectActiveLeftSidebarPanel(
   state: ReturnType<typeof useEditorStore.getState>,
@@ -41,6 +41,13 @@ function selectActiveLeftSidebarPanel(
   if (state.selectorsPanelOpen) return 'selectors'
   if (state.frameworkPanelOpen) return 'framework'
   if (state.dependenciesPanelOpen) return 'dependencies'
+  // The AI assistant is a column occupant like everything else: picking it
+  // swaps the column's content, the way picking Layers or Media does. It used
+  // to float over the editor as its own window, which meant two panels open at
+  // once and no single place the column's content came from. Its behaviour —
+  // model routing, the operator-configured providers, the classifier, image
+  // paste — is untouched; only where it renders changed.
+  if (state.isAgentOpen) return 'agent'
   return null
 }
 
@@ -83,6 +90,7 @@ const PANEL_RESIZE_LABELS: Record<HostedLeftPanelId, string> = {
   selectors: 'Selectors',
   framework: 'Framework',
   dependencies: 'Dependencies',
+  agent: 'AI authoring',
 }
 
 export function LeftSidebar({
@@ -232,6 +240,19 @@ export function LeftSidebar({
               <div className={styles.panelMount} hidden={effectiveActivePanel !== 'dependencies'}>
                 <DependenciesPanel {...dockablePanelProps} />
               </div>
+              {/* Kept MOUNTED (hidden, not unmounted) like its neighbours so a
+                  half-typed prompt and the streaming conversation survive
+                  switching to Layers and back. */}
+              {canUseAiChat && (
+                <div className={styles.panelMount} hidden={effectiveActivePanel !== 'agent'}>
+                  {/* eslint-disable-next-line react-compiler/react-compiler */}
+                  <AgentStoreProvider store={useEditorStore}>
+                    <Suspense fallback={null}>
+                      <AgentPanel variant="docked" />
+                    </Suspense>
+                  </AgentStoreProvider>
+                </div>
+              )}
               {effectivePluginPanelId !== null && (
                 <div
                   className={styles.panelMount}
@@ -253,17 +274,6 @@ export function LeftSidebar({
           )}
         </div>
         </SiteColumn>
-        {canUseAiChat && (
-          /* The AI assistant stays independent from the hosted left panel so
-             users can keep Layers visible while following a conversation.
-             Keeping it mounted also preserves the current draft. */
-          // eslint-disable-next-line react-compiler/react-compiler
-          <AgentStoreProvider store={useEditorStore}>
-            <Suspense fallback={null}>
-              <AgentPanel />
-            </Suspense>
-          </AgentStoreProvider>
-        )}
       </VCDeletionConfirmProvider>
       </FrameworkChangeConfirmProvider>
 

@@ -33,7 +33,10 @@ export function SearchBar({
   }
 
   return (
-    <div className={cn(styles.searchBar, className)}>
+    // `data-searchbar` is the stable hook a host column uses to restyle the
+    // field to its own geometry (the Site workspace's 44px outline field)
+    // without reaching for a hashed CSS-module class name.
+    <div className={cn(styles.searchBar, className)} data-searchbar="">
       <SearchSolidIcon
         size={11}
         color="var(--text-subtle)"

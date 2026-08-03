@@ -65,6 +65,14 @@ export function applyIframeBodyReset(
   iframeDoc: Document,
   breakpointId: string,
   interaction: IframeInteraction,
+  /**
+   * The frame is a fixed height and its own document scrolls (Responsive
+   * Review). Keeps every canvas EDITING behaviour — chrome CSS, cursor and
+   * selection suppression, nested-iframe blocking — while dropping the
+   * auto-height clamp below, which exists only for frames that grow to their
+   * content on a pannable canvas.
+   */
+  scrollsInternally = false,
 ): void {
   iframeDoc.body.setAttribute('data-breakpoint-id', breakpointId)
   iframeDoc.body.dataset.instaticIframeInteraction = interaction
@@ -78,6 +86,16 @@ export function applyIframeBodyReset(
     iframeDoc.documentElement.style.overflow = ''
     return
   }
+  // Responsive Review: the frame is the scroll viewport, exactly like the live
+  // frame, so the auto-height clamp below must not run — `height: auto` plus
+  // `overflow: hidden` on <html> is precisely what left those frames unable to
+  // scroll. The canvas chrome CSS is still installed at the end.
+  if (scrollsInternally) {
+    iframeDoc.documentElement.style.height = ''
+    iframeDoc.documentElement.style.overflow = ''
+    iframeDoc.body.style.height = ''
+    iframeDoc.body.style.minHeight = ''
+  } else {
   iframeDoc.documentElement.style.height = 'auto'
   iframeDoc.body.style.height = 'auto'
   iframeDoc.body.style.minHeight = `${CANVAS_VIEWPORT_HEIGHT}px`
@@ -96,6 +114,8 @@ export function applyIframeBodyReset(
   // identical to published. `''` clears any inline overflow a prior mode set.
   iframeDoc.documentElement.style.overflow = 'hidden'
   iframeDoc.body.style.overflow = ''
+  }
+
   let chrome = iframeDoc.head.querySelector('style[data-instatic-canvas-chrome]')
   if (!chrome) {
     chrome = iframeDoc.createElement('style')

@@ -733,15 +733,19 @@
     --canvas-hover-ring-color: rgba(21, 150, 78, 0.45);
 }
 
+/* The left track is deliberately NOT per-mode. The reference narrows the
+   outline column in Focus and Review; here the mode only changes what that
+   column SHOWS (heading, actions, row density, viewport context), never how
+   wide it is — a column that resizes itself under the pointer as the mode
+   changes reads as a layout glitch, and the width is the author's to set via
+   the resize handle. The right track still follows the reference. */
 [data-editor-screen='site'][data-site-mode='focus'] {
     --site-shell-height: 54px;
     --site-toolbar-height: 56px;
-    --site-left-track: 275px;
     --site-right-track: 380px;
 }
 
 [data-editor-screen='site'][data-site-mode='review'] {
-    --site-left-track: 250px;
     --site-right-track: 316px;
 }
 
@@ -775,13 +779,12 @@
         --site-right-track: 292px;
     }
 
+    /* Left track stays mode-independent here too — see the note above. */
     [data-editor-screen='site'][data-site-mode='focus'] {
-        --site-left-track: 245px;
         --site-right-track: 330px;
     }
 
     [data-editor-screen='site'][data-site-mode='review'] {
-        --site-left-track: 235px;
         --site-right-track: 290px;
     }
 }

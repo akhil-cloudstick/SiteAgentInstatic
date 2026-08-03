@@ -147,14 +147,12 @@ export function PropertiesPanelBody(props: PropertiesPanelBodyProps): React.Reac
           already leads with the module's own parameters, anchored by the
           category rail) and the raw HTML attribute editor. Renaming "Styles"
           to "Content" would put the reference's word on the wrong surface. */}
-      <nav className={styles.nodeViewSwitcher} role="tablist" aria-label="Element options">
+      <nav className={styles.nodeViewSwitcher} aria-label="Element options">
         <Button
           variant="ghost"
           size="xs"
-          role="tab"
           className={styles.nodeViewButton}
           active={activeNodeView === 'styles'}
-          aria-selected={activeNodeView === 'styles'}
           onClick={() => setActiveNodeView('styles')}
         >
           Styles
@@ -162,10 +160,8 @@ export function PropertiesPanelBody(props: PropertiesPanelBodyProps): React.Reac
         <Button
           variant="ghost"
           size="xs"
-          role="tab"
           className={styles.nodeViewButton}
           active={activeNodeView === 'attributes'}
-          aria-selected={activeNodeView === 'attributes'}
           onClick={() => setActiveNodeView('attributes')}
         >
           Attributes

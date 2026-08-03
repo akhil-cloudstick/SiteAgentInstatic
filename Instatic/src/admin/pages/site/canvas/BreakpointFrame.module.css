@@ -79,7 +79,7 @@
  * A grid cell rather than a free-floating frame on a pannable plane: fixed
  * position, its own internal scroll, sized by the column instead of by the
  * breakpoint width. */
-:global(.reviewGrid) > .frameWrapper {
+.frameWrapper[data-review-layout='true'] {
     display: grid;
     min-width: 0;
     min-height: 0;
@@ -91,27 +91,23 @@
     contain: layout;
 }
 
-:global(.reviewGrid) > .frameWrapper .labelRow {
+.frameWrapper[data-review-layout='true'] .labelRow {
     width: auto;
     min-width: 0;
 }
 
-:global(.reviewGrid) > .frameWrapper .viewport {
+.frameWrapper[data-review-layout='true'] .viewport {
     width: auto;
     height: 100%;
     /* The base rule pins `min-height: 100vh` so a lone frame fills the plane.
        In the grid the cell decides the height, and 100vh would overflow it. */
     min-width: 0;
     min-height: 0;
-    /* Each frame scrolls inside its own box — the whole point of the board. */
-    overflow: auto;
-    /* The reference hides the frame scrollbars so three cards read as one
-       board rather than three scroll gutters. */
-    scrollbar-width: none;
-}
-
-:global(.reviewGrid) > .frameWrapper .viewport::-webkit-scrollbar {
-    display: none;
+    /* The IFRAME scrolls its own document (fillHeight), not this box. Wheeling
+       over an iframe never chains out to the embedder, so a scrollbar here
+       would be unreachable — the frame would look scrollable and refuse to
+       move, which is exactly the bug this replaced. */
+    overflow: hidden;
 }
 
 /* Scale-to-fit wrapper.
@@ -129,6 +125,9 @@
  * as they will when published. Only the outer presentation shrinks.
  */
 .scaler {
+    /* Fill the cell exactly after zoom, so the iframe inside can be 100% tall
+       and scroll its own document — see IframeFrameSurface's fillHeight. */
+    height: calc(100% / var(--frame-scale));
     width: var(--bp-width);
     zoom: var(--frame-scale);
 }
@@ -136,13 +135,13 @@
 /* Frame heading in Responsive Review — `Desktop  1440 px` on the left, and
    the companion frames' "Open full-size" as an underlined action on the right.
    Transcribed from `.frame-heading` / `.frame-heading .open-full`. */
-:global(.reviewGrid) > .frameWrapper .labelRow {
+.frameWrapper[data-review-layout='true'] .labelRow {
     justify-content: space-between;
     gap: 4px;
     font-family: var(--font-mms);
 }
 
-:global(.reviewGrid) > .frameWrapper .labelBtn {
+.frameWrapper[data-review-layout='true'] .labelBtn {
     flex: 0 1 auto;
     min-height: 44px;
     padding: 0 5px;
@@ -151,7 +150,7 @@
     font-weight: 700;
 }
 
-:global(.reviewGrid) > .frameWrapper .pxBadge {
+.frameWrapper[data-review-layout='true'] .pxBadge {
     color: var(--mms-text-muted);
     font-weight: 450;
     opacity: 1;

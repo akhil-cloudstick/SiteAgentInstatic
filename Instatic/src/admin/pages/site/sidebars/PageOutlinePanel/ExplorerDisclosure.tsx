@@ -29,6 +29,7 @@ import { resolvePluginPanelIcon } from '@site/sidebars/PanelRail/pluginPanelIcon
 import type { IconComponent } from 'pixel-art-icons/types'
 import { FaIcon } from '@ui/components/FaIcon'
 import { Button } from '@ui/components/Button'
+import { cn } from '@ui/cn'
 import type { SiteWorkspaceMode } from '@site/siteWorkspaceMode'
 import styles from './ExplorerDisclosure.module.css'
 
@@ -150,6 +151,11 @@ export function ExplorerDisclosure({ mode }: ExplorerDisclosureProps) {
   }
 
   function openTool(tool: Tool): void {
+    // Picking a tool collapses the disclosure back to its four shortcuts. The
+    // grid has done its job at that point, and leaving it open would push the
+    // panel the user just asked for down behind a wall of tiles.
+    setOpen(false)
+
     switch (tool.target.kind) {
       case 'explorerTab':
         setExplorerPanelTab(tool.target.tab)
@@ -176,10 +182,19 @@ export function ExplorerDisclosure({ mode }: ExplorerDisclosureProps) {
         onClick={() => setOpen((current) => !current)}
       >
         <span>{mode === 'live' ? 'Explorer' : 'Advanced workspace'}</span>
-        <FaIcon name={open ? 'chevron-up' : 'chevron-down'} size={12} />
+        {/* One chevron that rotates, rather than swapping two glyphs — a swap
+            can't be tweened, which is what made this read as a hard snap. */}
+        <FaIcon
+          name="chevron-down"
+          size={12}
+          className={cn(styles.chevron, open && styles.chevronOpen)}
+        />
       </Button>
 
-      {open ? (
+      {/* Both states stay mounted so the height can ease between them; the
+          hidden one is inert and out of the tab order. */}
+      <div className={cn(styles.reveal, open && styles.revealOpen)}>
+        <div className={styles.revealInner} inert={open ? undefined : true}>
         <div className={styles.grid}>
           {tools.map((tool) => (
             <Button
@@ -200,7 +215,11 @@ export function ExplorerDisclosure({ mode }: ExplorerDisclosureProps) {
             </Button>
           ))}
         </div>
-      ) : (
+        </div>
+      </div>
+
+      <div className={cn(styles.reveal, !open && styles.revealOpen)}>
+        <div className={styles.revealInner} inert={open ? true : undefined}>
         <div className={styles.shortcuts}>
           {SHORTCUT_TOOLS.map((tool) => (
             <Button
@@ -218,7 +237,8 @@ export function ExplorerDisclosure({ mode }: ExplorerDisclosureProps) {
             </Button>
           ))}
         </div>
-      )}
+        </div>
+      </div>
     </div>
   )
 }

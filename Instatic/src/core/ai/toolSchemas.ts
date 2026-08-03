@@ -59,6 +59,13 @@ export type AgentDocumentRef = Static<typeof AgentDocumentRefSchema>
 export const InsertHtmlInputSchema = Type.Object({
   parentId: Type.String({ minLength: 1 }),
   index: Type.Optional(Type.Integer({ minimum: 0 })),
+  // Sibling placement. `parentId` + `index` requires the model to count a
+  // node's offset in its parent's child list, which it reliably gets wrong —
+  // an omitted `index` silently appends to the end of the page instead of
+  // landing where the user pointed. These name the anchor directly; the
+  // executor derives the real parent and index from the tree.
+  afterNodeId: Type.Optional(Type.String({ minLength: 1 })),
+  beforeNodeId: Type.Optional(Type.String({ minLength: 1 })),
   html: Type.String({ minLength: 1 }),
 })
 export type InsertHtmlInput = Static<typeof InsertHtmlInputSchema>

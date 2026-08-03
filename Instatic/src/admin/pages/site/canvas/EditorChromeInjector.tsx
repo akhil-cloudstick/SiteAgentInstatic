@@ -157,6 +157,36 @@ function buildTokenBlock(parentDoc: Document): string {
  * Module-scope constant: stable across renders, not captured into closures.
  */
 const CHROME_RULES = `
+/* ── Empty text nodes ──────────────────────────────────────────────────────
+ * A text module with no content renders empty, exactly as it publishes — see
+ * TextEditor. Without an affordance such a node would be invisible, so it is
+ * labelled HERE, as editor chrome, and only while the author is pointing at
+ * it. At rest the canvas shows the real page; decorative empty spans (burger
+ * bars, icon-button inners) no longer read as the word "Text".
+ *
+ * The label is a ::after so it never enters the node's own content, and
+ * pointer-events stay off so it can't intercept a click meant for the node.
+ */
+[data-instatic-empty-text][data-canvas-selected="true"]::after,
+[data-instatic-empty-text][data-hovered="true"]::after {
+  content: "Empty text";
+  display: inline-block;
+  padding: 0 4px;
+  border-radius: 3px;
+  background: var(--canvas-placeholder-bg);
+  color: var(--text-subtle);
+  font-family: var(--chrome-font-sans);
+  font-size: var(--chrome-text-s);
+  font-style: normal;
+  font-weight: 400;
+  letter-spacing: normal;
+  line-height: 1.4;
+  pointer-events: none;
+  text-transform: none;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
 /* ── Section Focus ─────────────────────────────────────────────────────────
  * The whole of Section Focus, visually. \`CanvasRoot\` stamps
  * \`data-section-focus\` on the iframe body and \`data-section-focused\` on the

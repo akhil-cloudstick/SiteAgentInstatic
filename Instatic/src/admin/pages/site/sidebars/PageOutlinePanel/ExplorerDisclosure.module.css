@@ -24,6 +24,45 @@
     text-align: left;
 }
 
+/* ── Expand / collapse ───────────────────────────────────────────────────
+ * Animated with `grid-template-rows: 0fr → 1fr` rather than a max-height
+ * guess: the tool grid's height depends on how many tools the caller's
+ * permissions expose and on any plugin panels, so a fixed max-height would
+ * either clip the list or coast through empty space before it moves.
+ *
+ * The transitioning wrapper needs `overflow: hidden` and the inner track needs
+ * `min-height: 0`, or the row collapses instantly instead of easing.
+ */
+.reveal {
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows 180ms ease;
+}
+
+.revealOpen {
+    grid-template-rows: 1fr;
+}
+
+.revealInner {
+    min-height: 0;
+    overflow: hidden;
+}
+
+.chevron {
+    transition: transform 180ms ease;
+}
+
+.chevronOpen {
+    transform: rotate(180deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .reveal,
+    .chevron {
+        transition: none;
+    }
+}
+
 /* Collapsed: the four Explorer tabs as a compact icon-over-label strip. */
 .shortcuts {
     display: grid;

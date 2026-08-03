@@ -153,6 +153,11 @@ interface IframeFrameSurfaceProps {
    * iframe boundary.
    */
   dataAttrs?: Record<string, string | undefined>
+  /**
+   * Fill the container and scroll internally instead of growing to content
+   * height. Used by Responsive Review, whose frames must scroll on their own.
+   */
+  fillHeight?: boolean
   /** Interaction model — see {@link IframeInteraction}. Defaults to 'canvas'. */
   interaction?: IframeInteraction
   /**
@@ -193,6 +198,7 @@ export const IframeFrameSurface = forwardRef<IframeFrameSurfaceHandle, IframeFra
       onCursorLeave,
       children,
       dataAttrs,
+      fillHeight = false,
       interaction = 'canvas',
       runtimeScripts,
       onReadonlyOpen,
@@ -200,12 +206,23 @@ export const IframeFrameSurface = forwardRef<IframeFrameSurfaceHandle, IframeFra
     ref,
     ) {
       const isLive = interaction === 'live'
+      /**
+       * Whether the frame fills its container and scrolls INTERNALLY, instead
+       * of growing to content height inside a scrolling parent.
+       *
+       * Auto-height exists so the design canvas's wheel events reach the pan/
+       * zoom handler instead of being eaten by an inner scrollbar. Responsive
+       * Review has no pan/zoom and each frame is supposed to scroll on its own
+       * — and because browsers don't chain scroll from an iframe out to its
+       * embedder, an auto-grown frame there simply cannot be scrolled at all.
+       */
+      const fillsHeight = isLive || fillHeight
       const iframeRef = useRef<HTMLIFrameElement | null>(null)
       const [iframeDoc, setIframeDoc] = useState<Document | null>(null)
 
     useIframeCursorBridge(iframeRef, iframeDoc, { onCursorMove, onCursorLeave })
     useCanvasFormControlSuppression(iframeDoc, { breakpointId, enabled: !isLive })
-    useIframeFrameAutoHeight({ iframeRef, iframeDoc, isLive })
+    useIframeFrameAutoHeight({ iframeRef, iframeDoc, isLive: fillsHeight })
 
     // Bridge the iframe handle out to the parent (selection overlay reads
     // `iframeElement` to translate inside-iframe rects into editor coordinates).
@@ -281,7 +298,7 @@ export const IframeFrameSurface = forwardRef<IframeFrameSurfaceHandle, IframeFra
     // against `:where()` (zero-specificity) so the override is safe.
     useEffect(() => {
       if (!iframeDoc?.body) return
-      applyIframeBodyReset(iframeDoc, breakpointId, interaction)
+      applyIframeBodyReset(iframeDoc, breakpointId, interaction, fillsHeight)
       if (!onClick) return
       // Empty-frame click: ONLY fire when the click target is the body
       // itself (not a child node bubbling up). Without this guard, every
@@ -299,7 +316,7 @@ export const IframeFrameSurface = forwardRef<IframeFrameSurfaceHandle, IframeFra
       return () => {
         iframeDoc.body.removeEventListener('click', handler)
       }
-    }, [iframeDoc, breakpointId, onClick, interaction])
+    }, [iframeDoc, breakpointId, onClick, interaction, fillsHeight])
 
     // ── Navigation guard ─────────────────────────────────────────────────
     // The canvas iframe is an EDITING surface, never a browsing surface.
@@ -368,8 +385,10 @@ export const IframeFrameSurface = forwardRef<IframeFrameSurfaceHandle, IframeFra
     // the iframe element itself (in the parent doc), so it bubbles to the
     // canvas root and useGesture's handler picks it up.
     useEffect(() => {
-      // Live frames scroll natively — no pan to forward to.
-      if (isLive) return
+      // Frames that scroll themselves (live, and Responsive Review) must keep
+      // their own wheel: there is no canvas pan to forward it to, and the
+      // preventDefault below would simply make them unscrollable.
+      if (fillsHeight) return
       if (!iframeDoc) return
       const iframe = iframeRef.current
       if (!iframe) return
@@ -408,7 +427,7 @@ export const IframeFrameSurface = forwardRef<IframeFrameSurfaceHandle, IframeFra
       return () => {
         iframeDoc.removeEventListener('wheel', onWheel)
       }
-    }, [iframeDoc, isLive])
+    }, [iframeDoc, fillsHeight])
 
     // ── Forward pointer events for canvas pan gestures + parent-doc canvas drags ────
     // The canvas pan gesture (useCanvas via @use-gesture) and the canvas
@@ -643,7 +662,13 @@ export const IframeFrameSurface = forwardRef<IframeFrameSurfaceHandle, IframeFra
           // Canvas frames are sized to the breakpoint width and grow to content
           // height. Live frames fill the surface-controlled wrapper and scroll
           // internally, so they take 100% in both axes.
-          style={isLive ? { ...style, width: '100%', height: '100%' } : { ...style, width: `${width}px` }}
+          style={isLive
+            ? { ...style, width: '100%', height: '100%' }
+            : fillsHeight
+              // Review: true breakpoint width so media queries fire as
+              // published, full height so the document scrolls inside.
+              ? { ...style, width: `${width}px`, height: '100%' }
+              : { ...style, width: `${width}px` }}
           title={`Canvas frame for ${breakpointId}`}
           {...dataAttrSpread}
           // Allow the same-origin policy so the parent can read/write the

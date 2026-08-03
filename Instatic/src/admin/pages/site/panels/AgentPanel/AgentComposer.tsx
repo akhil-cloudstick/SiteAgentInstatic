@@ -4,7 +4,7 @@ import {
   useState,
   type ChangeEvent,
 } from 'react'
-import { useAgentStore } from '@admin/ai/useAgentStore'
+import { useAgentStore, useAgentStoreApi } from '@admin/ai/useAgentStore'
 import { useAsyncResource } from '@admin/lib/useAsyncResource'
 import { listModels, type CredentialView } from '@admin/ai/api'
 import {
@@ -57,10 +57,39 @@ export function AgentComposer({
   const abortAgent = useAgentStore((state) => state.abortAgent)
   const activeCredentialId = useAgentStore((state) => state.agentActiveCredentialId)
   const activeModelId = useAgentStore((state) => state.agentActiveModelId)
-  const [draft, setDraft] = useState('')
+  const consumeAgentComposerSeed = useAgentStore((state) => state.consumeAgentComposerSeed)
+  /**
+   * A mention queued by "Edit with AI" becomes this composer's INITIAL draft.
+   *
+   * `seedAgentComposer` bumps `agentComposerEpoch`, and AgentPanel keys this
+   * component by that epoch — so a seed remounts the composer and the lazy
+   * initializer picks it up. That is why this is a `useState` initializer and
+   * not an effect: writing local state from an effect is the cascading-render
+   * pattern `react-hooks/set-state-in-effect` exists to catch.
+   */
+  const agentStoreApi = useAgentStoreApi()
+  const [draft, setDraft] = useState(() => {
+    const seed = agentStoreApi.getState().agentComposerSeed
+    return seed ? `${seed}\n` : ''
+  })
   const [submitting, setSubmitting] = useState(false)
   const attachments = usePendingImageAttachments()
   const inputRef = useRef<HTMLTextAreaElement>(null)
+
+  // Clearing the store's copy is a store write, not local state, so it belongs
+  // in an effect — and it must happen once the seed has been taken, or
+  // re-opening the assistant would paste the same mention again.
+  //
+  // The caret also has to be moved to the END of the seeded text. Focusing a
+  // textarea whose value was set programmatically leaves the caret at index 0,
+  // so the author would start typing *in front of* the mention.
+  useEffect(() => {
+    consumeAgentComposerSeed()
+    const input = inputRef.current
+    if (!input || input.value.length === 0) return
+    input.focus()
+    input.setSelectionRange(input.value.length, input.value.length)
+  }, [consumeAgentComposerSeed])
 
   useEffect(() => {
     if (!isOpen) return

@@ -63,6 +63,37 @@
     box-shadow: none;
 }
 
+/* A hosted panel brings the admin's pill-shaped SearchBar, which read as a
+   different control from the outline's own field one mode away. In this column
+   the approved screen's `.search-field` is the only field shape: 44px tall,
+   7px radius, strong border on the raised surface. Scoped to the tool region so
+   the primitive keeps its pill everywhere else in the admin. */
+.toolRegion :global([data-searchbar]) {
+    min-height: 44px;
+    padding: 0 10px;
+    border-color: var(--mms-border-strong);
+    border-radius: var(--site-control-radius);
+    background: var(--mms-surface-raised);
+    gap: 9px;
+}
+
+.toolRegion :global([data-searchbar]) input {
+    min-height: 42px;
+}
+
+/* The field's row sits on the outline's own rhythm (9px above, 13px below) and
+   lines its left edge up with the heading, so switching to Layers doesn't shift
+   the column's top block. */
+.toolRegion :global(div:has(> [data-searchbar])) {
+    margin: 9px 15px 13px;
+}
+
+/* Whatever the hosted panel puts beside the field keeps the 44px target. */
+.toolRegion :global([data-searchbar]) + :global(button) {
+    min-width: 44px;
+    min-height: 44px;
+}
+
 /* Narrow viewports render the same panel inside a bottom drawer, where the
    border and the fixed track would fight the drawer's own chrome. */
 .panelDrawer {

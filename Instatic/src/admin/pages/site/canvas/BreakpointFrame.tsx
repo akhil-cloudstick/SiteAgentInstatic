@@ -158,6 +158,12 @@ export function BreakpointFrame({
       className={cn(styles.frameWrapper, isDimmed && styles.frameWrapperDimmed)}
       // Drives the approved screen's green ring on the active review frame.
       data-active={isActive ? 'true' : undefined}
+      // Review-layout rules key off THIS attribute, not off the grid's class.
+      // The grid's class lives in CanvasTransformLayer.module.css and is
+      // hashed, so a `:global(.reviewGrid)` selector in this file matched
+      // nothing — which silently killed the frame's scroll and fit-to-column
+      // sizing and left every frame cropped at its breakpoint width.
+      data-review-layout={reviewLayout ? 'true' : undefined}
       data-breakpoint-dimmed={isDimmed ? 'true' : undefined}
       data-testid={`canvas-frame-${breakpoint.id}`}
       style={bpStyle}
@@ -250,6 +256,7 @@ export function BreakpointFrame({
           onCursorLeave={handleFrameCursorLeave}
           onReadonlyOpen={handleReadonlyOpen}
           runtimeScripts={runtimeScripts}
+          fillHeight={reviewLayout}
         >
           <CanvasTemplateContext.Provider value={templateContext}>
             <CanvasBreakpointContext.Provider value={breakpoint.id}>

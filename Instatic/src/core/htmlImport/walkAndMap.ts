@@ -15,6 +15,10 @@
  *     to always match because the catch-all '*' rule is last).
  *   - Node creation uses the canonical factory so every produced node is a
  *     valid PageNode: createNode(moduleId, { ...def.defaults, ...ruleProps }).
+ *   - each node is NAMED from the element's own signals via deriveNodeLabel
+ *     (data-layer → meaningful class → id → aria-label → semantic tag), so the
+ *     Layers panel reads "Hero" / "Services" / "Footer" instead of forty rows
+ *     of "Container". Applies at every depth, not just top-level sections.
  *   - class names from el.classList are preserved verbatim on node.classIds.
  *     This layer is registry-agnostic: it writes *names*, not ids. The store
  *     action `insertImportedNodes` reconciles those names into real registry
@@ -42,6 +46,7 @@ import {
 } from '@core/htmlAttributes'
 import { HTML_TO_MODULE_RULES } from './rules'
 import type { ImportRule } from './rules'
+import { deriveNodeLabel } from './nodeLabel'
 import { parseHtml } from './parseHtml'
 import { stripUnsafe, collectStyleCss } from './stripUnsafe'
 import type { StripReport } from './stripUnsafe'
@@ -298,6 +303,13 @@ function processElement(el: Element, ctx: WalkContext): string {
   // action `insertImportedNodes` links these names to registry class ids (and
   // auto-creates bare classes for unknown names) when the fragment is inserted.
   node.classIds = Array.from(el.classList)
+
+  // Name the node from the element's own naming signals (data-layer / class /
+  // id / aria-label / semantic tag). Without this every imported section is a
+  // label-less base.container and the Layers panel — and the AI agent, which
+  // addresses nodes by name — sees forty rows all called "Container".
+  const label = deriveNodeLabel(el)
+  if (label) node.label = label
 
   // Attach the element's inline `style="…"` declarations (harvested before
   // stripUnsafe removed the `style` attribute) as the node's inline styles —

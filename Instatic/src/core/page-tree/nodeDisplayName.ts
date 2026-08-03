@@ -11,7 +11,9 @@
  *   - getNodeClassNames    → the assigned CSS class names
  *
  * Display name resolution order (first non-empty wins):
- *   1. node.label                — explicit user-set label
+ *   1. node.label                — explicit label: a user rename, or the name
+ *      the HTML importer derived from the source element (see
+ *      `src/core/htmlImport/nodeLabel.ts`). A rename overwrites it.
  *   2. VC name (when node.moduleId === 'base.visual-component-ref' AND
  *      props.componentId resolves to a Visual Component in the site)
  *   3. definition.name           — module's display name from registry

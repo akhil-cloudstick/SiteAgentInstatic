@@ -178,6 +178,63 @@ Define every brand color as a `:root` custom property and use it via `var(--…)
 - `background-image: url(/images/x.jpg)` works and is self-hosted, but is **not** an editable image (no alt, no media picker). Use it for decorative backgrounds; use `<img>` for content.
 - Allowed: **jpg, png, webp, gif, svg** (+ mp4/webm), at a clean web-root path (`/images/…`) with **no** `?query`/`#fragment`, not `data:`. A **real photo URL is fine** — OD saves it into `public/images/` and rewrites the ref before publish (see ❌ §7).
 
+### Layer naming — every block must say what it is
+
+Instatic names each imported block from the element's own markup and shows that name in the **Layers** panel. It reads, in order: **`data-layer`** → first **meaningful class** → **`id`** → **`aria-label`** → the semantic tag. If an element offers none of those, the panel falls back to the module name and the tenant sees a wall of rows all called **"Container"** — unusable to scan, and the AI editor (which addresses blocks by name) then edits the wrong section.
+
+**So: every structural element gets a meaningful class — outer sections *and* the blocks nested inside them.**
+
+```html
+<!-- ❌ WRONG — every row in the Layers panel reads "Container" -->
+<section>
+  <div class="container">
+    <div class="wrapper"><h2>Our services</h2></div>
+    <div><div></div><div></div></div>
+  </div>
+</section>
+```
+```html
+<!-- ✅ CORRECT — Layers reads Services › Services Header › Services Grid › Service Card -->
+<section class="services">
+  <div class="services-header"><h2 class="services-title">Our services</h2></div>
+  <div class="services-grid">
+    <article class="service-card">
+      <h3 class="service-card-title">Colour</h3>
+      <p class="service-card-copy">Full colour and gloss.</p>
+    </article>
+  </div>
+</section>
+```
+
+Naming rules:
+
+- **Name the thing, not the layout.** `hero`, `services`, `pricing-table`, `testimonials`, `site-footer` — not `container`, `wrapper`, `row`, `col`, `grid`, `box`, `inner`, `content`, `item`, `block`. Those words are **ignored** when Instatic picks the name, so an element whose only class is one of them is unnamed.
+- **Prefix children with their section** — `hero-title`, `hero-actions`, `service-card-title`. Reads as a path in the Layers tree and keeps names unique.
+- **A layout wrapper is fine — name it too.** `class="services-grid"`, not `class="grid"`.
+- **State and behaviour hooks don't count as names** (`is-open`, `has-error`, `js-toggle`, `u-hidden`) and neither does anything with a digit in it (`mt-4`, `col-6`). Put a real name alongside: `class="nav-drawer is-open"`.
+- **Animation and layout hooks are not names either.** `reveal`, `fade`, `parallax`, `sticky`, `split`, `track` describe *how it moves or stacks*, not what it is — they read as "Reveal / Reveal / Split" in the Layers panel, which is no better than "Container". Keep the hook for your CSS and add the real name first: `class="why-us-media reveal"`, `class="why-us-split"`.
+- **The name must match what the section visibly says.** If the block reads "How we travel", don't label it `aria-label="Why Travel Explorer"` — the tenant selects a layer and lands on copy that says something else, and the AI editor asked to "change the How we travel section" can't find it. Keep the class, the `aria-label` and the on-screen heading telling the same story.
+
+```html
+<!-- ❌ WRONG — Layers reads "Why Travel Explorer › Split › Reveal › Reveal" -->
+<section class="section" aria-label="Why Travel Explorer">
+  <div class="container split">
+    <div class="reveal"><div class="split-image"><img …></div></div>
+    <div class="reveal"><span class="eyebrow">How we travel</span><h2>Slow, small…</h2></div>
+```
+```html
+<!-- ✅ CORRECT — Layers reads "How We Travel › How We Travel Split › How We Travel Media / Copy" -->
+<section class="how-we-travel" aria-label="How we travel">
+  <div class="how-we-travel-split container">
+    <div class="how-we-travel-media reveal"><img …></div>
+    <div class="how-we-travel-copy reveal"><span class="eyebrow">How we travel</span><h2>Slow, small…</h2></div>
+```
+- **`kebab-case`, `snake_case`, `BEM` and `camelCase` all work** — `hero__title`, `hero-title` and `heroTitle` all display as "Hero Title".
+- **Escape hatch:** when the class must stay generic, set the name explicitly — `<div class="container" data-layer="Hero">` displays as "Hero". `data-*` attributes are preserved on import.
+- Names are capped at 40 characters in the panel — keep them short.
+
+This costs nothing (you already write one semantic class per component for styling — see **Selectors** above) and it is what makes the tenant's Layers panel, the AI editor, and the section icons all address the right block.
+
 ### Editability is automatic — no marker attribute needed
 Instatic makes an element editable **by its type** — write a real `<h1>`, `<p>`, `<img>`, `<button>`, and it becomes an editable block automatically. **You do NOT need a `data-sa` (or any) marker attribute** — the importer doesn't use one; clean semantic HTML is enough.
 
@@ -231,4 +288,5 @@ Don't block their workflow and don't lecture them. Figure out the compliant way 
 - [ ] No hashed/`_astro` imports, no SPA hydration root.
 - [ ] JavaScript is **behavior only** on existing markup (menus, tabs, swaps); no `on*=` inline handlers; no asset paths hardcoded in script text.
 - [ ] No bare text beside an inline element — every run wrapped so all parts are editable.
+- [ ] **Every structural element carries a meaningful class** (`hero`, `services-grid`, `service-card-title`) — outer sections *and* nested blocks — so the Layers panel never reads "Container". Never rely on `container`/`wrapper`/`row`/`grid` alone.
 - [ ] Effects (animation/3D/filters/carousels) built with CSS + behavioral JS, never content-generating JS.

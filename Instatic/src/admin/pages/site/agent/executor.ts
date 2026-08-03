@@ -234,6 +234,39 @@ function targetNodeIdFromInput(raw: unknown): string | undefined {
  *   3. insertImportedNodes(parentId, fragment, { index, styleRules, conditions })
  *      — nodes, <style> rules, and class-token binding in one undo step.
  */
+/**
+ * Turn `afterNodeId` / `beforeNodeId` into the concrete `(parentId, index)` the
+ * store insert needs.
+ *
+ * "Add a section below About Us" is a statement about a SIBLING, not about a
+ * parent and an offset. Left to compute the offset itself the model omits
+ * `index`, which appends to the end of the parent — the section lands at the
+ * bottom of the page and the author concludes nothing happened. Resolving the
+ * anchor here reads the offset straight off the tree, so placement is exact.
+ *
+ * An unknown anchor falls through to the caller's `parentId`/`index` rather
+ * than failing: the insert still happens, just without the sibling hint.
+ */
+function resolveInsertPlacement(
+  input: InsertHtmlInput,
+): { parentId: string; index: number | undefined } {
+  const anchorId = input.afterNodeId ?? input.beforeNodeId
+  if (!anchorId) return { parentId: input.parentId, index: input.index }
+
+  const nodes = activeDocumentNodes(getStoreState())
+  if (!nodes) return { parentId: input.parentId, index: input.index }
+
+  // Find the owner by its children array rather than reading the node's
+  // `parentId` field — that field is a derived index the tree backfills, and
+  // `page.ts` is explicit that the children arrays are the authority.
+  for (const [id, node] of Object.entries(nodes)) {
+    const position = node.children.indexOf(anchorId)
+    if (position < 0) continue
+    return { parentId: id, index: input.afterNodeId ? position + 1 : position }
+  }
+  return { parentId: input.parentId, index: input.index }
+}
+
 function runInsertHtml(input: InsertHtmlInput): AiToolOutput {
   // (1) Parse and walk the HTML to produce a flat node fragment + any <style> CSS
   const { nodes, rootIds, styleCss, stripped } = importHtml(input.html)
@@ -261,14 +294,15 @@ function runInsertHtml(input: InsertHtmlInput): AiToolOutput {
   }
 
   // (2) Insert via the store action — same path as the paste import modal
+  const placement = resolveInsertPlacement(input)
   const store = getStoreState()
   const insertedRootIds = store.insertImportedNodes(
-    input.parentId,
+    placement.parentId,
     { nodes, rootIds },
-    { index: input.index, styleRules: rules, conditions },
+    { index: placement.index, styleRules: rules, conditions },
   )
   if (insertedRootIds.length === 0) {
-    return aiToolError(`Parent node not found or does not accept children: ${input.parentId}`)
+    return aiToolError(`Parent node not found or does not accept children: ${placement.parentId}`)
   }
 
   // Return the full created subtree (id + module + class names) so the caller
@@ -293,7 +327,40 @@ function runInsertHtml(input: InsertHtmlInput): AiToolOutput {
   }
   for (const rootId of insertedRootIds) visit(rootId)
 
+  revealAgentEdit(insertedRootIds[0])
   return aiToolOk({ nodeIds: insertedRootIds, created })
+}
+
+/**
+ * Select what the agent just changed so the CANVAS shows it.
+ *
+ * Without this, an insert lands somewhere below the fold: the tool reports
+ * success and the node is in Layers, but the visible canvas is unchanged, so
+ * the author reasonably concludes nothing happened. Selecting the node draws
+ * the selection ring and scrolls the frame to it — the same feedback they'd
+ * get from inserting it by hand.
+ *
+ * Selection only. It never mutates the document, so it adds no history entry
+ * and an undo still steps over exactly the agent's edit.
+ */
+function revealAgentEdit(nodeId: string | undefined): void {
+  if (!nodeId) return
+  const state = getStoreState()
+  state.selectNode(nodeId)
+  // The canvas resolves the element through its own node cache on the next
+  // frame; scrolling before that would target a node that has not rendered.
+  requestAnimationFrame(() => {
+    const selector = `[data-node-id="${CSS.escape(nodeId)}"]`
+    // Search every canvas frame rather than assuming the first iframe: in
+    // Responsive Review there are three, and the node exists in all of them.
+    for (const frame of Array.from(document.querySelectorAll('iframe'))) {
+      const element = frame.contentDocument?.querySelector(selector)
+      if (element) {
+        element.scrollIntoView({ block: 'center', behavior: 'smooth' })
+        return
+      }
+    }
+  })
 }
 
 /**
@@ -396,6 +463,7 @@ function runReplaceNodeHtml(input: ReplaceNodeHtmlInput): AiToolOutput {
     return aiToolError(`Node does not accept children: ${input.nodeId}`)
   }
 
+  revealAgentEdit(insertedRootIds[0])
   return aiToolOk({ nodeIds: insertedRootIds })
 }
 
@@ -436,6 +504,7 @@ function runInsertComponentRef(input: InsertComponentRefInput): AiToolOutput {
         `children, or the reference would create a component cycle.`,
     )
   }
+  revealAgentEdit(nodeId)
   return aiToolOk({ nodeId })
 }
 

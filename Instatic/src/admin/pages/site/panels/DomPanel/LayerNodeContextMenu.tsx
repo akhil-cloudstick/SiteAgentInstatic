@@ -44,6 +44,8 @@ import {
 import { useEditorStore, selectActiveCanvasPage } from '@site/store/store'
 import { useShallow } from 'zustand/react/shallow'
 import { registry } from '@core/module-engine'
+import { getNodeDisplayName } from '@core/page-tree'
+import { AiSettingsSolidIcon } from 'pixel-art-icons/icons/ai-settings-solid'
 import { useInsertModule } from '@site/hooks/useInsertModule'
 import { resolveInsertLocation } from '@site/store/insertLocation'
 import { ModulePicker } from '@site/module-picker'
@@ -65,6 +67,7 @@ import { BoxSolidIcon } from 'pixel-art-icons/icons/box-solid'
 import { LayoutSolidIcon } from 'pixel-art-icons/icons/layout-solid'
 import { EyeSolidIcon } from 'pixel-art-icons/icons/eye-solid'
 import { isNarrowEditorChromeViewport } from '@site/layout/responsiveChrome'
+import { describeNodeForPrompt } from './describeNodeForPrompt'
 import styles from './LayerNodeContextMenu.module.css'
 
 interface LayerNodeContextMenuProps {
@@ -142,6 +145,52 @@ export function LayerNodeContextMenu({
   // CanvasRoot.onNodeContextMenu and TreeNode's onContextMenu).
   const isMulti = selectedNodeIds.length > 1 && nodeId !== null && selectedNodeIds.includes(nodeId)
   const targetIds = isMulti ? selectedNodeIds : nodeId ? [nodeId] : []
+
+  // ── Edit with AI ──────────────────────────────────────────────────────────
+  const canUseAgent = useEditorStore((s) => typeof s.seedAgentComposer === 'function')
+  const seedAgentComposer = useEditorStore((s) => s.seedAgentComposer)
+  const setLeftSidebarPanel = useEditorStore((s) => s.setLeftSidebarPanel)
+  const visualComponents = useEditorStore((s) => s.site?.visualComponents)
+  const selectNode = useEditorStore((s) => s.selectNode)
+  const agentTargetName = useEditorStore((s) => {
+    if (!nodeId) return null
+    const target = selectActiveCanvasPage(s)?.nodes[nodeId]
+    if (!target) return null
+    return getNodeDisplayName(target, registry.get(target.moduleId), visualComponents)
+  })
+  const agentTargetKind = useEditorStore((s) => {
+    if (!nodeId) return null
+    return selectActiveCanvasPage(s)?.nodes[nodeId]?.moduleId ?? null
+  })
+  /** A text node's own words read far better than its module name. */
+  const agentTargetText = useEditorStore((s) => {
+    if (!nodeId) return null
+    const target = selectActiveCanvasPage(s)?.nodes[nodeId]
+    const text = (target?.props as Record<string, unknown> | undefined)?.['text']
+    return typeof text === 'string' && text.trim() ? text.trim() : null
+  })
+
+  /**
+   * Seed the composer with a plain-English reference to the picked node, then
+   * bring the assistant up in the left column.
+   *
+   * Targeting rides on the selection — the agent's snapshot carries
+   * `selectedNodeId` (see `pageContext.ts`) — AND on the id in the sentence.
+   * Selection alone was not enough: seeded with a bare name like
+   * `Edit the "Container" section`, the model treated the name as ambiguous and
+   * asked which container the author meant rather than acting on the one they
+   * had selected. The id in the text matches the snapshot's `Selected:` line,
+   * so the two agree and there is nothing left to ask about.
+   */
+  function editWithAi(): void {
+    if (!nodeId) return
+    selectNode(nodeId)
+    seedAgentComposer(
+      describeNodeForPrompt(agentTargetKind, agentTargetName, agentTargetText, nodeId),
+    )
+    setLeftSidebarPanel('agent')
+    onClose()
+  }
 
   // slot-instance structural lock-down — Task 5
   //
@@ -350,6 +399,19 @@ export function LayerNodeContextMenu({
         </>
       )}
 
+      {/* Edit with AI — hands the assistant the block the author actually
+          picked. Without a named target the model has to infer which section a
+          prompt means, and a wrong guess edits the wrong part of the page. */}
+      {canUseAgent && nodeId && (
+        <>
+          <ContextMenuItem onClick={editWithAi} data-testid="layer-menu-edit-with-ai">
+            <span aria-hidden="true"><AiSettingsSolidIcon size={13} /></span>
+            Edit with AI
+          </ContextMenuItem>
+          <ContextMenuSeparator />
+        </>
+      )}
+
       {/* Rename — hidden for slot-instance lockdown AND for multi-select
           (rename is single-node only). */}
       {!lockedSlotInstance && !isMulti && (
@@ -476,3 +538,4 @@ export function LayerNodeContextMenu({
     </UIContextMenu>
   )
 }
+

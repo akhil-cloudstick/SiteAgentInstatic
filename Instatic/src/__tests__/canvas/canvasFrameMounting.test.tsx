@@ -3,7 +3,6 @@ import React from 'react'
 import { act, cleanup, render, screen } from '@testing-library/react'
 import { CanvasRoot } from '@site/canvas/CanvasRoot'
 import { CanvasTransformLayer } from '@site/canvas/CanvasTransformLayer'
-import { CANVAS_VIEWPORT_HEIGHT } from '@site/canvas/resolveViewportUnits'
 import { DEFAULT_BREAKPOINTS } from '@core/page-tree'
 import { useEditorStore } from '@site/store/store'
 import {
@@ -129,18 +128,22 @@ describe('canvas frame mounting', () => {
     expect(queryCanvasNodeInFrame('mobile', 'headline')).toBeNull()
   })
 
-  it('clamps root overflow on <html> only in design mode, leaves <body> to authored CSS, and stays scrollable in live mode', async () => {
+  it('leaves both canvas surfaces scrollable, with <body> overflow owned by authored CSS', async () => {
     render(<CanvasRoot />)
 
-    const designDoc = await waitForCanvasFrameDocument('desktop')
-    expect(designDoc.documentElement.style.height).toBe('auto')
-    expect(designDoc.body.style.height).toBe('auto')
-    expect(designDoc.body.style.minHeight).toBe(`${CANVAS_VIEWPORT_HEIGHT}px`)
-    expect(designDoc.documentElement.style.overflow).toBe('hidden')
+    // Responsive Review replaced the pannable design plane, so its frames are
+    // a fixed height and scroll their OWN document — exactly like the live
+    // frame. The old auto-height clamp (html height:auto + overflow:hidden)
+    // existed only so the wheel could reach the canvas pan handler; with no
+    // pan to reach, it just made the frames unscrollable.
+    const reviewDoc = await waitForCanvasFrameDocument('desktop')
+    expect(reviewDoc.documentElement.style.height).toBe('')
+    expect(reviewDoc.documentElement.style.overflow).toBe('')
+    expect(reviewDoc.body.style.minHeight).toBe('')
     // <body> overflow is left unset so the body is NOT a block formatting
-    // context — margin-collapsing then matches the published page (and live
-    // frame), not the editor-only forced-hidden behaviour it replaced.
-    expect(designDoc.body.style.overflow).toBe('')
+    // context — margin-collapsing then matches the published page, not the
+    // editor-only forced-hidden behaviour it replaced.
+    expect(reviewDoc.body.style.overflow).toBe('')
 
     cleanup()
     useEditorStore.setState({ canvasView: 'live' } as Parameters<typeof useEditorStore.setState>[0])
@@ -152,5 +155,4 @@ describe('canvas frame mounting', () => {
     expect(liveDoc!.body.style.minHeight).toBe('')
     expect(liveDoc!.documentElement.style.overflow).toBe('')
     expect(liveDoc!.body.style.overflow).toBe('')
-  })
-})
+  })})

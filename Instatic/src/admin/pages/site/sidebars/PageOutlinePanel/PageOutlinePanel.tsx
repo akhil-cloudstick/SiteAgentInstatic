@@ -30,7 +30,7 @@ import { ModuleInserterDialog } from '@site/module-picker/ModuleInserterDialog'
 import { useInsertInserterItem } from '@site/hooks/useInsertInserterItem'
 import { topLevelSectionIds, type SiteWorkspaceMode } from '@site/siteWorkspaceMode'
 import { ExplorerDisclosure } from './ExplorerDisclosure'
-import { moduleGlyph } from './moduleGlyph'
+import { moduleGlyph } from '@site/moduleGlyph'
 import styles from './PageOutlinePanel.module.css'
 
 const EMPTY_BREAKPOINTS: Breakpoint[] = []
@@ -72,6 +72,8 @@ export function PageOutlinePanel({
   const breakpoints = useEditorStore((s) => s.site?.breakpoints ?? EMPTY_BREAKPOINTS)
   const activeBreakpointId = useEditorStore((s) => s.activeBreakpointId)
   const setActiveBreakpoint = useEditorStore((s) => s.setActiveBreakpoint)
+  const setLeftSidebarPanel = useEditorStore((s) => s.setLeftSidebarPanel)
+  const setExplorerPanelTab = useEditorStore((s) => s.setExplorerPanelTab)
   const permissions = useEditorPermissions()
 
   const [query, setQuery] = useState('')
@@ -99,6 +101,17 @@ export function PageOutlinePanel({
    * in the Layers tree, which is one click away in the Explorer disclosure).
    * It goes through `moveNodes`, so it is one undo step like any other move.
    */
+  /**
+   * The reference's Live-mode heading button. It opens the full tool set — the
+   * same destination the Explorer disclosure at the foot reaches, through the
+   * same store actions, so the two entry points can never disagree about what
+   * "Explorer" means.
+   */
+  function openExplorer(): void {
+    setExplorerPanelTab('layers')
+    setLeftSidebarPanel('explorer')
+  }
+
   function moveEarlier(nodeId: string): void {
     const index = sectionIds.indexOf(nodeId)
     if (index < 1 || !page) return
@@ -113,9 +126,24 @@ export function PageOutlinePanel({
       data-mode={mode}
       data-body-hidden={hidden ? 'true' : undefined}
     >
+      {/* Heading + its one action, per the reference: Live offers Explorer,
+          Focus offers "Add section", Review offers neither (its actions live in
+          the viewport-context block below). */}
       <div className={styles.heading}>
         <h2>{hidden ? (toolHeading ?? HEADINGS[mode]) : HEADINGS[mode]}</h2>
-        {!hidden && mode !== 'live' && permissions.canEditStructure && (
+        {!hidden && mode === 'live' && (
+          <Button
+            variant="secondary"
+            size="md"
+            className={styles.headingAction}
+            onClick={openExplorer}
+            data-testid="page-outline-open-explorer"
+          >
+            <FaIcon name="sitemap" size={12} />
+            <span>Explorer</span>
+          </Button>
+        )}
+        {!hidden && mode === 'focus' && permissions.canEditStructure && (
           <Button
             variant="secondary"
             size="md"

@@ -11,6 +11,7 @@
  *   extractInlineStyles  — one element's inline declarations as a camelCase bag.
  *   walkAndMap(doc)      — maps doc.body element children to PageNodes.
  *   HTML_TO_MODULE_RULES — declarative element → module mapping table.
+ *   deriveNodeLabel(el)  — layer name for an element (data-layer / class / id / …).
  *
  * Types:
  *   ImportFragment  — { nodes, rootIds, body? } flat NodeTree fragment plus optional body attributes.
@@ -27,5 +28,6 @@ export type {  ImportFragment, ImportResult } from './walkAndMap'
 export { parseHtml } from './parseHtml'
 export { stripUnsafe } from './stripUnsafe'
 export { walkAndMap, importHtml } from './walkAndMap'
+export { deriveNodeLabel } from './nodeLabel'
 
 export { normalizeImportedText } from './text'
