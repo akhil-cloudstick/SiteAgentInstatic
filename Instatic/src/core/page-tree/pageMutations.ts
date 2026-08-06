@@ -11,6 +11,7 @@
  * to one page (see store slices/site/dirtyTracking.ts), forcing a full save.
  */
 import { nanoid } from 'nanoid'
+import { registry } from '@core/module-engine'
 import type { Page } from './page'
 import type { PageNode } from './pageNode'
 import type { SiteDocument } from './siteDocument'
@@ -18,7 +19,7 @@ import { normalizePageSlug, uniquePageSlug } from './slugs'
 import { cloneScopedClassesForNodeMap } from './scopedClassClone'
 import { reindexNodeParents } from './parentIndex'
 import { cloneNodeWithRemap } from './cloneNode'
-import { createNode } from './mutations'
+import { createNode, insertNode } from './mutations'
 
 
 export function addPage(site: SiteDocument, title: string, slug: string): Page {
@@ -34,6 +35,31 @@ export function addPage(site: SiteDocument, title: string, slug: string): Page {
   }
   site.pages.push(page)
   return page
+}
+
+/**
+ * Give a freshly created page its starter content: one empty `base.container`
+ * directly under `base.body`.
+ *
+ * `addPage` deliberately stays structural (a bare `base.body`) because the site
+ * importer calls it and then REPLACES `body.children` with the imported
+ * fragment roots — a seeded child there would be left orphaned in `page.nodes`.
+ * The starter container is a product decision about pages an author creates in
+ * the editor, so it is a separate call the editor's page action makes.
+ *
+ * Without it a new page renders as header + footer stacked with nothing between
+ * them (the everywhere template's `base.outlet` resolves to an empty body), so
+ * there is no drop target and no visible page area. The empty container gives
+ * the author the canvas's standard empty-container affordance to drop into.
+ *
+ * Must run inside the same mutation recipe that created the page so a single
+ * undo reverts both (same rule as `materializeDefaultChildren`).
+ */
+export function seedStarterContainer(page: Page): PageNode {
+  const definition = registry.get('base.container')
+  const container = createNode('base.container', { ...definition?.defaults })
+  insertNode(page, container, page.rootNodeId)
+  return container
 }
 
 export function deletePage(site: SiteDocument, pageId: string): void {

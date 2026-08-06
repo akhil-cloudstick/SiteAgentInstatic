@@ -131,7 +131,8 @@ All mutations live in `src/core/page-tree/mutations.ts`. They take a `NodeTree<P
 
 | Function                                       | What it does                                  |
 |------------------------------------------------|-----------------------------------------------|
-| `addPage(site, title, slug) → Page`            | Append a new page to `site.pages`. Slug is auto-uniqued via `uniquePageSlug` — a collision never bricks the save. |
+| `addPage(site, title, slug) → Page`            | Append a new page to `site.pages`. The page arrives structural — a bare `base.body` with no children — because the site importer calls this and then replaces `body.children` with the imported fragment roots. Slug is auto-uniqued via `uniquePageSlug` — a collision never bricks the save. |
+| `seedStarterContainer(page) → PageNode`        | Give a page its starter content: one empty `base.container` under `base.body`. Called by the editor's `addPage` store action (not by the importer, which brings its own content) so an author-created page opens with a real drop target instead of a bare body where the everywhere template's header and footer collapse together. Must run in the same mutation recipe as `addPage` so one undo reverts both. |
 | `deletePage(site, pageId)`                     | Remove a page                                 |
 | `renamePage(site, pageId, title, slug?)`       | Update title (and slug). Slug is auto-uniqued (skipping self-collision); `'index'` is always set verbatim. |
 | `reorderPages(site, fromIndex, toIndex)`       | Reorder the page list                         |

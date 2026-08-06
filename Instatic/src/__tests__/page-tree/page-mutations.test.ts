@@ -11,6 +11,7 @@ import { create } from 'mutative'
 import type { SiteDocument } from '@core/page-tree'
 import {
   addPage,
+  seedStarterContainer,
   normalizePageSlug,
   pagePublicPath,
   pageSlugError,
@@ -115,6 +116,35 @@ describe('addPage', () => {
     // No two pages share a slug — the site stays save-valid.
     const slugs = site.pages.map((p) => p.slug)
     expect(new Set(slugs).size).toBe(slugs.length)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// seedStarterContainer
+// ---------------------------------------------------------------------------
+
+describe('seedStarterContainer', () => {
+  it('adds one empty base.container under the page body', () => {
+    const site = makeSite({ pages: [] })
+    const page = addPage(site, 'Offers', 'offers')
+    const container = seedStarterContainer(page)
+
+    const body = page.nodes[page.rootNodeId]
+    expect(body.children).toEqual([container.id])
+    expect(page.nodes[container.id].moduleId).toBe('base.container')
+    expect(page.nodes[container.id].parentId).toBe(page.rootNodeId)
+    expect(page.nodes[container.id].children).toEqual([])
+  })
+
+  it('is Mutative-safe alongside addPage in one recipe', () => {
+    const site = makeSite({ pages: [makePage()] })
+    const nextSite = create(site, (draft) => {
+      const page = addPage(draft, 'Offers', 'offers')
+      seedStarterContainer(page)
+    })
+
+    const created = nextSite.pages[nextSite.pages.length - 1]
+    expect(Object.keys(created.nodes)).toHaveLength(2) // body + starter container
   })
 })
 

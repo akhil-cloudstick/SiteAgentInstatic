@@ -6,6 +6,7 @@
 import {
   type Page,
   addPage,
+  seedStarterContainer,
   deletePage,
   renamePage,
   reorderPages,
@@ -36,6 +37,11 @@ export function createPageActions({
       let newPage!: Page
       mutateSite((p) => {
         newPage = addPage(p, title, slug ?? title)
+        // Seeded in the SAME recipe as the page so one undo reverts both, and
+        // so the author lands on a page with a real drop target instead of a
+        // bare body where the everywhere template's header and footer collapse
+        // against each other.
+        seedStarterContainer(newPage)
         reconcileSiteExplorerInPlace(p)
         return true
       })

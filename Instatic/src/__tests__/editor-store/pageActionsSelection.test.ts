@@ -55,4 +55,27 @@ describe('page actions selection state', () => {
     expect(state.activeClassId).toBeNull()
     expect(selectRightSidebarExpanded(state)).toBe(false)
   })
+
+  it('seeds a new page with one empty container so the canvas has a drop target', () => {
+    useEditorStore.getState().createSite('Starter container site')
+    const page = useEditorStore.getState().addPage('Offers', 'offers')
+
+    const created = useEditorStore.getState().site!.pages.find((p) => p.id === page.id)!
+    const body = created.nodes[created.rootNodeId]
+    expect(body.children).toHaveLength(1)
+
+    const starter = created.nodes[body.children[0]]
+    expect(starter.moduleId).toBe('base.container')
+    expect(starter.children).toEqual([])
+  })
+
+  it('undoes the page and its starter container in one step', () => {
+    useEditorStore.getState().createSite('Starter container undo site')
+    const before = useEditorStore.getState().site!.pages.length
+
+    useEditorStore.getState().addPage('Offers', 'offers')
+    useEditorStore.getState().undo()
+
+    expect(useEditorStore.getState().site!.pages).toHaveLength(before)
+  })
 })

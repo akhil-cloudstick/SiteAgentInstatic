@@ -141,6 +141,7 @@ export {
 
 export {
   addPage,
+  seedStarterContainer,
   deletePage,
   renamePage,
   reorderPages,
