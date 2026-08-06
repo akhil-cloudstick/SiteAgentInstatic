@@ -114,6 +114,27 @@ On import, HTML `src`/`srcset`/`href` and CSS `url()` are rewritten to the CMS `
 ### 9. Inline event handlers
 ❌ `onclick="…"` / any `on*=` attribute is stripped on import. Attach behavior with `addEventListener` in a `<script>` instead.
 
+### 9b. Empty controls whose icon is injected by JavaScript
+
+A control that JS fills at runtime arrives at the CMS **empty** — the tenant sees the button's own border with nothing inside it, both on the canvas and on the published page's first paint. The icon was never in the markup, so there is nothing to import.
+
+**JS may SWAP an icon; it must never CREATE it.** Ship the initial icon (or label) in the HTML and let the script change it.
+
+```html
+<!-- ❌ WRONG — imports as an empty bordered box -->
+<button class="theme-toggle" aria-label="Toggle theme"></button>
+<script>btn.innerHTML = isDark ? moonSvg : sunSvg</script>
+
+<!-- ✅ RIGHT — the icon exists; JS only swaps which one shows -->
+<button class="theme-toggle" aria-label="Toggle theme">
+  <svg class="icon-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/></svg>
+  <svg class="icon-moon" viewBox="0 0 24 24" hidden><path d="M21 13A9 9 0 1 1 11 3a7 7 0 0 0 10 10Z"/></svg>
+</button>
+<script>/* toggles [hidden] between the two — both already in the DOM */</script>
+```
+
+A control drawn purely by CSS is fine — `<button class="hamburger"><span></span><span></span></button>` has elements to style, so it renders. Only a control with **nothing at all** inside it is blocked.
+
 ### 10. Content hidden until JavaScript runs
 The importer strips your `<script>`s from the **editing canvas**, so any content that only becomes visible once JS runs is **blank** there (it appears only on the published site). ❌ A full-screen loading overlay that a script removes; ❌ `opacity:0`/`visibility:hidden` content revealed only by a JS-added class (e.g. `IntersectionObserver` scroll reveals), or a hero whose words start `opacity:0`. Make the visible state the **default** and let CSS animate it in.
 

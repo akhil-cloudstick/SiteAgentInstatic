@@ -3,6 +3,7 @@
  * gateway (no restart), with the env value as an offline fallback.
  */
 import { describe, it, expect, afterEach } from 'bun:test'
+import { MANAGED_AI_CREDENTIAL_ID } from '@core/ai'
 import {
   isManagedAiMode,
   getGatewayUrl,
@@ -11,7 +12,6 @@ import {
   managedCredentialView,
   managedDefaultsMap,
   managedModelList,
-  MANAGED_CREDENTIAL_ID,
   __resetManagedModelCache,
 } from './managed'
 
@@ -67,11 +67,11 @@ describe('managed AI mode', () => {
 
   it('surfaces exactly one credential + one model + a default per scope', () => {
     setEnv(GATEWAY)
-    expect(managedCredentialView().id).toBe(MANAGED_CREDENTIAL_ID)
+    expect(managedCredentialView().id).toBe(MANAGED_AI_CREDENTIAL_ID)
     expect(managedModelList(MODEL).map((m) => m.id)).toEqual([MODEL])
     const defaults = managedDefaultsMap(MODEL)
     for (const scope of ['site', 'content', 'data', 'plugin']) {
-      expect(defaults[scope]).toEqual({ credentialId: MANAGED_CREDENTIAL_ID, modelId: MODEL })
+      expect(defaults[scope]).toEqual({ credentialId: MANAGED_AI_CREDENTIAL_ID, modelId: MODEL })
     }
   })
 })

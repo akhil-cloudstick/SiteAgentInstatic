@@ -708,7 +708,7 @@ describe('sendAgentMessage — request lifecycle', () => {
     }
   })
 
-  it('runs a toolRequest from the stream and POSTs the result to /admin/api/ai/tool-result', async () => {
+  it('runs a toolRequest from the stream and POSTs the result to /cms/api/ai/tool-result', async () => {
     const { rootId } = freshAgentState()
     useEditorStore.setState({ isAgentStreaming: false, agentMessages: [] })
 

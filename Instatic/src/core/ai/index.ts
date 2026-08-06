@@ -1,4 +1,5 @@
 export * from './mcpConnectorSchemas'
+export { MANAGED_AI_CREDENTIAL_ID } from './managed'
 export {
   AiToolOutputSchema,
   INTERRUPTED_TOOL_RESULT_ERROR,

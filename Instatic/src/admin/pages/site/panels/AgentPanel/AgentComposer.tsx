@@ -9,6 +9,7 @@ import { useAsyncResource } from '@admin/lib/useAsyncResource'
 import { listModels, type CredentialView } from '@admin/ai/api'
 import {
   AI_USER_IMAGE_MAX_PER_MESSAGE,
+  MANAGED_AI_CREDENTIAL_ID,
   type AiUserContentBlock,
 } from '@core/ai'
 import { Button } from '@ui/components/Button'
@@ -107,8 +108,25 @@ export function AgentComposer({
 
   const activeProviderId =
     credentials.find((credential) => credential.id === activeCredentialId)?.providerId ?? null
+  /**
+   * Managed mode — the operator runs this instance and the credential list is
+   * exactly one synthetic gateway entry.
+   *
+   * The gateway resolves the REAL model per request (per task-type category), so
+   * there is no model for the tenant to pick and nothing for the client to
+   * introspect. The server owns the capability answer instead
+   * (`managedModelCapabilities` — vision + tool calling on) and enforces it on
+   * the chat route, so the composer skips its own per-model probe here. Probing
+   * anyway left every attached image sitting behind "Could not verify image
+   * support" whenever the model list was slow, cached-out, or unreachable.
+   */
+  const isManagedMode =
+    credentialsLoaded
+    && credentials.length === 1
+    && credentials[0]!.id === MANAGED_AI_CREDENTIAL_ID
   const activeModelResource = useAsyncResource(
     async () => {
+      if (isManagedMode) return null
       if (!activeProviderId || !activeCredentialId || !activeModelId) return null
       const models = await listModels(activeProviderId, activeCredentialId)
       return {
@@ -117,7 +135,7 @@ export function AgentComposer({
         model: models.find((model) => model.id === activeModelId) ?? null,
       }
     },
-    [activeProviderId, activeCredentialId, activeModelId],
+    [isManagedMode, activeProviderId, activeCredentialId, activeModelId],
     { fallbackError: 'Could not load details for this model.' },
   )
   const resolvedSelection = activeModelResource.data
@@ -135,13 +153,15 @@ export function AgentComposer({
       ? 'error'
       : attachments.pending.some((entry) => entry.status === 'processing')
         ? 'processing'
-        : activeModelResource.loading
-          ? 'checking-model'
-          : activeModelResource.error || !resolvedSelection
-            ? 'model-error'
-          : activeModel?.capabilities.visionInput
-            ? 'ready'
-            : 'unsupported-model'
+        : isManagedMode
+          ? 'ready'
+          : activeModelResource.loading
+            ? 'checking-model'
+            : activeModelResource.error || !resolvedSelection
+              ? 'model-error'
+            : activeModel?.capabilities.visionInput
+              ? 'ready'
+              : 'unsupported-model'
 
   async function submit(): Promise<void> {
     if (
@@ -167,11 +187,23 @@ export function AgentComposer({
       if (entry.block) content.push(entry.block)
     }
 
+    // Hand the composer's copy over the moment Send is pressed, mirroring the
+    // store's optimistic user turn — the thread renders the text and images
+    // immediately. `sendAgentMessage` resolves only once the WHOLE stream is
+    // done, so clearing on its result left the draft and the image chips
+    // sitting in the composer for the entire turn, under a message already
+    // showing them. A send the server never accepted puts both back, which is
+    // what the store's own `dropOptimisticUserMessage` rollback assumes.
+    const draftBeforeSend = draft
+    const attachmentsBeforeSend = pending
+    setDraft('')
+    attachments.clear()
+
     setSubmitting(true)
     const result = await sendAgentMessage(content).finally(() => setSubmitting(false))
-    if (result.accepted) {
-      setDraft('')
-      attachments.clear()
+    if (!result.accepted) {
+      setDraft(draftBeforeSend)
+      attachments.restore(attachmentsBeforeSend)
     }
   }
 
@@ -277,13 +309,17 @@ export function AgentComposer({
           />
         )}
         <div className={styles.inputControls}>
-          <ModelPicker
-            className={styles.inputControlsPicker}
-            credentials={credentials}
-            credentialsLoaded={credentialsLoaded}
-            onRefreshCredentials={onRefreshCredentials}
-            disabled={isStreaming || conversationPending || providerPending || submitting}
-          />
+          {/* Managed mode routes the model per request, so a picker offering the
+              one synthetic gateway entry is a control that changes nothing. */}
+          {!isManagedMode && (
+            <ModelPicker
+              className={styles.inputControlsPicker}
+              credentials={credentials}
+              credentialsLoaded={credentialsLoaded}
+              onRefreshCredentials={onRefreshCredentials}
+              disabled={isStreaming || conversationPending || providerPending || submitting}
+            />
+          )}
           <div className={styles.inputControlActions}>
             <ContextMeter
               credentialId={activeCredentialId}

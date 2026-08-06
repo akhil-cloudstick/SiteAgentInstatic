@@ -60,7 +60,7 @@ It walks an ordered `routes` array of `RouteHandler` functions. Each handler ret
 ```ts
 const routes: readonly RouteHandler[] = [
   tryServeHealth,                  // /health
-  tryServeAi,                      // /admin/api/ai/*         → server/ai/handlers/
+  tryServeAi,                      // /cms/api/ai/*         → server/ai/handlers/
   tryServeCmsApi,                  // /admin/api/cms/*        → handlers/cms/index.ts
   tryServeLoopRuntimeAsset,        // /_instatic/loop-runtime.js (fixed CMS asset)
   tryServeLoop,                    // /_instatic/loop/*       → handlers/cms/loop.ts
@@ -88,7 +88,7 @@ const routes: readonly RouteHandler[] = [
 
 Order matters. Two examples:
 
-- `tryServeAi` is matched **before** `tryServeCmsApi` so the AI endpoints (`/admin/api/ai/*`) aren't swallowed by the broader CMS dispatcher (`/admin/api/cms/*`).
+- `tryServeAi` is matched **before** `tryServeCmsApi` so the AI endpoints (`/cms/api/ai/*`) aren't swallowed by the broader CMS dispatcher (`/admin/api/cms/*`).
 - `tryServeUpload` is matched **before** `tryServeAdminApp` because `/uploads/...` is a sub-tree the SPA fallback would otherwise consume.
 
 Adding a new endpoint is a one-line edit to `routes` plus a focused `tryServeX` function.

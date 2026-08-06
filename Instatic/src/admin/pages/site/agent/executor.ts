@@ -4,7 +4,7 @@
  * The AI runtime defines these browser-executed tools server-side, then emits a
  * `toolRequest` stream event so the browser can apply the mutation against the
  * live editor store. The browser then POSTs the canonical `AiToolOutput` back
- * to /admin/api/ai/tool-result and the driver loop continues.
+ * to /cms/api/ai/tool-result and the driver loop continues.
  *
  * No batch semantics, no rollback. Each tool call is its own atomic mutation
  * — successful mutations push history entries normally so Cmd+Z reverts them.
@@ -686,7 +686,7 @@ function runDuplicateNode(input: DuplicateNodeInput): AiToolOutput {
  *
  * The browser receives a `toolRequest` event from the server stream,
  * dispatches the tool here, and POSTs the canonical result back to
- * /admin/api/ai/tool-result so the driver loop can return it to the model.
+ * /cms/api/ai/tool-result so the driver loop can return it to the model.
  */
 export async function executeAgentTool(
   toolName: string,

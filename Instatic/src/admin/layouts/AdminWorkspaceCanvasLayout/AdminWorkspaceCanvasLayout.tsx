@@ -86,7 +86,16 @@ export function AdminWorkspaceCanvasLayout({
       />
 
       <ConfirmDeleteProvider>
-        <div className={styles.editorBody}>
+        <div
+          className={styles.editorBody}
+          // Scopes the Content screen's own `--mms-*` palette and its fixed
+          // reference geometry (see the content block in globals.css). Set on
+          // the BODY rather than the shell on purpose: the shared toolbar sits
+          // outside this element and must keep the Dashboard palette, since the
+          // Content re-skin is scoped to the sidebar, canvas and settings panel.
+          // Data and Media render the same layout and are deliberately excluded.
+          data-editor-screen={workspace === 'content' ? 'content' : undefined}
+        >
           {contentSidebar ?? null}
           <div
             className={cn(styles.canvasStage, hasRightSidebar && styles.canvasStageRightSidebarOpen)}

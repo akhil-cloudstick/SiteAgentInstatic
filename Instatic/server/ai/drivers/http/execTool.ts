@@ -4,7 +4,7 @@
  * Both execution modes funnel through here:
  *   - `server`  — call the tool's `handler(input, ctx)` directly, in-process.
  *   - `browser` — forward to the browser via `bridge.callBrowser(...)` and
- *                 await the POST-back from /admin/api/ai/tool-result.
+ *                 await the POST-back from /cms/api/ai/tool-result.
  *
  * Defence in depth: every raw tool input is re-validated against the
  * canonical TypeBox `inputSchema` before dispatch — the model's argument JSON

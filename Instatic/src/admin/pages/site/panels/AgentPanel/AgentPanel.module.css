@@ -228,11 +228,15 @@
   flex: 1 1 auto;
 }
 
+/* `margin-left: auto` keeps the actions hard right in BOTH composer shapes:
+   with the model picker present (space-between already separates them) and in
+   managed mode, where the picker is hidden and these are the only children. */
 .inputControlActions {
   display: flex;
   align-items: center;
   gap: var(--space-2xs);
   flex: 0 0 auto;
+  margin-left: auto;
 }
 
 /* ── Message turn — role label + full-width text, no bubble ───────────────── */

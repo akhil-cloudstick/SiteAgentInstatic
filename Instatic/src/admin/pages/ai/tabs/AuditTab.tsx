@@ -7,7 +7,7 @@
  *   • Per-surface breakdown   — table with one row per chat scope.
  *   • Daily bars              — sparkline-style cost-per-day bar list.
  *
- * Sourced from `GET /admin/api/ai/audit?since=ISO`. Time window driven by
+ * Sourced from `GET /cms/api/ai/audit?since=ISO`. Time window driven by
  * the same `RangeTabs` primitive the dashboard uses (Today / 7d / 30d /
  * All), so the data feels coherent across the admin.
  */

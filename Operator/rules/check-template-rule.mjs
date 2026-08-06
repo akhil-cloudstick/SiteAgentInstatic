@@ -437,6 +437,38 @@ function checkPage(html) {
     add('Every text element has its own unique class', 'PASS');
   }
 
+  // 18) Interactive controls ship their visible content in the HTML. The
+  // importer strips every <script>, so a control whose icon or label is injected
+  // at runtime arrives EMPTY — the tenant sees the control's border with nothing
+  // inside it. JS may SWAP an icon; it must never create it. Only a control with
+  // no children at all is flagged: one drawn purely by CSS (`<button
+  // class="hamburger"><span></span><span></span></button>`) renders fine.
+  // Kept in parity with rule 18 in OpenDesign/apps/daemon/src/cms-compliance.ts.
+  {
+    const emptyControls = [];
+    for (const m of html.matchAll(/<(button|a)\b([^>]*)>([\s\S]*?)<\/\1>/gi)) {
+      const tag = (m[1] || '').toLowerCase();
+      const attrs = m[2] || '';
+      const inner = m[3] || '';
+      if (inner.replace(/<!--[\s\S]*?-->/g, '').trim()) continue;
+      if (tag === 'a' && !/\bhref\s*=/i.test(attrs)) continue; // scroll target, not a control
+      const label = (attrs.match(/class\s*=\s*"([^"]*)"/i)
+        || attrs.match(/aria-label\s*=\s*"([^"]*)"/i)
+        || [])[1] || '';
+      emptyControls.push(`<${tag}${label ? ` "${label}"` : ''}>`);
+    }
+    if (emptyControls.length) {
+      const shown = [...new Set(emptyControls)].slice(0, 8);
+      add('Interactive controls have visible content in the HTML', 'FAIL',
+        `${emptyControls.length} control(s) are empty in the markup, so they import as a blank box — the tenant ` +
+        `sees the border with no icon. Put the icon or label IN the HTML (inline <svg>, <img>, or text); ` +
+        `let JS swap it, not create it. Fix every occurrence, not only the examples listed here: ` +
+        `${shown.join(', ')} (see templateRule.md)`);
+    } else {
+      add('Interactive controls have visible content in the HTML', 'PASS');
+    }
+  }
+
   return results;
 }
 

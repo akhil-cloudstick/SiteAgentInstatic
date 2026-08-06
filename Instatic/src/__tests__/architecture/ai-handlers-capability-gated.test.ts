@@ -16,6 +16,10 @@ const REPO_ROOT = join(import.meta.dir, '../../../')
 const HANDLERS_DIR = join(REPO_ROOT, 'server/ai/handlers')
 
 const CAPABILITY_GATE_RE = /\brequireCapability\s*\(|\brequireAnyCapability\s*\(/
+// A handler is a file that owns a route entry point. `index.ts` (the
+// dispatcher) and support modules like `paths.ts` (shared route constants)
+// answer no requests, so they have nothing to gate.
+const ROUTE_ENTRY_RE = /export function tryHandleAi\w*\s*\(/
 
 describe('ai-handlers-capability-gated gate', () => {
   it('every handler file calls requireCapability at least once', () => {
@@ -24,6 +28,7 @@ describe('ai-handlers-capability-gated gate', () => {
     const handlerFiles = readdirSync(HANDLERS_DIR)
       .filter((f) => extname(f) === '.ts' && f !== 'index.ts')
       .map((f) => join(HANDLERS_DIR, f))
+      .filter((file) => ROUTE_ENTRY_RE.test(readFileSync(file, 'utf8')))
 
     expect(handlerFiles.length).toBeGreaterThan(0)
 
@@ -36,7 +41,7 @@ describe('ai-handlers-capability-gated gate', () => {
       throw new Error(
         `[ai-handlers-capability-gated] handler files don't call requireCapability():\n` +
         violations.map((v) => `  ${relative(REPO_ROOT, v).replaceAll('\\', '/')}`).join('\n') +
-        `\n\nEvery /admin/api/ai/** route must gate access via requireCapability()` +
+        `\n\nEvery /cms/api/ai/** route must gate access via requireCapability()` +
         ` so unauthenticated callers cannot reach the AI runtime.`,
       )
     }

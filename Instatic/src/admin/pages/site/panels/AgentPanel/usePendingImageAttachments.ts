@@ -172,11 +172,22 @@ export function usePendingImageAttachments() {
     replacePending([])
   }
 
+  /**
+   * Put back entries handed to a send the server then rejected, so the author
+   * doesn't have to re-attach. Only ever called with entries this hook produced
+   * and already finished normalizing, so there is no queue or decode to revive.
+   */
+  function restore(entries: PendingImageAttachment[]): void {
+    if (entries.length === 0) return
+    replacePending(entries)
+  }
+
   return {
     pending,
     current: () => pendingRef.current,
     queueFiles,
     remove,
     clear,
+    restore,
   }
 }

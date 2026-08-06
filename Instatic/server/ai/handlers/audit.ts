@@ -1,5 +1,5 @@
 /**
- * AI usage audit handler — `GET /admin/api/ai/audit?since=ISO&tz=IANA`.
+ * AI usage audit handler — `GET /cms/api/ai/audit?since=ISO&tz=IANA`.
  *
  * Returns the four rollups consumed by the `/cms/ai` Audit tab + the
  * dashboard "AI usage this month" widget:
@@ -23,6 +23,9 @@ import {
   getUsageByUser,
   getUsageTotals,
 } from '../audit/store'
+import { AI_API_PREFIX } from './paths'
+
+const AUDIT_PATH = `${AI_API_PREFIX}/audit`
 
 export function tryHandleAiAudit(
   req: Request,
@@ -30,7 +33,7 @@ export function tryHandleAiAudit(
   url: URL,
   pathname: string,
 ): Promise<Response> | null {
-  if (pathname !== '/cms/api/ai/audit') return null
+  if (pathname !== AUDIT_PATH) return null
   return handleAuditList(req, db, url)
 }
 

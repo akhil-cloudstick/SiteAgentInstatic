@@ -225,3 +225,36 @@ describe('cms-compliance — checkPageCompliance', () => {
     expect(typeof s.warns).toBe('number');
   });
 });
+
+describe('cms-compliance — interactive controls have visible content', () => {
+  const RULE = 'Interactive controls have visible content';
+
+  it('fails a control whose icon is injected by JS', () => {
+    const html = '<button class="theme-toggle" aria-label="Toggle theme"></button>';
+    const f = findingFor(html, RULE);
+    expect(f.status).toBe('fail');
+    expect(f.detail).toContain('theme-toggle');
+  });
+
+  it('passes a control that ships its icon in the markup', () => {
+    const html =
+      '<button class="theme-toggle" aria-label="Toggle theme">' +
+      '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/></svg></button>';
+    expect(findingFor(html, RULE).status).toBe('pass');
+  });
+
+  it('passes a control drawn entirely by CSS', () => {
+    const html = '<button class="hamburger"><span></span><span></span></button>';
+    expect(findingFor(html, RULE).status).toBe('pass');
+  });
+
+  it('ignores a bare scroll-target anchor', () => {
+    const html = '<a id="pricing"></a><button>Buy</button>';
+    expect(findingFor(html, RULE).status).toBe('pass');
+  });
+
+  it('fails an empty link that is actually clickable', () => {
+    const html = '<a href="/cart" class="cart-link"></a>';
+    expect(findingFor(html, RULE).status).toBe('fail');
+  });
+});

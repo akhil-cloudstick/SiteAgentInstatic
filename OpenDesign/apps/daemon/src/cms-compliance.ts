@@ -628,6 +628,54 @@ export function checkPageCompliance(html: string): ComplianceFinding[] {
     add('Every text element has its own unique class', 'pass');
   }
 
+  // 18) Interactive controls ship their visible content in the HTML. The
+  // importer strips every <script>, so a control whose icon or label is
+  // injected at runtime (`btn.innerHTML = '<svg…>'`) arrives at the CMS with an
+  // EMPTY body — the tenant sees the control's own border with nothing inside
+  // it, on the canvas and on first paint of the published page alike. There is
+  // nothing the CMS can render: the icon was never in the markup to import.
+  // JS may SWAP the icon (sun ⇄ moon on a theme toggle); it must never be the
+  // thing that creates it.
+  //
+  // Only a control with no children AT ALL is flagged. A control drawn purely
+  // by CSS (`<button class="hamburger"><span></span><span></span></button>`)
+  // has elements to style and renders fine, so it passes.
+  {
+    const emptyControls: string[] = [];
+    for (const m of html.matchAll(
+      /<(button|a)\b([^>]*)>([\s\S]*?)<\/\1>/gi,
+    )) {
+      const tag = (m[1] ?? '').toLowerCase();
+      const attrs = m[2] ?? '';
+      const inner = m[3] ?? '';
+      // Anything at all inside — text, an icon, or CSS-drawn spans — is content
+      // the importer can carry, so only a truly empty body is a blank box.
+      if (inner.replace(/<!--[\s\S]*?-->/g, '').trim()) continue;
+      // `<a id="pricing"></a>` is a scroll target, not a control. Without an
+      // href there is nothing to click and nothing to draw.
+      if (tag === 'a' && !/\bhref\s*=/i.test(attrs)) continue;
+      // Class first — it is what the author greps for to find the element.
+      const label =
+        attrs.match(/class\s*=\s*"([^"]*)"/i)?.[1] ??
+        attrs.match(/aria-label\s*=\s*"([^"]*)"/i)?.[1] ??
+        '';
+      emptyControls.push(`<${tag}${label ? ` "${label}"` : ''}>`);
+    }
+    if (emptyControls.length) {
+      const shown = [...new Set(emptyControls)].slice(0, 8);
+      add(
+        'Interactive controls have visible content in the HTML',
+        'fail',
+        `${emptyControls.length} control(s) are empty in the markup, so they import as a blank box — the tenant ` +
+          `sees the border with no icon. Put the icon or label IN the HTML (inline <svg>, <img>, or text); ` +
+          `let JS swap it, not create it. Fix every occurrence, not only the examples listed here: ` +
+          `${shown.join(', ')} (see templateRule.md)`,
+      );
+    } else {
+      add('Interactive controls have visible content in the HTML', 'pass');
+    }
+  }
+
   return findings;
 }
 

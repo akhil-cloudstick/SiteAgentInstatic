@@ -5,7 +5,7 @@
  * and have a monotonic `position` within it.
  *
  * Wire shapes are separate from records:
- *   - `ConversationView` is what /admin/api/ai/conversations returns —
+ *   - `ConversationView` is what /cms/api/ai/conversations returns —
  *     summary fields only; full message history fetched on open.
  *   - `MessageView` keeps non-image blocks and uses lazy image URLs; base64
  *     remains only on `MessageRecord` for durable provider replay.

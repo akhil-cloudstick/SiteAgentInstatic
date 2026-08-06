@@ -14,7 +14,7 @@ The Dashboard is the **canonical implementation** of the borderless-tile-card pa
 - Widgets are draggable (move) and resizable (column / row span). Drop targets and resize previews use `--accent-3` for the dashed indicator.
 - Customize mode: dashed outline + bottom-docked `<BlockLibrary>` of unused widgets. Toggled by a top-toolbar button.
 - Layout persists per-user via `useDashboardLayout` (server-side `user_preferences`).
-- Most data-backed widgets stream from `/admin/api/cms/dashboard/<domain>` (`handleDashboardRoutes` -> per-widget readers). AI usage reads `/admin/api/ai/audit`; Domain and Site status are local status tiles today.
+- Most data-backed widgets stream from `/admin/api/cms/dashboard/<domain>` (`handleDashboardRoutes` -> per-widget readers). AI usage reads `/cms/api/ai/audit`; Domain and Site status are local status tiles today.
 
 ---
 
@@ -236,7 +236,7 @@ Non-CMS first-party widgets:
 
 | Widget | Data source | Notes |
 |--------|-------------|-------|
-| `ai-usage` | `listAiAudit(startOfMonthIso())` -> `/admin/api/ai/audit` | Maps a 403 from missing `ai.audit.read` to a no-permission empty state. |
+| `ai-usage` | `listAiAudit(startOfMonthIso())` -> `/cms/api/ai/audit` | Maps a 403 from missing `ai.audit.read` to a no-permission empty state. |
 | `domain` | Local component rows | Shows the current placeholder primary-domain / HTTPS rows. |
 | `status` | Local component rows | Shows the current placeholder site/build/backup/plugin status rows. |
 

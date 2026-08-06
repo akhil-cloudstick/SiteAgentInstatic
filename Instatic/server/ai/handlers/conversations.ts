@@ -1,11 +1,13 @@
 /**
  * Conversations handler — full CRUD over chat history.
  *
- *   GET    /admin/api/ai/conversations?scope=site            list
- *   POST   /admin/api/ai/conversations                       create
- *   GET    /admin/api/ai/conversations/:id                   read (+messages)
- *   PUT    /admin/api/ai/conversations/:id                   update
- *   DELETE /admin/api/ai/conversations/:id                   soft-delete
+ *   GET    /cms/api/ai/conversations?scope=site              list
+ *   POST   /cms/api/ai/conversations                         create
+ *   GET    /cms/api/ai/conversations/:id                     read (+messages)
+ *   PUT    /cms/api/ai/conversations/:id                     update
+ *   DELETE /cms/api/ai/conversations/:id                     soft-delete
+ *   GET    /cms/api/ai/conversations/:id/messages/:mid/images/:n
+ *                                                            attached image bytes
  *
  * Every operation is scoped to the authenticated user (cross-user reads
  * return 404).
@@ -33,8 +35,15 @@ import {
 } from '../conversations/store'
 import type { ToolScope } from '../runtime/types'
 import { isManagedAiMode, getManagedModel } from '../managed'
+import { AI_API_PREFIX, aiRoutePattern } from './paths'
 
 const VALID_SCOPES: ToolScope[] = ['site', 'content', 'data', 'plugin']
+
+const CONVERSATIONS_PATH = `${AI_API_PREFIX}/conversations`
+const CONVERSATION_IMAGE_PATTERN = aiRoutePattern(
+  'conversations/([^/]+)/messages/([^/]+)/images/(\\d+)',
+)
+const CONVERSATION_ITEM_PATTERN = aiRoutePattern('conversations/([^/]+)')
 
 const CreateBodySchema = Type.Object({
   scope: Type.Union(VALID_SCOPES.map((s) => Type.Literal(s))),
@@ -55,12 +64,10 @@ export function tryHandleAiConversations(
   url: URL,
   pathname: string,
 ): Promise<Response> | null {
-  if (pathname === '/cms/api/ai/conversations') {
+  if (pathname === CONVERSATIONS_PATH) {
     return dispatchCollection(req, db, url)
   }
-  const imageMatch = pathname.match(
-    /^\/admin\/api\/ai\/conversations\/([^/]+)\/messages\/([^/]+)\/images\/(\d+)$/,
-  )
+  const imageMatch = pathname.match(CONVERSATION_IMAGE_PATTERN)
   if (imageMatch) {
     return handleMessageImage(
       req,
@@ -70,7 +77,7 @@ export function tryHandleAiConversations(
       Number(imageMatch[3]),
     )
   }
-  const match = pathname.match(/^\/admin\/api\/ai\/conversations\/([^/]+)$/)
+  const match = pathname.match(CONVERSATION_ITEM_PATTERN)
   if (match) {
     return dispatchItem(req, db, match[1]!)
   }
@@ -212,7 +219,7 @@ function conversationImageUrl(
   messageId: string,
   blockIndex: number,
 ): string {
-  return `/cms/api/ai/conversations/${encodeURIComponent(conversationId)}/messages/${encodeURIComponent(messageId)}/images/${blockIndex}`
+  return `${CONVERSATIONS_PATH}/${encodeURIComponent(conversationId)}/messages/${encodeURIComponent(messageId)}/images/${blockIndex}`
 }
 
 async function handleUpdate(req: Request, db: DbClient, id: string): Promise<Response> {

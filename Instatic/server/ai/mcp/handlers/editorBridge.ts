@@ -1,12 +1,12 @@
 /**
- * Workspace bridge stream — `GET /admin/api/ai/editor-bridge?scope=…`.
+ * Workspace bridge stream — `GET /cms/api/ai/editor-bridge?scope=…`.
  *
  * The Site editor and Content workspace each open their own NDJSON stream so
  * MCP browser tools are relayed to the workspace that owns the tool (see
  * `../editorBridge.ts`). Authenticated by the admin session; each bridge is
  * registered under the session user + scope, so it can only serve that user's
  * own MCP connectors. Results flow back through the existing
- * `POST /admin/api/ai/tool-result` endpoint.
+ * `POST /cms/api/ai/tool-result` endpoint.
  */
 import { Type, safeParseValue } from '@core/utils/typeboxHelpers'
 import type { CoreCapability } from '@core/capabilities'

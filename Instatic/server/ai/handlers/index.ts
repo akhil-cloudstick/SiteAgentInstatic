@@ -20,6 +20,7 @@ import { tryHandleAiModels } from './models'
 import { tryHandleAiMcpManagement } from '../mcp/handlers/management'
 import { tryHandleMcpOAuthAuthorization } from '../mcp/handlers/oauthAuthorization'
 import { tryHandleAiEditorBridge } from '../mcp/handlers/editorBridge'
+import { AI_API_PREFIX } from './paths'
 
 export function tryHandleAi(
   req: Request,
@@ -27,7 +28,7 @@ export function tryHandleAi(
   url: URL,
 ): Promise<Response> | null {
   const pathname = url.pathname
-  if (!pathname.startsWith('/cms/api/ai/')) return null
+  if (!pathname.startsWith(`${AI_API_PREFIX}/`)) return null
 
   // Centralised CSRF gate — mirrors handleCmsRequest in server/handlers/cms/index.ts.
   // GETs pass through; state-changing methods (POST/PUT/PATCH/DELETE) require

@@ -8,7 +8,7 @@
  * prop, models are lazy-loaded per credential and cached internally.
  *
  * Sourcing:
- *   - Models per credential: `GET /admin/api/ai/providers/:id/models?credentialId=…`
+ *   - Models per credential: `GET /cms/api/ai/providers/:id/models?credentialId=…`
  *     Cached per-credential. Two-phase: while CLOSED only the selected
  *     credential's models are fetched (enough to label the trigger); on OPEN
  *     it fans out to every credential so the full grouped list populates.
@@ -27,6 +27,7 @@ import {
 } from '@ui/components/ContextMenu'
 import { ChevronDownIcon } from 'pixel-art-icons/icons/chevron-down'
 import { cn } from '@ui/cn'
+import { MANAGED_AI_CREDENTIAL_ID } from '@core/ai'
 import { type AiModel, type CredentialView, listModels } from '@admin/ai/api'
 import styles from './ModelPicker.module.css'
 
@@ -351,11 +352,18 @@ export function ModelPicker({
               // Plain presentational row, NOT a disabled ContextMenuItem — a
               // disabled Button is dimmed to 0.38 opacity, which made the group
               // header almost invisible.
+              // The provider id disambiguates one of several BYO credentials.
+              // Managed mode has exactly one, whose `openrouter` provider is the
+              // operator gateway's wire format rather than a tenant choice — so
+              // the header stays "Managed by operator", nothing more.
+              const showProvider = credentialId !== MANAGED_AI_CREDENTIAL_ID
               items.push(
                 <div key={`${credentialId}:header`} role="presentation" className={styles.groupHeaderRow}>
                   <span className={styles.groupHeader}>
                     {group.cred.displayLabel}
-                    <span className={styles.groupProvider}> · {group.cred.providerId}</span>
+                    {showProvider && (
+                      <span className={styles.groupProvider}> · {group.cred.providerId}</span>
+                    )}
                   </span>
                 </div>,
               )

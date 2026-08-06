@@ -22,6 +22,7 @@
  * Instatic behaves exactly as before (users add their own providers).
  */
 
+import { MANAGED_AI_CREDENTIAL_ID } from '@core/ai'
 import { Type, safeParseValue, type Static } from '@core/utils/typeboxHelpers'
 import type {
   AiResolvedCredential,
@@ -31,10 +32,13 @@ import type {
 import type { AiProviderId, ToolScope } from './runtime/types'
 import type { CredentialView } from './credentials/types'
 
-/** The synthetic credential id used everywhere in managed mode. */
-export const MANAGED_CREDENTIAL_ID = 'managed'
-
 const MANAGED_LABEL = 'Managed by operator'
+/**
+ * The gateway speaks the OpenRouter wire format, so the driver has to be told
+ * `openrouter`. That is plumbing between the tenant server and the operator's
+ * proxy, NOT a provider the tenant picked — the picker keys off
+ * `MANAGED_AI_CREDENTIAL_ID` to keep it off screen.
+ */
 const MANAGED_PROVIDER: AiProviderId = 'openrouter' as AiProviderId
 const MODEL_CACHE_TTL_MS = 10_000
 const CONFIG_CACHE_TTL_MS = 10_000
@@ -199,7 +203,7 @@ export async function classifyCategory(
       headers: {
         'content-type': 'application/json',
         'x-instatic-ai-classify': '1',
-        Authorization: `Bearer ${process.env.INSTATIC_AI_GATEWAY_TOKEN?.trim() || MANAGED_CREDENTIAL_ID}`,
+        Authorization: `Bearer ${process.env.INSTATIC_AI_GATEWAY_TOKEN?.trim() || MANAGED_AI_CREDENTIAL_ID}`,
       },
       body: JSON.stringify(body),
       signal: composite,
@@ -223,12 +227,12 @@ export async function classifyCategory(
 export function managedResolvedCredential(): AiResolvedCredential {
   const base = getGatewayUrl() ?? ''
   return {
-    id: MANAGED_CREDENTIAL_ID,
+    id: MANAGED_AI_CREDENTIAL_ID,
     providerId: MANAGED_PROVIDER,
     authMode: 'apiKey',
     // The gateway authenticates by the token baked into the URL and injects the
     // real key upstream, so the api key here is only a non-empty placeholder.
-    apiKey: process.env.INSTATIC_AI_GATEWAY_TOKEN?.trim() || MANAGED_CREDENTIAL_ID,
+    apiKey: process.env.INSTATIC_AI_GATEWAY_TOKEN?.trim() || MANAGED_AI_CREDENTIAL_ID,
     baseUrl: base,
   }
 }
@@ -236,7 +240,7 @@ export function managedResolvedCredential(): AiResolvedCredential {
 /** The single wire-safe credential surfaced to the picker in managed mode. */
 export function managedCredentialView(): CredentialView {
   return {
-    id: MANAGED_CREDENTIAL_ID,
+    id: MANAGED_AI_CREDENTIAL_ID,
     providerId: MANAGED_PROVIDER,
     authMode: 'apiKey',
     displayLabel: MANAGED_LABEL,
@@ -254,7 +258,7 @@ export function managedDefaultsMap(
   const scopes: ToolScope[] = ['site', 'content', 'data', 'plugin']
   const out: Record<string, { credentialId: string; modelId: string }> = {}
   for (const scope of scopes) {
-    out[scope] = { credentialId: MANAGED_CREDENTIAL_ID, modelId: model }
+    out[scope] = { credentialId: MANAGED_AI_CREDENTIAL_ID, modelId: model }
   }
   return out
 }

@@ -1,6 +1,6 @@
 /**
- * Credentials handler — GET/POST/PUT/DELETE /admin/api/ai/credentials[/:id]
- *                  + POST /admin/api/ai/credentials/:id/test
+ * Credentials handler — GET/POST/PUT/DELETE /cms/api/ai/credentials[/:id]
+ *                  + POST /cms/api/ai/credentials/:id/test
  *
  * Every response is the wire-safe `CredentialView` projection. Plaintext +
  * ciphertext + iv NEVER cross the HTTP boundary — gated by
@@ -30,8 +30,14 @@ import type { CredentialRecord } from '../credentials/types'
 import { listDefaults, setDefaultForScope } from '../defaults/store'
 import type { ToolScope } from '../runtime/types'
 import { isManagedAiMode, managedCredentialView } from '../managed'
+import { AI_API_PREFIX, aiRoutePattern } from './paths'
 
 const ALL_SCOPES: ToolScope[] = ['site', 'content', 'data', 'plugin']
+
+const CREDENTIALS_PATH = `${AI_API_PREFIX}/credentials`
+// `[^/]+` can't swallow a slash, so the item pattern never shadows `/test`.
+const CREDENTIAL_ITEM_PATTERN = aiRoutePattern('credentials/([^/]+)')
+const CREDENTIAL_TEST_PATTERN = aiRoutePattern('credentials/([^/]+)/test')
 
 /**
  * In managed AI mode the operator owns the provider + key + model; the tenant
@@ -86,14 +92,14 @@ export function tryHandleAiCredentials(
   db: DbClient,
   pathname: string,
 ): Promise<Response> | null {
-  if (pathname === '/cms/api/ai/credentials') {
+  if (pathname === CREDENTIALS_PATH) {
     return dispatchCollection(req, db)
   }
-  const idMatch = pathname.match(/^\/admin\/api\/ai\/credentials\/([^/]+)$/)
+  const idMatch = pathname.match(CREDENTIAL_ITEM_PATTERN)
   if (idMatch) {
     return dispatchItem(req, db, idMatch[1]!)
   }
-  const testMatch = pathname.match(/^\/admin\/api\/ai\/credentials\/([^/]+)\/test$/)
+  const testMatch = pathname.match(CREDENTIAL_TEST_PATTERN)
   if (testMatch) {
     return dispatchTest(req, db, testMatch[1]!)
   }
@@ -310,7 +316,7 @@ async function handleDelete(req: Request, db: DbClient, id: string): Promise<Res
 }
 
 // ---------------------------------------------------------------------------
-// Test: POST /admin/api/ai/credentials/:id/test
+// Test: POST /cms/api/ai/credentials/:id/test
 // ---------------------------------------------------------------------------
 
 async function dispatchTest(req: Request, db: DbClient, id: string): Promise<Response> {

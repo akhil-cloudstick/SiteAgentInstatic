@@ -1,5 +1,5 @@
 /**
- * POST /admin/api/ai/chat/:scope
+ * POST /cms/api/ai/chat/:scope
  *
  * Opens an NDJSON stream against a chat. Body:
  *   {
@@ -90,8 +90,10 @@ import {
   getManagedAiConfig,
   classifyCategory,
 } from '../managed'
+import { AI_API_PREFIX } from './paths'
 
 const VALID_SCOPES: ToolScope[] = ['site', 'content', 'data', 'plugin']
+const CHAT_PATH_PREFIX = `${AI_API_PREFIX}/chat/`
 const activeChatConversations = new Set<string>()
 const REQUEST_ABORTED = Symbol('request-aborted')
 
@@ -103,8 +105,8 @@ export function tryHandleAiChat(
   db: DbClient,
   pathname: string,
 ): Promise<Response> | null {
-  if (!pathname.startsWith('/cms/api/ai/chat/')) return null
-  const scope = pathname.slice('/cms/api/ai/chat/'.length)
+  if (!pathname.startsWith(CHAT_PATH_PREFIX)) return null
+  const scope = pathname.slice(CHAT_PATH_PREFIX.length)
   if (!VALID_SCOPES.includes(scope as ToolScope)) return null
   return handleAiChat(req, db, scope as ToolScope)
 }

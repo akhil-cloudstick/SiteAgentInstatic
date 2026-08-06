@@ -197,7 +197,7 @@ export type AiStreamEvent =
 export interface AiBrowserBridge {
   /**
    * Forward a `toolRequest` to the browser and resolve with whatever the
-   * browser POSTs back to /admin/api/ai/tool-result. Rejects if the stream
+   * browser POSTs back to /cms/api/ai/tool-result. Rejects if the stream
    * closes before a result arrives (browser disconnected, stream aborted).
    */
   callBrowser(toolName: string, input: unknown): Promise<AiToolOutput>

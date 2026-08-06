@@ -1,5 +1,5 @@
 /**
- * Model picker source — GET /admin/api/ai/providers/:id/models
+ * Model picker source — GET /cms/api/ai/providers/:id/models
  *
  * Asks the driver to list models for one provider. The optional
  * `credentialId` query parameter is forwarded to the driver in case the
@@ -20,8 +20,11 @@ import { getModelCatalogue, pricingKey } from '../pricing'
 import type { AiProviderModel } from '../drivers/types'
 import type { AiProviderId } from '../runtime/types'
 import { isManagedAiMode, getManagedModel, managedModelList } from '../managed'
+import { aiRoutePattern } from './paths'
 
 const VALID_PROVIDERS: AiProviderId[] = ['anthropic', 'openai', 'ollama', 'openrouter', 'openai-compatible']
+
+const MODELS_PATTERN = aiRoutePattern('providers/([^/]+)/models')
 
 export function tryHandleAiModels(
   req: Request,
@@ -29,7 +32,7 @@ export function tryHandleAiModels(
   url: URL,
   pathname: string,
 ): Promise<Response> | null {
-  const match = pathname.match(/^\/admin\/api\/ai\/providers\/([^/]+)\/models$/)
+  const match = pathname.match(MODELS_PATTERN)
   if (!match) return null
   return handleModels(req, db, url, match[1]!)
 }

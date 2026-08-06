@@ -9,7 +9,7 @@
  *   2. Browser bridge registry — drivers need to await the browser's
  *      response to a write tool. `createBridge()` issues a fresh bridgeId
  *      and returns an `AiBrowserBridge` whose `callBrowser()` returns a
- *      promise that resolves when /admin/api/ai/tool-result POSTs back.
+ *      promise that resolves when /cms/api/ai/tool-result POSTs back.
  *
  * Extracted into its own module so the chat handler stays focused on HTTP
  * + auth + persistence, not bridge bookkeeping.
@@ -153,7 +153,7 @@ export function createBridge(
 }
 
 /**
- * Resolve a pending tool wait. Called by the /admin/api/ai/tool-result
+ * Resolve a pending tool wait. Called by the /cms/api/ai/tool-result
  * handler when the browser POSTs the result of a write tool.
  *
  * Returns true when a matching pending promise was found + resolved. False

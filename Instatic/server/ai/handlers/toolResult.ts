@@ -1,5 +1,5 @@
 /**
- * POST /admin/api/ai/tool-result
+ * POST /cms/api/ai/tool-result
  *
  * Browser-side bridge POST. After applying a write tool against the
  * editor store, the browser sends `{ bridgeId, requestId, result }`. The
@@ -19,6 +19,9 @@ import { jsonResponse, readValidatedBody, badRequest } from '../../http'
 import { requireCapability } from '../../auth/authz'
 import type { DbClient } from '../../db/client'
 import { resolveBridgeToolResult } from '../runtime'
+import { AI_API_PREFIX } from './paths'
+
+const TOOL_RESULT_PATH = `${AI_API_PREFIX}/tool-result`
 
 const ToolResultBodySchema = Type.Object({
   bridgeId: Type.String({ minLength: 1 }),
@@ -35,7 +38,7 @@ export function tryHandleAiToolResult(
   db: DbClient,
   pathname: string,
 ): Promise<Response> | null {
-  if (pathname !== '/cms/api/ai/tool-result') return null
+  if (pathname !== TOOL_RESULT_PATH) return null
   return handleAiToolResult(req, db)
 }
 

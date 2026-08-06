@@ -1,7 +1,7 @@
 /**
  * Site-scope write tools — browser-bridged. The runner emits a
  * `toolRequest` for each call and waits for the browser to POST a result
- * to /admin/api/ai/tool-result.
+ * to /cms/api/ai/tool-result.
  *
  * Each tool defines only `name`, `description`, `inputSchema`, and the
  * sentinel `execution: 'browser'`. There is NO server-side handler — the

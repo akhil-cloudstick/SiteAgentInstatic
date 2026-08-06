@@ -28,7 +28,7 @@ import type {
 // ---------------------------------------------------------------------------
 // Conversation bootstrap
 //
-// On first send we POST to /admin/api/ai/conversations to create a row, then
+// On first send we POST to /cms/api/ai/conversations to create a row, then
 // reuse its id for every subsequent send in this session. The conversation
 // row carries `(credentialId, modelId)`; the chat handler reads them from
 // the row.

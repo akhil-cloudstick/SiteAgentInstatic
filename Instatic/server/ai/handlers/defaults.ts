@@ -1,10 +1,10 @@
 /**
  * Site-wide AI defaults handler.
  *
- *   GET /admin/api/ai/defaults                Returns a record of every scope's
+ *   GET /cms/api/ai/defaults                  Returns a record of every scope's
  *                                              default { credentialId, modelId }.
- *   PUT /admin/api/ai/defaults/:scope         Body: { credentialId, modelId }
- *   DELETE /admin/api/ai/defaults/:scope      Clears the scope default.
+ *   PUT /cms/api/ai/defaults/:scope           Body: { credentialId, modelId }
+ *   DELETE /cms/api/ai/defaults/:scope        Clears the scope default.
  */
 
 import { Type } from '@core/utils/typeboxHelpers'
@@ -15,8 +15,12 @@ import { createAuditEvent } from '../../repositories/audit'
 import { clearDefaultForScope, listDefaults, setDefaultForScope } from '../defaults/store'
 import type { ToolScope } from '../runtime/types'
 import { isManagedAiMode, getManagedModel, managedDefaultsMap } from '../managed'
+import { AI_API_PREFIX, aiRoutePattern } from './paths'
 
 const VALID_SCOPES: ToolScope[] = ['site', 'content', 'data', 'plugin']
+
+const DEFAULTS_PATH = `${AI_API_PREFIX}/defaults`
+const DEFAULTS_SCOPE_PATTERN = aiRoutePattern('defaults/([^/]+)')
 
 /** In managed AI mode the operator fixes the default model; block writes. */
 function managedMutationLock(): Response | null {
@@ -38,10 +42,10 @@ export function tryHandleAiDefaults(
   db: DbClient,
   pathname: string,
 ): Promise<Response> | null {
-  if (pathname === '/cms/api/ai/defaults') {
+  if (pathname === DEFAULTS_PATH) {
     return handleList(req, db)
   }
-  const match = pathname.match(/^\/admin\/api\/ai\/defaults\/([^/]+)$/)
+  const match = pathname.match(DEFAULTS_SCOPE_PATTERN)
   if (match) {
     return handleScope(req, db, match[1]!)
   }
