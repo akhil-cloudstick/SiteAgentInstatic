@@ -3,7 +3,7 @@
  * channel is healthy.
  *
  * Two moving parts, matching the server:
- *   1. An `EventSource` on `/admin/api/cms/presence/events` that receives the
+ *   1. An `EventSource` on `/cms/api/cms/presence/events` that receives the
  *      whole roster on every change (the browser handles reconnect/backoff).
  *   2. A heartbeat POST every `HEARTBEAT_INTERVAL_MS` that keeps this tab in
  *      the roster, plus a `leave` beacon on `pagehide`.
@@ -52,7 +52,7 @@ export function usePresence(scope: PresenceScope): PresenceState {
 
     async function beat(leave = false): Promise<void> {
       try {
-        await apiRequest('/admin/api/cms/presence/heartbeat', {
+        await apiRequest('/cms/api/cms/presence/heartbeat', {
           method: 'POST',
           body: { scope, sessionId, leave },
         })
@@ -77,7 +77,7 @@ export function usePresence(scope: PresenceScope): PresenceState {
     const source = typeof EventSource === 'undefined'
       ? null
       : new EventSource(
-          `/admin/api/cms/presence/events?scope=${encodeURIComponent(scope)}`,
+          `/cms/api/cms/presence/events?scope=${encodeURIComponent(scope)}`,
           { withCredentials: true },
         )
 

@@ -80,11 +80,11 @@ describe('development workflow', () => {
   it('Vite proxies CMS API and uploaded media to the local Bun server', () => {
     const viteConfig = readSiteFile('vite.config.ts')
 
-    // `/admin/api` covers both the CMS endpoints (`/admin/api/cms/...`) and
-    // the agent endpoints (`/admin/api/agent`, `/admin/api/agent/tool-result`).
-    // The shared `/admin/` prefix is required so the session cookie (scoped
-    // to `Path=/admin`) is sent on every request to the Bun backend.
-    expect(viteConfig).toContain("'/admin/api'")
+    // `/cms/api` covers both the CMS endpoints (`/cms/api/cms/...`) and
+    // the agent endpoints (`/cms/api/agent`, `/cms/api/agent/tool-result`).
+    // The shared `/cms/` prefix is required so the session cookie (scoped
+    // to `Path=/cms`) is sent on every request to the Bun backend.
+    expect(viteConfig).toContain("'/cms/api'")
     expect(viteConfig).toContain("'/uploads'")
     expect(viteConfig).toContain("const CMS_DEV_SERVER_ORIGIN = `http://localhost:${process.env.PORT ?? '3001'}`")
     expect(viteConfig).toContain('target: CMS_DEV_SERVER_ORIGIN')
@@ -96,8 +96,8 @@ describe('development workflow', () => {
 
     expect(viteConfig).toContain('function publicSiteDevProxyPlugin')
     expect(viteConfig).toContain('publicSiteDevProxyPlugin()')
-    expect(viteConfig).toContain("pathname === '/admin'")
-    expect(viteConfig).toContain("pathname.startsWith('/admin/')")
+    expect(viteConfig).toContain("pathname === '/cms'")
+    expect(viteConfig).toContain("pathname.startsWith('/cms/')")
     expect(viteConfig).toContain("pathname === '/'")
     expect(viteConfig).toContain('proxyPublicSiteRequest')
   })

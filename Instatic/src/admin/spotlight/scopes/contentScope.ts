@@ -21,7 +21,7 @@ function getContentScopeCommands(): Command[] {
       run: (ctx) => {
         ctx.closeSpotlight()
         // The content page listens for this URL param to auto-create a row.
-        ctx.navigate('/admin/content?action=new')
+        ctx.navigate('/cms/content?action=new')
       },
     },
     {
@@ -34,7 +34,7 @@ function getContentScopeCommands(): Command[] {
       workspaces: ['content'],
       run: (ctx) => {
         ctx.closeSpotlight()
-        ctx.navigate('/admin/content?action=createCollection')
+        ctx.navigate('/cms/content?action=createCollection')
       },
     },
     {
@@ -47,7 +47,7 @@ function getContentScopeCommands(): Command[] {
       workspaces: ['content'],
       run: (ctx) => {
         ctx.closeSpotlight()
-        ctx.navigate('/admin/content?action=media')
+        ctx.navigate('/cms/content?action=media')
       },
     },
   ]

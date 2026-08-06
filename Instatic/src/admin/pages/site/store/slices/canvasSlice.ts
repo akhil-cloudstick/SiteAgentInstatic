@@ -4,6 +4,7 @@ import {
   RESET_ZOOM,
   clampZoom,
   clampPan,
+  clampFrameWidth,
   nearestZoomStep,
 } from '@site/canvas/math'
 
@@ -93,6 +94,22 @@ interface CanvasSlice {
    */
   collapsedBreakpointIds: string[]
   /**
+   * PREVIEW widths in CSS px for Responsive Review frames, keyed by breakpoint
+   * id. A missing id means "no override" — the breakpoint's stored width applies.
+   *
+   * EDITOR-SESSION-ONLY and ephemeral — never written to
+   * `site.breakpoints[].width`, never marked dirty, never pushed to undo
+   * history, and with NO effect on published CSS (the context still emits its
+   * stored `mediaQuery`). It only changes how wide Review draws that context's
+   * frame, so an author can sanity-check a size without committing to it.
+   * Reloading the editor clears it. The document editor for the real width is
+   * the "Edit viewport" dialog in `CanvasContextSelector`.
+   *
+   * Never read this map directly — go through `useBreakpointFrameWidth` so the
+   * stored and effective widths cannot drift apart.
+   */
+  breakpointPreviewWidths: Record<string, number>
+  /**
    * One ephemeral, offscreen frame requested by `site_render_snapshot` when the
    * exact viewport is not already mounted on the visible canvas. This is editor
    * session state only: it never changes the active viewport, canvas mode, or
@@ -119,6 +136,14 @@ interface CanvasSlice {
   setRunScripts: (run: boolean) => void
   /** Toggle whether a breakpoint's design-canvas frame is collapsed to its slim header. */
   toggleBreakpointCollapsed: (id: string) => void
+  /**
+   * Set one viewport context's ephemeral preview width. Clamped and rounded
+   * INSIDE the setter — the same belt-and-suspenders rule `setZoom`/`setPan`
+   * follow — and a non-finite value is ignored rather than written.
+   */
+  setBreakpointPreviewWidth: (breakpointId: string, width: number) => void
+  /** Drop one context's preview width, restoring its stored `width`. */
+  clearBreakpointPreviewWidth: (breakpointId: string) => void
   /** Mount or release the agent's one-shot offscreen snapshot frame. */
   setAgentSnapshotCaptureRequest: (request: AgentSnapshotCaptureRequest | null) => void
   resetView: () => void
@@ -154,6 +179,7 @@ export const createCanvasSlice: EditorStoreSliceCreator<CanvasSlice> = (set, get
   sectionFocusNodeId: null,
   runScripts: false,
   collapsedBreakpointIds: [],
+  breakpointPreviewWidths: {},
   agentSnapshotCaptureRequest: null,
 
   setZoom: (zoom) => set({ zoom: clampZoom(zoom) }),
@@ -190,6 +216,16 @@ export const createCanvasSlice: EditorStoreSliceCreator<CanvasSlice> = (set, get
     const idx = s.collapsedBreakpointIds.indexOf(id)
     if (idx === -1) s.collapsedBreakpointIds.push(id)
     else s.collapsedBreakpointIds.splice(idx, 1)
+  }),
+
+  setBreakpointPreviewWidth: (breakpointId, width) => set((s) => {
+    if (Number.isFinite(width)) {
+      s.breakpointPreviewWidths[breakpointId] = clampFrameWidth(width)
+    }
+  }),
+
+  clearBreakpointPreviewWidth: (breakpointId) => set((s) => {
+    delete s.breakpointPreviewWidths[breakpointId]
   }),
 
   setAgentSnapshotCaptureRequest: (agentSnapshotCaptureRequest) => set({

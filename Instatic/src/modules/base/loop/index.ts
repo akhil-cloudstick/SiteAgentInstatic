@@ -62,6 +62,11 @@ export const LoopModule: ModuleDefinition<LoopProps> = {
   trusted: true,
   canHaveChildren: true,
 
+  // A Loop's children ARE the per-item template, so an empty Loop repeats
+  // nothing however good the data source is. One Text gives the author a
+  // visible template to bind.
+  defaultChildren: [{ moduleId: 'base.text' }],
+
   // The publisher intercepts loop nodes with `renderLoop()` instead of the
   // standard walk — declared here so the dispatch is visible on the definition.
   publishBehavior: 'special',

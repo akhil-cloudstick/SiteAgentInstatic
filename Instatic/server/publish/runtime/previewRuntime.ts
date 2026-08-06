@@ -1,6 +1,7 @@
 import type { Page, SiteDocument } from '@core/page-tree'
 import type { IModuleRegistry } from '@core/module-engine'
 import type { TemplateRenderDataContext } from '@core/templates/dynamicBindings'
+import { composeTemplateChain, resolveWrapperTemplates } from '@core/templates'
 import { normalizeSiteRuntimeConfig } from '@core/site-runtime'
 import { publishPage } from '@core/publisher'
 import type { PublishedRuntimePackageImportmap } from '@core/publisher'
@@ -39,6 +40,15 @@ interface RuntimePreviewDocumentInput {
    * loops emit a "no resolved data" comment.
    */
   db?: DbClient
+  /**
+   * Whether to render `page` inside the templates that wrap it at publish
+   * time (the `everywhere` layout's nav / footer chrome, …). Default `true`
+   * — a preview that drops the chrome is not a preview of the published page.
+   *
+   * Pass `false` only for documents that are not published routes: the
+   * Visual-Component edit surface, which the canvas likewise never wraps.
+   */
+  wrapInTemplates?: boolean
 }
 
 interface RuntimePreviewDocumentResult extends SiteRuntimeBuildResult {
@@ -49,6 +59,21 @@ interface RuntimePreviewDocumentResult extends SiteRuntimeBuildResult {
 export async function buildRuntimePreviewDocument(
   input: RuntimePreviewDocumentInput,
 ): Promise<RuntimePreviewDocumentResult> {
+  // Wrap the document in its matching template chain, exactly as
+  // `renderPublishedSnapshot` does — otherwise the preview drops the site
+  // chrome (nav, footer) that the canvas renders via `CanvasComposedTree` and
+  // the published page carries. With no wrappers, `composeTemplateChain`
+  // returns the page untouched.
+  const renderPage = input.wrapInTemplates === false
+    ? input.page
+    : composeTemplateChain(
+        resolveWrapperTemplates(input.site, input.page),
+        { kind: 'page', page: input.page },
+      )
+  // Script selection stays keyed on the DOCUMENT, not the composed tree:
+  // `collectRuntimeScripts` scopes each script by page, and composition
+  // rewrites the merged page's id/slug to the outermost template's. This
+  // mirrors the publish path, which bundles per `page` and renders `merged`.
   const runtimeBuild = await buildSiteRuntimeScripts({
     site: input.site,
     page: input.page,
@@ -77,15 +102,15 @@ export async function buildRuntimePreviewDocument(
     }
   }
   const loopData = input.db
-    ? await prefetchLoopData(input.page, input.site, input.db)
+    ? await prefetchLoopData(renderPage, input.site, input.db)
     : undefined
   const mediaAssets = input.db
-    ? await prefetchMediaAssets(input.page, input.site, input.registry, input.db, {
+    ? await prefetchMediaAssets(renderPage, input.site, input.registry, input.db, {
         templateContext: input.templateContext,
         loopData,
       })
     : undefined
-  const baseHtml = publishPage(input.page, input.site, input.registry, {
+  const baseHtml = publishPage(renderPage, input.site, input.registry, {
     breakpointId: input.breakpointId,
     templateContext: input.templateContext,
     runtimeAssets: runtimeBuild.runtimeAssets,

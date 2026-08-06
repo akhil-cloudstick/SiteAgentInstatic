@@ -40,7 +40,7 @@ const AuditEnvelope = Type.Object({ events: Type.Optional(Type.Array(CmsAuditEve
 
 export async function listCmsUsers(
   fetchImpl: FetchLike = globalThis.fetch.bind(globalThis),
-  basePath = '/admin/api/cms',
+  basePath = '/cms/api/cms',
 ): Promise<CmsCurrentUser[]> {
   const body = await apiRequest(`${basePath}/users`, {
     schema: UsersEnvelope,
@@ -53,7 +53,7 @@ export async function listCmsUsers(
 export async function createCmsUser(
   input: { email: string; displayName: string; password: string; roleId: string; status?: 'active' | 'suspended' },
   fetchImpl: FetchLike = globalThis.fetch.bind(globalThis),
-  basePath = '/admin/api/cms',
+  basePath = '/cms/api/cms',
 ): Promise<CmsCurrentUser> {
   const body = await apiRequest(`${basePath}/users`, {
     method: 'POST',
@@ -70,7 +70,7 @@ export async function updateCmsUser(
   userId: string,
   input: Partial<{ email: string; displayName: string; password: string; roleId: string; status: 'active' | 'suspended' }>,
   fetchImpl: FetchLike = globalThis.fetch.bind(globalThis),
-  basePath = '/admin/api/cms',
+  basePath = '/cms/api/cms',
 ): Promise<CmsCurrentUser> {
   const body = await apiRequest(`${basePath}/users/${encodeURIComponent(userId)}`, {
     method: 'PATCH',
@@ -86,7 +86,7 @@ export async function updateCmsUser(
 export async function deleteCmsUser(
   userId: string,
   fetchImpl: FetchLike = globalThis.fetch.bind(globalThis),
-  basePath = '/admin/api/cms',
+  basePath = '/cms/api/cms',
 ): Promise<void> {
   await apiRequest(`${basePath}/users/${encodeURIComponent(userId)}`, {
     method: 'DELETE',
@@ -97,7 +97,7 @@ export async function deleteCmsUser(
 
 export async function listCmsRoles(
   fetchImpl: FetchLike = globalThis.fetch.bind(globalThis),
-  basePath = '/admin/api/cms',
+  basePath = '/cms/api/cms',
 ): Promise<CmsRole[]> {
   const body = await apiRequest(`${basePath}/roles`, {
     schema: RolesEnvelope,
@@ -110,7 +110,7 @@ export async function listCmsRoles(
 export async function createCmsRole(
   input: { name: string; slug?: string; description: string; capabilities: string[] },
   fetchImpl: FetchLike = globalThis.fetch.bind(globalThis),
-  basePath = '/admin/api/cms',
+  basePath = '/cms/api/cms',
 ): Promise<CmsRole> {
   const body = await apiRequest(`${basePath}/roles`, {
     method: 'POST',
@@ -127,7 +127,7 @@ export async function updateCmsRole(
   roleId: string,
   input: Partial<{ name: string; slug: string; description: string; capabilities: string[] }>,
   fetchImpl: FetchLike = globalThis.fetch.bind(globalThis),
-  basePath = '/admin/api/cms',
+  basePath = '/cms/api/cms',
 ): Promise<CmsRole> {
   const body = await apiRequest(`${basePath}/roles/${encodeURIComponent(roleId)}`, {
     method: 'PATCH',
@@ -143,7 +143,7 @@ export async function updateCmsRole(
 export async function deleteCmsRole(
   roleId: string,
   fetchImpl: FetchLike = globalThis.fetch.bind(globalThis),
-  basePath = '/admin/api/cms',
+  basePath = '/cms/api/cms',
 ): Promise<void> {
   await apiRequest(`${basePath}/roles/${encodeURIComponent(roleId)}`, {
     method: 'DELETE',
@@ -154,7 +154,7 @@ export async function deleteCmsRole(
 
 export async function listCmsAuditEvents(
   fetchImpl: FetchLike = globalThis.fetch.bind(globalThis),
-  basePath = '/admin/api/cms',
+  basePath = '/cms/api/cms',
 ): Promise<CmsAuditEvent[]> {
   const body = await apiRequest(`${basePath}/audit`, {
     schema: AuditEnvelope,

@@ -115,7 +115,7 @@ export function ChangesWidget({ span, editing }: DashboardWidgetRendererProps) {
                 iconOnly
                 className={styles.changeOpen}
                 aria-label={`Open ${change.title}`}
-                onClick={() => navigate('/admin/site')}
+                onClick={() => navigate('/cms/site')}
               >
                 <FaIcon name="chevron-right" size={13} />
               </Button>

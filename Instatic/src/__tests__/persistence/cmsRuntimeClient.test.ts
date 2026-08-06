@@ -29,7 +29,7 @@ describe('CMS runtime client', () => {
     expect(result.dependencyLock).toEqual(dependencyLock)
     expect(result.packageImportmap).toEqual(packageImportmap)
     expect(calls[0]).toMatchObject({
-      input: '/admin/api/cms/runtime/dependencies/resolve',
+      input: '/cms/api/cms/runtime/dependencies/resolve',
       init: { method: 'POST', credentials: 'include' },
     })
     expect(calls[0].init?.body).toBe(JSON.stringify({
@@ -129,7 +129,7 @@ describe('CMS runtime client', () => {
 
     expect(result.html).toContain('<!DOCTYPE html>')
     expect(calls[0]).toMatchObject({
-      input: '/admin/api/cms/runtime/preview',
+      input: '/cms/api/cms/runtime/preview',
       init: { method: 'POST', credentials: 'include' },
     })
     expect(calls[0].init?.signal).toBe(controller.signal)

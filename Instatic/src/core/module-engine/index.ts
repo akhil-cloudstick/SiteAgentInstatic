@@ -7,6 +7,7 @@
 
 export type {
   ModuleDefinition,
+  ModuleDefaultChild,
   AnyModuleDefinition,
   IModuleRegistry,
   RenderOutput,

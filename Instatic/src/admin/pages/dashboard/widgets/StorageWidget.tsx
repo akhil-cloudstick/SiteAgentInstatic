@@ -10,7 +10,7 @@
  * database adapter is active (`SQLite` / `Postgres`) so the operator
  * knows where data physically lives.
  *
- * Data comes from `useStorageStats()` → `/admin/api/cms/dashboard/storage`.
+ * Data comes from `useStorageStats()` → `/cms/api/cms/dashboard/storage`.
  * Sizing detail per segment:
  *   • Images     — sum of `media_assets.size_bytes` for `image/*`.
  *   • Videos     — sum of `media_assets.size_bytes` for `video/*`.

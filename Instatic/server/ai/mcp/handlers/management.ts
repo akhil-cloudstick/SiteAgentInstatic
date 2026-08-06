@@ -16,8 +16,8 @@ import { generatePersonalAccessToken, hashMcpSecret } from '../connectors/token'
 import { MCP_ENDPOINT_PATH } from '../paths'
 import { isRemoteMcpEndpoint } from '../oauth/protocol'
 
-const CONNECTIONS_BASE = '/admin/api/ai/mcp/connections'
-const ACCESS_TOKENS_PATH = '/admin/api/ai/mcp/access-tokens'
+const CONNECTIONS_BASE = '/cms/api/ai/mcp/connections'
+const ACCESS_TOKENS_PATH = '/cms/api/ai/mcp/access-tokens'
 
 export function tryHandleAiMcpManagement(
   req: Request,

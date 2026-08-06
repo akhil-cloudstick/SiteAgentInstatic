@@ -1,5 +1,8 @@
 /**
- * CanvasNotch — fixed insert controls notched into the top canvas chrome.
+ * CanvasNotch — fixed quick-action controls notched into the top of the
+ * Content document canvas. The peek / roller / floating-control rules moved to
+ * `CanvasDocumentModeDock.module.css` with the site canvas's mode pills; this
+ * notch is always pinned.
  */
 
 .shell {
@@ -18,78 +21,6 @@
 @media (max-width: 900px) {
     .shell {
         left: calc(50% + 24px);
-    }
-}
-
-/* Vertical stack of the notch + its floating control. In peek mode this is the
-   element that rolls up out of view; everything else in the shell stays put. */
-.roller {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: var(--space-xs);
-}
-
-/* ─── Peek (live mode) ────────────────────────────────────────────────────
-   The notch is parked above the top edge (clipped by the canvas's
-   overflow:hidden) so it doesn't overlay the page header. Hovering the handle
-   — or focusing any control inside the notch — rolls it back down. */
-.shellPeek .roller {
-    transform: translateY(calc(-100% - 8px));
-    /* Reveal is instant; the hide waits 600ms so a momentary pointer slip off
-       the notch (a one-pixel overshoot) doesn't snap it shut. The delay lives
-       on the hidden state and is zeroed on the revealed state below. */
-    transition: transform 180ms ease 600ms;
-    will-change: transform;
-}
-
-.shellPeek:hover .roller,
-.shellPeek:focus-within .roller {
-    transform: translateY(0);
-    transition-delay: 0ms;
-}
-
-/* Slim always-visible affordance + hover target. Sits at the very top edge so
-   there is something to reach for while the notch itself is hidden. */
-.peekHandle {
-    position: absolute;
-    top: 0;
-    left: 50%;
-    z-index: 1;
-    width: 72px;
-    height: 12px;
-    transform: translateX(-50%);
-    pointer-events: auto;
-    display: flex;
-    justify-content: center;
-}
-
-.peekHandle::after {
-    content: "";
-    width: 38px;
-    height: 4px;
-    border-radius: 0 0 var(--radius) var(--radius);
-    background: var(--border-muted);
-    /* Match the roller: the nub reappears 600ms after the pointer leaves so it
-       stays in sync with the notch rolling back up. */
-    transition: background 160ms ease, opacity 160ms ease 600ms;
-}
-
-.peekHandle:hover::after {
-    background: var(--text-muted);
-}
-
-/* Once the notch is rolled down it covers the handle's job — fade the nub so
-   it doesn't double up under the notch. */
-.shellPeek:hover .peekHandle::after,
-.shellPeek:focus-within .peekHandle::after {
-    opacity: 0;
-    transition-delay: 0ms;
-}
-
-@media (prefers-reduced-motion: reduce) {
-    .shellPeek .roller {
-        transition: none;
     }
 }
 
@@ -148,21 +79,4 @@
 
 .quickButton:hover {
     color: var(--text);
-}
-
-.divider {
-    width: 1px;
-    height: 18px;
-    margin: 0 var(--space-4xs);
-    background: var(--border-muted);
-}
-
-.historyGroup {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-4xs);
-}
-
-.floatingControl {
-    pointer-events: auto;
 }

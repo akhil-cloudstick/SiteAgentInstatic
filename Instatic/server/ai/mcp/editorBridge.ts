@@ -11,7 +11,7 @@
  *
  * Reuses the chat bridge machinery wholesale: `createBridge` issues the
  * `AiBrowserBridge` (whose `callBrowser` resolves when the editor POSTs back to
- * the existing `/admin/api/ai/tool-result`), and `encodeStreamEvent` frames the
+ * the existing `/cms/api/ai/tool-result`), and `encodeStreamEvent` frames the
  * NDJSON the editor reads with `readNdjsonStream`.
  *
  * Security: the registry is keyed by `userId` + workspace scope, so an MCP

@@ -218,7 +218,7 @@ export function TiptapBodyEditor({
         'data-testid': 'content-body-editor',
       },
       // Paste / drop handlers from `useEditorMediaDrop`: intercept files
-      // and route them through `/admin/api/cms/media`, inserting a
+      // and route them through `/cms/api/cms/media`, inserting a
       // progress placeholder at the drop position. Returns `false` for
       // non-media payloads so ProseMirror's default text-paste flow stays
       // intact.

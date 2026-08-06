@@ -16,6 +16,7 @@ import { useEditorStore } from '@site/store/store'
 import { Panel, type DockablePanelProps } from '@admin/shared/Panel'
 import { SegmentedControl } from '@ui/components/SegmentedControl'
 import { DomPanel } from '@site/panels/DomPanel'
+import { useSiteColumnHost } from '@site/sidebars/PageOutlinePanel/siteColumnContext'
 import { SiteExplorerPanel } from '@site/panels/SiteExplorerPanel'
 import { MediaExplorerPanel } from '@site/panels/MediaExplorerPanel'
 import type { ExplorerPanelTab } from '@site/store/slices/uiSlice'
@@ -23,25 +24,25 @@ import styles from './ExplorerPanel.module.css'
 
 const TABS: ReadonlyArray<{ value: ExplorerPanelTab; label: string }> = [
   { value: 'layers', label: 'Layers' },
-  { value: 'site', label: 'Site' },
+  { value: 'site', label: 'Layouts' },
   { value: 'code', label: 'Code' },
   { value: 'media', label: 'Media' },
 ]
 
 interface ExplorerPanelProps extends DockablePanelProps {
-  /** Hide the tab row when an outer switcher already provides it. */
-  hideTabs?: boolean
   /** Whether the caller can perform structural edits (drives DnD/insert). */
   editable?: boolean
 }
 
 export function ExplorerPanel({
-  hideTabs = false,
   editable = true,
   mode,
   dragHandleProps,
   onToggleMode,
 }: ExplorerPanelProps) {
+  // The Site column supplies the heading, the search field and the switcher
+  // (its Explorer disclosure), so inside it this panel drops its own tab row.
+  const hosted = useSiteColumnHost() !== null
   const tab = useEditorStore((s) => s.explorerPanelTab)
   const setTab = useEditorStore((s) => s.setExplorerPanelTab)
   const setOpen = useEditorStore((s) => s.setExplorerPanelOpen)
@@ -62,7 +63,7 @@ export function ExplorerPanel({
           column IS this switcher, so repeating the tabs here would show
           Layers/Site/Code/Media twice in one panel. Other workspaces mount
           this panel without a disclosure and keep their own tab row. */}
-      {!hideTabs && (
+      {!hosted && (
         <div className={styles.tabsRow}>
           <SegmentedControl<ExplorerPanelTab>
             value={tab}

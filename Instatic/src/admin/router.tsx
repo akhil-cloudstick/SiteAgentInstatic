@@ -51,20 +51,20 @@ function withRouteBoundary(element: ReactElement): ReactElement {
 export function AdminRoutes() {
   return (
     <Routes>
-      <Route path="/" element={<Navigate to="/admin/dashboard" replace />} />
-      <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
-      <Route path="/admin/dashboard" element={withRouteBoundary(<AdminEntry section="dashboard" />)} />
-      <Route path="/admin/site" element={withRouteBoundary(<AdminEntry section="site" />)} />
-      <Route path="/admin/content" element={withRouteBoundary(<AdminEntry section="content" />)} />
-      <Route path="/admin/data" element={withRouteBoundary(<AdminEntry section="data" />)} />
-      <Route path="/admin/media" element={withRouteBoundary(<AdminEntry section="media" />)} />
-      <Route path="/admin/plugins" element={withRouteBoundary(<AdminEntry section="plugins" />)} />
-      <Route path="/admin/users" element={withRouteBoundary(<AdminEntry section="users" />)} />
-      <Route path="/admin/ai" element={withRouteBoundary(<AdminEntry section="ai" />)} />
-      <Route path="/admin/ai/oauth/authorize" element={withRouteBoundary(<AdminEntry section="ai" />)} />
-      <Route path="/admin/account" element={withRouteBoundary(<AdminEntry section="account" />)} />
+      <Route path="/" element={<Navigate to="/cms/dashboard" replace />} />
+      <Route path="/cms" element={<Navigate to="/cms/dashboard" replace />} />
+      <Route path="/cms/dashboard" element={withRouteBoundary(<AdminEntry section="dashboard" />)} />
+      <Route path="/cms/site" element={withRouteBoundary(<AdminEntry section="site" />)} />
+      <Route path="/cms/content" element={withRouteBoundary(<AdminEntry section="content" />)} />
+      <Route path="/cms/data" element={withRouteBoundary(<AdminEntry section="data" />)} />
+      <Route path="/cms/media" element={withRouteBoundary(<AdminEntry section="media" />)} />
+      <Route path="/cms/plugins" element={withRouteBoundary(<AdminEntry section="plugins" />)} />
+      <Route path="/cms/users" element={withRouteBoundary(<AdminEntry section="users" />)} />
+      <Route path="/cms/ai" element={withRouteBoundary(<AdminEntry section="ai" />)} />
+      <Route path="/cms/ai/oauth/authorize" element={withRouteBoundary(<AdminEntry section="ai" />)} />
+      <Route path="/cms/account" element={withRouteBoundary(<AdminEntry section="account" />)} />
       <Route
-        path="/admin/plugins/:pluginId/:pageId"
+        path="/cms/plugins/:pluginId/:pageId"
         element={withRouteBoundary(<AdminEntry section="pluginPage" />)}
       />
       {/* Catch-all for ADMIN paths only — an unknown /admin URL (typo, stale
@@ -75,7 +75,7 @@ export function AdminRoutes() {
           pipeline's NotFound template) and must never be swallowed by the
           admin SPA. MUST stay the last route: <Routes> takes the first match
           in declaration order. */}
-      <Route path="/admin/*" element={<Navigate to="/admin/dashboard" replace />} />
+      <Route path="/cms/*" element={<Navigate to="/cms/dashboard" replace />} />
     </Routes>
   )
 }

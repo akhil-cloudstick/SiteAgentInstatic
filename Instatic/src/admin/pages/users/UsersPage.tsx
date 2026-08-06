@@ -1,5 +1,5 @@
 /**
- * UsersPage — `/admin/users`.
+ * UsersPage — `/cms/users`.
  *
  * Capability-gated workspace for managing CMS users, custom roles and the
  * audit log. The page itself is a thin shell: it figures out which tabs

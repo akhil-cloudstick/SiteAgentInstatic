@@ -30,7 +30,6 @@ import type { IconComponent } from 'pixel-art-icons/types'
 import { FaIcon } from '@ui/components/FaIcon'
 import { Button } from '@ui/components/Button'
 import { cn } from '@ui/cn'
-import type { SiteWorkspaceMode } from '@site/siteWorkspaceMode'
 import styles from './ExplorerDisclosure.module.css'
 
 /**
@@ -72,7 +71,7 @@ function ToolGlyph({ tool, size }: { tool: Tool; size: number }) {
  */
 const SHORTCUT_TOOLS: readonly Tool[] = [
   { id: 'layers', label: 'Layers', icon: 'layer-group', target: { kind: 'explorerTab', tab: 'layers' } },
-  { id: 'site', label: 'Site files', icon: 'folder', target: { kind: 'explorerTab', tab: 'site' } },
+  { id: 'site', label: 'Layouts', icon: 'folder', target: { kind: 'explorerTab', tab: 'site' } },
   { id: 'code', label: 'Code', icon: 'code', target: { kind: 'explorerTab', tab: 'code' } },
   { id: 'media', label: 'Media', icon: 'image', target: { kind: 'explorerTab', tab: 'media' } },
 ]
@@ -90,11 +89,7 @@ const getPluginPanels = () => pluginRuntime.getPanels()
 // Stable reference so useSyncExternalStore sees no server/client mismatch.
 const SERVER_PLUGIN_PANELS: ReturnType<typeof getPluginPanels> = []
 
-interface ExplorerDisclosureProps {
-  mode: SiteWorkspaceMode
-}
-
-export function ExplorerDisclosure({ mode }: ExplorerDisclosureProps) {
+export function ExplorerDisclosure() {
   const explorerOpen = useEditorStore((s) => s.explorerPanelOpen)
   const explorerTab = useEditorStore((s) => s.explorerPanelTab)
   const activePluginPanelId = useEditorStore((s) => s.activePluginPanelId)
@@ -156,6 +151,17 @@ export function ExplorerDisclosure({ mode }: ExplorerDisclosureProps) {
     // panel the user just asked for down behind a wall of tiles.
     setOpen(false)
 
+    // Picking the tool that is ALREADY showing puts the column back on the Page
+    // outline. In this column the hosted panels' own close buttons are hidden
+    // (the column owns the chrome), so without this the outline — and with it
+    // the mode's own controls, e.g. Review's Viewport context — is unreachable
+    // once any tool has been opened.
+    if (isActive(tool)) {
+      if (tool.target.kind === 'plugin') setActivePluginPanel(null)
+      else setLeftSidebarPanel(null)
+      return
+    }
+
     switch (tool.target.kind) {
       case 'explorerTab':
         setExplorerPanelTab(tool.target.tab)
@@ -170,7 +176,14 @@ export function ExplorerDisclosure({ mode }: ExplorerDisclosureProps) {
   }
 
   return (
-    <div className={styles.block} data-testid="explorer-disclosure">
+    // The dock keeps the collapsed switcher's footprint in the column while the
+    // block floats out of flow to expand — so opening the tool grid never
+    // shifts the outline or Review's viewport rows (see `.dock`).
+    <div className={styles.dock}>
+    <div
+      className={cn(styles.block, open && styles.blockOpen)}
+      data-testid="explorer-disclosure"
+    >
       <Button
         variant="ghost"
         size="lg"
@@ -181,7 +194,11 @@ export function ExplorerDisclosure({ mode }: ExplorerDisclosureProps) {
         data-testid="explorer-disclosure-toggle"
         onClick={() => setOpen((current) => !current)}
       >
-        <span>{mode === 'live' ? 'Explorer' : 'Advanced workspace'}</span>
+        {/* One name in every mode. The reference renames this to "Advanced
+            workspace" outside Live, which made the same control read as two
+            different things depending on where you came from — and "Explorer"
+            now names the Live heading button, which opens this same tool set. */}
+        <span>Advanced options</span>
         {/* One chevron that rotates, rather than swapping two glyphs — a swap
             can't be tweened, which is what made this read as a hard snap. */}
         <FaIcon
@@ -207,7 +224,7 @@ export function ExplorerDisclosure({ mode }: ExplorerDisclosureProps) {
               data-testid={`explorer-tool-${tool.id}`}
               // The label clips to fit the tile, so the full name stays
               // reachable on hover.
-              tooltip={tool.label}
+              tooltip={isActive(tool) ? `${tool.label} — back to the outline` : tool.label}
               onClick={() => openTool(tool)}
             >
               <ToolGlyph tool={tool} size={14} />
@@ -229,7 +246,7 @@ export function ExplorerDisclosure({ mode }: ExplorerDisclosureProps) {
               className={styles.shortcut}
               data-selected={isActive(tool) ? 'true' : undefined}
               data-testid={`explorer-shortcut-${tool.id}`}
-              tooltip={`Open ${tool.label}`}
+              tooltip={isActive(tool) ? 'Back to the outline' : `Open ${tool.label}`}
               onClick={() => openTool(tool)}
             >
               <ToolGlyph tool={tool} size={13} />
@@ -239,6 +256,7 @@ export function ExplorerDisclosure({ mode }: ExplorerDisclosureProps) {
         </div>
         </div>
       </div>
+    </div>
     </div>
   )
 }

@@ -16,6 +16,7 @@ import {
   computeFloatingPosition,
   type ResolvedFloatingSide,
 } from '@ui/lib/floatingPosition'
+import { useContextMenuPanelRegistry } from './contextMenuPanels'
 import styles from './ContextMenu.module.css'
 
 interface ContextMenuSubmenuProps {
@@ -95,6 +96,19 @@ export function ContextMenuSubmenu({
   const triggerRef = useRef<HTMLButtonElement>(null)
   const submenuRef = useRef<HTMLDivElement>(null)
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // The parent menu's dismiss handler only forgives clicks inside its own
+  // element; this panel is a portaled sibling. Register it so a click here
+  // isn't treated as an outside click (see `contextMenuPanels.ts`).
+  // Registered in a layout effect so the panel is known to the parent before
+  // the browser paints it — a `mousedown` can otherwise land in the gap.
+  const panelRegistry = useContextMenuPanelRegistry()
+  useLayoutEffect(() => {
+    if (!open) return
+    const node = submenuRef.current
+    if (!node || !panelRegistry) return
+    return panelRegistry.registerPanel(node)
+  }, [open, panelRegistry])
 
   const resolvedMinWidth = minWidth ?? width
 
@@ -298,6 +312,10 @@ export function ContextMenuSubmenu({
           onKeyDown={handleSubmenuKeyDown}
           onClick={handleSubmenuClick}
         >
+          {/* No provider here on purpose: React context flows through portals
+              along the React tree, so a nested submenu consumes the ROOT
+              menu's registry and registers directly with it. Re-providing
+              would add a level of indirection for nothing. */}
           {children}
         </div>,
         document.body,

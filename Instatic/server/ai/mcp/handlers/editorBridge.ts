@@ -22,7 +22,7 @@ import {
   type EditorBridgeScope,
 } from '../editorBridge'
 
-const PATH = '/admin/api/ai/editor-bridge'
+const PATH = '/cms/api/ai/editor-bridge'
 const EditorBridgeScopeSchema = Type.Union([
   Type.Literal('site'),
   Type.Literal('content'),

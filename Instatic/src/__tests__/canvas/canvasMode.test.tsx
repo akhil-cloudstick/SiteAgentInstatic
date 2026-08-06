@@ -4,9 +4,8 @@
  * Covers:
  * - canvasView default + setCanvasView store action ('design' | 'live')
  * - runScripts default + setRunScripts store action
- * - CanvasModeToggle reflects + drives store.runScripts (its Design/Live tabs
- *   and inline breakpoint switcher moved to WorkspaceToolbar in the MMSBUILD
- *   re-skin — see the WorkspaceToolbar block below)
+ * - runScripts has no on-canvas control any more: the top-left CanvasModeToggle
+ *   pill was removed, so the flag is driven by the store alone
  * - WorkspaceToolbar drives the three modes (Live edit / Focus section /
  *   Responsive review) and the viewport control
  * - useRuntimeScriptBuild signature contract: it builds only while enabled,
@@ -18,7 +17,6 @@
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { CanvasModeToggle } from '@site/canvas/CanvasModeToggle'
 import { WorkspaceToolbar } from '@site/toolbar/WorkspaceToolbar'
 import { useRuntimeScriptBuild } from '@site/canvas/useRuntimeScriptBuild'
 import { useEditorStore } from '@site/store/store'
@@ -71,30 +69,6 @@ describe('canvas view + run-scripts store state', () => {
     act(() => useEditorStore.getState().setRunScripts(true))
     expect(useEditorStore.getState().runScripts).toBe(true)
   })
-})
-
-// ---------------------------------------------------------------------------
-// CanvasModeToggle
-// ---------------------------------------------------------------------------
-
-const NOOP = () => {}
-
-describe('CanvasModeToggle', () => {
-  it('the Run-scripts toggle reflects + drives store.runScripts', () => {
-    render(<CanvasModeToggle scriptStatus="idle" onRefreshScripts={NOOP} />)
-    const toggle = screen.getByTestId('canvas-run-scripts-toggle')
-    expect(toggle.getAttribute('aria-pressed')).toBe('false')
-    fireEvent.click(toggle)
-    expect(useEditorStore.getState().runScripts).toBe(true)
-  })
-
-  it('shows the Refresh button only while scripts are running', () => {
-    render(<CanvasModeToggle scriptStatus="idle" onRefreshScripts={NOOP} />)
-    expect(screen.queryByTestId('canvas-run-scripts-refresh')).toBeNull()
-    act(() => useEditorStore.getState().setRunScripts(true))
-    expect(screen.getByTestId('canvas-run-scripts-refresh')).toBeDefined()
-  })
-
 })
 
 // ---------------------------------------------------------------------------
@@ -244,7 +218,7 @@ describe('useRuntimeScriptBuild', () => {
     buildCalls = 0
     globalThis.fetch = (async (input: RequestInfo | URL) => {
       const url = typeof input === 'string' ? input : input.toString()
-      if (url.includes('/admin/api/cms/runtime/preview')) {
+      if (url.includes('/cms/api/cms/runtime/preview')) {
         buildCalls += 1
         return new Response(JSON.stringify({
           html: '<!DOCTYPE html><html><body></body></html>',

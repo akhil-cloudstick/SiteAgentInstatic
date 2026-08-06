@@ -6,7 +6,7 @@
  * uses (`buildImportPlan` + `commitImportPlan` against the live editor
  * store), landing on "Review import" — not a separate server-side commit.
  *
- * URL contract: `/admin/site?importToken=<token>` — consumed once on mount
+ * URL contract: `/cms/site?importToken=<token>` — consumed once on mount
  * (mirrors the `?table=&row=` deep link in `useSiteEditorUrlSync`), then the
  * token is stripped from the address bar immediately so a reload never
  * re-fetches an already-burned (single-use) token.
@@ -53,7 +53,7 @@ export function useStagedSiteImportHandoff({ enabled }: UseStagedSiteImportHando
 
     void (async () => {
       try {
-        const result = await apiRequest(`/admin/api/cms/import/staged/${encodeURIComponent(token)}`, {
+        const result = await apiRequest(`/cms/api/cms/import/staged/${encodeURIComponent(token)}`, {
           schema: StagedImportResponseSchema,
         })
         setPendingSiteImportFileMap({ files: result.files })

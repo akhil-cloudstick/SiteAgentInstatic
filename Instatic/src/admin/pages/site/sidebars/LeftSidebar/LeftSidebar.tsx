@@ -77,12 +77,24 @@ interface LeftSidebarProps {
  * and is dropped from the rail (and its panel mount) when `editable=false`.
  */
 const READ_ONLY_RAIL_IDS: ReadonlySet<LeftSidebarPanelId> = new Set(['explorer'])
-/** Column heading per Explorer tab — the tab IS the thing being shown. */
-const EXPLORER_TAB_HEADINGS: Record<ExplorerPanelTab, string> = {
+/**
+ * What each Explorer tab lists. It names the content in the column's KICKER,
+ * under the search field — the heading above stays the workspace mode.
+ */
+const EXPLORER_TAB_LABELS: Record<ExplorerPanelTab, string> = {
   layers: 'Layers',
-  site: 'Site files',
+  site: 'Layouts',
   code: 'Code',
   media: 'Media',
+}
+
+/**
+ * Placeholder for the column's search field per tab. Only the Layers tree
+ * filters on it; the others are left without a field rather than given an
+ * inert one.
+ */
+const EXPLORER_TAB_SEARCH: Partial<Record<ExplorerPanelTab, string>> = {
+  layers: 'Search layers…',
 }
 
 const PANEL_RESIZE_LABELS: Record<HostedLeftPanelId, string> = {
@@ -157,16 +169,23 @@ export function LeftSidebar({
   // share the same track, so the panel must not add width on top of it.
   const isSiteColumn = workspace === 'site' && !railOnly
   const siteColumnShowsPanel = sidebarOpen && !panelFloating
-  // The column's heading follows what is actually showing in it, so switching
-  // to Layers retitles the column rather than leaving "Page outline" above a
-  // layer tree.
-  const activePanelHeading = effectivePluginPanelId !== null
+  // What the column is listing. This names the content in the kicker under the
+  // search field — NOT in the heading, which stays the workspace mode so it
+  // can't change out from under the author just because they opened a tool.
+  const activePanelLabel = effectivePluginPanelId !== null
     ? 'Plugin panel'
     : effectiveActivePanel === 'explorer'
-      ? EXPLORER_TAB_HEADINGS[explorerTab]
+      ? EXPLORER_TAB_LABELS[explorerTab]
       : effectiveActivePanel
         ? PANEL_RESIZE_LABELS[effectiveActivePanel]
         : null
+  const activePanelSearch = effectiveActivePanel === 'explorer' && effectivePluginPanelId === null
+    ? EXPLORER_TAB_SEARCH[explorerTab] ?? null
+    : null
+  // The AI panel is a conversation with a composer pinned to its foot — it
+  // wants every pixel of the column's height. The mode's own controls step
+  // aside while it is open rather than squeezing the transcript.
+  const toolNeedsFullColumn = effectiveActivePanel === 'agent'
 
   const style = {
     '--left-sidebar-panel-width': `${isSiteColumn ? 0 : panelWidth}px`,
@@ -188,7 +207,7 @@ export function LeftSidebar({
     >
       {/* ONE column, not two. The Site workspace's left column shows the Page
           outline by default and swaps its body for whichever panel the Explorer
-          disclosure selects (Layers, Site files, Code, Media, Framework, …).
+          disclosure selects (Layers, Layouts, Code, Media, Framework, …).
           The disclosure itself stays pinned at the foot, so the switcher is
           always reachable whatever is showing above it.
 
@@ -200,7 +219,9 @@ export function LeftSidebar({
           enabled={isSiteColumn}
           mode={siteMode}
           showsPanel={siteColumnShowsPanel}
-          heading={activePanelHeading}
+          toolLabel={activePanelLabel}
+          toolSearchPlaceholder={activePanelSearch}
+          toolNeedsFullColumn={toolNeedsFullColumn}
         >
         <div
           ref={panelFloating ? setPanelRef : undefined}
@@ -223,7 +244,7 @@ export function LeftSidebar({
               editing tools; each respects its own read-only state internally
               (e.g. TreeNode disables drag + context menu via `editable`). */}
           <div className={styles.panelMount} hidden={effectiveActivePanel !== 'explorer'}>
-            <ExplorerPanel editable={editable} hideTabs={isSiteColumn} {...dockablePanelProps} />
+            <ExplorerPanel editable={editable} {...dockablePanelProps} />
           </div>
           {/* Editor-only panels — only mounted when the caller can perform
               structural edits. Mounting them for non-editors would expose
@@ -318,18 +339,28 @@ function SiteColumn({
   enabled,
   mode,
   showsPanel,
-  heading,
+  toolLabel,
+  toolSearchPlaceholder,
+  toolNeedsFullColumn,
   children,
 }: {
   enabled: boolean
   mode: SiteWorkspaceMode
   showsPanel: boolean
-  heading: string | null
+  toolLabel: string | null
+  toolSearchPlaceholder: string | null
+  toolNeedsFullColumn: boolean
   children: ReactNode
 }) {
   if (!enabled) return children
   return (
-    <PageOutlinePanel mode={mode} hidden={showsPanel} toolHeading={heading}>
+    <PageOutlinePanel
+      mode={mode}
+      hidden={showsPanel}
+      toolLabel={toolLabel}
+      toolSearchPlaceholder={toolSearchPlaceholder}
+      toolNeedsFullColumn={toolNeedsFullColumn}
+    >
       {children}
     </PageOutlinePanel>
   )

@@ -371,10 +371,10 @@ describe('CMS plugin handlers', () => {
         lifecycleStatus: 'active',
         lastError: null,
         manifest: {
-          adminPages: [{ route: '/admin/plugins/local.map/overview' }],
+          adminPages: [{ route: '/cms/plugins/local.map/overview' }],
         },
       },
-      adminPages: [{ pluginId: 'local.map', route: '/admin/plugins/local.map/overview' }],
+      adminPages: [{ pluginId: 'local.map', route: '/cms/plugins/local.map/overview' }],
     })
 
     const list = await handleCmsRequest(

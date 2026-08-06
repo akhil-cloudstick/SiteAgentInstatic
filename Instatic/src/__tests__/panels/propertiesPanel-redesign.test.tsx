@@ -39,6 +39,46 @@ const PP_DIR = join(SRC_ROOT, 'admin/pages/site/panels/PropertiesPanel')
 
 afterEach(cleanup)
 
+/**
+ * Render the inspector with every disclosure expanded.
+ *
+ * The approved Site screen is a GUIDED surface: the class picker, the raw
+ * property workbench and the HTML attribute editor live behind its
+ * "Advanced instance styles, classes & attributes" disclosure, and the CSS
+ * sections behind "Layout & spacing". These tests assert on those controls, so
+ * they perform the same clicks a user does to reach them.
+ *
+ * Disclosures nest (Advanced → the workbench's own section accordions), so the
+ * sweep repeats until nothing is left collapsed.
+ */
+function expandAll() {
+  // Bounded: the deepest nesting is panel → Advanced → section → Advanced
+  // (BorderControl's own shorthand disclosure).
+  for (let pass = 0; pass < 4; pass++) {
+    const collapsed = screen.queryAllByRole('button', { expanded: false })
+    if (collapsed.length === 0) break
+    for (const toggle of collapsed) fireEvent.click(toggle)
+  }
+}
+
+/**
+ * Click a class pill to make it the active editing target, then re-expand.
+ *
+ * Activating a class swaps the guided slice's inline-style composer for the
+ * class composer, which mounts its own section accordions closed. Re-expanding
+ * after the click is the same thing a user does to reach a property row.
+ */
+function selectClassPill(name: RegExp) {
+  fireEvent.click(screen.getByRole('button', { name }))
+  expandAll()
+}
+
+function renderInspector(ui: React.ReactElement = <PropertiesPanel />) {
+  const result = render(ui)
+  expandAll()
+  return result
+}
+
 // ---------------------------------------------------------------------------
 // Store helpers
 // ---------------------------------------------------------------------------
@@ -53,6 +93,13 @@ function resetStore() {
     selectedNodeIds: [],
     hoveredNodeId: null,
     activeBreakpointId: 'desktop',
+    // The inspector draws a different body per workspace mode (the approved
+    // Site screen's Live edit / Focus section / Responsive review). These
+    // tests are about the Live-edit inspector, so pin the mode rather than
+    // inheriting the store's `canvasView: 'design'` default, which resolves to
+    // Responsive review and renders the guided-CSS body instead.
+    canvasView: 'live',
+    sectionFocusNodeId: null,
     activeClassId: null,
     previewClassAssignment: null,
     propertiesPanel: { collapsed: false, x: 0, y: 0, width: 280 },
@@ -135,7 +182,7 @@ describe('PP-2 — ClassPicker visible immediately on element selection', () => 
   it('class add input is visible directly under the panel header with no accordion interaction', () => {
     const { nodeId } = loadSiteWithHeading()
     selectNode(nodeId)
-    render(<PropertiesPanel />)
+    renderInspector()
     const renameButton = screen.getByRole('button', { name: /rename text/i })
     const classInput = screen.getByRole('textbox', { name: /add or create a css selector/i })
 
@@ -153,7 +200,7 @@ describe('PP-3 — Pill click toggles CSS editor; locked preview shown with no a
   it('before class selection the locked preview CTA is shown; clicking a pill opens the CSS editor; clicking again returns to locked preview', () => {
     const { nodeId } = loadSiteWithClasses(1)
     selectNode(nodeId)
-    render(<PropertiesPanel />)
+    renderInspector()
 
     // No active class — LockedStylePreview is shown with its "Add class" CTA.
     // The style search bar is bound to the active class, so it's hidden in
@@ -164,6 +211,7 @@ describe('PP-3 — Pill click toggles CSS editor; locked preview shown with no a
     // Click the pill to activate the class CSS editor.
     const pill = screen.getByRole('button', { name: /edit class \.class-1/i })
     fireEvent.click(pill)
+    expandAll()
 
     // CSS editor active — locked preview CTA gone, CSS property rows accessible,
     // and the style search bar is now visible (scoped to the active class).
@@ -173,6 +221,7 @@ describe('PP-3 — Pill click toggles CSS editor; locked preview shown with no a
     // Click again to deselect — locked preview returns and the search bar
     // disappears with it.
     fireEvent.click(pill)
+    expandAll()
     expect(screen.getByRole('button', { name: /^add class$/i })).toBeDefined()
     expect(screen.queryByRole('searchbox', { name: /search class style properties to add/i })).toBeNull()
   })
@@ -190,7 +239,7 @@ describe('SelectorHeader delete action', () => {
       propertiesPanel: { collapsed: false, x: 0, y: 0, width: 360 },
     } as Parameters<typeof useEditorStore.setState>[0])
 
-    render(<PropertiesPanel variant="docked" />)
+    renderInspector(<PropertiesPanel variant="docked" />)
 
     fireEvent.click(screen.getByRole('button', { name: /delete selector \.class-1/i }))
 
@@ -210,9 +259,9 @@ describe('StyleRuleComposer inline style filtering', () => {
   it('filters the inline style catalog without opening an autocomplete menu', () => {
     const { nodeId } = loadSiteWithClasses(1)
     selectNode(nodeId)
-    render(<PropertiesPanel />)
+    renderInspector()
 
-    fireEvent.click(screen.getByRole('button', { name: /edit class \.class-1/i }))
+    selectClassPill(/edit class \.class-1/i)
     fireEvent.change(screen.getByRole('searchbox', { name: /search class style properties to add/i }), {
       target: { value: 'color' },
     })
@@ -235,49 +284,66 @@ describe('StyleRuleComposer inline style filtering', () => {
     expect(css).not.toMatch(/\.searchResultsEmpty\b/)
   })
 
-  it('category rail buttons navigate via scroll-anchor (all sections stay in DOM)', () => {
+  it('keeps every style section in the DOM, and drops the category rail', () => {
     const { nodeId } = loadSiteWithClasses(1)
     selectNode(nodeId)
-    render(<PropertiesPanel />)
+    renderInspector()
 
-    fireEvent.click(screen.getByRole('button', { name: /edit class \.class-1/i }))
+    selectClassPill(/edit class \.class-1/i)
 
     // All sections always rendered — layout renders the DisplaySwitcher
-    // and typography renders the fontFamily row.
+    // and typography renders the fontFamily row. They live in different
+    // surfaces now (the "Layout & spacing" disclosure and the Advanced
+    // disclosure), but nothing is unmounted to show something else.
     expect(document.querySelector('[data-testid="css-display-switcher"]')).not.toBeNull()
     expect(document.querySelector('[data-testid="css-property-row-fontFamily"]')).not.toBeNull()
 
-    const typographyButton = screen.getByRole('button', { name: /show typography styles/i })
-    fireEvent.click(typographyButton)
-
-    // Typography button is pressed (scroll-anchor active); both sections still in DOM.
-    expect(typographyButton.getAttribute('aria-pressed')).toBe('true')
-    expect(document.querySelector('[data-testid="css-property-row-fontFamily"]')).not.toBeNull()
-    // Scroll-anchor: clicking a section scrolls to it, does NOT hide other sections.
-    expect(document.querySelector('[data-testid="css-display-switcher"]')).not.toBeNull()
+    // The 32px scroll-anchor rail is gone from the node inspector: the approved
+    // Site screen navigates by tab and disclosure, and inside a disclosure the
+    // rail had no full-height column to anchor against.
+    expect(screen.queryByRole('button', { name: /show typography styles/i })).toBeNull()
   })
 
-  it('search filters across all categories regardless of which rail button was last clicked', () => {
+  it('search filters across every category in the workbench', () => {
     const { nodeId } = loadSiteWithClasses(1)
     selectNode(nodeId)
-    render(<PropertiesPanel />)
+    renderInspector()
 
-    fireEvent.click(screen.getByRole('button', { name: /edit class \.class-1/i }))
-    // Click typography rail button (scroll-anchor: does NOT remove other sections from DOM).
-    fireEvent.click(screen.getByRole('button', { name: /show typography styles/i }))
+    selectClassPill(/edit class \.class-1/i)
 
-    // All sections still present after clicking a rail button in scroll-anchor mode.
-    expect(document.querySelector('[data-testid="css-display-switcher"]')).not.toBeNull()
-
-    // Search for 'fontFamily' — only typography rows match. The layout
+    // Search for 'backgroundColor' — only background rows match. The layout
     // section, which is not specially filtered by query inside LayoutSection,
     // collapses to nothing because none of its property keys match.
     fireEvent.change(screen.getByRole('searchbox', { name: /search class style properties to add/i }), {
-      target: { value: 'fontFamily' },
+      target: { value: 'backgroundColor' },
     })
 
+    expect(document.querySelector('[data-testid="css-property-row-backgroundColor"]')).not.toBeNull()
+    expect(document.querySelector('[data-testid="css-property-row-borderRadius"]')).toBeNull()
+  })
+
+  /**
+   * Typography was promoted out of the Advanced disclosure to a top-level
+   * section, so the Advanced search box no longer reaches it — the box filters
+   * the workbench it belongs to, and typography is no longer in that
+   * workbench. Pinned because the alternative reading ("search is broken") is
+   * the natural first guess when someone types a font property and sees the
+   * background rows vanish while the font rows stay put.
+   */
+  it('leaves the promoted Typography section unfiltered by the Advanced search', () => {
+    const { nodeId } = loadSiteWithClasses(1)
+    selectNode(nodeId)
+    renderInspector()
+
+    selectClassPill(/edit class \.class-1/i)
+
+    fireEvent.change(screen.getByRole('searchbox', { name: /search class style properties to add/i }), {
+      target: { value: 'backgroundColor' },
+    })
+
+    // Typography rows live outside the searched surface and stay visible.
     expect(document.querySelector('[data-testid="css-property-row-fontFamily"]')).not.toBeNull()
-    expect(document.querySelector('[data-testid="css-property-row-color"]')).toBeNull()
+    expect(document.querySelector('[data-testid="css-property-row-color"]')).not.toBeNull()
   })
 })
 
@@ -286,7 +352,7 @@ describe('ClassPicker — suggestion hover preview', () => {
     const { nodeId } = loadSiteWithHeading()
     const cls = useEditorStore.getState().createClass('preview-target')
     selectNode(nodeId)
-    render(<PropertiesPanel />)
+    renderInspector()
 
     fireEvent.focus(screen.getByRole('textbox', { name: /add or create a css selector/i }))
     const item = screen.getByRole('menuitem', { name: '.preview-target' })
@@ -307,7 +373,7 @@ describe('ClassPicker — suggestion hover preview', () => {
     const { nodeId } = loadSiteWithHeading()
     useEditorStore.getState().createClass('no-preview')
     selectNode(nodeId)
-    render(<PropertiesPanel />)
+    renderInspector()
 
     fireEvent.focus(screen.getByRole('textbox', { name: /add or create a css selector/i }))
     fireEvent.mouseEnter(screen.getByRole('menuitem', { name: '.no-preview' }))
@@ -319,7 +385,7 @@ describe('ClassPicker — suggestion hover preview', () => {
     const { nodeId } = loadSiteWithHeading()
     const cls = useEditorStore.getState().createClass('consume-preview')
     selectNode(nodeId)
-    render(<PropertiesPanel />)
+    renderInspector()
 
     fireEvent.focus(screen.getByRole('textbox', { name: /add or create a css selector/i }))
     const item = screen.getByRole('menuitem', { name: '.consume-preview' })
@@ -337,19 +403,23 @@ describe('ClassPicker — suggestion hover preview', () => {
 // PP-4: Module Section visible with definition.name, controls in DOM by default
 // ---------------------------------------------------------------------------
 
-describe('PP-4 — Module Section default open with controls', () => {
-  it('Module section titled with definition.name is present and open by default', () => {
+describe('PP-4 — module parameters lead the inspector', () => {
+  it('renders the parameters under the "Instance parameters" heading, not in an accordion', () => {
+    // The approved Site screen leads its inspector with a muted "Instance
+    // parameters" kicker and the fields themselves — no "Module settings"
+    // accordion to open first. The accordion the panel used to wrap them in is
+    // gone; the fields are the first thing in the body.
     const { nodeId } = loadSiteWithHeading()
     selectNode(nodeId)
-    render(<PropertiesPanel />)
-    // "Text" is the definition.name for base.text
-    expect(screen.getByRole('button', { name: /module settings.*text/i })).toBeDefined()
+    renderInspector()
+    expect(screen.getByText('Instance parameters')).toBeDefined()
+    expect(screen.queryByRole('button', { name: /module settings/i })).toBeNull()
   })
 
-  it('Property controls are visible without interaction (module section default open)', () => {
+  it('Property controls are visible without interaction (no accordion to open)', () => {
     const { nodeId } = loadSiteWithHeading()
     selectNode(nodeId)
-    render(<PropertiesPanel />)
+    renderInspector()
     // base.text has a 'text' property control — should be in DOM immediately
     expect(screen.getByTestId('property-control-text')).toBeDefined()
   })
@@ -359,15 +429,31 @@ describe('PP-4 — Module Section default open with controls', () => {
 // PP-5: Advanced Section removed from the Properties panel
 // ---------------------------------------------------------------------------
 
-describe('PP-5 — Advanced Section removed', () => {
-  it('does not render the Advanced section or Hidden/Locked toggles', () => {
+describe('PP-5 — old Advanced Section removed', () => {
+  it('does not render the Hidden/Locked toggles or the node-id readout', () => {
+    // The panel used to carry an "Advanced" section of node plumbing — Hidden
+    // and Locked switches and a raw node id. Those moved to the layer row's
+    // context menu and are gone from here for good.
+    //
+    // The approved Site screen has its OWN "Advanced instance styles, classes
+    // & attributes" disclosure — a different object, holding the class picker,
+    // the raw property workbench and the HTML attribute editor. Its presence
+    // is asserted below; what must stay absent is the node plumbing.
     const { nodeId } = loadSiteWithHeading()
     selectNode(nodeId)
-    render(<PropertiesPanel />)
-    expect(screen.queryByRole('button', { name: /Advanced/i })).toBeNull()
+    renderInspector()
     expect(screen.queryByLabelText(/^Hidden$/)).toBeNull()
     expect(screen.queryByLabelText(/^Locked$/)).toBeNull()
     expect(screen.queryByText(/^Node ID:/)).toBeNull()
+  })
+
+  it('does render the approved screen\'s Advanced instance-styles disclosure', () => {
+    const { nodeId } = loadSiteWithHeading()
+    selectNode(nodeId)
+    renderInspector()
+    expect(
+      screen.getByRole('button', { name: /advanced instance styles, classes & attributes/i }),
+    ).toBeDefined()
   })
 })
 
@@ -376,13 +462,14 @@ describe('PP-5 — Advanced Section removed', () => {
 // ---------------------------------------------------------------------------
 
 describe("PP-6 — StyleSurface used by PropertiesPanel; Section shared in StyleSectionsEditor", () => {
-  it('PropertiesPanelBody.tsx imports StyleSurface from ./StyleSurface', () => {
-    // The PropertiesPanel was refactored into a slim JSX shell + a body
-    // component that owns the surface-selection branches. The StyleSurface
-    // import now lives in `PropertiesPanelBody.tsx`, which is the file the
-    // panel composes for the scrollable content area.
-    const src = readFileSync(join(PP_DIR, 'PropertiesPanelBody.tsx'), 'utf-8')
-    expect(src).toMatch(/import.*StyleSurface.*from\s+['"]\.\/StyleSurface['"]/)
+  it('InspectorSurfaces.tsx imports StyleSurface from ./StyleSurface', () => {
+    // The PropertiesPanel is a slim JSX shell; `PropertiesPanelBody.tsx` picks
+    // the surface, and — since the panel became per-mode for the approved Site
+    // screen — the three mode bodies reach the workbench through the shared
+    // `InspectorSurfaces` helpers (`StyleSlice` / `AdvancedDisclosure`). That
+    // is now the single file that mounts StyleSurface for a node.
+    const src = readFileSync(join(PP_DIR, 'InspectorSurfaces.tsx'), 'utf-8')
+    expect(src).toMatch(/import\s*\{\s*StyleSurface\s*\}\s*from\s+['"]\.\/StyleSurface['"]/)
   })
 
   it('StyleSectionsEditor.tsx imports Section from the shared @ui/components/Section primitive', () => {
@@ -403,7 +490,7 @@ describe('PP-7 — No cascade order badges on chips', () => {
   it('Three chips render without ordinal superscript badges ¹ ² ³', () => {
     const { nodeId } = loadSiteWithClasses(3)
     selectNode(nodeId)
-    render(<PropertiesPanel />)
+    renderInspector()
 
     expect(screen.queryByText('¹')).toBeNull()
     expect(screen.queryByText('²')).toBeNull()
@@ -429,7 +516,7 @@ describe('PP-8 — Class pill context menu owns reorder actions', () => {
   it('right-clicking a class pill opens class actions and moves the class up or down', () => {
     const { nodeId, classIds } = loadSiteWithClasses(3)
     selectNode(nodeId)
-    render(<PropertiesPanel />)
+    renderInspector()
 
     const classTwoPill = screen.getByRole('button', { name: /edit class \.class-2/i })
     fireEvent.contextMenu(classTwoPill, { clientX: 32, clientY: 48 })
@@ -459,7 +546,7 @@ describe('PP-8 — Class pill context menu owns reorder actions', () => {
   it('disables boundary moves in the class pill context menu', () => {
     const { nodeId, classIds } = loadSiteWithClasses(2)
     selectNode(nodeId)
-    render(<PropertiesPanel />)
+    renderInspector()
 
     fireEvent.contextMenu(screen.getByRole('button', { name: /edit class \.class-1/i }), {
       clientX: 32,
@@ -477,7 +564,7 @@ describe('PP-8 — Class pill context menu owns reorder actions', () => {
   it('opens class actions from the keyboard and renames the selector with a dialog', () => {
     const { nodeId, classIds } = loadSiteWithClasses(1)
     selectNode(nodeId)
-    render(<PropertiesPanel />)
+    renderInspector()
 
     fireEvent.keyDown(screen.getByRole('button', { name: /edit class \.class-1/i }), { key: 'ContextMenu' })
     expect(screen.getByRole('menu', { name: /class actions/i })).toBeDefined()
@@ -515,11 +602,12 @@ describe('PP-10 — Class and module style controls visible in StyleRuleComposer
     state.addNodeClass(nodeId, cls.id)
     state.updateClassStyles(cls.id, { fontFamily: 'Inter' })
     selectNode(nodeId)
-    render(<PropertiesPanel />)
+    renderInspector()
 
     // Open the StyleRuleComposer by clicking the pill
     const pill = screen.getByRole('button', { name: /edit class \.styled-class/i })
     fireEvent.click(pill)
+    expandAll()
 
     expect(document.querySelector('[data-testid="css-property-row-fontFamily"]')).not.toBeNull()
   })
@@ -527,10 +615,11 @@ describe('PP-10 — Class and module style controls visible in StyleRuleComposer
   it('no textarea element is present in StyleRuleComposer (PP-17)', () => {
     const { nodeId } = loadSiteWithClasses(1)
     selectNode(nodeId)
-    render(<PropertiesPanel />)
+    renderInspector()
 
     const pill = screen.getByRole('button', { name: /edit class \.class-1/i })
     fireEvent.click(pill)
+    expandAll()
 
     // Phase 3 removes the former StyleRuleComposer "Edit CSS" textarea.
     expect(screen.queryByRole('textbox', { name: /edit css/i })).toBeNull()
@@ -549,10 +638,11 @@ describe('PP-11 — Editing a text-type class property via TextControl updates c
     state.addNodeClass(nodeId, cls.id)
     state.updateClassStyles(cls.id, { fontFamily: 'serif' })
     selectNode(nodeId)
-    render(<PropertiesPanel />)
+    renderInspector()
 
     const pill = screen.getByRole('button', { name: /edit class \.edit-class/i })
     fireEvent.click(pill)
+    expandAll()
 
     // Find the text input for fontFamily (TextControl renders a text input)
     const input = document
@@ -573,10 +663,11 @@ describe('PP-11 — Editing a text-type class property via TextControl updates c
     state.updateClassStyles(cls.id, { fontFamily: 'serif' })
     useEditorStore.setState({ activeBreakpointId: 'mobile' } as Parameters<typeof useEditorStore.setState>[0])
     selectNode(nodeId)
-    render(<PropertiesPanel />)
+    renderInspector()
 
     const pill = screen.getByRole('button', { name: /edit class \.responsive-edit-class/i })
     fireEvent.click(pill)
+    expandAll()
 
     expect(screen.queryByRole('combobox', { name: /class style breakpoint/i })).toBeNull()
 
@@ -596,9 +687,9 @@ describe('PP-11 — Editing a text-type class property via TextControl updates c
     const { nodeId } = loadSiteWithClasses(1)
     useEditorStore.setState({ activeBreakpointId: 'mobile' } as Parameters<typeof useEditorStore.setState>[0])
     selectNode(nodeId)
-    render(<PropertiesPanel />)
+    renderInspector()
 
-    fireEvent.click(screen.getByRole('button', { name: /edit class \.class-1/i }))
+    selectClassPill(/edit class \.class-1/i)
 
     expect(screen.queryByRole('combobox', { name: /class style breakpoint/i })).toBeNull()
     expect(screen.getByRole('searchbox', { name: /search class style properties to add/i })).toBeDefined()
@@ -609,9 +700,9 @@ describe('StyleRuleComposer unset CSS property placeholders', () => {
   it('renders the display switcher with no segment pressed when display is unset', () => {
     const { nodeId } = loadSiteWithClasses(1)
     selectNode(nodeId)
-    render(<PropertiesPanel />)
+    renderInspector()
 
-    fireEvent.click(screen.getByRole('button', { name: /edit class \.class-1/i }))
+    selectClassPill(/edit class \.class-1/i)
 
     const displaySwitcher = document.querySelector('[data-testid="css-display-switcher"]')
     expect(displaySwitcher).not.toBeNull()
@@ -634,9 +725,9 @@ describe('StyleRuleComposer unset CSS property placeholders', () => {
     // flex/grid blocks rather than the fallback rows.
     useEditorStore.getState().updateClassStyles(clsId, { display: 'flex' })
     selectNode(nodeId)
-    render(<PropertiesPanel />)
+    renderInspector()
 
-    fireEvent.click(screen.getByRole('button', { name: /edit class \.class-1/i }))
+    selectClassPill(/edit class \.class-1/i)
 
     const gapInput = screen.getByLabelText('Gap') as HTMLInputElement
     expect(gapInput.value).toBe('')
@@ -649,9 +740,9 @@ describe('StyleRuleComposer unset CSS property placeholders', () => {
     const clsId = classIds[0]
     useEditorStore.getState().updateClassStyles(clsId, { display: 'flex', gap: '32px' })
     selectNode(nodeId)
-    render(<PropertiesPanel />)
+    renderInspector()
 
-    fireEvent.click(screen.getByRole('button', { name: /edit class \.class-1/i }))
+    selectClassPill(/edit class \.class-1/i)
 
     // The Flex segment of the SegmentedControl is pressed when display: flex
     // is stored on the class.
@@ -670,9 +761,9 @@ describe('LayoutSection — clear via active segment X', () => {
     const clsId = classIds[0]
     useEditorStore.getState().updateClassStyles(clsId, { display: 'flex' })
     selectNode(nodeId)
-    render(<PropertiesPanel />)
+    renderInspector()
 
-    fireEvent.click(screen.getByRole('button', { name: /edit class \.class-1/i }))
+    selectClassPill(/edit class \.class-1/i)
 
     const flexSegment = screen.getByRole('button', { name: /^flex layout$/i })
     expect(flexSegment.getAttribute('aria-pressed')).toBe('true')
@@ -690,9 +781,9 @@ describe('LayoutSection — clear via active segment X', () => {
     useEditorStore.getState().updateClassStyles(clsId, { display: 'grid' })
     useEditorStore.setState({ activeBreakpointId: 'mobile' } as Parameters<typeof useEditorStore.setState>[0])
     selectNode(nodeId)
-    render(<PropertiesPanel />)
+    renderInspector()
 
-    fireEvent.click(screen.getByRole('button', { name: /edit class \.class-1/i }))
+    selectClassPill(/edit class \.class-1/i)
 
     const gridSegment = screen.getByRole('button', { name: /^grid layout$/i })
     expect(gridSegment.getAttribute('aria-pressed')).toBe('true')
@@ -712,9 +803,9 @@ describe('LayoutSection — clear via active segment X', () => {
     const clsId = classIds[0]
     useEditorStore.getState().updateClassStyles(clsId, { display: 'flex', flexDirection: 'column' })
     selectNode(nodeId)
-    render(<PropertiesPanel />)
+    renderInspector()
 
-    fireEvent.click(screen.getByRole('button', { name: /edit class \.class-1/i }))
+    selectClassPill(/edit class \.class-1/i)
 
     const columnSegment = screen.getByRole('button', { name: /^column$/i })
     expect(columnSegment.getAttribute('aria-pressed')).toBe('true')
@@ -731,9 +822,9 @@ describe('LayoutSection — grid block', () => {
     const clsId = classIds[0]
     useEditorStore.getState().updateClassStyles(clsId, { display: 'grid' })
     selectNode(nodeId)
-    render(<PropertiesPanel />)
+    renderInspector()
 
-    fireEvent.click(screen.getByRole('button', { name: /edit class \.class-1/i }))
+    selectClassPill(/edit class \.class-1/i)
 
     // Grid template column / row track pickers and the alignment switchers
     // are present.
@@ -748,9 +839,9 @@ describe('LayoutSection — grid block', () => {
     const clsId = classIds[0]
     useEditorStore.getState().updateClassStyles(clsId, { display: 'flex' })
     selectNode(nodeId)
-    render(<PropertiesPanel />)
+    renderInspector()
 
-    fireEvent.click(screen.getByRole('button', { name: /edit class \.class-1/i }))
+    selectClassPill(/edit class \.class-1/i)
 
     expect(screen.queryByRole('group', { name: /grid template columns/i })).toBeNull()
   })
@@ -760,9 +851,9 @@ describe('LayoutSection — grid block', () => {
     const clsId = classIds[0]
     useEditorStore.getState().updateClassStyles(clsId, { display: 'grid' })
     selectNode(nodeId)
-    render(<PropertiesPanel />)
+    renderInspector()
 
-    fireEvent.click(screen.getByRole('button', { name: /edit class \.class-1/i }))
+    selectClassPill(/edit class \.class-1/i)
 
     // Column track group renders [1, 2, 3, 4, 5, 6] count segments. Click "3".
     const columnGroup = screen.getByRole('group', { name: /grid template columns/i })
@@ -778,9 +869,9 @@ describe('LayoutSection — grid block', () => {
     const clsId = classIds[0]
     useEditorStore.getState().updateClassStyles(clsId, { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)' })
     selectNode(nodeId)
-    render(<PropertiesPanel />)
+    renderInspector()
 
-    fireEvent.click(screen.getByRole('button', { name: /edit class \.class-1/i }))
+    selectClassPill(/edit class \.class-1/i)
 
     const columnGroup = screen.getByRole('group', { name: /grid template columns/i })
     const fourColsSegment = columnGroup.querySelector('button[aria-label="4 tracks"]') as HTMLButtonElement
@@ -792,9 +883,9 @@ describe('LayoutSection — grid block', () => {
     const clsId = classIds[0]
     useEditorStore.getState().updateClassStyles(clsId, { display: 'grid', gridTemplateColumns: '200px 1fr 200px' })
     selectNode(nodeId)
-    render(<PropertiesPanel />)
+    renderInspector()
 
-    fireEvent.click(screen.getByRole('button', { name: /edit class \.class-1/i }))
+    selectClassPill(/edit class \.class-1/i)
 
     // The chip exposes the raw value as the button's accessible name.
     const chip = screen.getByRole('button', { name: /grid template columns: 200px 1fr 200px/i })
@@ -806,9 +897,9 @@ describe('LayoutSection — grid block', () => {
     const clsId = classIds[0]
     useEditorStore.getState().updateClassStyles(clsId, { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)' })
     selectNode(nodeId)
-    render(<PropertiesPanel />)
+    renderInspector()
 
-    fireEvent.click(screen.getByRole('button', { name: /edit class \.class-1/i }))
+    selectClassPill(/edit class \.class-1/i)
 
     const columnGroup = screen.getByRole('group', { name: /grid template columns/i })
     const twoColsSegment = columnGroup.querySelector('button[aria-label="2 tracks"]') as HTMLButtonElement
@@ -824,9 +915,9 @@ describe('LayoutSection — grid block', () => {
     const clsId = classIds[0]
     useEditorStore.getState().updateClassStyles(clsId, { display: 'grid' })
     selectNode(nodeId)
-    render(<PropertiesPanel />)
+    renderInspector()
 
-    fireEvent.click(screen.getByRole('button', { name: /edit class \.class-1/i }))
+    selectClassPill(/edit class \.class-1/i)
 
     // Generic ClassPropertyRow rows for the grid-owned properties are
     // suppressed; the visual GridBlock owns those controls instead.
@@ -841,8 +932,8 @@ describe('LayoutSection — grid block', () => {
   it('hides gap / rowGap / columnGap rows when display is not flex or grid', () => {
     const { nodeId } = loadSiteWithClasses(1)
     selectNode(nodeId)
-    render(<PropertiesPanel />)
-    fireEvent.click(screen.getByRole('button', { name: /edit class \.class-1/i }))
+    renderInspector()
+    selectClassPill(/edit class \.class-1/i)
 
     // Default display (unset) → no gap controls at all (fallback is gone,
     // visual block isn't rendered yet).
@@ -861,8 +952,8 @@ describe('LayoutSection — grid block', () => {
     const clsId = classIds[0]
     useEditorStore.getState().updateClassStyles(clsId, { display: 'flex' })
     selectNode(nodeId)
-    render(<PropertiesPanel />)
-    fireEvent.click(screen.getByRole('button', { name: /edit class \.class-1/i }))
+    renderInspector()
+    selectClassPill(/edit class \.class-1/i)
 
     // Gap is now inside the flex block (token-aware input), not a fallback row.
     expect(screen.getByLabelText('Gap')).toBeDefined()
@@ -875,9 +966,9 @@ describe('LayoutSection — position block', () => {
   it('always renders the position switcher, regardless of display', () => {
     const { nodeId } = loadSiteWithClasses(1)
     selectNode(nodeId)
-    render(<PropertiesPanel />)
+    renderInspector()
 
-    fireEvent.click(screen.getByRole('button', { name: /edit class \.class-1/i }))
+    selectClassPill(/edit class \.class-1/i)
 
     expect(document.querySelector('[data-testid="css-position-switcher"]')).not.toBeNull()
   })
@@ -886,8 +977,8 @@ describe('LayoutSection — position block', () => {
     const { nodeId, classIds } = loadSiteWithClasses(1)
     const clsId = classIds[0]
     selectNode(nodeId)
-    render(<PropertiesPanel />)
-    fireEvent.click(screen.getByRole('button', { name: /edit class \.class-1/i }))
+    renderInspector()
+    selectClassPill(/edit class \.class-1/i)
 
     expect(document.querySelector('[data-testid="css-direction-input-top"]')).toBeNull()
 
@@ -902,8 +993,8 @@ describe('LayoutSection — position block', () => {
     const clsId = classIds[0]
     useEditorStore.getState().updateClassStyles(clsId, { position: 'relative' })
     selectNode(nodeId)
-    render(<PropertiesPanel />)
-    fireEvent.click(screen.getByRole('button', { name: /edit class \.class-1/i }))
+    renderInspector()
+    selectClassPill(/edit class \.class-1/i)
 
     expect(document.querySelector('[data-testid="css-direction-input-top"]')).not.toBeNull()
     expect(document.querySelector('[data-testid="css-direction-input-right"]')).not.toBeNull()
@@ -916,8 +1007,8 @@ describe('LayoutSection — position block', () => {
     const clsId = classIds[0]
     useEditorStore.getState().updateClassStyles(clsId, { position: 'relative' })
     selectNode(nodeId)
-    render(<PropertiesPanel />)
-    fireEvent.click(screen.getByRole('button', { name: /edit class \.class-1/i }))
+    renderInspector()
+    selectClassPill(/edit class \.class-1/i)
 
     const relSegment = screen.getByRole('button', { name: /^position relative$/i })
     expect(relSegment.getAttribute('aria-pressed')).toBe('true')
@@ -928,8 +1019,8 @@ describe('LayoutSection — position block', () => {
     const clsId = classIds[0]
     useEditorStore.getState().updateClassStyles(clsId, { position: 'sticky' })
     selectNode(nodeId)
-    render(<PropertiesPanel />)
-    fireEvent.click(screen.getByRole('button', { name: /edit class \.class-1/i }))
+    renderInspector()
+    selectClassPill(/edit class \.class-1/i)
 
     const chip = screen.getByRole('button', { name: /position: sticky/i })
     expect(chip).toBeDefined()
@@ -940,8 +1031,8 @@ describe('LayoutSection — position block', () => {
     const clsId = classIds[0]
     useEditorStore.getState().updateClassStyles(clsId, { position: 'absolute' })
     selectNode(nodeId)
-    render(<PropertiesPanel />)
-    fireEvent.click(screen.getByRole('button', { name: /edit class \.class-1/i }))
+    renderInspector()
+    selectClassPill(/edit class \.class-1/i)
 
     const topCell = document.querySelector('[data-testid="css-direction-input-top"]')
     const topInput = topCell?.querySelector('input') as HTMLInputElement
@@ -961,8 +1052,8 @@ describe('LayoutSection — position block', () => {
     const clsId = classIds[0]
     useEditorStore.getState().updateClassStyles(clsId, { position: 'relative' })
     selectNode(nodeId)
-    render(<PropertiesPanel />)
-    fireEvent.click(screen.getByRole('button', { name: /edit class \.class-1/i }))
+    renderInspector()
+    selectClassPill(/edit class \.class-1/i)
 
     expect(document.querySelector('[data-testid="css-property-row-position"]')).toBeNull()
     expect(document.querySelector('[data-testid="css-property-row-top"]')).toBeNull()
@@ -974,8 +1065,8 @@ describe('LayoutSection — position block', () => {
   it('keeps the switcher visible but hides offset inputs entirely when position is unset', () => {
     const { nodeId } = loadSiteWithClasses(1)
     selectNode(nodeId)
-    render(<PropertiesPanel />)
-    fireEvent.click(screen.getByRole('button', { name: /edit class \.class-1/i }))
+    renderInspector()
+    selectClassPill(/edit class \.class-1/i)
 
     // The PositionSection always renders the switcher.
     expect(document.querySelector('[data-testid="css-position-switcher"]')).not.toBeNull()
@@ -992,8 +1083,8 @@ describe('LayoutSection — position block', () => {
   it('renders zIndex row inside the position section regardless of position value', () => {
     const { nodeId } = loadSiteWithClasses(1)
     selectNode(nodeId)
-    render(<PropertiesPanel />)
-    fireEvent.click(screen.getByRole('button', { name: /edit class \.class-1/i }))
+    renderInspector()
+    selectClassPill(/edit class \.class-1/i)
 
     // zIndex always renders inside the position section as a generic
     // ClassPropertyRow — even when the position keyword itself is unset.
@@ -1006,8 +1097,8 @@ describe('ClassPropertyRow — token-aware properties', () => {
     const { nodeId, classIds } = loadSiteWithClasses(1)
     const clsId = classIds[0]
     selectNode(nodeId)
-    render(<PropertiesPanel />)
-    fireEvent.click(screen.getByRole('button', { name: /edit class \.class-1/i }))
+    renderInspector()
+    selectClassPill(/edit class \.class-1/i)
 
     const fontSizeRow = document.querySelector('[data-testid="css-property-row-fontSize"]')
     expect(fontSizeRow).not.toBeNull()
@@ -1033,8 +1124,8 @@ describe('ClassPropertyRow — token-aware properties', () => {
     // back when no typography tokens are configured.
     useEditorStore.getState().updateClassStyles(clsId, { fontSize: 'var(--text-l)' })
     selectNode(nodeId)
-    render(<PropertiesPanel />)
-    fireEvent.click(screen.getByRole('button', { name: /edit class \.class-1/i }))
+    renderInspector()
+    selectClassPill(/edit class \.class-1/i)
 
     const fontSizeRow = document.querySelector('[data-testid="css-property-row-fontSize"]')
     const fontSizeInput = fontSizeRow?.querySelector('input') as HTMLInputElement
@@ -1049,8 +1140,8 @@ describe('ClassPropertyRow — number-typed CSS properties', () => {
     const { nodeId, classIds } = loadSiteWithClasses(1)
     const classId = classIds[0]
     selectNode(nodeId)
-    render(<PropertiesPanel />)
-    fireEvent.click(screen.getByRole('button', { name: /edit class \.class-1/i }))
+    renderInspector()
+    selectClassPill(/edit class \.class-1/i)
 
     const opacityRow = document.querySelector('[data-testid="css-property-row-opacity"]')
     const opacityInput = opacityRow?.querySelector('input') as HTMLInputElement
@@ -1074,8 +1165,8 @@ describe('ClassPropertyRow — number-typed CSS properties', () => {
     const { nodeId, classIds } = loadSiteWithClasses(1)
     const classId = classIds[0]
     selectNode(nodeId)
-    render(<PropertiesPanel />)
-    fireEvent.click(screen.getByRole('button', { name: /edit class \.class-1/i }))
+    renderInspector()
+    selectClassPill(/edit class \.class-1/i)
 
     const zIndexRow = document.querySelector('[data-testid="css-property-row-zIndex"]')
     const zIndexInput = zIndexRow?.querySelector('input') as HTMLInputElement
@@ -1096,22 +1187,21 @@ describe('ClassPropertyRow — number-typed CSS properties', () => {
 })
 
 describe('StyleRuleComposer set style indicators', () => {
-  it('marks category rail icons and section headers that contain stored class styles', () => {
+  it('marks section headers that contain stored class styles', () => {
     const { nodeId, classIds } = loadSiteWithClasses(1)
     const clsId = classIds[0]
     useEditorStore.getState().updateClassStyles(clsId, { display: 'flex', fontFamily: 'Inter, sans-serif' })
     selectNode(nodeId)
-    render(<PropertiesPanel />)
+    renderInspector()
 
-    fireEvent.click(screen.getByRole('button', { name: /edit class \.class-1/i }))
+    selectClassPill(/edit class \.class-1/i)
 
+    // The section-header dot is the surviving "this category has stored styles"
+    // signal; its rail-icon twin went with the category rail.
     expect(screen.getByTestId('class-style-section-dot-layout')).toBeDefined()
     expect(screen.getByTestId('class-style-section-dot-typography')).toBeDefined()
     expect(screen.queryByTestId('class-style-section-dot-size')).toBeNull()
-
-    expect(screen.getByTestId('class-style-category-dot-layout')).toBeDefined()
-    expect(screen.getByTestId('class-style-category-dot-typography')).toBeDefined()
-    expect(screen.queryByTestId('class-style-category-dot-size')).toBeNull()
+    expect(screen.queryByTestId('class-style-category-dot-layout')).toBeNull()
   })
 
   it('does not mark inherited base styles as set on breakpoint tabs', () => {
@@ -1120,9 +1210,9 @@ describe('StyleRuleComposer set style indicators', () => {
     useEditorStore.getState().updateClassStyles(clsId, { display: 'flex' })
     useEditorStore.setState({ activeBreakpointId: 'mobile' } as Parameters<typeof useEditorStore.setState>[0])
     selectNode(nodeId)
-    render(<PropertiesPanel />)
+    renderInspector()
 
-    fireEvent.click(screen.getByRole('button', { name: /edit class \.class-1/i }))
+    selectClassPill(/edit class \.class-1/i)
 
     expect(screen.queryByTestId('class-style-section-dot-layout')).toBeNull()
     expect(screen.queryByTestId('class-style-category-dot-layout')).toBeNull()
@@ -1147,10 +1237,11 @@ describe('PP-12 — Removing a class CSS property removes it from class styles',
     state.addNodeClass(nodeId, cls.id)
     state.updateClassStyles(cls.id, { fontFamily: 'serif' })
     selectNode(nodeId)
-    render(<PropertiesPanel />)
+    renderInspector()
 
     const pill = screen.getByRole('button', { name: /edit class \.remove-class/i })
     fireEvent.click(pill)
+    expandAll()
 
     const removeBtn = screen.getByRole('button', { name: /remove font family property/i })
     fireEvent.click(removeBtn)
@@ -1165,27 +1256,26 @@ describe('PP-12 — Removing a class CSS property removes it from class styles',
 // PP-13: Breakpoint hint appears inside Module section when non-desktop bp active
 // ---------------------------------------------------------------------------
 
-describe('PP-13 — Breakpoint hint inside Module section when non-desktop bp active', () => {
-  // The previous "editing tablet" text affordance was replaced by the breakpoint
-  // dot indicator on the Module section header — only the dot indicator below is
-  // still part of the spec.
+describe('PP-13 — parameters stay editable on a non-desktop breakpoint', () => {
+  // The module accordion that used to carry a breakpoint dot is gone with the
+  // approved Site screen's re-skin — the parameters now lead the body directly.
+  // Per-property override state is carried by the row itself (`ControlRow`'s
+  // `isOverride`) and, in Responsive review, by the override note.
 
-  it('breakpoint dot indicator appears on Module section header when non-desktop bp active', () => {
+  it('renders the parameter rows when a non-desktop breakpoint is active', () => {
     const { nodeId } = loadSiteWithHeading()
     selectNode(nodeId)
     useEditorStore.setState({ activeBreakpointId: 'tablet' } as Parameters<typeof useEditorStore.setState>[0])
-    render(<PropertiesPanel />)
+    renderInspector()
 
-    // The Module settings section includes the selected module name and breakpoint indicator.
-    const moduleSection = screen.getByRole('button', { name: /module settings.*text/i })
-    expect(moduleSection).toBeDefined()
+    expect(screen.getByTestId('property-control-text')).toBeDefined()
   })
 
   it('no breakpoint hint when desktop bp is active', () => {
     const { nodeId } = loadSiteWithHeading()
     selectNode(nodeId)
     useEditorStore.setState({ activeBreakpointId: 'desktop' } as Parameters<typeof useEditorStore.setState>[0])
-    render(<PropertiesPanel />)
+    renderInspector()
     expect(screen.queryByText(/editing.*overrides/i)).toBeNull()
   })
 })
@@ -1251,7 +1341,7 @@ describe('HF-1 — Class pill actions are keyboard-reachable (no tabIndex={-1})'
   it('class pills are focusable and open actions from the keyboard context-menu key', () => {
     const { nodeId } = loadSiteWithClasses(2)
     selectNode(nodeId)
-    render(<PropertiesPanel />)
+    renderInspector()
 
     const pill = screen.getByRole('button', { name: /edit class \.class-1/i })
     expect(pill.tabIndex).toBe(0)
@@ -1269,7 +1359,7 @@ describe('HF-2 — Switching class pills resets StyleRuleComposer local state', 
   it('property search resets and updates placeholder after switching classes (no state leak)', () => {
     const { nodeId } = loadSiteWithClasses(2)
     selectNode(nodeId)
-    render(<PropertiesPanel />)
+    renderInspector()
 
     // Activate class-1 — StyleRuleComposer mounts
     const pill1 = screen.getByRole('button', { name: /edit class \.class-1/i })
@@ -1303,16 +1393,14 @@ describe('HF-2 — Switching class pills resets StyleRuleComposer local state', 
     storeState.updateClassStyles(cls1.id, { fontFamily: 'serif' })
     // cls2 has no styles
     selectNode(nodeId)
-    render(<PropertiesPanel />)
+    renderInspector()
 
     // Open class-1 — fontFamily CSS property row should be visible
-    const pill1 = screen.getByRole('button', { name: /edit class \.class-1-isolation/i })
-    fireEvent.click(pill1)
+    selectClassPill(/edit class \.class-1-isolation/i)
     expect(document.querySelector('[data-testid="css-property-row-fontFamily"]')).not.toBeNull()
 
     // Switch to class-2 — the full catalog appears, but the inherited class-1 value is not leaked.
-    const pill2 = screen.getByRole('button', { name: /edit class \.class-2-isolation/i })
-    fireEvent.click(pill2)
+    selectClassPill(/edit class \.class-2-isolation/i)
     expect(document.querySelector('[data-testid="css-property-row-fontFamily"]')).not.toBeNull()
     expect(screen.queryByDisplayValue('serif')).toBeNull()
     expect(document.querySelectorAll('[data-testid^="css-property-row-"]').length).toBeGreaterThan(0)
@@ -1336,10 +1424,11 @@ describe('PP-17 — No textarea element in StyleRuleComposer (Phase 3)', () => {
   it('rendered StyleRuleComposer contains no textarea element in the DOM', () => {
     const { nodeId } = loadSiteWithClasses(1)
     selectNode(nodeId)
-    render(<PropertiesPanel />)
+    renderInspector()
 
     const pill = screen.getByRole('button', { name: /edit class \.class-1/i })
     fireEvent.click(pill)
+    expandAll()
 
     expect(screen.queryByRole('textbox', { name: /edit css/i })).toBeNull()
   })
@@ -1404,10 +1493,11 @@ describe('PP-20 — Property search adds class-backed styles to the active class
     const cls = state.createClass('add-prop-class')
     state.addNodeClass(nodeId, cls.id)
     selectNode(nodeId)
-    render(<PropertiesPanel />)
+    renderInspector()
 
     const pill = screen.getByRole('button', { name: /edit class \.add-prop-class/i })
     fireEvent.click(pill)
+    expandAll()
 
     // The minimal add-property search is always present when a class is active.
     const searchInput = screen.getByRole('searchbox', { name: /search class style properties to add/i })
@@ -1435,10 +1525,11 @@ describe('PP-20 — Property search adds class-backed styles to the active class
     state.addNodeClass(nodeId, cls.id)
     useEditorStore.setState({ activeBreakpointId: 'mobile' } as Parameters<typeof useEditorStore.setState>[0])
     selectNode(nodeId)
-    render(<PropertiesPanel />)
+    renderInspector()
 
     const pill = screen.getByRole('button', { name: /edit class \.bp-prop-class/i })
     fireEvent.click(pill)
+    expandAll()
 
     expect(screen.queryByRole('combobox', { name: /class style breakpoint/i })).toBeNull()
 
@@ -1469,7 +1560,7 @@ describe('PP-20b — Module settings exclude visual CSS fields', () => {
     // "Edit" button that opens the viewer.
     const { nodeId } = loadSiteWithImage()
     selectNode(nodeId)
-    render(<PropertiesPanel />)
+    renderInspector()
 
     expect(screen.getByTestId('property-control-src')).toBeDefined()
     expect(screen.queryByTestId('property-control-alt')).toBeNull()
@@ -1492,10 +1583,11 @@ describe('PP-21 — Empty class shows full property catalog', () => {
     const cls = state.createClass('empty-cls')
     state.addNodeClass(nodeId, cls.id)
     selectNode(nodeId)
-    render(<PropertiesPanel />)
+    renderInspector()
 
     const pill = screen.getByRole('button', { name: /edit class \.empty-cls/i })
     fireEvent.click(pill)
+    expandAll()
 
     // Full catalog rows are visible even before a property is assigned.
     // Layout-position uses the DisplaySwitcher; typography still uses
@@ -1514,16 +1606,21 @@ describe('PP-21 — Empty class shows full property catalog', () => {
 // PP-22: Module settings section is first visible accordion
 // ---------------------------------------------------------------------------
 
-describe('PP-22 — Module settings is the first visible accordion', () => {
-  it('Module settings is the first accordion after the header class picker', () => {
+describe('PP-22 — parameters lead, the class picker follows', () => {
+  it('the parameters come before the class picker, not after it', () => {
+    // The approved Site screen inverts the old order: content first
+    // ("Instance parameters" and the fields), with the class picker tucked into
+    // the "Advanced instance styles, classes & attributes" disclosure below.
     const { nodeId } = loadSiteWithHeading()
     selectNode(nodeId)
-    render(<PropertiesPanel />)
+    renderInspector()
 
+    const parameters = screen.getByTestId('property-control-text')
     const classInput = screen.getByRole('textbox', { name: /add or create a css selector/i })
-    const moduleSectionBtn = screen.getByRole('button', { name: /module settings/i })
 
-    expect(classInput.compareDocumentPosition(moduleSectionBtn) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(
+      parameters.compareDocumentPosition(classInput) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
     expect(screen.queryByRole('button', { name: /^classes$/i })).toBeNull()
   })
 })
@@ -1565,10 +1662,11 @@ describe('PP-25 — Keyboard navigation reaches ClassPropertyRow controls and re
     state.addNodeClass(nodeId, cls.id)
     state.updateClassStyles(cls.id, { fontFamily: 'serif' })
     selectNode(nodeId)
-    render(<PropertiesPanel />)
+    renderInspector()
 
     const pill = screen.getByRole('button', { name: /edit class \.kb-test-class/i })
     fireEvent.click(pill)
+    expandAll()
 
     const user = userEvent.setup()
 

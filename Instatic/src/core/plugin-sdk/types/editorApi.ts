@@ -88,7 +88,7 @@ export interface EditorPluginApi {
     }
   }
   /**
-   * Admin dashboard surface — `/admin/dashboard`. Plugins register cards
+   * Admin dashboard surface — `/cms/dashboard`. Plugins register cards
    * (analytics charts, queue counters, plugin-specific stats) for the
    * configurable widget grid via `dashboard.widgets.register(...)`.
    * Requires the `dashboard.widgets.register` permission.

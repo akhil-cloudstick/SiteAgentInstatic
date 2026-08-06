@@ -1,15 +1,47 @@
-# OpenDesign Version Comparison — Current v0.12.x vs Latest v0.16.1
+# OpenDesign Version Comparison — v0.14.x → v0.16.1
 
-**Current vendored version in this repo:** `0.12.1`
-_Source: `OpenDesign/package.json` → `"version": "0.12.1"` (the "Brand-backed Design System" line)._
+> ## ✅ SUPERSEDED — this upgrade is DONE (2026-08-03)
+>
+> The repo now runs upstream **`open-design-v0.16.1`**. See
+> **`docs/opendesign-0.16.1-upgrade-report.md`** (what happened + the customization ledger) and
+> **`docs/opendesign-upgrade-runbook.md`** (how to do the next one). The segment tables below are
+> kept as the human-readable summary of *what changed* across the releases we adopted.
 
-**Latest upstream release:** `0.16.1` (2026-07-23) — [github.com/nexu-io/open-design](https://github.com/nexu-io/open-design)
+> ## ⚠️ CORRECTION — the original baseline in this doc was WRONG
+>
+> This doc used to claim the vendored baseline was **0.12.x**, read from
+> `OpenDesign/package.json` → `"version": "0.12.1"`. That is not a reliable signal:
+> **upstream's `package.json` version lags its own release tags by 1–3 releases.**
+>
+> | Upstream tag | Its own `package.json` says |
+> |---|---|
+> | `open-design-v0.13.0` | `0.12.1` ← identical to what we had |
+> | `open-design-v0.16.1` | `0.15.1` |
+>
+> Identifying the version empirically — diffing the vendored tree against each upstream release and
+> taking the closest match — showed we were actually on **v0.14.0**:
+>
+> | Candidate version | Files differing from the vendored tree |
+> |---|---|
+> | v0.13.0 (this doc's old claim) | 1,027 |
+> | **v0.14.0** (actual) | **196** |
+> | v0.14.1 | 603 |
+> | v0.15.0 | 1,891 |
+>
+> So the real gap was **5 releases** (0.14.1 → 0.16.1), not six from 0.13.0, and the repo already
+> had 0.13.0's session-resume + PPTX/PDF export and 0.14.0's plan mode. Never identify the
+> version from `package.json`, `README.md`, or `CHANGELOG.md` — all three disagreed here, and all
+> three were wrong. Use the procedure in `docs/opendesign-upgrade-runbook.md` §1.
 
-> ⚠️ **Current-version caveat.** This repo's OpenDesign copy is internally inconsistent:
-> `package.json` says **0.12.1**, but the local `README.md` announces **0.13.0** and the local
-> `CHANGELOG.md` stops at **0.9.0** (stale). Treat **0.12.x** as the working baseline — the
-> comparison gap that matters is **0.13.0 → 0.16.1** (six releases of features this repo does
-> not yet have). If a git-level version check later pins it exactly, adjust the baseline.
+**Upstream:** [github.com/nexu-io/open-design](https://github.com/nexu-io/open-design) ·
+**Adopted:** `open-design-v0.16.1` (2026-07-23), the newest tag.
+
+> **Reading note.** Rows below labelled "Current (0.12.x)" describe the *pre-upgrade* state and
+> overstate what was missing: anything introduced in 0.13.0 or 0.14.0 (session resume, deck/PPTX
+> export, plan mode) was **already present** before this upgrade. The genuinely new material is
+> everything from **0.14.1 onward**: the expanded model catalog, the 0.15.0 prompt optimization,
+> the upgraded built-in agent, auto-update/long-task resilience, the message centre, and the
+> 0.16.1 run-status fix.
 
 This doc compares them **segment by segment** — agents/AI, model selection, Studio/editor,
 export, design system, version history, UI, MCP, reliability, platform, localization — so each
@@ -207,18 +239,27 @@ translated._
 
 ---
 
-## Upgrade notes
+## Upgrade notes — how the predictions here actually turned out
 
-- **Distance:** six releases (0.13.0 → 0.16.1) of features this repo lacks — session resume,
-  plan mode, HTML version history, deck/export tooling, and the 0.15.0 prompt optimization
-  (−49.5% time-to-first-token, −25.1% tokens).
-- **Highest-value reasons to upgrade:** session resume + long-running-task resilience (#1),
-  the design-system prompt optimization (#2/#5 performance), and stopped-tasks-cancel-processes
-  (#9, saves quota).
-- **Biggest merge risk:** this is a **desktop monorepo** and the repo carries **local
-  Share-to-CMS / templateRule compliance code** (`apps/daemon/src/cms-compliance.ts`,
-  `od-share-to-cms.ts`) that upstream does not have. An upgrade must re-apply those on top of
-  the new base — this is the OD analog of Instatic's MMS re-skin risk.
-- **Version metadata is inconsistent locally** (`package.json` 0.12.1 vs README 0.13.0 vs
-  CHANGELOG 0.9.0). Reconcile the vendored version before an upgrade so the baseline is exact.
-- This document is descriptive (what changed), **not** a step-by-step upgrade runbook.
+- **Distance (corrected):** **5 releases** — v0.14.0 → v0.16.1 — not the six-from-0.13.0 this doc
+  originally claimed. Session resume, PPTX/PDF export and plan mode
+  were **already in the tree**. The real additions were the expanded model catalog, the 0.15.0
+  prompt optimization (−49.5% time-to-first-token), the upgraded built-in agent, auto-update and
+  long-task resilience, the message centre, and the 0.16.1 run-status fix.
+- **Biggest merge risk — confirmed, and it held up well.** The local Share-to-CMS / templateRule
+  code (`apps/daemon/src/cms-compliance.ts`, `od-share-to-cms.ts`, `tenant-sso.ts`, the gateway
+  base-path shim) is indeed the OD analog of Instatic's MMS re-skin risk. With the baseline pinned
+  correctly it produced only **14 conflicts** across a 2,302-file upstream delta, and **zero**
+  customizations were lost.
+- **Version metadata:** the local inconsistency was not a local bug — **upstream's own
+  `package.json` lags its tags**. `OpenDesign/package.json` is now pinned to the *tag* version
+  (`0.16.1`) on purpose. Do not "correct" it back to match upstream's field.
+- **Surprises the pre-analysis missed** (see the upgrade report for detail):
+  - upstream v0.16.1 ships a **validation-only** `promptCoreVariant: 'slim'` default that its own
+    comment says must not reach main — we adopted the plumbing and kept `classic`;
+  - upstream's `@types/node` bump silently broke `fsp.readdir` typing in our Share-to-CMS collector;
+  - `git archive` honours `core.autocrlf=true` and emits CRLF, which makes every text file look
+    changed unless exports use `-c core.autocrlf=false`.
+- This document is descriptive (what changed). The step-by-step procedure lives in
+  **`docs/opendesign-upgrade-runbook.md`**; the per-file ledger in
+  **`docs/opendesign-0.16.1-upgrade-report.md`**.

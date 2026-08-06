@@ -2,7 +2,7 @@
  * Per-widget dashboard data hooks.
  *
  * Each hook owns ONE network round-trip against a per-domain endpoint
- * (`/admin/api/cms/dashboard/<domain>`). The 6 hooks fire in parallel
+ * (`/cms/api/cms/dashboard/<domain>`). The 6 hooks fire in parallel
  * when the dashboard mounts, and each widget unblocks AS ITS DATA
  * ARRIVES — the dashboard fills in progressively instead of stalling
  * on the slowest endpoint (the audit-events-driven Activity feed).
@@ -241,7 +241,7 @@ function useDashboardEndpoint<S extends TSchema>(
   const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone
   const resource = useAsyncResource(
     (signal) =>
-      apiRequest(`/admin/api/cms/dashboard/${endpoint}`, {
+      apiRequest(`/cms/api/cms/dashboard/${endpoint}`, {
         schema,
         signal,
         query: { tz: timeZone },

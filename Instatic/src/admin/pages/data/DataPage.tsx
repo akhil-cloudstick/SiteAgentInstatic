@@ -103,13 +103,13 @@ export function DataPage() {
   function handleEditInContent(row: DataRow) {
     const table = workspace.selectedTable
     if (!table) return
-    navigate('/admin/content?table=' + table.slug + '&row=' + row.id)
+    navigate('/cms/content?table=' + table.slug + '&row=' + row.id)
   }
 
   function handleOpenInSiteEditor(row: DataRow) {
     const table = workspace.selectedTable
     if (!table) return
-    navigate('/admin/site?table=' + table.slug + '&row=' + row.id)
+    navigate('/cms/site?table=' + table.slug + '&row=' + row.id)
   }
 
   async function handleAddRow(): Promise<void> {

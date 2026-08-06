@@ -34,7 +34,7 @@
 import { useEffect, useRef } from 'react'
 import { usePropertiesPanelAutoOpen } from './usePropertiesPanelAutoOpen'
 import { usePropertiesPanelData } from './usePropertiesPanelData'
-import { renderModuleTabContent } from './renderModuleTabContent'
+import { renderModuleTabContent, type ModuleTabContent } from './renderModuleTabContent'
 import { PropertiesPanelBody } from './PropertiesPanelBody'
 import { NodeHeader } from './NodeHeader'
 import { SelectorHeader } from './SelectorHeader'
@@ -135,7 +135,7 @@ export function PropertiesPanel({ variant = 'floating' }: PropertiesPanelProps) 
   // ── Module tab content — pre-rendered, passed to StyleSurface as a ReactNode.
   // The dispatch lives in `renderModuleTabContent` (own file) to keep this
   // shell flat — see that helper for the per-branch rationale.
-  const moduleTabContent: React.ReactNode = renderModuleTabContent({
+  const moduleTabContent: ModuleTabContent = renderModuleTabContent({
     selectedNode: data.selectedNode,
     selectedNodeId: data.selectedNodeId,
     definition: data.definition,
@@ -234,6 +234,7 @@ export function PropertiesPanel({ variant = 'floating' }: PropertiesPanelProps) 
           moduleTabContent={moduleTabContent}
           classPickerRef={classPickerRef}
           onFocusClassPicker={handleFocusClassPicker}
+          overrideKeys={data.overrideKeys}
         />
       </div>
 

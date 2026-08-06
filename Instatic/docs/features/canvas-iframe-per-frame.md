@@ -111,9 +111,9 @@ Source: `src/admin/pages/site/canvas/CanvasLiveSurface.tsx`
 - **Side handle resizing.** Left and right `LiveResizeHandle` divs let the author drag the frame width continuously between 240 px and the selected viewport context's natural width. Switching viewport contexts invalidates any active override — the frame snaps to the new context width automatically.
 - **Width badge.** A small `{N}px` indicator updates live while dragging.
 
-Pan/zoom gestures are disabled in live mode (`useCanvas({ enabled: !isLive })`). The `CanvasModeToggle` shows an inline viewport icon row when live is active.
+Pan/zoom gestures are disabled in live mode (`useCanvas({ enabled: !isLive })`). The mode + viewport controls live in `WorkspaceToolbar`, above the canvas.
 
-Because the live frame sits flush against the top of the surface, both top-edge chrome controls — the `CanvasModeToggle` (top-left) and the `CanvasNotch` (top-center) — render in **peek** mode in live view. Each parks above the top edge (clipped by the canvas's `overflow:hidden`) and rolls down on hover or `:focus-within`, leaving a slim handle as the affordance, so neither overlays the page's own header. In design mode both stay pinned over the empty canvas chrome. The peek prop is passed as `peek={isLive}` from `CanvasRoot`.
+Because the live frame sits flush against the top of the surface, the one remaining top-edge control — `CanvasDocumentModeDock` (top-center, shown only for a Visual Component or Template document) — renders in **peek** mode in live view. It parks above the top edge (clipped by the canvas's `overflow:hidden`) and rolls down on hover or `:focus-within`, leaving a slim handle as the affordance, so it never overlays the page's own header. In design mode it stays pinned. The peek prop is passed as `peek={isLive}` from `CanvasRoot`.
 
 ---
 

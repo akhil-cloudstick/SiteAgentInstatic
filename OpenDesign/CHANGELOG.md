@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.16.1] - 2026-08-03 (SiteAgentHub vendored upgrade)
+
+Vendored fork upgraded **v0.14.0 → v0.16.1**, adopting 5 upstream releases:
+0.14.1, 0.15.0, 0.15.1, 0.16.0 and 0.16.1. The MMS/SiteAgent layer (Share-to-CMS,
+tenant SSO, gateway base-path, capture proxy, annotate/edit-mode, MMS theme and
+branding) was re-applied on top — see `docs/opendesign-0.16.1-upgrade-report.md`
+in the SiteAgentHub monorepo.
+
+> **Note on version numbers:** upstream's own `package.json` lags its release
+> tags (it reads `0.15.1` at tag `v0.16.1`, and `0.12.1` at `v0.13.0`). The field
+> above is set to the **tag** version deliberately. Do not "correct" it back, and
+> never use it to identify the vendored baseline — see
+> `docs/opendesign-upgrade-runbook.md` §1.
+
+_(Entries below this point are upstream's own changelog, which stops at 0.9.0.)_
+
 ## [0.9.0] - 2026-05-29
 
 🎉 **310 PRs · 88 contributors · 7 days** — Meet the **install-and-create release**. No more API-key scavenger hunts. No more asking teammates to install three different CLIs before their first prompt. **Open Design AMR** is now built into the app: sign in once, pick a model, and start building. Around that zero-config first run, 0.9.0 brings a bigger agent bench, faster model picking, a more discoverable plugin marketplace, richer review workflows, smoother Studio tools, and easier installs across Windows, macOS, and Linux. 🚀

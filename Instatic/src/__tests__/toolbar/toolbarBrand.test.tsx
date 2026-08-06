@@ -98,6 +98,6 @@ describe('Toolbar brand mark', () => {
   it('links the brand through to the dashboard', () => {
     const { brand } = renderToolbar()
 
-    expect(brand.getAttribute('href')).toBe('/admin/dashboard')
+    expect(brand.getAttribute('href')).toBe('/cms/dashboard')
   })
 })

@@ -3,7 +3,7 @@ import {
   canvasFrame,
   createPage,
   expectEditorReady,
-  insertNotchModule,
+  insertModule,
   openSiteEditor,
   openSitePanel,
   saveDraft,
@@ -25,7 +25,7 @@ test.describe('reliability', () => {
 
     await openSiteEditor(page)
     await createPage(page, pageName, slug)
-    await insertNotchModule(page, 'text')
+    await insertModule(page, 'text')
     await setPropValue(page, 'text', text)
     await expect(canvasFrame(page).getByText(text, { exact: true })).toBeVisible()
     await saveDraft(page)

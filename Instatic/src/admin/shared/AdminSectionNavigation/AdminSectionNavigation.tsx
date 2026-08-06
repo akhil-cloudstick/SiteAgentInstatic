@@ -122,7 +122,7 @@ export function AdminSectionNavigation({
     <>
       {canAccess('dashboard') && (
         <NavItem
-          to="/admin/dashboard"
+          to="/cms/dashboard"
           icon={<FaIcon name="table-cells-large" size={NAV_ICON_SIZE} />}
           label="Dashboard"
           active={section === 'dashboard'}
@@ -131,7 +131,7 @@ export function AdminSectionNavigation({
       )}
       {canAccess('site') && (
         <NavItem
-          to="/admin/site"
+          to="/cms/site"
           icon={<FaIcon name="window-maximize" size={NAV_ICON_SIZE} />}
           label="Site"
           active={section === 'site'}
@@ -140,7 +140,7 @@ export function AdminSectionNavigation({
       )}
       {canAccess('content') && (
         <NavItem
-          to="/admin/content"
+          to="/cms/content"
           icon={<FaIcon name="file-lines" size={NAV_ICON_SIZE} />}
           label="Content"
           active={section === 'content'}
@@ -149,7 +149,7 @@ export function AdminSectionNavigation({
       )}
       {canAccess('data') && (
         <NavItem
-          to="/admin/data"
+          to="/cms/data"
           icon={<FaIcon name="database" size={NAV_ICON_SIZE} />}
           label="Data"
           active={section === 'data'}
@@ -158,7 +158,7 @@ export function AdminSectionNavigation({
       )}
       {canAccess('media') && (
         <NavItem
-          to="/admin/media"
+          to="/cms/media"
           icon={<FaIcon name="image" size={NAV_ICON_SIZE} />}
           label="Media"
           active={section === 'media'}
@@ -173,7 +173,7 @@ export function AdminSectionNavigation({
       )}
       {canAccess('users') && (
         <NavItem
-          to="/admin/users"
+          to="/cms/users"
           icon={<FaIcon name="user" size={NAV_ICON_SIZE} />}
           label="Users"
           active={section === 'users'}
@@ -264,7 +264,7 @@ function PluginsNavLink({
     )
   }
   return (
-    <AdminRouteLink to="/admin/plugins" onNavigateStart={onNavigateStart}>
+    <AdminRouteLink to="/cms/plugins" onNavigateStart={onNavigateStart}>
       <FaIcon name="cube" size={NAV_ICON_SIZE} />
       <span>Plugins</span>
       {dot}

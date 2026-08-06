@@ -24,12 +24,17 @@ import { getNodeDisplayName, type Breakpoint, type PageNode } from '@core/page-t
 import { useEditorPermissions } from '@site/editorPermissionsContext'
 import { FaIcon } from '@ui/components/FaIcon'
 import { Button } from '@ui/components/Button'
+import { Input } from '@ui/components/Input'
+import { cn } from '@ui/cn'
 import { SearchBar } from '@ui/components/SearchBar'
+import { useBreakpointFrameWidth } from '@site/canvas/useBreakpointFrameWidth'
+import { MAX_PREVIEW_FRAME_WIDTH, MIN_PREVIEW_FRAME_WIDTH } from '@site/canvas/math'
 import { LayerNodeContextMenu } from '@site/panels/DomPanel/LayerNodeContextMenu'
 import { ModuleInserterDialog } from '@site/module-picker/ModuleInserterDialog'
 import { useInsertInserterItem } from '@site/hooks/useInsertInserterItem'
 import { topLevelSectionIds, type SiteWorkspaceMode } from '@site/siteWorkspaceMode'
 import { ExplorerDisclosure } from './ExplorerDisclosure'
+import { SiteColumnContext } from './siteColumnContext'
 import { moduleGlyph } from '@site/moduleGlyph'
 import styles from './PageOutlinePanel.module.css'
 
@@ -51,8 +56,25 @@ interface PageOutlinePanelProps {
    * stays visible so the switcher never disappears with it.
    */
   hidden?: boolean
-  /** Heading for the switched-to panel, replacing the outline's own. */
-  toolHeading?: string | null
+  /**
+   * What the switched-to panel lists — "Layers", "Layouts", "Code", "Media".
+   * It names the content in the KICKER under the search field, never in the
+   * heading: the heading says which mode you are in, and that must not change
+   * out from under you just because you opened a different tool.
+   */
+  toolLabel?: string | null
+  /**
+   * Placeholder for the column's search field while that panel is showing, or
+   * null when the panel has nothing to search — the field is then hidden
+   * rather than left inert.
+   */
+  toolSearchPlaceholder?: string | null
+  /**
+   * True when the switched-to panel needs the column's whole height — the AI
+   * assistant, whose transcript and composer fill it. The mode's own controls
+   * (Review's Viewport context) step aside rather than squeezing the chat.
+   */
+  toolNeedsFullColumn?: boolean
   /** The switched-to panel itself, rendered in place of the outline list. */
   children?: ReactNode
 }
@@ -61,7 +83,9 @@ export function PageOutlinePanel({
   mode,
   drawer = false,
   hidden = false,
-  toolHeading = null,
+  toolLabel = null,
+  toolSearchPlaceholder = null,
+  toolNeedsFullColumn = false,
   children,
 }: PageOutlinePanelProps) {
   const page = useEditorStore(selectActiveCanvasPage)
@@ -70,13 +94,12 @@ export function PageOutlinePanel({
   const selectNode = useEditorStore((s) => s.selectNode)
   const moveNodes = useEditorStore((s) => s.moveNodes)
   const breakpoints = useEditorStore((s) => s.site?.breakpoints ?? EMPTY_BREAKPOINTS)
-  const activeBreakpointId = useEditorStore((s) => s.activeBreakpointId)
-  const setActiveBreakpoint = useEditorStore((s) => s.setActiveBreakpoint)
-  const setLeftSidebarPanel = useEditorStore((s) => s.setLeftSidebarPanel)
-  const setExplorerPanelTab = useEditorStore((s) => s.setExplorerPanelTab)
   const permissions = useEditorPermissions()
 
   const [query, setQuery] = useState('')
+  // Collapsed by default — see the block itself. Local UI, not editor state:
+  // reopening the workspace should start from the quiet column.
+  const [viewportContextOpen, setViewportContextOpen] = useState(false)
   const [inserterOpen, setInserterOpen] = useState(false)
   const [rowMenu, setRowMenu] = useState<{ nodeId: string; x: number; y: number } | null>(null)
   const onInsertItem = useInsertInserterItem()
@@ -95,23 +118,28 @@ export function PageOutlinePanel({
     ? sections.filter((section) => section.label.toLowerCase().includes(needle))
     : sections
 
+  // What the column is listing right now, and whether that content is
+  // searchable. Showing the outline, the reference gives Live a field over
+  // "Top-level layers" and leaves Focus/Review unfiltered — their lists are
+  // short and every row is already on screen.
+  // The AI panel draws its own "AI Assistant" title bar, so repeating the tool
+  // name above it would be two headings for one thing — and that column needs
+  // the row for the transcript.
+  const kicker = hidden
+    ? (toolNeedsFullColumn ? null : toolLabel)
+    : mode === 'live' ? 'Top-level layers' : null
+  const searchPlaceholder = hidden
+    ? toolSearchPlaceholder
+    : mode === 'live'
+      ? 'Search sections…'
+      : null
+
   /**
    * Reordering from the outline moves a section one place earlier — the
    * reference's grip is a nudge, not a drag surface (full drag-and-drop lives
    * in the Layers tree, which is one click away in the Explorer disclosure).
    * It goes through `moveNodes`, so it is one undo step like any other move.
    */
-  /**
-   * The reference's Live-mode heading button. It opens the full tool set — the
-   * same destination the Explorer disclosure at the foot reaches, through the
-   * same store actions, so the two entry points can never disagree about what
-   * "Explorer" means.
-   */
-  function openExplorer(): void {
-    setExplorerPanelTab('layers')
-    setLeftSidebarPanel('explorer')
-  }
-
   function moveEarlier(nodeId: string): void {
     const index = sectionIds.indexOf(nodeId)
     if (index < 1 || !page) return
@@ -126,24 +154,14 @@ export function PageOutlinePanel({
       data-mode={mode}
       data-body-hidden={hidden ? 'true' : undefined}
     >
-      {/* Heading + its one action, per the reference: Live offers Explorer,
-          Focus offers "Add section", Review offers neither (its actions live in
-          the viewport-context block below). */}
+      {/* One header for the column, in every state. The heading names the MODE
+          — it never becomes "Layers" — and its action is "Add section" while
+          there is a page to add to (Live and Focus). Review is a read-across of
+          breakpoints, so it offers no insert; nor does the AI panel, which owns
+          the column and has its own header a row below. */}
       <div className={styles.heading}>
-        <h2>{hidden ? (toolHeading ?? HEADINGS[mode]) : HEADINGS[mode]}</h2>
-        {!hidden && mode === 'live' && (
-          <Button
-            variant="secondary"
-            size="md"
-            className={styles.headingAction}
-            onClick={openExplorer}
-            data-testid="page-outline-open-explorer"
-          >
-            <FaIcon name="sitemap" size={12} />
-            <span>Explorer</span>
-          </Button>
-        )}
-        {!hidden && mode === 'focus' && permissions.canEditStructure && (
+        <h2>{HEADINGS[mode]}</h2>
+        {mode !== 'review' && !toolNeedsFullColumn && permissions.canEditStructure && (
           <Button
             variant="secondary"
             size="md"
@@ -157,24 +175,33 @@ export function PageOutlinePanel({
         )}
       </div>
 
-      {!hidden && mode === 'live' && (
-        <>
-          <SearchBar
-            className={styles.search}
-            value={query}
-            onValueChange={setQuery}
-            placeholder="Search sections…"
-            aria-label="Search sections"
-          />
-          <p className={styles.kicker}>Top-level layers</p>
-        </>
+      {/* One search field, whatever the column is showing: it filters the
+          outline, and — through `SiteColumnContext` — whatever hosted panel is
+          listing instead of it. The kicker under it is what names that content,
+          the way the reference names the outline's own list. */}
+      {searchPlaceholder && (
+        <SearchBar
+          className={styles.search}
+          value={query}
+          onValueChange={setQuery}
+          placeholder={searchPlaceholder}
+          aria-label={searchPlaceholder.replace('…', '')}
+          data-testid="site-column-search"
+        />
       )}
+      {kicker && <p className={styles.kicker}>{kicker}</p>}
 
       {/* The switched-to panel replaces the outline list IN PLACE — same
           column, same heading, same disclosure below. It is not an overlay:
           stacking a second panel on top of the menu is what produced the
           floating block over the sidebar. */}
-      {hidden && <div className={styles.toolRegion}>{children}</div>}
+      {hidden && (
+        <div className={styles.toolRegion}>
+          <SiteColumnContext.Provider value={{ query, setQuery }}>
+            {children}
+          </SiteColumnContext.Provider>
+        </div>
+      )}
 
       <div className={styles.body} hidden={hidden}>
 
@@ -249,40 +276,61 @@ export function PageOutlinePanel({
         </Button>
       )}
 
-      {mode === 'review' && (
+      </div>
+
+      {/* Review's own controls, like the heading above: they belong to the MODE,
+          not to the outline list, so they stay put when Layers / Layouts / Code
+          take the column. Inside the collapsing body they were invisible for as
+          long as any tool was open — which, with the last-open panel restored
+          from localStorage, is every session after the first. */}
+      {mode === 'review' && !toolNeedsFullColumn && (
         <div className={styles.viewportContext}>
-          <h3>Viewport context</h3>
-          <p>Base styles apply everywhere. Other contexts store only their overrides.</p>
-          {breakpoints.map((breakpoint) => (
-            <Button
-              key={breakpoint.id}
-              variant="ghost"
-              size="lg"
-              align="start"
-              className={styles.viewportButton}
-              data-selected={activeBreakpointId === breakpoint.id ? 'true' : undefined}
-              aria-pressed={activeBreakpointId === breakpoint.id}
-              onClick={() => setActiveBreakpoint(breakpoint.id)}
-            >
-              <FaIcon name={breakpoint.id === 'mobile' ? 'mobile-screen-button'
-                : breakpoint.id === 'tablet' ? 'tablet-screen-button' : 'desktop'} size={14} />
-              <span>
-                {/* The reference marks the widest context as the base, because
-                    that is the one whose styles apply everywhere. */}
-                {isBaseContext(breakpoints, breakpoint) ? 'Base · ' : ''}
-                {breakpoint.label} ({breakpoint.width} px)
-              </span>
-            </Button>
-          ))}
+          {/* Collapsed by default: with the outline (or Layers) above it and the
+              switcher below, three always-open rows made the column feel packed.
+              One line until the author actually wants to retune a width. */}
+          <Button
+            variant="ghost"
+            size="md"
+            align="between"
+            fullWidth
+            className={styles.viewportToggle}
+            aria-expanded={viewportContextOpen}
+            data-testid="viewport-context-toggle"
+            onClick={() => setViewportContextOpen((current) => !current)}
+          >
+            <span>Viewport context</span>
+            <FaIcon
+              name="chevron-down"
+              size={12}
+              className={cn(
+                styles.viewportChevron,
+                viewportContextOpen && styles.viewportChevronOpen,
+              )}
+            />
+          </Button>
+          {viewportContextOpen && (
+            <>
+              {/* Short enough to hold two lines in the column — the longer
+                  reference wording ran to four and pushed the rows off. */}
+              <p>Base styles apply everywhere. Others store only overrides.</p>
+              {breakpoints.map((breakpoint) => (
+                <ViewportContextRow
+                  key={breakpoint.id}
+                  breakpoint={breakpoint}
+                  /* The reference marks the widest context as the base, because
+                     that is the one whose styles apply everywhere. */
+                  isBase={isBaseContext(breakpoints, breakpoint)}
+                />
+              ))}
+            </>
+          )}
         </div>
       )}
-
-      </div>
 
       {/* Outside the collapsing body: the switcher must stay reachable while a
           panel occupies the column, otherwise you could switch away from the
           outline and have no way back. */}
-      <ExplorerDisclosure mode={mode} />
+      <ExplorerDisclosure />
 
       {rowMenu && (
         <OutlineRowMenu
@@ -306,6 +354,140 @@ export function PageOutlinePanel({
 /** The widest configured context is the base — every narrower one overrides it. */
 function isBaseContext(breakpoints: readonly Breakpoint[], breakpoint: Breakpoint): boolean {
   return breakpoints.every((other) => other.width <= breakpoint.width)
+}
+
+/**
+ * One Review-mode viewport context: pick it, and try a width on it.
+ *
+ * The px field writes an EPHEMERAL preview width (`breakpointPreviewWidths` on
+ * the canvas slice) — the Review frame redraws at that size immediately, but
+ * the breakpoint itself, its media query and the published CSS are untouched,
+ * and a reload restores the stored width. Changing the real width is the
+ * "Edit viewport" dialog's job.
+ *
+ * The row is a grid rather than one big button because an `<input>` cannot live
+ * inside a `<button>`; the reset column is always reserved so the row does not
+ * reflow when an override appears.
+ */
+function ViewportContextRow({
+  breakpoint,
+  isBase,
+}: { breakpoint: Breakpoint; isBase: boolean }) {
+  const activeBreakpointId = useEditorStore((s) => s.activeBreakpointId)
+  const setActiveBreakpoint = useEditorStore((s) => s.setActiveBreakpoint)
+  const setPreviewWidth = useEditorStore((s) => s.setBreakpointPreviewWidth)
+  const clearPreviewWidth = useEditorStore((s) => s.clearBreakpointPreviewWidth)
+  const frameWidth = useBreakpointFrameWidth(breakpoint)
+
+  // `null` means "not editing", so the field mirrors the store and reconciles to
+  // an external change (a reset, a different site) for free.
+  const [draft, setDraft] = useState<string | null>(null)
+
+  const isActive = activeBreakpointId === breakpoint.id
+  const isOverridden = frameWidth !== breakpoint.width
+  const parsedDraft = draft === null ? null : Number(draft)
+  const draftIsCommittable =
+    parsedDraft !== null &&
+    draft?.trim() !== '' &&
+    Number.isFinite(parsedDraft) &&
+    parsedDraft >= MIN_PREVIEW_FRAME_WIDTH &&
+    parsedDraft <= MAX_PREVIEW_FRAME_WIDTH
+
+  /**
+   * Commit only a value that is ALREADY in range — never clamp mid-keystroke.
+   * Typing toward 1200 passes through 1, 12 and 120; clamping those would snap
+   * the frame to 240 and fight the author's next character.
+   */
+  function handleChange(raw: string): void {
+    setDraft(raw)
+    const next = Number(raw)
+    if (
+      raw.trim() !== '' &&
+      Number.isFinite(next) &&
+      next >= MIN_PREVIEW_FRAME_WIDTH &&
+      next <= MAX_PREVIEW_FRAME_WIDTH
+    ) {
+      setPreviewWidth(breakpoint.id, next)
+    }
+  }
+
+  // On the way out, an out-of-range number is worth honouring (the setter
+  // clamps it); a blank or unparseable one is simply dropped and the field
+  // snaps back to whatever the frame is actually drawn at.
+  function commitDraft(): void {
+    const next = draft === null ? NaN : Number(draft)
+    if (draft?.trim() !== '' && Number.isFinite(next)) setPreviewWidth(breakpoint.id, next)
+    setDraft(null)
+  }
+
+  return (
+    <div
+      className={styles.viewportRow}
+      data-selected={isActive ? 'true' : undefined}
+      data-testid={`viewport-context-${breakpoint.id}`}
+    >
+      <Button
+        variant="ghost"
+        size="lg"
+        align="start"
+        className={styles.viewportSelect}
+        aria-pressed={isActive}
+        onClick={() => setActiveBreakpoint(breakpoint.id)}
+      >
+        <FaIcon name={breakpoint.id === 'mobile' ? 'mobile-screen-button'
+          : breakpoint.id === 'tablet' ? 'tablet-screen-button' : 'desktop'} size={14} />
+        <span className={styles.viewportLabel} data-fidelity-dynamic="">
+          {isBase ? 'Base · ' : ''}{breakpoint.label}
+        </span>
+      </Button>
+
+      <Input
+        className={styles.viewportWidth}
+        data-fidelity-dynamic=""
+        data-testid={`viewport-width-${breakpoint.id}`}
+        type="number"
+        inputMode="numeric"
+        // The ▲▼ buttons would eat a third of the field in a 305px column, and
+        // the row already carries a reset control.
+        numberSpinner={false}
+        unit="px"
+        fieldSize="sm"
+        min={MIN_PREVIEW_FRAME_WIDTH}
+        max={MAX_PREVIEW_FRAME_WIDTH}
+        invalid={draft !== null && draft.trim() !== '' && !draftIsCommittable}
+        aria-label={`${breakpoint.label} preview width in pixels`}
+        value={draft ?? String(frameWidth)}
+        onChange={(event) => handleChange(event.target.value)}
+        onBlur={commitDraft}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') event.currentTarget.blur()
+          if (event.key === 'Escape') {
+            setDraft(null)
+            event.currentTarget.blur()
+          }
+        }}
+      />
+
+      {isOverridden && (
+        <Button
+          variant="ghost"
+          size="md"
+          iconOnly
+          className={styles.viewportReset}
+          data-fidelity-dynamic=""
+          data-testid={`viewport-width-reset-${breakpoint.id}`}
+          aria-label={`Reset ${breakpoint.label} preview width to ${breakpoint.width} px`}
+          tooltip={`Reset to ${breakpoint.width} px`}
+          onClick={() => {
+            clearPreviewWidth(breakpoint.id)
+            setDraft(null)
+          }}
+        >
+          <FaIcon name="arrow-rotate-left" size={12} />
+        </Button>
+      )}
+    </div>
+  )
 }
 
 /**

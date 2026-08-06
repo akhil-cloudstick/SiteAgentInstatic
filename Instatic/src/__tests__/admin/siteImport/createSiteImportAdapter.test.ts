@@ -21,7 +21,7 @@ describe('createSiteImportAdapter', () => {
       calls.push({ input, init })
       const url = String(input)
 
-      if (url === '/admin/api/cms/media') {
+      if (url === '/cms/api/cms/media') {
         return jsonResponse({
           asset: {
             id: 'asset/one',
@@ -35,7 +35,7 @@ describe('createSiteImportAdapter', () => {
         }, 201)
       }
 
-      if (url === '/admin/api/cms/media/folders') {
+      if (url === '/cms/api/cms/media/folders') {
         if (init?.method === 'GET') {
           return jsonResponse({ folders: [] })
         }
@@ -52,7 +52,7 @@ describe('createSiteImportAdapter', () => {
         }, 201)
       }
 
-      if (url === '/admin/api/cms/media/asset%2Fone/folders') {
+      if (url === '/cms/api/cms/media/asset%2Fone/folders') {
         return jsonResponse({
           asset: {
             id: 'asset/one',
@@ -79,10 +79,10 @@ describe('createSiteImportAdapter', () => {
 
     expect(calls).toHaveLength(4)
     expect(calls.map((call) => String(call.input))).toEqual([
-      '/admin/api/cms/media',
-      '/admin/api/cms/media/folders',
-      '/admin/api/cms/media/folders',
-      '/admin/api/cms/media/asset%2Fone/folders',
+      '/cms/api/cms/media',
+      '/cms/api/cms/media/folders',
+      '/cms/api/cms/media/folders',
+      '/cms/api/cms/media/asset%2Fone/folders',
     ])
     for (const call of calls) {
       expect(call.init?.credentials).toBe('include')

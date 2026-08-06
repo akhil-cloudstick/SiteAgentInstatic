@@ -20,7 +20,7 @@ function eventLike(key: string, overrides: Partial<KeyboardEvent> = {}) {
 function context(capabilities: string[], editor?: CommandContext['editor']): CommandContext {
   return {
     workspace: 'site',
-    pathname: '/admin/site',
+    pathname: '/cms/site',
     user: {
       id: 'user-1',
       email: 'owner@example.com',

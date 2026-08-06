@@ -205,7 +205,7 @@ beforeAll(async () => {
 
 describe('handleExportRoute — GET no filters', () => {
   test('returns all 4 rows across all tables', async () => {
-    const req = makeGetRequest('/admin/api/cms/export', cookie)
+    const req = makeGetRequest('/cms/api/cms/export', cookie)
     const res = await handleExportRoute(req, db)
     expect(res).not.toBeNull()
 
@@ -215,7 +215,7 @@ describe('handleExportRoute — GET no filters', () => {
   })
 
   test('includes all tables (system + custom)', async () => {
-    const req = makeGetRequest('/admin/api/cms/export', cookie)
+    const req = makeGetRequest('/cms/api/cms/export', cookie)
     const res = await handleExportRoute(req, db)
     const { bundle } = await readExportArchive(res!)
 
@@ -227,7 +227,7 @@ describe('handleExportRoute — GET no filters', () => {
   })
 
   test('site shell is present by default', async () => {
-    const req = makeGetRequest('/admin/api/cms/export', cookie)
+    const req = makeGetRequest('/cms/api/cms/export', cookie)
     const res = await handleExportRoute(req, db)
     const { bundle } = await readExportArchive(res!)
 
@@ -236,7 +236,7 @@ describe('handleExportRoute — GET no filters', () => {
   })
 
   test('sourceSiteName is set from the site shell name', async () => {
-    const req = makeGetRequest('/admin/api/cms/export', cookie)
+    const req = makeGetRequest('/cms/api/cms/export', cookie)
     const res = await handleExportRoute(req, db)
     const { bundle } = await readExportArchive(res!)
 
@@ -244,7 +244,7 @@ describe('handleExportRoute — GET no filters', () => {
   })
 
   test('media is absent (not requested)', async () => {
-    const req = makeGetRequest('/admin/api/cms/export', cookie)
+    const req = makeGetRequest('/cms/api/cms/export', cookie)
     const res = await handleExportRoute(req, db)
     const { bundle } = await readExportArchive(res!)
 
@@ -254,7 +254,7 @@ describe('handleExportRoute — GET no filters', () => {
 
 describe('handleExportRoute — GET ?tables=posts', () => {
   test('returns only the posts table', async () => {
-    const req = makeGetRequest('/admin/api/cms/export?tables=posts', cookie)
+    const req = makeGetRequest('/cms/api/cms/export?tables=posts', cookie)
     const res = await handleExportRoute(req, db)
     const { bundle } = await readExportArchive(res!)
 
@@ -263,7 +263,7 @@ describe('handleExportRoute — GET ?tables=posts', () => {
   })
 
   test('returns only the 2 posts rows', async () => {
-    const req = makeGetRequest('/admin/api/cms/export?tables=posts', cookie)
+    const req = makeGetRequest('/cms/api/cms/export?tables=posts', cookie)
     const res = await handleExportRoute(req, db)
     const { bundle } = await readExportArchive(res!)
 
@@ -272,7 +272,7 @@ describe('handleExportRoute — GET ?tables=posts', () => {
   })
 
   test('site is still present when only tables are filtered', async () => {
-    const req = makeGetRequest('/admin/api/cms/export?tables=posts', cookie)
+    const req = makeGetRequest('/cms/api/cms/export?tables=posts', cookie)
     const res = await handleExportRoute(req, db)
     const { bundle } = await readExportArchive(res!)
 
@@ -282,7 +282,7 @@ describe('handleExportRoute — GET ?tables=posts', () => {
 
 describe('handleExportRoute — POST { tables: [{ tableId: "posts", rowIds: [id1, id2] }] }', () => {
   test('returns only the 2 specified rows', async () => {
-    const req = makePostRequest('/admin/api/cms/export', cookie, {
+    const req = makePostRequest('/cms/api/cms/export', cookie, {
       tables: [{ tableId: 'posts', rowIds: [post1Id, post2Id] }],
     })
     const res = await handleExportRoute(req, db)
@@ -297,7 +297,7 @@ describe('handleExportRoute — POST { tables: [{ tableId: "posts", rowIds: [id1
   })
 
   test('only the selected table is included (others are excluded)', async () => {
-    const req = makePostRequest('/admin/api/cms/export', cookie, {
+    const req = makePostRequest('/cms/api/cms/export', cookie, {
       tables: [{ tableId: 'posts', rowIds: [post1Id, post2Id] }],
     })
     const res = await handleExportRoute(req, db)
@@ -310,7 +310,7 @@ describe('handleExportRoute — POST { tables: [{ tableId: "posts", rowIds: [id1
   })
 
   test('accepts form-encoded exportRequest for browser-native downloads', async () => {
-    const req = makeFormPostRequest('/admin/api/cms/export', cookie, {
+    const req = makeFormPostRequest('/cms/api/cms/export', cookie, {
       tables: [{ tableId: 'posts', rowIds: [post1Id] }],
       includeMedia: true,
       includeSite: false,
@@ -358,7 +358,7 @@ describe('handleExportRoute — GET ?includeMedia=1', () => {
         externallyHosted: false,
       })
 
-      const req = makeGetRequest('/admin/api/cms/export?includeMedia=1', mediaCookie)
+      const req = makeGetRequest('/cms/api/cms/export?includeMedia=1', mediaCookie)
       const res = await handleExportRoute(req, mediaDb, { uploadsDir })
       const { bundle, entries } = await readExportArchive(res!)
 
@@ -373,7 +373,7 @@ describe('handleExportRoute — GET ?includeMedia=1', () => {
 
 describe('handleExportRoute — GET ?includeSite=0', () => {
   test('site shell is absent', async () => {
-    const req = makeGetRequest('/admin/api/cms/export?includeSite=0', cookie)
+    const req = makeGetRequest('/cms/api/cms/export?includeSite=0', cookie)
     const res = await handleExportRoute(req, db)
     const { bundle } = await readExportArchive(res!)
 
@@ -381,7 +381,7 @@ describe('handleExportRoute — GET ?includeSite=0', () => {
   })
 
   test('sourceSiteName is still set even when includeSite=0', async () => {
-    const req = makeGetRequest('/admin/api/cms/export?includeSite=0', cookie)
+    const req = makeGetRequest('/cms/api/cms/export?includeSite=0', cookie)
     const res = await handleExportRoute(req, db)
     const { bundle } = await readExportArchive(res!)
 
@@ -391,7 +391,7 @@ describe('handleExportRoute — GET ?includeSite=0', () => {
 
 describe('handleExportRoute — POST { tables: ["pages"], includeSite: false }', () => {
   test('returns only the pages table', async () => {
-    const req = makePostRequest('/admin/api/cms/export', cookie, {
+    const req = makePostRequest('/cms/api/cms/export', cookie, {
       tables: [{ tableId: 'pages' }],
       includeSite: false,
     })
@@ -403,7 +403,7 @@ describe('handleExportRoute — POST { tables: ["pages"], includeSite: false }',
   })
 
   test('returns only the 1 pages row', async () => {
-    const req = makePostRequest('/admin/api/cms/export', cookie, {
+    const req = makePostRequest('/cms/api/cms/export', cookie, {
       tables: [{ tableId: 'pages' }],
       includeSite: false,
     })
@@ -416,7 +416,7 @@ describe('handleExportRoute — POST { tables: ["pages"], includeSite: false }',
   })
 
   test('site is absent when includeSite: false', async () => {
-    const req = makePostRequest('/admin/api/cms/export', cookie, {
+    const req = makePostRequest('/cms/api/cms/export', cookie, {
       tables: [{ tableId: 'pages' }],
       includeSite: false,
     })
@@ -429,7 +429,7 @@ describe('handleExportRoute — POST { tables: ["pages"], includeSite: false }',
 
 describe('handleExportRoute — POST { tables: [{ tableId: "pages", rowIds: [bogusId] }] }', () => {
   test('returns empty rows when the row subset matches nothing', async () => {
-    const req = makePostRequest('/admin/api/cms/export', cookie, {
+    const req = makePostRequest('/cms/api/cms/export', cookie, {
       tables: [{ tableId: 'pages', rowIds: ['completely-bogus-row-id-that-does-not-exist'] }],
     })
     const res = await handleExportRoute(req, db)
@@ -439,7 +439,7 @@ describe('handleExportRoute — POST { tables: [{ tableId: "pages", rowIds: [bog
   })
 
   test('still includes the selected table structure (a subset keeps its table)', async () => {
-    const req = makePostRequest('/admin/api/cms/export', cookie, {
+    const req = makePostRequest('/cms/api/cms/export', cookie, {
       tables: [{ tableId: 'pages', rowIds: ['completely-bogus-row-id-that-does-not-exist'] }],
     })
     const res = await handleExportRoute(req, db)
@@ -476,20 +476,20 @@ async function estimateBytes(path: string, body: unknown, cookieStr: string, opt
 
 describe('handleExportRoute — POST /export/estimate', () => {
   test('estimate equals the real download byte length exactly (no media)', async () => {
-    const dl = await handleExportRoute(makePostRequest('/admin/api/cms/export', cookie, {}), db)
+    const dl = await handleExportRoute(makePostRequest('/cms/api/cms/export', cookie, {}), db)
     const realBytes = (await dl!.arrayBuffer()).byteLength
 
-    const bytes = await estimateBytes('/admin/api/cms/export/estimate', {}, cookie)
+    const bytes = await estimateBytes('/cms/api/cms/export/estimate', {}, cookie)
     expect(bytes).toBe(realBytes)
   })
 
   test('estimate drops the shell cost when includeSite is false, still matching the real download', async () => {
-    const withSite = await estimateBytes('/admin/api/cms/export/estimate', { includeSite: true }, cookie)
-    const withoutSite = await estimateBytes('/admin/api/cms/export/estimate', { includeSite: false }, cookie)
+    const withSite = await estimateBytes('/cms/api/cms/export/estimate', { includeSite: true }, cookie)
+    const withoutSite = await estimateBytes('/cms/api/cms/export/estimate', { includeSite: false }, cookie)
     expect(withoutSite).toBeLessThan(withSite)
 
     const realNoSite = await handleExportRoute(
-      makePostRequest('/admin/api/cms/export', cookie, { includeSite: false }),
+      makePostRequest('/cms/api/cms/export', cookie, { includeSite: false }),
       db,
     )
     expect(withoutSite).toBe((await realNoSite!.arrayBuffer()).byteLength)
@@ -531,14 +531,14 @@ describe('handleExportRoute — POST /export/estimate with embedded media', () =
       })
 
       const dl = await handleExportRoute(
-        makePostRequest('/admin/api/cms/export', mediaCookie, { includeMedia: true }),
+        makePostRequest('/cms/api/cms/export', mediaCookie, { includeMedia: true }),
         mediaDb,
         { uploadsDir },
       )
       const realBytes = (await dl!.arrayBuffer()).byteLength
 
       const estRes = await handleExportRoute(
-        makePostRequest('/admin/api/cms/export/estimate', mediaCookie, { includeMedia: true }),
+        makePostRequest('/cms/api/cms/export/estimate', mediaCookie, { includeMedia: true }),
         mediaDb,
         { uploadsDir },
       )

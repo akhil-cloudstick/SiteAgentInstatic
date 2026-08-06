@@ -55,7 +55,7 @@ function adminUser(): CmsCurrentUser {
 
 function Providers({ children }: { children: ReactNode }) {
   return (
-    <MemoryRouter initialEntries={['/admin/data']}>
+    <MemoryRouter initialEntries={['/cms/data']}>
       <AdminSessionProvider user={adminUser()}>
         <StepUpProvider>{children}</StepUpProvider>
       </AdminSessionProvider>
@@ -101,7 +101,7 @@ describe('Data table step-up flow', () => {
     globalThis.fetch = mock(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input)
 
-      if (url === '/admin/api/cms/data/tables' && init?.method !== 'POST') {
+      if (url === '/cms/api/cms/data/tables' && init?.method !== 'POST') {
         return json({
           tables: [{
             id: 'components',
@@ -123,15 +123,15 @@ describe('Data table step-up flow', () => {
         })
       }
 
-      if (url === '/admin/api/cms/data/tables/components/rows' && init?.method === 'GET') {
+      if (url === '/cms/api/cms/data/tables/components/rows' && init?.method === 'GET') {
         return json({ rows: [] })
       }
 
-      if (url === '/admin/api/cms/data/tables/custom-table/rows' && init?.method === 'GET') {
+      if (url === '/cms/api/cms/data/tables/custom-table/rows' && init?.method === 'GET') {
         return json({ rows: [] })
       }
 
-      if (url === '/admin/api/cms/data/tables' && init?.method === 'POST') {
+      if (url === '/cms/api/cms/data/tables' && init?.method === 'POST') {
         createAttempts += 1
         if (createAttempts === 1) return json({ error: 'step_up_required' }, 401)
         return json({
@@ -154,14 +154,14 @@ describe('Data table step-up flow', () => {
         }, 201)
       }
 
-      if (url === '/admin/api/cms/auth/step-up' && init?.method === 'POST') {
+      if (url === '/cms/api/cms/auth/step-up' && init?.method === 'POST') {
         stepUpRequests.push(JSON.parse(String(init.body)) as Record<string, unknown>)
         return json({ ok: true, stepUpExpiresAt: '2026-06-10T10:15:00.000Z' })
       }
 
-      if (url.endsWith('/admin/api/cms/plugins')) return json({ plugins: [], adminPages: [] })
-      if (url.endsWith('/admin/api/cms/site')) return json({ site: null }, 404)
-      if (url.endsWith('/admin/api/cms/publish/status')) return json({ ok: false }, 404)
+      if (url.endsWith('/cms/api/cms/plugins')) return json({ plugins: [], adminPages: [] })
+      if (url.endsWith('/cms/api/cms/site')) return json({ site: null }, 404)
+      if (url.endsWith('/cms/api/cms/publish/status')) return json({ ok: false }, 404)
 
       return json({ error: `Unhandled ${url}` }, 500)
     }) as typeof fetch

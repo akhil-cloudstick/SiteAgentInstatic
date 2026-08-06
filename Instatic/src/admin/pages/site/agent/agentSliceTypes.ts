@@ -5,7 +5,7 @@ import type { AgentMessage, AgentToolScope } from './types'
 
 export interface AgentSliceConfig {
   /**
-   * Conversation scope. Used in URL paths (`/admin/api/ai/chat/${scope}`,
+   * Conversation scope. Used in URL paths (`/cms/api/ai/chat/${scope}`,
    * `?scope=${scope}`), conversation-create body, and the per-scope default
    * lookup. Keep it aligned with `server/ai/runtime/types.ts → ToolScope`.
    */

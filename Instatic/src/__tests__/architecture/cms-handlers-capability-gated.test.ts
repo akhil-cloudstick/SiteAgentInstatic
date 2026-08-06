@@ -6,7 +6,7 @@
  * Mirrors `ai-handlers-capability-gated.test.ts` but for the CMS handler
  * tree. Catches the case where a new CMS endpoint ships completely
  * ungated — the previous lack of this gate is what let
- * `/admin/api/cms/dashboard/activity` leak audit data to any
+ * `/cms/api/cms/dashboard/activity` leak audit data to any
  * authenticated user (A2 in the capabilities review).
  *
  * The `ALLOWLIST` covers files that are intentionally not gated by an

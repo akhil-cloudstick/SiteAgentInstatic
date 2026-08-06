@@ -30,6 +30,7 @@ import {
   wrapNode,
   wrapNodes,
   reindexNodeParents,
+  materializeDefaultChildren,
 } from '@core/page-tree'
 import type { NodeTree, PageNode, SiteDocument } from '@core/page-tree'
 import { subtreeHasOutlet, treeHasOutlet } from '@core/templates'
@@ -175,6 +176,13 @@ export function createNodeActions(helpers: SiteSliceHelpers): NodeActions {
           return false
         }
         insertNode(tree, newNode, parentId, index)
+        // Starter subtree, minted in THIS recipe so the parent and its
+        // children land in one patch set — i.e. one undo entry. Splitting
+        // them would let Cmd+Z revert only the parent and orphan the
+        // children in the persisted node map (see insertComponentRef).
+        if (mod?.canHaveChildren) {
+          materializeDefaultChildren(tree, tree.nodes[newNode.id], mod.defaultChildren)
+        }
         inserted = true
         return true
       })

@@ -10,8 +10,12 @@
 
 export const MIN_ZOOM = 0.1
 export const MAX_ZOOM = 4
-/** Zoom the design canvas opens at — 50% keeps several breakpoint frames in view. */
-export const INITIAL_ZOOM = 0.5
+/**
+ * Zoom the design canvas opens at. Responsive Review is a fixed grid that
+ * already fits all three frames into the surface, so 100% IS the fit — opening
+ * at anything else showed the board pre-shrunk for no reason.
+ */
+export const INITIAL_ZOOM = 1
 /** Zoom that "reset view" (Cmd/Ctrl+0, the toolbar % button) returns to. */
 export const RESET_ZOOM = 1
 
@@ -32,6 +36,23 @@ export function clampZoom(z: number): number {
 /** Clamp a pan value to [-MAX_PAN, MAX_PAN]. */
 export function clampPan(v: number): number {
   return Math.max(-MAX_PAN, Math.min(MAX_PAN, v))
+}
+
+/**
+ * Bounds for a Responsive Review preview frame width — the ephemeral px an
+ * author can type into a viewport context to try a size without changing the
+ * breakpoint. Narrower than MIN there is no usable canvas left; wider than MAX
+ * is past 4K. Deliberately NOT the same constant as `LIVE_MIN_WIDTH`, which is
+ * the drag floor of a different mode.
+ */
+export const MIN_PREVIEW_FRAME_WIDTH = 240
+export const MAX_PREVIEW_FRAME_WIDTH = 3840
+
+/** Clamp + round a requested preview frame width to a renderable integer px. */
+export function clampFrameWidth(px: number): number {
+  return Math.round(
+    Math.max(MIN_PREVIEW_FRAME_WIDTH, Math.min(MAX_PREVIEW_FRAME_WIDTH, px)),
+  )
 }
 
 /** Step zoom up (1) or down (-1) to the next preset level. */

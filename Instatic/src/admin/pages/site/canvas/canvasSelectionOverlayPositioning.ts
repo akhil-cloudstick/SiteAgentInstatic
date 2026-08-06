@@ -11,7 +11,23 @@ import type {
 } from './canvasDnd'
 import styles from './BreakpointSelectionOverlay.module.css'
 
-const TOOLBAR_VERTICAL_OFFSET = 30
+/**
+ * Gap between the toolbar and the edge of the selection it belongs to. The
+ * toolbar is anchored fully OUTSIDE the selection: it used to sit at a flat
+ * `-30px` while rendering 50px tall, so its bottom 20px covered the top of the
+ * very element the author had just selected.
+ */
+export const TOOLBAR_GAP = 6
+
+/**
+ * Height assumed when the element cannot be measured — `offsetHeight` is 0 in
+ * happy-dom (tests) and during the first tick before layout. Must track
+ * `.selectionToolbar`'s `min-height` in `BreakpointSelectionOverlay.module.css`.
+ */
+export const TOOLBAR_HEIGHT_FALLBACK = 32
+
+/** Breathing room between the toolbar and the canvas viewport edges. */
+const TOOLBAR_VIEWPORT_MARGIN = 4
 
 /**
  * Last placement applied per overlay element ('hidden' or the exact rect).
@@ -183,34 +199,68 @@ export function positionToolbar(
     }
   }
 
+  // Make the element visible BEFORE measuring it: a `display: none` element
+  // reports offsetWidth/offsetHeight as 0, which would collapse both the X
+  // clamp and the vertical flip. Unconditional (the old code only reset it in
+  // scoped mode, so fixed mode measured a hidden element).
+  if (toolbar.style.display === 'none') toolbar.style.display = ''
+  const toolbarWidth = toolbar.offsetWidth
+  const toolbarHeight = toolbar.offsetHeight || TOOLBAR_HEIGHT_FALLBACK
+
   // Keep toolbar actions reachable when a wide selected element overlaps the
   // canvas but its left edge is panned under surrounding editor chrome. Fully
   // out-of-bounds selections are hidden above; clamping here only affects
   // partially visible selections.
-  if (canvasRect && toolbar.style.display === 'none') toolbar.style.display = ''
-  const rawX = union.x
-  let x = rawX
-  if (canvasRect) {
-    const gutter = 4
-    const minX = scroll.left + gutter
-    const maxX = Math.max(minX, scroll.left + canvasRect.width - toolbar.offsetWidth - gutter)
-    x = Math.min(Math.max(rawX, minX), maxX)
-  }
+  let x = union.x
+  let y = union.y - toolbarHeight - TOOLBAR_GAP
+  let side: 'above' | 'below' = 'above'
 
-  const placement: CanvasOverlayRect = {
-    x,
-    y: union.y - TOOLBAR_VERTICAL_OFFSET,
-    width: union.width,
-    height: union.height,
+  if (canvasRect) {
+    const minX = scroll.left + TOOLBAR_VIEWPORT_MARGIN
+    const maxX = Math.max(
+      minX,
+      scroll.left + canvasRect.width - toolbarWidth - TOOLBAR_VIEWPORT_MARGIN,
+    )
+    x = Math.min(Math.max(union.x, minX), maxX)
+
+    // Prefer above; drop below only when above doesn't fit and below does.
+    // Same shape as `computeCanvasTreeLadderPosition`, but computed here in
+    // canvas-root SCROLL-CONTENT coordinates (that helper mixes bounds- and
+    // scroll-relative values, which is a latent bug of its own — don't
+    // inherit it by calling into it).
+    const aboveY = union.y - toolbarHeight - TOOLBAR_GAP
+    const belowY = union.y + union.height + TOOLBAR_GAP
+    const minY = scroll.top + TOOLBAR_VIEWPORT_MARGIN
+    const visibleBottom = scroll.top + canvasRect.height
+    const maxY = Math.max(minY, visibleBottom - toolbarHeight - TOOLBAR_VIEWPORT_MARGIN)
+    const hasRoomAbove = aboveY >= minY
+    const hasRoomBelow = belowY + toolbarHeight <= visibleBottom - TOOLBAR_VIEWPORT_MARGIN
+    side = hasRoomAbove || !hasRoomBelow ? 'above' : 'below'
+    y = Math.min(Math.max(side === 'above' ? aboveY : belowY, minY), maxY)
   }
+  // Fixed-mode fallback (`canvasRect === null`, i.e. tests or a transient
+  // mount race): stay above with no clamp and no flip. There are no known
+  // bounds to flip against, and `window.innerHeight` is the wrong bound for a
+  // body-portaled overlay inside a scrolled page. X already behaves this way.
+
+  const placement: CanvasOverlayRect = { x, y, width: union.width, height: union.height }
   const prev = appliedOverlayPlacements.get(toolbar)
-  if (prev !== undefined && prev !== 'hidden' && prev.x === placement.x && prev.y === placement.y) {
+  if (
+    prev !== undefined &&
+    prev !== 'hidden' &&
+    prev.x === placement.x &&
+    prev.y === placement.y &&
+    // `CanvasOverlayRect` is shared with `positionOverlayElement`, so the
+    // placement rides on the element instead of widening that type. An
+    // attribute read costs no layout.
+    toolbar.dataset.placement === side
+  ) {
     return
   }
 
-  toolbar.style.display = ''
   toolbar.style.left = `${placement.x}px`
   toolbar.style.top = `${placement.y}px`
+  toolbar.dataset.placement = side
   appliedOverlayPlacements.set(toolbar, placement)
 }
 

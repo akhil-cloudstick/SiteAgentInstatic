@@ -2,7 +2,7 @@ import { expect, test, type Locator, type Page } from '@playwright/test'
 import {
   canvasFrame,
   createPage,
-  insertNotchModule,
+  insertModule,
   openSiteEditor,
   openSitePanel,
   saveDraft,
@@ -101,7 +101,7 @@ test.describe('page management', () => {
 
     await test.step('edit the first page and observe the unsaved draft state', async () => {
       await openPage(firstPage)
-      await insertNotchModule(page, 'text')
+      await insertModule(page, 'text')
       await setPropValue(page, 'text', draftText)
       await expect(page.getByRole('status', { name: 'Unsaved draft' })).toBeVisible()
       await expect(canvasFrame(page).getByText(draftText)).toBeVisible()
@@ -134,7 +134,7 @@ test.describe('page management', () => {
 
     await openSiteEditor(page)
     await createPage(page, name, `mobile-draft-${suffix}`)
-    await insertNotchModule(page, 'text')
+    await insertModule(page, 'text')
     await setPropValue(page, 'text', draftText)
     await expect(canvasFrame(page).getByText(draftText)).toBeVisible()
     await saveDraft(page)
@@ -164,7 +164,7 @@ test.describe('page management', () => {
 
     await openSiteEditor(page)
     await createPage(page, name, slug)
-    await insertNotchModule(page, 'text')
+    await insertModule(page, 'text')
     await setPropValue(page, 'text', draftText)
     await saveDraft(page)
 
@@ -179,7 +179,7 @@ test.describe('page management', () => {
     })
 
     await test.step('the dashboard reports the scheduled page row', async () => {
-      await page.goto('/admin/dashboard')
+      await page.goto('/cms/dashboard')
       await expect(page).toHaveURL(/\/admin\/dashboard$/)
 
       const pagesWidget = page.locator('[data-widget="pages"]')

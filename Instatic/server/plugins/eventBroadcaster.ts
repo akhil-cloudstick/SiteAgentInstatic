@@ -6,7 +6,7 @@
  * Subscribers register a callback through `subscribePluginEvents`; the
  * crash-recovery handler (and other lifecycle code paths) call
  * `broadcastPluginEvent` whenever something interesting happens. The SSE
- * endpoint (`/admin/api/cms/plugins/events`) wires one subscriber per
+ * endpoint (`/cms/api/cms/plugins/events`) wires one subscriber per
  * connected admin browser tab.
  *
  * Kept in a separate module from `pluginWorkerHost` so:

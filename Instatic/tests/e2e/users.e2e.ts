@@ -23,7 +23,7 @@ test.describe('users and roles', () => {
     await login(page)
     const email = `member-${Date.now().toString(36)}@example.com`
 
-    await page.goto('/admin/users')
+    await page.goto('/cms/users')
     await createUser(page, {
       email,
       displayName: 'E2E Member',
@@ -47,7 +47,7 @@ test.describe('users and roles', () => {
     const initialPassword = 'user-lifecycle-pass-12345'
     const resetPassword = 'user-lifecycle-reset-12345'
 
-    await page.goto('/admin/users')
+    await page.goto('/cms/users')
     await createUser(page, {
       email,
       displayName: initialDisplayName,
@@ -117,7 +117,7 @@ test.describe('users and roles', () => {
         await completeStepUp(page)
         await expect(userRow(page, editedEmail)).toHaveCount(0)
 
-        await activeAdmin.goto('/admin/dashboard')
+        await activeAdmin.goto('/cms/dashboard')
         await expect(activeAdmin.getByRole('heading', { name: 'Admin Login' })).toBeVisible()
       })
 
@@ -139,7 +139,7 @@ test.describe('users and roles', () => {
     await login(page)
     const email = `stepup-${Date.now().toString(36)}@example.com`
 
-    await page.goto('/admin/users')
+    await page.goto('/cms/users')
     await fillCreateUserDialog(page, {
       email,
       displayName: 'Step-Up Guard',
@@ -176,7 +176,7 @@ test.describe('users and roles', () => {
     await login(page)
     const email = `stepup-mobile-${Date.now().toString(36)}@example.com`
 
-    await page.goto('/admin/users')
+    await page.goto('/cms/users')
     await fillCreateUserDialog(page, {
       email,
       displayName: 'Mobile Step-Up Guard',
@@ -211,7 +211,7 @@ test.describe('users and roles', () => {
     const firstEmail = `stepup-fresh-${Date.now().toString(36)}@example.com`
     const staleEmail = `stepup-stale-${Date.now().toString(36)}@example.com`
 
-    await page.goto('/admin/users')
+    await page.goto('/cms/users')
     await createUser(page, {
       email: firstEmail,
       displayName: 'Fresh Step-Up Window',
@@ -262,7 +262,7 @@ test.describe('users and roles', () => {
 
         // A direct URL to a denied workspace must not render it — the guard
         // redirects away from /admin/users.
-        await limited.goto('/admin/users')
+        await limited.goto('/cms/users')
         await expect(limited).not.toHaveURL(/\/admin\/users/)
         await expect(
           limited.getByRole('heading', { name: 'All Users' }),
@@ -309,7 +309,7 @@ test.describe('users and roles', () => {
     const roleName = `Role lifecycle ${suffix}`
     const editedRoleName = `Role lifecycle edited ${suffix}`
 
-    await page.goto('/admin/users')
+    await page.goto('/cms/users')
     await page.getByRole('button', { name: 'Roles', exact: true }).click()
 
     await test.step('create a custom role with selected capabilities', async () => {
@@ -360,7 +360,7 @@ test.describe('users and roles', () => {
     await login(page)
     const roleName = `Role mobile ${Date.now().toString(36)}`
 
-    await page.goto('/admin/users')
+    await page.goto('/cms/users')
     await page.getByRole('button', { name: 'Roles', exact: true }).click()
 
     const rolesTable = page.getByRole('table', { name: 'Roles' })
@@ -388,7 +388,7 @@ test.describe('users and roles', () => {
     const email = `audit-${suffix}@example.com`
     const displayName = `Audit User ${suffix}`
 
-    await page.goto('/admin/users')
+    await page.goto('/cms/users')
     await createUser(page, {
       email,
       displayName,
@@ -398,7 +398,7 @@ test.describe('users and roles', () => {
     await expect(page.getByText(email)).toBeVisible()
 
     // Reload so the read-only audit feed is fetched from the authoritative API.
-    await page.goto('/admin/users')
+    await page.goto('/cms/users')
     await page.getByRole('button', { name: 'Audit', exact: true }).click()
 
     const auditTable = page.getByRole('table', { name: 'Audit events' })
@@ -421,7 +421,7 @@ test.describe('users and roles', () => {
     const email = `audit-mobile-${suffix}@example.com`
     const displayName = `Audit Mobile ${suffix}`
 
-    await page.goto('/admin/users')
+    await page.goto('/cms/users')
     await createUser(page, {
       email,
       displayName,
@@ -430,7 +430,7 @@ test.describe('users and roles', () => {
     })
     await expect(page.getByText(email)).toBeVisible()
 
-    await page.goto('/admin/users')
+    await page.goto('/cms/users')
     await page.getByRole('button', { name: 'Audit', exact: true }).click()
 
     const auditTable = page.getByRole('table', { name: 'Audit events' })
@@ -473,7 +473,7 @@ async function createLimitedSiteMediaUser(
 
   await createSiteAndMediaRole(page, roleName)
   // Reload so the freshly created role is selectable in the user dialog.
-  await page.goto('/admin/users')
+  await page.goto('/cms/users')
   await createUser(page, {
     email,
     displayName: 'Limited User',
@@ -513,7 +513,7 @@ if (result.changes !== 1) {
 
 /** Create a custom role granting only Site (read) and Media (read). */
 async function createSiteAndMediaRole(page: Page, name: string): Promise<void> {
-  await page.goto('/admin/users')
+  await page.goto('/cms/users')
   await page.getByRole('button', { name: 'Roles', exact: true }).click()
   await page.getByRole('button', { name: 'Create Role', exact: true }).click()
 
@@ -552,7 +552,7 @@ async function expectLoginRejected(
   email: string,
   password: string,
 ): Promise<void> {
-  await page.goto('/admin')
+  await page.goto('/cms')
   await expect(page.getByRole('heading', { name: 'Admin Login' })).toBeVisible()
   await page.getByLabel('Email').fill(email)
   await page.getByLabel('Password').fill(password)
@@ -683,7 +683,7 @@ async function expectLimitedToolbarMobileLayout(page: Page): Promise<void> {
     const viewportWidth = documentElement.clientWidth
     const viewportHeight = window.innerHeight
     const toolbarRect = toolbar.getBoundingClientRect()
-    const mediaLink = toolbar.querySelector('a[href="/admin/media"]')
+    const mediaLink = toolbar.querySelector('a[href="/cms/media"]')
     const accountTrigger = toolbar.querySelector('[data-testid="account-menu-trigger"]')
     const controls = [mediaLink, accountTrigger].filter(
       (control): control is Element => control !== null,

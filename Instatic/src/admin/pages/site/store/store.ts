@@ -87,7 +87,7 @@ export const useEditorStore = create<EditorStore>()(
 // open/closed panel states) from localStorage at module-load time —
 // BEFORE the first React render reads the store. Picks the workspace
 // to hydrate from based on the current URL pathname so e.g. opening
-// `/admin/media` paints with media's saved sidebar state, not site's.
+// `/cms/media` paints with media's saved sidebar state, not site's.
 //
 // Why this can't live in a `useEffect`: `useEditorLayoutPersistence`
 // used to be the sole hydration site, and `useEffect` only runs after
@@ -262,8 +262,10 @@ export const selectSelectedNode = (s: EditorStore) => {
 }
 
 // ---------------------------------------------------------------------------
-// Undo / Redo hooks — subscribe only to the flags, not the full site,
-// so toolbar buttons re-render only when availability changes.
+// Undo / Redo hooks — subscribe only to the actions, not the full site.
+// History has no buttons in the canvas chrome; it is reached through
+// `useUndoRedoShortcuts` (Ctrl/Cmd+Z, Ctrl/Cmd+Shift+Z) and the command
+// palette, which reads `canUndo` / `canRedo` off the store directly.
 // ---------------------------------------------------------------------------
 
 /** React hook: returns the undo action. Stable reference (Zustand action). */
@@ -271,9 +273,3 @@ export const useUndo = () => useEditorStore((s) => s.undo)
 
 /** React hook: returns the redo action. Stable reference (Zustand action). */
 export const useRedo = () => useEditorStore((s) => s.redo)
-
-/** React hook: true when undo is available. */
-export const useCanUndo = () => useEditorStore((s) => s.canUndo)
-
-/** React hook: true when redo is available. */
-export const useCanRedo = () => useEditorStore((s) => s.canRedo)

@@ -8,12 +8,19 @@
 import React from 'react'
 import type { ModuleComponentProps } from '@core/module-engine'
 import styles from './list.module.css'
-import { parseItems } from './items'
+import { listUsesChildren, parseItems } from './items'
 import type { ListStoredProps } from './props'
 
-export const ListEditor: React.FC<ModuleComponentProps<ListStoredProps>> = ({ props, mcClassName, nodeWrapperProps }) => {
-  const items = parseItems(props.items || '')
+export const ListEditor: React.FC<ModuleComponentProps<ListStoredProps>> = ({ props, children, mcClassName, nodeWrapperProps }) => {
   const Tag = props.listType === 'ordered' ? 'ol' : 'ul'
+
+  // Same three-way decision the publisher makes: child layers, else the
+  // legacy `items` textarea, else the placeholder item.
+  if (listUsesChildren(React.Children.count(children))) {
+    return React.createElement(Tag, { ...nodeWrapperProps, className: mcClassName }, children)
+  }
+
+  const items = parseItems(props.items || '')
   return React.createElement(
     Tag,
     { ...nodeWrapperProps, className: mcClassName },

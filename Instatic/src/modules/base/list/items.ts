@@ -19,3 +19,17 @@ export function parseItems(raw: string): string[] {
     .map((s) => s.trim())
     .filter((s) => s.length > 0)
 }
+
+/**
+ * Whether the list should render its own child nodes (`true`) or fall back to
+ * the legacy `items` textarea (`false`), given how many children it has.
+ *
+ * `base.list` became a container without migrating existing documents: a List
+ * authored before that change has no children and must keep rendering from
+ * `items` exactly as it always did. Mirrors `linkUsesChildren` — an explicit
+ * count, not a `children ?? items` short-circuit, because the renderer always
+ * passes an array and an empty array is not nullish.
+ */
+export function listUsesChildren(childCount: number): boolean {
+  return childCount > 0
+}

@@ -1,7 +1,7 @@
 /**
  * Agent store slice — drives the AI Assistant panel.
  *
- * The browser opens a streaming NDJSON request against `/admin/api/ai/chat/
+ * The browser opens a streaming NDJSON request against `/cms/api/ai/chat/
  * ${scope}`. The Bun server selects the configured provider credential and
  * model, then streams through the provider-agnostic direct-HTTP runtime.
  * The NDJSON wire protocol and its per-event handling live in `streamEvents.ts`;
@@ -646,7 +646,7 @@ export function createAgentSlice(
         }
 
         const body: AiChatRequestBody = { conversationId, content: [...content], snapshot }
-        const res = await fetch(`/admin/api/ai/chat/${config.scope}`, {
+        const res = await fetch(`/cms/api/ai/chat/${config.scope}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body),

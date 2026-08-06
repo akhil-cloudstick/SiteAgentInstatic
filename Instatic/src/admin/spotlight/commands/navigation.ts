@@ -56,7 +56,7 @@ export function getNavigationCommands(): Command[] {
       workspaces: ['any'],
       capability: 'site.read',
       run: (ctx) => {
-        ctx.navigate('/admin/site')
+        ctx.navigate('/cms/site')
         ctx.closeSpotlight()
       },
     },
@@ -70,7 +70,7 @@ export function getNavigationCommands(): Command[] {
       workspaces: ['any'],
       capability: CONTENT_ACCESS_CAPABILITIES,
       run: (ctx) => {
-        ctx.navigate('/admin/content')
+        ctx.navigate('/cms/content')
         ctx.closeSpotlight()
       },
     },
@@ -84,7 +84,7 @@ export function getNavigationCommands(): Command[] {
       workspaces: ['any'],
       capability: DATA_WORKSPACE_CAPABILITIES,
       run: (ctx) => {
-        ctx.navigate('/admin/data')
+        ctx.navigate('/cms/data')
         ctx.closeSpotlight()
       },
     },
@@ -98,7 +98,7 @@ export function getNavigationCommands(): Command[] {
       workspaces: ['any'],
       capability: 'media.read',
       run: (ctx) => {
-        ctx.navigate('/admin/media')
+        ctx.navigate('/cms/media')
         ctx.closeSpotlight()
       },
     },
@@ -112,7 +112,7 @@ export function getNavigationCommands(): Command[] {
       workspaces: ['any'],
       capability: PLUGINS_ACCESS_CAPABILITIES,
       run: (ctx) => {
-        ctx.navigate('/admin/plugins')
+        ctx.navigate('/cms/plugins')
         ctx.closeSpotlight()
       },
     },
@@ -126,7 +126,7 @@ export function getNavigationCommands(): Command[] {
       workspaces: ['any'],
       capability: USERS_ACCESS_CAPABILITIES,
       run: (ctx) => {
-        ctx.navigate('/admin/users')
+        ctx.navigate('/cms/users')
         ctx.closeSpotlight()
       },
     },
@@ -143,7 +143,7 @@ export function getNavigationCommands(): Command[] {
       keywords: ['account', 'profile', 'security', 'password', 'mfa', 'sessions'],
       workspaces: ['any'],
       run: (ctx) => {
-        ctx.navigate('/admin/account')
+        ctx.navigate('/cms/account')
         ctx.closeSpotlight()
       },
     },

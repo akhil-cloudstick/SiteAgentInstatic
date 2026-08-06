@@ -311,17 +311,6 @@ export function useCanvas({ canvasRootRef, transformLayerRef, enabled }: UseCanv
 
   // ─── Keyboard shortcuts ───────────────────────────────────────────────────
 
-  /**
-   * Resolve the current canvas viewport center, in canvas-local coords.
-   * Used as the zoom origin for keyboard +/− shortcuts so the zoom is
-   * anchored to the middle of the visible area, not the document top-left.
-   */
-  const getViewportCenter = (): { x: number; y: number } | null => {
-    const el = canvasRootRef.current
-    if (!el) return null
-    const rect = el.getBoundingClientRect()
-    return { x: rect.width / 2, y: rect.height / 2 }
-  }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     // Don't intercept typing — let inputs and contenteditables consume keys.
@@ -333,17 +322,14 @@ export function useCanvas({ canvasRootRef, transformLayerRef, enabled }: UseCanv
         target.isContentEditable)
     ) return
 
-    // Zoom in/out with +/- keys — zoom around the canvas viewport center
+    // Zoom in/out with +/- keys. No origin argument — see ZoomControls: the
+    // board scales about its own centre, and writing pan drags it off-centre.
     if (e.key === '=' || e.key === '+') {
       e.preventDefault()
-      const c = getViewportCenter()
-      if (c) zoomIn(c.x, c.y)
-      else zoomIn()
+      zoomIn()
     } else if (e.key === '-') {
       e.preventDefault()
-      const c = getViewportCenter()
-      if (c) zoomOut(c.x, c.y)
-      else zoomOut()
+      zoomOut()
     } else if ((e.metaKey || e.ctrlKey) && e.key === '0') {
       e.preventDefault()
       resetCanvasView()

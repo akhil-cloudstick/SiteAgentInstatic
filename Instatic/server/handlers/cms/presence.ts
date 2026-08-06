@@ -35,8 +35,8 @@ import {
 } from '@core/presence'
 import { Value } from '@sinclair/typebox/value'
 
-const EVENTS_PATH = '/admin/api/cms/presence/events'
-const HEARTBEAT_PATH = '/admin/api/cms/presence/heartbeat'
+const EVENTS_PATH = '/cms/api/cms/presence/events'
+const HEARTBEAT_PATH = '/cms/api/cms/presence/heartbeat'
 
 /** Cap an orphaned stream's lifetime; EventSource reconnects on its own. */
 const STREAM_LEASE_MS = 120_000

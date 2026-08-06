@@ -72,8 +72,8 @@ function jsonResponse(body: unknown, status = 200): Response {
 function defaultFetch(summary = { media: 2, mediaFolders: 1, redirects: 1 }, bytes = 12_000) {
   return async (input: RequestInfo | URL): Promise<Response> => {
     const url = typeof input === 'string' ? input : input.toString()
-    if (url.startsWith('/admin/api/cms/export/summary')) return jsonResponse(summary)
-    if (url === '/admin/api/cms/export/estimate') return jsonResponse({ bytes })
+    if (url.startsWith('/cms/api/cms/export/summary')) return jsonResponse(summary)
+    if (url === '/cms/api/cms/export/estimate') return jsonResponse({ bytes })
     return jsonResponse({ error: `Unexpected request: ${url}` }, 500)
   }
 }
@@ -167,9 +167,9 @@ describe('ExportDialog', () => {
 
     globalThis.fetch = async (input: RequestInfo | URL) => {
       const url = typeof input === 'string' ? input : input.toString()
-      if (url.startsWith('/admin/api/cms/export/summary')) return jsonResponse({ media: 2, mediaFolders: 1, redirects: 1 })
-      if (url === '/admin/api/cms/export/estimate') return jsonResponse({ bytes: 1000 })
-      if (url === '/admin/api/cms/export') {
+      if (url.startsWith('/cms/api/cms/export/summary')) return jsonResponse({ media: 2, mediaFolders: 1, redirects: 1 })
+      if (url === '/cms/api/cms/export/estimate') return jsonResponse({ bytes: 1000 })
+      if (url === '/cms/api/cms/export') {
         exportFetchCalled = true
         return jsonResponse({ error: 'Export downloads must not go through fetch' }, 500)
       }
@@ -198,7 +198,7 @@ describe('ExportDialog', () => {
       expect(exportFetchCalled).toBe(false)
       expect(submittedForm).not.toBeNull()
       expect(submittedForm!.method.toLowerCase()).toBe('post')
-      expect(submittedForm!.action.endsWith('/admin/api/cms/export')).toBe(true)
+      expect(submittedForm!.action.endsWith('/cms/api/cms/export')).toBe(true)
       expect(submittedForm!.target).toBeTruthy()
       expect(document.querySelector(`iframe[name="${submittedForm!.target}"]`)).toBeTruthy()
 
@@ -232,8 +232,8 @@ describe('ExportDialog', () => {
 
     globalThis.fetch = async (input: RequestInfo | URL) => {
       const url = typeof input === 'string' ? input : input.toString()
-      if (url.startsWith('/admin/api/cms/export/summary')) return jsonResponse({ media: 0, mediaFolders: 0, redirects: 0 })
-      if (url === '/admin/api/cms/export/estimate') return jsonResponse({ bytes: 1000 })
+      if (url.startsWith('/cms/api/cms/export/summary')) return jsonResponse({ media: 0, mediaFolders: 0, redirects: 0 })
+      if (url === '/cms/api/cms/export/estimate') return jsonResponse({ bytes: 1000 })
       return jsonResponse({ error: `Unexpected: ${url}` }, 500)
     }
     HTMLFormElement.prototype.submit = function () {
@@ -269,8 +269,8 @@ describe('ExportDialog', () => {
     // one; turning media off re-requests and the estimate drops.
     globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input.toString()
-      if (url.startsWith('/admin/api/cms/export/summary')) return jsonResponse({ media: 2, mediaFolders: 1, redirects: 1 })
-      if (url === '/admin/api/cms/export/estimate') {
+      if (url.startsWith('/cms/api/cms/export/summary')) return jsonResponse({ media: 2, mediaFolders: 1, redirects: 1 })
+      if (url === '/cms/api/cms/export/estimate') {
         const body = JSON.parse((init?.body as string) ?? '{}') as { includeMedia?: boolean }
         return jsonResponse({ bytes: body.includeMedia ? 5_000_000 : 12_000 })
       }
@@ -306,8 +306,8 @@ describe('ExportDialog', () => {
     let submittedForm: HTMLFormElement | null = null
     globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input.toString()
-      if (url.startsWith('/admin/api/cms/export/summary')) return jsonResponse({ media: 0, mediaFolders: 0, redirects: 0 })
-      if (url === '/admin/api/cms/export/estimate') return jsonResponse({ bytes: 1000 })
+      if (url.startsWith('/cms/api/cms/export/summary')) return jsonResponse({ media: 0, mediaFolders: 0, redirects: 0 })
+      if (url === '/cms/api/cms/export/estimate') return jsonResponse({ bytes: 1000 })
       if (url.includes('/data/tables/posts/rows')) {
         return jsonResponse({
           rows: [
@@ -316,7 +316,7 @@ describe('ExportDialog', () => {
           ],
         })
       }
-      if (url === '/admin/api/cms/export') return jsonResponse({ error: 'Export downloads must not go through fetch' }, 500)
+      if (url === '/cms/api/cms/export') return jsonResponse({ error: 'Export downloads must not go through fetch' }, 500)
       return jsonResponse({ error: `Unexpected request: ${url}` }, 500)
     }
     HTMLFormElement.prototype.submit = function (this: HTMLFormElement) {

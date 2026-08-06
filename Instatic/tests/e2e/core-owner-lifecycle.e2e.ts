@@ -3,7 +3,7 @@ import {
   ANONYMOUS_STATE,
   canvasFrame,
   expectEditorReady,
-  insertNotchModule,
+  insertModule,
   login,
   logout,
   openSiteEditor,
@@ -46,7 +46,7 @@ test.describe('core owner lifecycle', () => {
     })
 
     await test.step('add editable homepage text (EDIT-001)', async () => {
-      await insertNotchModule(page, 'text')
+      await insertModule(page, 'text')
       await setPropValue(page, 'text', PUBLISHED_TEXT)
       await expect(canvasFrame(page).getByText(PUBLISHED_TEXT)).toBeVisible()
       await saveDraft(page)

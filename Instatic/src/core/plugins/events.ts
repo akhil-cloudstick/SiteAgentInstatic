@@ -1,7 +1,7 @@
 /**
  * Plugin lifecycle event schema — the single source of truth for the
  * payloads broadcast over the SSE channel
- * (`/admin/api/cms/plugins/events`).
+ * (`/cms/api/cms/plugins/events`).
  *
  * The server's `eventBroadcaster` emits these; the admin client validates
  * each frame against `PluginEventSchema` before dispatching to listeners.

@@ -19,7 +19,7 @@
  *   • Plugin settings — per plugin, all admins share.
  *   • User preferences — per user, private to them. ← this file
  *
- * Wire format: `/admin/api/cms/me/preferences/:key`
+ * Wire format: `/cms/api/cms/me/preferences/:key`
  *   • GET    → `{ value: T }` or `{ value: null }` (not yet set — client
  *              falls back to its default)
  *   • PUT    → `{ value: T }` upserts
@@ -167,7 +167,7 @@ import { parseValue } from '@core/utils/typeboxHelpers'
 // Client helpers
 // ---------------------------------------------------------------------------
 
-const BASE_PATH = '/admin/api/cms/me/preferences'
+const BASE_PATH = '/cms/api/cms/me/preferences'
 
 /**
  * Fetch a single user preference. Returns `null` when the user hasn't set

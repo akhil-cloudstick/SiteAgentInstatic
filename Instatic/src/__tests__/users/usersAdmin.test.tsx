@@ -157,13 +157,13 @@ function json(body: unknown, status = 200) {
  * handler should still answer those.
  */
 function ambientFetchFallback(url: string): Response | undefined {
-  if (url.endsWith('/admin/api/cms/plugins')) {
+  if (url.endsWith('/cms/api/cms/plugins')) {
     return json({ plugins: [], adminPages: [] })
   }
-  if (url.endsWith('/admin/api/cms/site')) {
+  if (url.endsWith('/cms/api/cms/site')) {
     return json({ site: null }, 404)
   }
-  if (url.endsWith('/admin/api/cms/site/publish-status')) {
+  if (url.endsWith('/cms/api/cms/site/publish-status')) {
     return json({ ok: false }, 404)
   }
   return undefined
@@ -251,9 +251,9 @@ beforeEach(() => {
   setupEditorState()
   globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input)
-    if (url === '/admin/api/cms/users' && init?.method === 'GET') return json({ users })
-    if (url === '/admin/api/cms/roles' && init?.method === 'GET') return json({ roles })
-    if (url === '/admin/api/cms/audit' && init?.method === 'GET') return json({ events: auditEvents })
+    if (url === '/cms/api/cms/users' && init?.method === 'GET') return json({ users })
+    if (url === '/cms/api/cms/roles' && init?.method === 'GET') return json({ roles })
+    if (url === '/cms/api/cms/audit' && init?.method === 'GET') return json({ events: auditEvents })
     const ambient = ambientFetchFallback(url)
     if (ambient) return ambient
     return json({ error: `Unhandled ${url}` }, 500)
@@ -271,9 +271,9 @@ describe('UsersPage', () => {
     globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input)
       calls.push(`${init?.method ?? 'GET'} ${url}`)
-      if (url === '/admin/api/cms/users' && init?.method === 'GET') return json({ users })
-      if (url === '/admin/api/cms/roles' && init?.method === 'GET') return json({ roles })
-      if (url === '/admin/api/cms/audit' && init?.method === 'GET') return json({ events: auditEvents })
+      if (url === '/cms/api/cms/users' && init?.method === 'GET') return json({ users })
+      if (url === '/cms/api/cms/roles' && init?.method === 'GET') return json({ roles })
+      if (url === '/cms/api/cms/audit' && init?.method === 'GET') return json({ events: auditEvents })
       const ambient = ambientFetchFallback(url)
       if (ambient) return ambient
       return json({ error: `Unhandled ${url}` }, 500)
@@ -300,9 +300,9 @@ describe('UsersPage', () => {
     globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input)
       calls.push(`${init?.method ?? 'GET'} ${url}`)
-      if (url === '/admin/api/cms/users' && init?.method === 'GET') return json({ users })
-      if (url === '/admin/api/cms/roles' && init?.method === 'GET') return json({ roles })
-      if (url === '/admin/api/cms/audit' && init?.method === 'GET') return json({ events: auditEvents })
+      if (url === '/cms/api/cms/users' && init?.method === 'GET') return json({ users })
+      if (url === '/cms/api/cms/roles' && init?.method === 'GET') return json({ roles })
+      if (url === '/cms/api/cms/audit' && init?.method === 'GET') return json({ events: auditEvents })
       const ambient = ambientFetchFallback(url)
       if (ambient) return ambient
       return json({ error: `Unhandled ${url}` }, 500)
@@ -329,9 +329,9 @@ describe('UsersPage', () => {
     globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input)
       calls.push(`${init?.method ?? 'GET'} ${url}`)
-      if (url === '/admin/api/cms/users' && init?.method === 'GET') return json({ users })
-      if (url === '/admin/api/cms/roles' && init?.method === 'GET') return json({ roles })
-      if (url === '/admin/api/cms/audit' && init?.method === 'GET') return json({ events: auditEvents })
+      if (url === '/cms/api/cms/users' && init?.method === 'GET') return json({ users })
+      if (url === '/cms/api/cms/roles' && init?.method === 'GET') return json({ roles })
+      if (url === '/cms/api/cms/audit' && init?.method === 'GET') return json({ events: auditEvents })
       const ambient = ambientFetchFallback(url)
       if (ambient) return ambient
       return json({ error: `Unhandled ${url}` }, 500)
@@ -368,7 +368,7 @@ describe('UsersPage', () => {
   it('renders the audit empty state when the audit feed is empty', async () => {
     globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input)
-      if (url === '/admin/api/cms/audit' && init?.method === 'GET') return json({ events: [] })
+      if (url === '/cms/api/cms/audit' && init?.method === 'GET') return json({ events: [] })
       const ambient = ambientFetchFallback(url)
       if (ambient) return ambient
       return json({ error: `Unhandled ${url}` }, 500)
@@ -387,7 +387,7 @@ describe('UsersPage', () => {
   it('surfaces audit API load failures to audit readers', async () => {
     globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input)
-      if (url === '/admin/api/cms/audit' && init?.method === 'GET') {
+      if (url === '/cms/api/cms/audit' && init?.method === 'GET') {
         return json({ error: 'Audit service unavailable' }, 503)
       }
       const ambient = ambientFetchFallback(url)

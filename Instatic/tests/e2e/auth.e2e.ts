@@ -49,12 +49,12 @@ test.describe('auth session lifecycle', () => {
       stalePage.on('console', (message) => {
         if (message.type() === 'error') staleConsoleErrors.push(message.text())
       })
-      await stalePage.goto('/admin/site')
+      await stalePage.goto('/cms/site')
       await expectLoggedIn(stalePage)
 
       await logout(page)
 
-      await stalePage.goto('/admin/site')
+      await stalePage.goto('/cms/site')
       await expect(stalePage.getByRole('heading', { name: 'Admin Login' })).toBeVisible()
       await expect(stalePage.getByTestId('account-menu-trigger')).toHaveCount(0)
       expect(staleConsoleErrors).not.toContainEqual(

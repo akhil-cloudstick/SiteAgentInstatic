@@ -19,7 +19,7 @@ export function getAccountCommands(): Command[] {
       workspaces: ['any'],
       run: (ctx) => {
         ctx.closeSpotlight()
-        ctx.navigate('/admin/account')
+        ctx.navigate('/cms/account')
       },
     },
 
@@ -36,7 +36,7 @@ export function getAccountCommands(): Command[] {
         ctx.closeSpotlight()
         try {
           await logoutCms()
-          window.location.assign('/admin')
+          window.location.assign('/cms')
         } catch (err) {
           console.error('[spotlight] sign out failed:', err)
         }

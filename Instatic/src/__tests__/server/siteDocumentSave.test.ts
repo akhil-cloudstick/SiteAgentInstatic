@@ -165,7 +165,7 @@ async function setupHarness(): Promise<Ctx> {
   const pages = await storedRows(harness, 'pages')
   expect(pages.size).toBe(1)
   const homeId = [...pages.keys()][0]
-  const shellRes = await harness.cms('/admin/api/cms/site', { method: 'GET', cookie })
+  const shellRes = await harness.cms('/cms/api/cms/site', { method: 'GET', cookie })
   expect(shellRes.status).toBe(200)
   const { site: shell } = await readJson<{ site: SiteShell }>(shellRes)
   return { harness, cookie, homeId, shell }
@@ -183,7 +183,7 @@ interface DocOverrides {
 }
 
 function putDoc(ctx: Ctx, overrides: DocOverrides = {}): Promise<Response> {
-  return ctx.harness.cms('/admin/api/cms/site-document', {
+  return ctx.harness.cms('/cms/api/cms/site-document', {
     method: 'PUT',
     cookie: ctx.cookie,
     json: {
@@ -450,7 +450,7 @@ describe('site-document save — atomicity', () => {
       expect(components.has('vc-valid')).toBe(false)
 
       // …and the shell change was NOT written either.
-      const shellRes = await ctx.harness.cms('/admin/api/cms/site', { method: 'GET', cookie: ctx.cookie })
+      const shellRes = await ctx.harness.cms('/cms/api/cms/site', { method: 'GET', cookie: ctx.cookie })
       const { site: storedShell } = await readJson<{ site: SiteShell }>(shellRes)
       expect(storedShell.settings.metaTitle).not.toBe('Should never persist')
     } finally {

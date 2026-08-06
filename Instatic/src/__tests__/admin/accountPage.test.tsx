@@ -1,5 +1,5 @@
 /**
- * AccountPage — `/admin/account` self-targeted user settings.
+ * AccountPage — `/cms/account` self-targeted user settings.
  *
  * Verifies:
  *   - All four tab buttons render (Profile / Active devices / Security /
@@ -148,9 +148,9 @@ function makeAccountFetch(
     if (override) return override
     // Fallbacks that keep AdminPageLayout's ambient calls happy. The Account
     // page itself never calls these, but the surrounding layout does.
-    if (url.endsWith('/admin/api/cms/plugins')) return jsonResponse({ plugins: [], adminPages: [] })
-    if (url.endsWith('/admin/api/cms/site')) return jsonResponse({ site: null }, 404)
-    if (url.endsWith('/admin/api/cms/site/publish-status')) return jsonResponse({ ok: false }, 404)
+    if (url.endsWith('/cms/api/cms/plugins')) return jsonResponse({ plugins: [], adminPages: [] })
+    if (url.endsWith('/cms/api/cms/site')) return jsonResponse({ site: null }, 404)
+    if (url.endsWith('/cms/api/cms/site/publish-status')) return jsonResponse({ ok: false }, 404)
     return jsonResponse({ error: `Unhandled ${url}` }, 500)
   }) as typeof fetch
 }
@@ -160,7 +160,7 @@ function renderWithUser(user: CmsCurrentUser) {
   // router (AdminRouteLink ↔ useAdminNavigate) and StepUpProvider
   // (Sessions tab calls useStepUp).
   return render(
-    <MemoryRouter initialEntries={['/admin/account']}>
+    <MemoryRouter initialEntries={['/cms/account']}>
       <AdminSessionProvider user={user}>
         <StepUpProvider>
           <AccountPage />
@@ -202,7 +202,7 @@ describe('AccountPage', () => {
   it('does not start plugin background work for users without plugin access', async () => {
     const pluginRequests: string[] = []
     globalThis.fetch = makeAccountFetch((url) => {
-      if (url.includes('/admin/api/cms/plugins')) {
+      if (url.includes('/cms/api/cms/plugins')) {
         pluginRequests.push(url)
       }
       return undefined
@@ -217,7 +217,7 @@ describe('AccountPage', () => {
 
   it('renders all four tabs and defaults to Profile', () => {
     globalThis.fetch = makeAccountFetch((url) => {
-      if (url.endsWith('/admin/api/cms/auth/sessions')) return jsonResponse({ sessions: [] })
+      if (url.endsWith('/cms/api/cms/auth/sessions')) return jsonResponse({ sessions: [] })
       return undefined
     })
     renderWithUser(makeUser())
@@ -232,7 +232,7 @@ describe('AccountPage', () => {
 
   it('Sessions tab renders the device list with the current session pinned', async () => {
     globalThis.fetch = makeAccountFetch((url) => {
-      if (url.endsWith('/admin/api/cms/auth/sessions')) {
+      if (url.endsWith('/cms/api/cms/auth/sessions')) {
         return jsonResponse({
           sessions: [
             makeSession({ id: 'sess_a', deviceLabel: 'Chrome on macOS', isCurrent: true }),
@@ -258,7 +258,7 @@ describe('AccountPage', () => {
 
   it('Security tab renders active security actions', () => {
     globalThis.fetch = makeAccountFetch((url) => {
-      if (url.endsWith('/admin/api/cms/auth/sessions')) return jsonResponse({ sessions: [] })
+      if (url.endsWith('/cms/api/cms/auth/sessions')) return jsonResponse({ sessions: [] })
       return undefined
     })
     renderWithUser(makeUser())
@@ -280,7 +280,7 @@ describe('AccountPage', () => {
     let settingsPatchCalls = 0
     let lastBody: unknown = null
     globalThis.fetch = makeAccountFetch((url, init) => {
-      if (url.endsWith('/admin/api/cms/me/security/step-up') && init?.method === 'PATCH') {
+      if (url.endsWith('/cms/api/cms/me/security/step-up') && init?.method === 'PATCH') {
         settingsPatchCalls += 1
         lastBody = JSON.parse(String(init.body))
         if (settingsPatchCalls === 1) return jsonResponse({ error: 'step_up_required' }, 401)
@@ -291,7 +291,7 @@ describe('AccountPage', () => {
           }),
         })
       }
-      if (url.endsWith('/admin/api/cms/auth/step-up')) {
+      if (url.endsWith('/cms/api/cms/auth/step-up')) {
         return jsonResponse({ ok: true, stepUpExpiresAt: '2026-05-09T11:15:00.000Z' })
       }
       return undefined
@@ -320,7 +320,7 @@ describe('AccountPage', () => {
   it('Security tab configures the step-up window', async () => {
     let lastBody: unknown = null
     globalThis.fetch = makeAccountFetch((url, init) => {
-      if (url.endsWith('/admin/api/cms/me/security/step-up') && init?.method === 'PATCH') {
+      if (url.endsWith('/cms/api/cms/me/security/step-up') && init?.method === 'PATCH') {
         lastBody = JSON.parse(String(init.body))
         return jsonResponse({
           user: makeUser({
@@ -346,12 +346,12 @@ describe('AccountPage', () => {
   it('Security tab changes password through the shared step-up flow', async () => {
     let passwordPatchCalls = 0
     globalThis.fetch = makeAccountFetch((url, init) => {
-      if (url.endsWith('/admin/api/cms/me/password') && init?.method === 'PATCH') {
+      if (url.endsWith('/cms/api/cms/me/password') && init?.method === 'PATCH') {
         passwordPatchCalls += 1
         if (passwordPatchCalls === 1) return jsonResponse({ error: 'step_up_required' }, 401)
         return jsonResponse({ user: makeUser({ passwordUpdatedAt: '2026-05-09T11:00:00.000Z' }) })
       }
-      if (url.endsWith('/admin/api/cms/auth/step-up')) {
+      if (url.endsWith('/cms/api/cms/auth/step-up')) {
         return jsonResponse({ ok: true, stepUpExpiresAt: '2026-05-09T11:15:00.000Z' })
       }
       return undefined
@@ -385,13 +385,13 @@ describe('AccountPage', () => {
 
   it('Security tab enables MFA and shows one-time recovery codes', async () => {
     globalThis.fetch = makeAccountFetch((url, init) => {
-      if (url.endsWith('/admin/api/cms/me/mfa/totp/start') && init?.method === 'POST') {
+      if (url.endsWith('/cms/api/cms/me/mfa/totp/start') && init?.method === 'POST') {
         return jsonResponse({
           secret: 'JBSWY3DPEHPK3PXP',
           otpauthUrl: 'otpauth://totp/Page%20Builder%20CMS:owner%40example.com?secret=JBSWY3DPEHPK3PXP&issuer=Page%20Builder%20CMS',
         })
       }
-      if (url.endsWith('/admin/api/cms/me/mfa/totp/enable') && init?.method === 'POST') {
+      if (url.endsWith('/cms/api/cms/me/mfa/totp/enable') && init?.method === 'POST') {
         return jsonResponse({
           user: makeUser({
             mfaEnabled: true,
@@ -447,13 +447,13 @@ describe('AccountPage', () => {
 
     try {
       globalThis.fetch = makeAccountFetch((url, init) => {
-        if (url.endsWith('/admin/api/cms/me/mfa/totp/start') && init?.method === 'POST') {
+        if (url.endsWith('/cms/api/cms/me/mfa/totp/start') && init?.method === 'POST') {
           return jsonResponse({
             secret: 'JBSWY3DPEHPK3PXP',
             otpauthUrl: 'otpauth://totp/Page%20Builder%20CMS:owner%40example.com?secret=JBSWY3DPEHPK3PXP&issuer=Page%20Builder%20CMS',
           })
         }
-        if (url.endsWith('/admin/api/cms/me/mfa/totp/enable') && init?.method === 'POST') {
+        if (url.endsWith('/cms/api/cms/me/mfa/totp/enable') && init?.method === 'POST') {
           return jsonResponse({
             user: makeUser({
               mfaEnabled: true,
@@ -498,7 +498,7 @@ describe('AccountPage', () => {
 
   it('Activity tab shows an empty state when there are no events', async () => {
     globalThis.fetch = makeAccountFetch((url) => {
-      if (url.endsWith('/admin/api/cms/auth/activity')) return jsonResponse({ events: [] })
+      if (url.endsWith('/cms/api/cms/auth/activity')) return jsonResponse({ events: [] })
       return undefined
     })
 
@@ -513,7 +513,7 @@ describe('AccountPage', () => {
   it('Activity tab surfaces a suspicious-activity banner when recent locked events exist', async () => {
     const recentLockTimestamp = new Date(Date.now() - 5 * 60_000).toISOString()
     globalThis.fetch = makeAccountFetch((url) => {
-      if (url.endsWith('/admin/api/cms/auth/activity')) {
+      if (url.endsWith('/cms/api/cms/auth/activity')) {
         return jsonResponse({
           events: [
             {
@@ -542,7 +542,7 @@ describe('AccountPage', () => {
   it('Activity tab treats recent rate-limited events as suspicious activity', async () => {
     const recentRateLimitTimestamp = new Date(Date.now() - 5 * 60_000).toISOString()
     globalThis.fetch = makeAccountFetch((url) => {
-      if (url.endsWith('/admin/api/cms/auth/activity')) {
+      if (url.endsWith('/cms/api/cms/auth/activity')) {
         return jsonResponse({
           events: [
             {
@@ -576,7 +576,7 @@ describe('AccountPage', () => {
     const recentFailure = new Date(Date.now() - 5 * 60_000).toISOString()
     const recentSuccess = new Date(Date.now() - 60_000).toISOString()
     globalThis.fetch = makeAccountFetch((url) => {
-      if (url.endsWith('/admin/api/cms/auth/activity')) {
+      if (url.endsWith('/cms/api/cms/auth/activity')) {
         return jsonResponse({
           events: [
             {

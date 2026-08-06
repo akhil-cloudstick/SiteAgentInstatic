@@ -56,6 +56,7 @@ const SITE_SCREEN_CSS = [
   'admin/pages/site/canvas/CanvasLiveSurface.module.css',
   'admin/pages/site/canvas/BreakpointSelectionOverlay.module.css',
   'admin/pages/site/panels/PropertiesPanel/PropertiesPanel.module.css',
+  'admin/pages/site/panels/PropertiesPanel/inspector/Inspector.module.css',
 ] as const
 
 /** TSX that renders the re-skinned surfaces — the icon audit's search space. */
@@ -71,6 +72,14 @@ const SITE_SCREEN_TSX = [
   'admin/pages/site/moduleGlyph.ts',
   'admin/pages/site/layout/WorkspaceDock.tsx',
   'admin/pages/site/canvas/CanvasLiveSurface.tsx',
+  // The inspector: its furniture, the two node bodies, and the guided CSS
+  // control map whose glyph names live in the map rather than in a component.
+  'admin/pages/site/panels/PropertiesPanel/inspector/InspectorChrome.tsx',
+  'admin/pages/site/panels/PropertiesPanel/inspector/SlotContentList.tsx',
+  'admin/pages/site/panels/PropertiesPanel/NodeInspectorBody.tsx',
+  'admin/pages/site/panels/PropertiesPanel/ReviewInspectorBody.tsx',
+  'admin/pages/site/panels/PropertiesPanel/guidedCssControls.ts',
+  'admin/pages/site/property-controls/UrlControl.tsx',
 ] as const
 
 const combinedCss = () => SITE_SCREEN_CSS.map(read).join('\n')
@@ -159,8 +168,6 @@ describe.if(hasReference)('site screen fidelity — reference value audit', () =
     const expected: ReadonlyArray<[string, RegExp]> = [
       ['shell height', /--site-shell-height:\s*61px/],
       ['toolbar height', /--site-toolbar-height:\s*69px/],
-      ['focus shell height', /--site-shell-height:\s*54px/],
-      ['focus toolbar height', /--site-toolbar-height:\s*56px/],
       ['focus right track', /--site-right-track:\s*380px/],
       ['review right track', /--site-right-track:\s*316px/],
     ]
@@ -169,21 +176,24 @@ describe.if(hasReference)('site screen fidelity — reference value audit', () =
   })
 
   /**
-   * The one deliberate departure from the reference: it narrows the outline
-   * column in Focus (275px) and Review (250px). Here the mode changes only what
-   * the column shows — a column that resizes itself as the mode changes reads
-   * as a glitch, and the width belongs to the author's resize handle. Pinned so
-   * a future "restore reference geometry" pass doesn't silently undo it.
+   * The deliberate departure from the reference: it shrinks the header/toolbar
+   * in Focus (54/56px) and narrows the outline column in Focus (275px) and
+   * Review (250px). Here the mode changes only what those surfaces show — the
+   * chrome keeps one geometry, because a header that resizes itself as the mode
+   * changes makes the page jump, and the column width belongs to the author's
+   * resize handle. Pinned so a future "restore reference geometry" pass doesn't
+   * silently undo it.
    */
-  it('keeps the left track mode-independent (a deliberate reference departure)', () => {
+  it('keeps the shell chrome mode-independent (a deliberate reference departure)', () => {
     const globals = read('styles/globals.css')
     const perModeBlocks = [...globals.matchAll(
       /\[data-site-mode='(?:focus|review)'\]\s*\{([^}]*)\}/g,
     )]
     expect(perModeBlocks.length).toBeGreaterThan(0)
+    const MODE_INDEPENDENT = ['--site-left-track', '--site-shell-height', '--site-toolbar-height']
     const offenders = perModeBlocks
-      .map((block) => block[1] ?? '')
-      .filter((body) => body.includes('--site-left-track'))
+      .flatMap((block) => MODE_INDEPENDENT
+        .filter((property) => (block[1] ?? '').includes(property)))
     expect(offenders).toEqual([])
   })
 
@@ -213,19 +223,18 @@ describe.if(hasReference)('site screen fidelity — reference value audit', () =
       'fa-arrow-right', 'fa-bottle-droplet', 'fa-spa', 'fa-pen',
       // The mock's demo-only affordances: a sync-state picker and a role
       // switcher, neither of which has a real counterpart.
-      'fa-user-shield', 'fa-circle-info', 'fa-globe', 'fa-calendar-days',
-      'fa-align-center', 'fa-align-right', 'fa-object-group', 'fa-panorama',
-      'fa-images', 'fa-align-left', 'fa-link', 'fa-trash', 'fa-copy',
-      'fa-circle-plus', 'fa-ellipsis-vertical', 'fa-arrow-up-right-from-square',
+      'fa-user-shield', 'fa-globe', 'fa-calendar-days',
+      'fa-copy', 'fa-circle-plus', 'fa-ellipsis-vertical',
       // The disclosure swaps chevron-down/chevron-up in the mock. We render ONE
       // chevron-down and rotate it, because a glyph swap cannot be tweened and
       // the reference's open/close read as a hard snap. Visually identical at
-      // both rest states; only the transition differs.
+      // both rest states; only the transition differs. The inspector's own
+      // disclosures draw their marker from the same webfont in CSS (`Section`),
+      // which this source-level audit cannot see.
       'fa-chevron-up',
-      'fa-gear', 'fa-scissors', 'fa-star', 'fa-envelope', 'fa-quote-left',
-      'fa-magnifying-glass', 'fa-sitemap', 'fa-square', 'fa-file-lines',
+      'fa-magnifying-glass', 'fa-sitemap', 'fa-file-lines',
       'fa-database', 'fa-cube', 'fa-user', 'fa-window-maximize', 'fa-moon',
-      'fa-sun', 'fa-xmark', 'fa-bars', 'fa-table-cells-large', 'fa-plus',
+      'fa-sun', 'fa-xmark',
     ])
 
     const app = readFileSync(REFERENCE_APP, 'utf8')

@@ -26,7 +26,7 @@ async function listUsers(
   harness: CapabilityTestHarness,
   cookie: string,
 ): Promise<ListedUser[]> {
-  const res = await harness.cms('/admin/api/cms/users', { cookie })
+  const res = await harness.cms('/cms/api/cms/users', { cookie })
   expect(res.status).toBe(200)
   const body = await readJson<{ users: ListedUser[] }>(res)
   return body.users
@@ -55,7 +55,7 @@ async function listRoles(
   harness: CapabilityTestHarness,
   cookie: string,
 ): Promise<ListedRole[]> {
-  const res = await harness.cms('/admin/api/cms/roles', { cookie })
+  const res = await harness.cms('/cms/api/cms/roles', { cookie })
   expect(res.status).toBe(200)
   const body = await readJson<{ roles: ListedRole[] }>(res)
   return body.roles
@@ -65,7 +65,7 @@ async function listSessions(
   harness: CapabilityTestHarness,
   cookie: string,
 ): Promise<ListedSession[]> {
-  const res = await harness.cms('/admin/api/cms/auth/sessions', { cookie })
+  const res = await harness.cms('/cms/api/cms/auth/sessions', { cookie })
   expect(res.status).toBe(200)
   const body = await readJson<{ sessions: ListedSession[] }>(res)
   return body.sessions
@@ -94,20 +94,20 @@ describe('secondary step-up protected actions', () => {
     const targetUser = await requireUserByEmail(harness, manager.cookie, target.email)
 
     const steppedViewerCookie = await harness.stepUp(viewer.cookie)
-    await expectForbidden(await harness.cms(`/admin/api/cms/users/${targetUser.id}`, {
+    await expectForbidden(await harness.cms(`/cms/api/cms/users/${targetUser.id}`, {
       method: 'DELETE',
       cookie: steppedViewerCookie,
     }))
     expect(await findUserByEmail(harness, manager.cookie, target.email)).toBeDefined()
 
-    await expectStepUpRequired(await harness.cms(`/admin/api/cms/users/${targetUser.id}`, {
+    await expectStepUpRequired(await harness.cms(`/cms/api/cms/users/${targetUser.id}`, {
       method: 'DELETE',
       cookie: manager.cookie,
     }))
     expect(await findUserByEmail(harness, manager.cookie, target.email)).toBeDefined()
 
     const steppedManagerCookie = await harness.stepUp(manager.cookie)
-    const deleted = await harness.cms(`/admin/api/cms/users/${targetUser.id}`, {
+    const deleted = await harness.cms(`/cms/api/cms/users/${targetUser.id}`, {
       method: 'DELETE',
       cookie: steppedManagerCookie,
     })
@@ -131,14 +131,14 @@ describe('secondary step-up protected actions', () => {
       capabilities: ['site.read'],
     })
 
-    await expectStepUpRequired(await harness.cms(`/admin/api/cms/roles/${roleId}`, {
+    await expectStepUpRequired(await harness.cms(`/cms/api/cms/roles/${roleId}`, {
       method: 'DELETE',
       cookie: roleManager.cookie,
     }))
     expect((await listRoles(harness, roleManager.cookie)).some((role) => role.id === roleId)).toBe(true)
 
     const steppedRoleManagerCookie = await harness.stepUp(roleManager.cookie)
-    const deleted = await harness.cms(`/admin/api/cms/roles/${roleId}`, {
+    const deleted = await harness.cms(`/cms/api/cms/roles/${roleId}`, {
       method: 'DELETE',
       cookie: steppedRoleManagerCookie,
     })
@@ -157,14 +157,14 @@ describe('secondary step-up protected actions', () => {
     })
 
     const body = { mode: 'required', windowMinutes: 30 }
-    await expectStepUpRequired(await harness.cms('/admin/api/cms/me/security/step-up', {
+    await expectStepUpRequired(await harness.cms('/cms/api/cms/me/security/step-up', {
       method: 'PATCH',
       cookie: account.cookie,
       json: body,
     }))
 
     const steppedCookie = await harness.stepUp(account.cookie)
-    const updated = await harness.cms('/admin/api/cms/me/security/step-up', {
+    const updated = await harness.cms('/cms/api/cms/me/security/step-up', {
       method: 'PATCH',
       cookie: steppedCookie,
       json: body,
@@ -190,7 +190,7 @@ describe('secondary step-up protected actions', () => {
     if (!otherSession) throw new Error('Expected a secondary session to revoke')
 
     await expectStepUpRequired(await harness.cms(
-      `/admin/api/cms/auth/sessions/${encodeURIComponent(otherSession.id)}`,
+      `/cms/api/cms/auth/sessions/${encodeURIComponent(otherSession.id)}`,
       {
         method: 'DELETE',
         cookie: account.cookie,
@@ -200,7 +200,7 @@ describe('secondary step-up protected actions', () => {
 
     const steppedCookie = await harness.stepUp(account.cookie)
     const revoked = await harness.cms(
-      `/admin/api/cms/auth/sessions/${encodeURIComponent(otherSession.id)}`,
+      `/cms/api/cms/auth/sessions/${encodeURIComponent(otherSession.id)}`,
       {
         method: 'DELETE',
         cookie: steppedCookie,

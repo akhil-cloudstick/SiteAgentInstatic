@@ -30,6 +30,12 @@ function resetStore() {
     selectedNodeId: 'container-node',
     selectedNodeIds: ['container-node'],
     hoveredNodeId: null,
+    // Componentize is a Live-edit / Focus affordance — you restructure there,
+    // not in Responsive review. The inspector is per-mode since the approved
+    // Site re-skin, so pin the mode instead of inheriting the store's 'design'
+    // default.
+    canvasView: 'live',
+    sectionFocusNodeId: null,
     propertiesPanel: { collapsed: true, x: 0, y: 0, width: 360 },
     propertiesPanelMode: 'docked',
     _historyPast: [],

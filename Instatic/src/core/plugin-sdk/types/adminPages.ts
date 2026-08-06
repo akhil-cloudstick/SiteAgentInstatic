@@ -41,7 +41,7 @@ export interface PluginAdminPage {
   icon?: string
   /**
    * Optional admin route override. The host derives the final route from
-   * the plugin id + page id at install time (`/admin/plugins/:pluginId/:pageId`),
+   * the plugin id + page id at install time (`/cms/plugins/:pluginId/:pageId`),
    * so plugin authors never need to set it. Kept on the type for forward
    * compatibility (e.g. nested plugin pages).
    */

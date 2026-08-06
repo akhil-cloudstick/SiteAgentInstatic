@@ -146,6 +146,186 @@ function siteWithVC(): SiteDocument {
   }
 }
 
+/**
+ * A page plus an `everywhere` layout holding the shared chrome (nav + footer)
+ * around a `base.outlet`. The draft preview must render the page INSIDE that
+ * chrome, exactly as the canvas and the published page do.
+ */
+function siteWithEverywhereTemplate(): SiteDocument {
+  const base = site()
+  return {
+    ...base,
+    pages: [
+      {
+        ...base.pages[0],
+        nodes: {
+          root: {
+            id: 'root',
+            moduleId: 'base.body',
+            props: {},
+            breakpointOverrides: {},
+            children: ['page_text'],
+          },
+          page_text: {
+            id: 'page_text',
+            moduleId: 'base.text',
+            props: { text: 'PAGE BODY' },
+            breakpointOverrides: {},
+            children: [],
+          },
+        },
+      },
+      {
+        id: 'tpl_everywhere',
+        title: 'Site chrome',
+        slug: 'site-chrome',
+        template: { enabled: true, target: { kind: 'everywhere' }, priority: 0 },
+        rootNodeId: 'tpl_root',
+        nodes: {
+          tpl_root: {
+            id: 'tpl_root',
+            moduleId: 'base.body',
+            props: {},
+            breakpointOverrides: {},
+            children: ['tpl_nav', 'tpl_outlet', 'tpl_footer'],
+          },
+          tpl_nav: {
+            id: 'tpl_nav',
+            moduleId: 'base.text',
+            props: { text: 'SHARED NAVBAR' },
+            breakpointOverrides: {},
+            children: [],
+          },
+          tpl_outlet: {
+            id: 'tpl_outlet',
+            moduleId: 'base.outlet',
+            props: {},
+            breakpointOverrides: {},
+            children: [],
+          },
+          tpl_footer: {
+            id: 'tpl_footer',
+            moduleId: 'base.text',
+            props: { text: 'SHARED FOOTER' },
+            breakpointOverrides: {},
+            children: [],
+          },
+        },
+      },
+    ],
+  }
+}
+
+/**
+ * The real-world shape: the `everywhere` layout holds NO chrome markup itself —
+ * its body is [VC-ref → "Shared Header", base.outlet, VC-ref → "Shared Footer"].
+ * This is how the site importer builds site chrome, so the preview has to
+ * survive both hops: compose the template chain AND expand the VC refs inside
+ * it. Composition alone would still render an empty header/footer.
+ */
+function siteWithSharedComponentChrome(): SiteDocument {
+  const base = site()
+  const chromeVc = (id: string, name: string, text: string) => ({
+    id,
+    name,
+    tree: {
+      rootNodeId: `${id}_root`,
+      nodes: {
+        [`${id}_root`]: {
+          id: `${id}_root`,
+          moduleId: 'base.container',
+          props: { tag: 'div', customTag: '', htmlAttributes: {} },
+          breakpointOverrides: {},
+          children: [`${id}_text`],
+        },
+        [`${id}_text`]: {
+          id: `${id}_text`,
+          moduleId: 'base.text',
+          props: { text },
+          breakpointOverrides: {},
+          children: [],
+        },
+      },
+    },
+    params: [],
+    breakpoints: [],
+    createdAt: 1,
+  })
+
+  return {
+    ...base,
+    visualComponents: [
+      chromeVc('vc_header', 'Shared Header', 'SHARED NAVBAR'),
+      chromeVc('vc_footer', 'Shared Footer', 'SHARED FOOTER'),
+    ],
+    pages: [
+      {
+        ...base.pages[0],
+        nodes: {
+          root: {
+            id: 'root',
+            moduleId: 'base.body',
+            props: {},
+            breakpointOverrides: {},
+            children: ['page_text'],
+          },
+          page_text: {
+            id: 'page_text',
+            moduleId: 'base.text',
+            props: { text: 'PAGE BODY' },
+            breakpointOverrides: {},
+            children: [],
+          },
+        },
+      },
+      {
+        id: 'tpl_site_layout',
+        title: 'Site Layout',
+        slug: 'site-layout',
+        template: { enabled: true, target: { kind: 'everywhere' }, priority: 0 },
+        rootNodeId: 'tpl_root',
+        nodes: {
+          tpl_root: {
+            id: 'tpl_root',
+            moduleId: 'base.body',
+            props: {},
+            breakpointOverrides: {},
+            children: ['ref_header', 'tpl_outlet', 'ref_footer'],
+          },
+          ref_header: {
+            id: 'ref_header',
+            moduleId: 'base.visual-component-ref',
+            props: { componentId: 'vc_header' },
+            breakpointOverrides: {},
+            children: [],
+          },
+          tpl_outlet: {
+            id: 'tpl_outlet',
+            moduleId: 'base.outlet',
+            props: {},
+            breakpointOverrides: {},
+            children: [],
+          },
+          ref_footer: {
+            id: 'ref_footer',
+            moduleId: 'base.visual-component-ref',
+            props: { componentId: 'vc_footer' },
+            breakpointOverrides: {},
+            children: [],
+          },
+        },
+      },
+    ],
+  }
+}
+
+function siteWithVCAndEverywhereTemplate(): SiteDocument {
+  return {
+    ...siteWithEverywhereTemplate(),
+    visualComponents: siteWithVC().visualComponents,
+  }
+}
+
 function siteWithLoop(): SiteDocument {
   const base = site()
   return {
@@ -213,7 +393,7 @@ function siteWithLoop(): SiteDocument {
 describe('CMS runtime handlers', () => {
   it('resolves an empty runtime dependency manifest', async () => {
     const res = await handleCmsRequest(runtimeRequest(
-      'http://localhost/admin/api/cms/runtime/dependencies/resolve',
+      'http://localhost/cms/api/cms/runtime/dependencies/resolve',
       { packageJson: { dependencies: {}, devDependencies: {} } },
     ), makeFakeDb())
 
@@ -225,7 +405,7 @@ describe('CMS runtime handlers', () => {
 
   it('normalizes unsafe and non-runtime dependency manifest entries before resolving', async () => {
     const res = await handleCmsRequest(runtimeRequest(
-      'http://localhost/admin/api/cms/runtime/dependencies/resolve',
+      'http://localhost/cms/api/cms/runtime/dependencies/resolve',
       {
         packageJson: {
           dependencies: {
@@ -253,7 +433,7 @@ describe('CMS runtime handlers', () => {
 
   it('builds a runtime preview document for a provided site and page', async () => {
     const res = await handleCmsRequest(runtimeRequest(
-      'http://localhost/admin/api/cms/runtime/preview',
+      'http://localhost/cms/api/cms/runtime/preview',
       { site: site(), pageId: 'page_1' },
     ), makeFakeDb())
 
@@ -268,7 +448,7 @@ describe('CMS runtime handlers', () => {
 
   it('prefetches and renders loop rows in the runtime preview (ISS-234)', async () => {
     const res = await handleCmsRequest(runtimeRequest(
-      'http://localhost/admin/api/cms/runtime/preview',
+      'http://localhost/cms/api/cms/runtime/preview',
       { site: siteWithLoop(), pageId: 'page_1' },
     ), makeFakeDb())
 
@@ -280,7 +460,7 @@ describe('CMS runtime handlers', () => {
 
   it('builds a runtime preview from a VC virtual page id when the editor is in VC canvas mode', async () => {
     const res = await handleCmsRequest(runtimeRequest(
-      'http://localhost/admin/api/cms/runtime/preview',
+      'http://localhost/cms/api/cms/runtime/preview',
       { site: siteWithVC(), pageId: 'vc-virtual:vc_hero' },
     ), makeFakeDb())
 
@@ -291,9 +471,50 @@ describe('CMS runtime handlers', () => {
     })
   })
 
+  it('renders the draft preview inside the everywhere template chrome', async () => {
+    const res = await handleCmsRequest(runtimeRequest(
+      'http://localhost/cms/api/cms/runtime/preview',
+      { site: siteWithEverywhereTemplate(), pageId: 'page_1' },
+    ), makeFakeDb())
+
+    expect(res.status).toBe(200)
+    const body = await res.text()
+    // Shared components the canvas shows must also reach the preview…
+    expect(body).toContain('SHARED NAVBAR')
+    expect(body).toContain('SHARED FOOTER')
+    // …with the page spliced into the outlet, and no outlet placeholder left.
+    expect(body).toContain('PAGE BODY')
+    expect(body).not.toContain('base.outlet')
+  })
+
+  it('renders shared header/footer components carried by the everywhere template', async () => {
+    const res = await handleCmsRequest(runtimeRequest(
+      'http://localhost/cms/api/cms/runtime/preview',
+      { site: siteWithSharedComponentChrome(), pageId: 'page_1' },
+    ), makeFakeDb())
+
+    expect(res.status).toBe(200)
+    const body = await res.text()
+    expect(body).toContain('SHARED NAVBAR')
+    expect(body).toContain('SHARED FOOTER')
+    expect(body).toContain('PAGE BODY')
+  })
+
+  it('does not wrap a VC virtual page in the template chrome', async () => {
+    const res = await handleCmsRequest(runtimeRequest(
+      'http://localhost/cms/api/cms/runtime/preview',
+      { site: siteWithVCAndEverywhereTemplate(), pageId: 'vc-virtual:vc_hero' },
+    ), makeFakeDb())
+
+    expect(res.status).toBe(200)
+    const body = await res.text()
+    expect(body).not.toContain('SHARED NAVBAR')
+    expect(body).not.toContain('SHARED FOOTER')
+  })
+
   it('returns 404 for an unknown VC virtual page id', async () => {
     const res = await handleCmsRequest(runtimeRequest(
-      'http://localhost/admin/api/cms/runtime/preview',
+      'http://localhost/cms/api/cms/runtime/preview',
       { site: siteWithVC(), pageId: 'vc-virtual:unknown_vc' },
     ), makeFakeDb())
 

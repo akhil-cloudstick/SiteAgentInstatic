@@ -85,7 +85,7 @@ function runtimeRequestPackageJson(raw: unknown): SitePackageJson {
 export async function handleRuntimeRoutes(req: Request, db: DbClient): Promise<Response | null> {
   const url = new URL(req.url)
 
-  if (url.pathname === '/admin/api/cms/runtime/dependencies/resolve') {
+  if (url.pathname === '/cms/api/cms/runtime/dependencies/resolve') {
     const user = await requireCapability(req, db, 'runtime.dependencies')
     if (user instanceof Response) return user
     if (req.method !== 'POST') return methodNotAllowed()
@@ -131,7 +131,7 @@ export async function handleRuntimeRoutes(req: Request, db: DbClient): Promise<R
     }
   }
 
-  if (url.pathname === '/admin/api/cms/runtime/preview') {
+  if (url.pathname === '/cms/api/cms/runtime/preview') {
     // Preview is a render — the right gate is the read floor for the site
     // editor, not page-metadata edit. A Designer holding `site.style.edit`
     // (and therefore `site.read`) needs to use the preview iframe even
@@ -178,6 +178,11 @@ export async function handleRuntimeRoutes(req: Request, db: DbClient): Promise<R
       const site: SiteDocument = { ...shell, pages, visualComponents, layouts: [] }
       const page = resolvePreviewPage(site, pageId)
       if (!page) return jsonResponse({ error: 'Page not found' }, { status: 404 })
+      // A Visual Component edit surface is never a published route, so it is
+      // never wrapped in a template chain — same branch the canvas takes in VC
+      // mode (`CanvasComposedTree`). Everything else previews inside its
+      // wrapping templates, chrome and all.
+      const wrapInTemplates = parseVirtualVCPageId(pageId) === null
 
       const runtime = normalizeSiteRuntimeConfig(site.runtime)
       const dependencyCache = Object.keys(runtime.dependencyLock.packages).length > 0
@@ -191,6 +196,7 @@ export async function handleRuntimeRoutes(req: Request, db: DbClient): Promise<R
         dependencyCache,
         breakpointId,
         templateContext,
+        wrapInTemplates,
         db,
       })
 

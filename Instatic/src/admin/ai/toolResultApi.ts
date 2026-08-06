@@ -3,7 +3,7 @@ import { Type } from '@core/utils/typeboxHelpers'
 import { apiRequest } from '@core/http'
 import type { AiToolOutput } from '@core/ai'
 
-const TOOL_RESULT_PATH = '/admin/api/ai/tool-result'
+const TOOL_RESULT_PATH = '/cms/api/ai/tool-result'
 const ToolResultAckSchema = Type.Object({ ok: Type.Boolean() })
 
 export async function postToolResult(

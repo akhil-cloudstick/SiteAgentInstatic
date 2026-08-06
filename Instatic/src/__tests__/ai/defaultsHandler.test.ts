@@ -40,7 +40,7 @@ describe('AI defaults handler', () => {
       return originalFetch(input)
     }
 
-    const createRes = await harness.ai('/admin/api/ai/credentials', {
+    const createRes = await harness.ai('/cms/api/ai/credentials', {
       method: 'POST',
       cookie,
       json: {
@@ -53,7 +53,7 @@ describe('AI defaults handler', () => {
     expect(createRes.status).toBe(201)
     const createBody = await readJson<{ credential: { id: string } }>(createRes)
 
-    const setRes = await harness.ai('/admin/api/ai/defaults/data', {
+    const setRes = await harness.ai('/cms/api/ai/defaults/data', {
       method: 'PUT',
       cookie,
       json: {
@@ -63,13 +63,13 @@ describe('AI defaults handler', () => {
     })
     expect(setRes.status).toBe(200)
 
-    const clearRes = await harness.ai('/admin/api/ai/defaults/data', {
+    const clearRes = await harness.ai('/cms/api/ai/defaults/data', {
       method: 'DELETE',
       cookie,
     })
     expect(clearRes.status).toBe(204)
 
-    const defaultsRes = await harness.ai('/admin/api/ai/defaults', {
+    const defaultsRes = await harness.ai('/cms/api/ai/defaults', {
       method: 'GET',
       cookie,
     })
@@ -77,7 +77,7 @@ describe('AI defaults handler', () => {
     const defaultsBody = await readJson<{ defaults: Record<string, unknown> }>(defaultsRes)
     expect(defaultsBody.defaults.data).toBeUndefined()
 
-    const deleteRes = await harness.ai(`/admin/api/ai/credentials/${createBody.credential.id}`, {
+    const deleteRes = await harness.ai(`/cms/api/ai/credentials/${createBody.credential.id}`, {
       method: 'DELETE',
       cookie,
     })

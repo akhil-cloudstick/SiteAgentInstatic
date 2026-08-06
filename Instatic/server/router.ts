@@ -1,3 +1,5 @@
+import { getSessionHash } from './auth/authz'
+import { findUserBySessionHash } from './auth/sessions'
 import { tryHandleAi } from './ai/handlers'
 import { handleMcpHttp, MCP_ENDPOINT_PATH } from './ai/mcp'
 import { tryHandleMcpOAuth } from './ai/mcp/oauth/handler'
@@ -73,9 +75,9 @@ const routes: readonly RouteHandler[] = [
   // scoped personal tokens. Matched before the admin-cookie-gated AI routes
   // since it authenticates per connection, not via the admin session.
   tryServeMcp,
-  // AI runtime — `/admin/api/ai/*`. The legacy `/admin/api/agent` and
-  // `/admin/api/agent/tool-result` were deleted in Phase 3 of the AI
-  // runtime rewrite. The site editor now POSTs `/admin/api/ai/chat/site`.
+  // AI runtime — `/cms/api/ai/*`. The legacy `/cms/api/agent` and
+  // `/cms/api/agent/tool-result` were deleted in Phase 3 of the AI
+  // runtime rewrite. The site editor now POSTs `/cms/api/ai/chat/site`.
   tryServeAi,
   tryServeCmsApi,
   tryServeLoopRuntimeAsset,
@@ -133,17 +135,17 @@ function tryServeMcpOAuth(
 }
 
 /**
- * AI runtime — provider-agnostic stack at `/admin/api/ai/*`. Handles chat
+ * AI runtime — provider-agnostic stack at `/cms/api/ai/*`. Handles chat
  * streams, browser bridge, credentials CRUD, conversation history,
  * defaults, and model discovery. See `server/ai/handlers/index.ts` for the
  * full route table; the dispatcher there is the source of truth for
  * which paths are owned by this namespace.
  *
- * Endpoints live under `/admin/api/` so the admin session cookie — scoped
- * to `Path=/admin` to keep it off the public site — is carried to them.
+ * Endpoints live under `/cms/api/` so the admin session cookie — scoped
+ * to `Path=/cms` to keep it off the public site — is carried to them.
  * Without that, the `requireCapability('ai.chat' / 'ai.tools.write' /
  * 'ai.providers.manage')` gate would 401 every request. Matched before
- * the broader `/admin/api/cms/` route so the AI paths don't get swallowed
+ * the broader `/cms/api/cms/` route so the AI paths don't get swallowed
  * by the CMS dispatcher.
  */
 function tryServeAi(req: Request, runtime: ServerRuntime, url: URL, _pathname: string): Promise<Response> | null {
@@ -162,7 +164,7 @@ function tryServeMcp(req: Request, runtime: ServerRuntime, _url: URL, pathname: 
 }
 
 function tryServeCmsApi(req: Request, runtime: ServerRuntime, _url: URL, pathname: string): Promise<Response> | null {
-  if (!pathname.startsWith('/admin/api/cms/')) return null
+  if (!pathname.startsWith('/cms/api/cms/')) return null
   return handleCmsRequest(req, runtime.db, {
     uploadsDir: runtime.uploadsDir,
     databaseUrl: runtime.databaseUrl,
@@ -426,14 +428,62 @@ async function tryServeUpload(
   return hardened
 }
 
+/**
+ * Does this request carry a session that is actually still VALID?
+ *
+ * Cookie presence is deliberately not enough. An EXPIRED session still sends its
+ * cookie, so a presence-only check would serve the SPA, `/me` would 401, and the
+ * user would land on our own login form — the second login we are eliminating.
+ * The expiry case is the common one in production (sessions outlive nothing;
+ * people come back the next day), so it must resolve to the hub, not to us.
+ *
+ * Costs one indexed lookup, and only for top-level admin navigations — never for
+ * assets or API calls.
+ */
+async function requestHasValidAdminSession(req: Request, db: DbClient): Promise<boolean> {
+  const idHash = await getSessionHash(req)
+  if (!idHash) return false
+  return (await findUserBySessionHash(db, idHash)) !== null
+}
+
+/**
+ * True for top-level navigations (the address bar), false for fetch/XHR/asset
+ * requests. Only a navigation may be redirected to the hub — bouncing an API
+ * call would turn a clean 401 into a confusing cross-origin redirect.
+ */
+function requestIsDocument(req: Request): boolean {
+  const dest = req.headers.get('sec-fetch-dest')
+  if (dest) return dest === 'document'
+  return (req.headers.get('accept') ?? '').includes('text/html')
+}
+
 async function tryServeAdminApp(
   req: Request,
   runtime: ServerRuntime,
   _url: URL,
   pathname: string,
 ): Promise<Response | null> {
-  const isAdminPath = pathname === '/admin' || pathname.startsWith('/admin/')
-  if (!isAdminPath) return null
+  const isCmsPath = pathname === '/cms' || pathname.startsWith('/cms/')
+  if (!isCmsPath) return null
+
+  // ONE LOGIN FOR THE WHOLE PRODUCT.
+  // When this instance is hub-managed (INSTATIC_HUB_SSO_URL is set by the
+  // control plane), an unauthenticated PAGE load must never render our own
+  // login form — that is the "second login" users report. Bounce to the hub,
+  // which silently re-mints an SSO token if their hub session is alive and only
+  // shows the single shared login when it is not. Standalone installs leave the
+  // env unset and keep the built-in login, which is the correct behaviour there.
+  const hubSsoUrl = (process.env.INSTATIC_HUB_SSO_URL ?? '').trim()
+  if (hubSsoUrl && requestIsDocument(req) && !(await requestHasValidAdminSession(req, runtime.db))) {
+    const next = pathname + (new URL(req.url).search || '')
+    return new Response(null, {
+      status: 302,
+      headers: {
+        location: `${hubSsoUrl}?next=${encodeURIComponent(next)}`,
+        'cache-control': 'no-store',
+      },
+    })
+  }
 
   if (runtime.staticDir) {
     const adminApp = await serveAdminApp(runtime.staticDir, req)
@@ -470,14 +520,14 @@ async function trySetupRedirect(req: Request, runtime: ServerRuntime, _url: URL,
   // unmatched GET (bot probes, 404s) paid two COUNT queries forever.
   const setupStatus = await getSetupStatusCached(runtime.db)
   return setupStatus.needsSetup
-    ? new Response(null, { status: 302, headers: { location: '/admin' } })
+    ? new Response(null, { status: 302, headers: { location: '/cms' } })
     : null
 }
 
 /**
  * Last route before the dispatcher's bare JSON 404: serve the site's designed
  * 404 page (the `notFound` template) for any GET no other route claimed.
- * Namespaced prefixes (`/admin/api/*`, `/_instatic/*`, `/uploads/*`) never
+ * Namespaced prefixes (`/cms/api/*`, `/_instatic/*`, `/uploads/*`) never
  * reach here — they absorb their namespace and emit their own 404s. Returns
  * null (→ JSON 404) when the published site has no notFound template.
  */

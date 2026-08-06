@@ -100,7 +100,7 @@ interface ClientBase {
 function resolveClient(base: ClientBase | undefined) {
   return {
     fetchImpl: base?.fetchImpl ?? globalThis.fetch.bind(globalThis),
-    basePath: base?.basePath ?? '/admin/api/cms',
+    basePath: base?.basePath ?? '/cms/api/cms',
   }
 }
 

@@ -11,7 +11,7 @@ import { getErrorMessage } from '@core/utils/errorMessage'
 import { readNdjsonStream } from './ndjsonStream'
 import { postToolResult } from './toolResultApi'
 
-const MCP_BRIDGE_PATH = '/admin/api/ai/editor-bridge'
+const MCP_BRIDGE_PATH = '/cms/api/ai/editor-bridge'
 const RECONNECT_DELAY_MS = 3000
 // Auth failures (logged out / brief blip during a server restart) back off
 // longer but still retry so the bridge self-heals once the session is valid.

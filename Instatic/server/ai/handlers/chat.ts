@@ -96,15 +96,15 @@ const activeChatConversations = new Set<string>()
 const REQUEST_ABORTED = Symbol('request-aborted')
 
 /**
- * Match `/admin/api/ai/chat/:scope`. Returns `null` if path doesn't match.
+ * Match `/cms/api/ai/chat/:scope`. Returns `null` if path doesn't match.
  */
 export function tryHandleAiChat(
   req: Request,
   db: DbClient,
   pathname: string,
 ): Promise<Response> | null {
-  if (!pathname.startsWith('/admin/api/ai/chat/')) return null
-  const scope = pathname.slice('/admin/api/ai/chat/'.length)
+  if (!pathname.startsWith('/cms/api/ai/chat/')) return null
+  const scope = pathname.slice('/cms/api/ai/chat/'.length)
   if (!VALID_SCOPES.includes(scope as ToolScope)) return null
   return handleAiChat(req, db, scope as ToolScope)
 }

@@ -21,7 +21,7 @@ import { buildAssetPlan, type CssFileResult } from './assetPlan'
 import { partitionLinkedStylesheets } from './stylesheetPlan'
 import { detectCrossSheetClassConflicts, isSharedUtilityClassName } from './classCascades'
 import { detectConflicts } from './conflicts'
-import { detectGlobalSections } from './globalSections'
+import { detectGlobalSections, detectSharedBlocks } from './globalSections'
 import { createCssPlanState, parseCssSourceIntoPlan } from './planCss'
 import { rewriteNpmCdnModuleImports } from './scriptDependencies'
 import type {
@@ -180,6 +180,9 @@ export function buildImportPlan({ fileMap, currentSite, options }: BuildImportPl
   //     structurally identical across ≥2 pages. These will be promoted to
   //     VisualComponents on commit so operators edit once → all pages update.
   const globalSections = detectGlobalSections(normalizedPagePlans)
+  // Author-marked shared blocks are detected on the same normalized plans, but
+  // are committed in place rather than hoisted into the everywhere layout.
+  const sharedBlocks = detectSharedBlocks(normalizedPagePlans)
 
   // 6. Detect conflicts against the current site — pages, class rules, and
   //    design tokens (colour + font) all flow through one resolution model.
@@ -209,6 +212,7 @@ export function buildImportPlan({ fileMap, currentSite, options }: BuildImportPl
     droppedAtRules,
     unusedCss,
     globalSections: globalSections.length > 0 ? globalSections : undefined,
+    sharedBlocks: sharedBlocks.length > 0 ? sharedBlocks : undefined,
   }
 }
 

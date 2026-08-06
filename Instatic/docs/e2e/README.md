@@ -92,7 +92,7 @@ first retry automatically.
   account persona, never the owner.
 - **Selectors.** Durable user-facing selectors first (roles, labels, accessible
   names). `data-testid` only for stable editor/canvas controls where an
-  accessible name is not practical (canvas notch, toolbar publish actions, the
+  accessible name is not practical (canvas chrome, toolbar publish actions, the
   step-up dialog).
 - **Isolation.** With `workers: 1` all specs share one database; each spec works
   on its own uniquely-named page/post (only the core lifecycle spec edits the

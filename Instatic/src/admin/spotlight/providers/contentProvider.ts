@@ -19,7 +19,7 @@ export const contentProvider = makeServerProvider({
   id: 'content',
   label: 'Content',
   debounceMs: 150,
-  endpoint: '/admin/api/cms/data/search',
+  endpoint: '/cms/api/cms/data/search',
   schema: DataSearchResponseSchema,
   select: (body) => body.entries,
   toCommand: (entry): Command => {
@@ -38,7 +38,7 @@ export const contentProvider = makeServerProvider({
       keywords: ['content', 'document', entry.tableSlug, entry.slug],
       run: (ctx) => {
         ctx.closeSpotlight()
-        ctx.navigate(`/admin/content?table=${encodeURIComponent(entry.tableSlug)}&row=${encodeURIComponent(entry.id)}`)
+        ctx.navigate(`/cms/content?table=${encodeURIComponent(entry.tableSlug)}&row=${encodeURIComponent(entry.id)}`)
       },
     }
   },

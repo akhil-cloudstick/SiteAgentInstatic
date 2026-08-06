@@ -24,9 +24,25 @@ interface InlineStyleComposerProps {
   inlineStyles: Record<string, unknown> | undefined
   /** Search query — filters visible properties across all categories. */
   styleQuery: string
+  /** Restrict to these section ids — the Site screen's per-tab slices. */
+  sectionIds?: ReadonlyArray<string>
+  /** Hide the catch-all custom-properties section. */
+  hideCustomProperties?: boolean
+  /** Individual properties owned by a guided control elsewhere on screen. */
+  excludeProperties?: ReadonlyArray<keyof CSSPropertyBag>
+  /** Force every section closed on mount (the Site inspector does). */
+  collapsedByDefault?: boolean
 }
 
-export function InlineStyleComposer({ nodeId, inlineStyles, styleQuery }: InlineStyleComposerProps) {
+export function InlineStyleComposer({
+  nodeId,
+  inlineStyles,
+  styleQuery,
+  sectionIds,
+  hideCustomProperties,
+  excludeProperties,
+  collapsedByDefault,
+}: InlineStyleComposerProps) {
   const setNodeInlineStyles = useEditorStore((s) => s.setNodeInlineStyles)
   const removeNodeInlineStyleProperty = useEditorStore((s) => s.removeNodeInlineStyleProperty)
 
@@ -57,6 +73,10 @@ export function InlineStyleComposer({ nodeId, inlineStyles, styleQuery }: Inline
       // Hover-preview is class-keyed in the store; skip it for inline editing.
       onPreview={noop}
       onClearPreview={noop}
+      sectionIds={sectionIds}
+      hideCustomProperties={hideCustomProperties}
+      excludeProperties={excludeProperties}
+      collapsedByDefault={collapsedByDefault}
     />
   )
 }

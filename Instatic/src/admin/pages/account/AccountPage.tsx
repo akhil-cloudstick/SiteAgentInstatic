@@ -1,5 +1,5 @@
 /**
- * AccountPage — `/admin/account`.
+ * AccountPage — `/cms/account`.
  *
  * Self-targeted user settings page. Every authenticated user sees the same
  * shell (no capability gating — see `canAccessWorkspace('account', user)`).

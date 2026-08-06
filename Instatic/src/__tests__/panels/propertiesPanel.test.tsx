@@ -44,6 +44,12 @@ function resetStore() {
     selectedNodeIds: [],
     hoveredNodeId: null,
     activeBreakpointId: 'desktop',
+    // The inspector draws a different body — and carries a different title —
+    // per workspace mode. These tests are about the Live-edit inspector
+    // ("Properties"), so pin the mode instead of inheriting the store's
+    // `canvasView: 'design'` default, which resolves to Responsive review.
+    canvasView: 'live',
+    sectionFocusNodeId: null,
     propertiesPanel: { collapsed: false, x: 0, y: 0, width: 280 },
     focusedPanel: 'canvas',
     _historyPast: [],

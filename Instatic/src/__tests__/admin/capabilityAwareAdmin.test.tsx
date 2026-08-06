@@ -156,7 +156,7 @@ afterEach(() => {
 describe('capability-aware admin UI', () => {
   it('hides admin sections that the current user cannot access', () => {
     render(
-      <MemoryRouter initialEntries={['/admin/content']}>
+      <MemoryRouter initialEntries={['/cms/content']}>
         <AdminSessionProvider user={currentUser(['content.create', 'content.edit.own', 'content.publish.own'])}>
           <AdminSectionNavigation section="content" />
         </AdminSessionProvider>
@@ -176,10 +176,10 @@ describe('capability-aware admin UI', () => {
       const url = String(input)
       const method = init?.method ?? 'GET'
       calls.push({ url, method })
-      if (url === '/admin/api/cms/data/tables') {
+      if (url === '/cms/api/cms/data/tables') {
         return json({ tables: [makeTable('posts', 'Posts', 'posts')] })
       }
-      if (url === '/admin/api/cms/data/tables/posts/rows' && method === 'GET') {
+      if (url === '/cms/api/cms/data/tables/posts/rows' && method === 'GET') {
         return json({
           rows: [makeRow('entry_1', 'posts', {
             title: 'Own draft',
@@ -192,10 +192,10 @@ describe('capability-aware admin UI', () => {
           })],
         })
       }
-      if (url === '/admin/api/cms/media') return json({ assets: [] })
-      if (url.endsWith('/admin/api/cms/plugins')) return json({ plugins: [], adminPages: [] })
-      if (url.endsWith('/admin/api/cms/site')) return json({ site: null }, 404)
-      if (url.endsWith('/admin/api/cms/publish/status')) return json({ ok: false }, 404)
+      if (url === '/cms/api/cms/media') return json({ assets: [] })
+      if (url.endsWith('/cms/api/cms/plugins')) return json({ plugins: [], adminPages: [] })
+      if (url.endsWith('/cms/api/cms/site')) return json({ site: null }, 404)
+      if (url.endsWith('/cms/api/cms/publish/status')) return json({ ok: false }, 404)
       return json({ error: `Unhandled ${url}` }, 500)
     }
 
@@ -218,7 +218,7 @@ describe('capability-aware admin UI', () => {
     expect(within(menu).getByRole('menuitem', { name: 'Publish' })).toBeDefined()
     expect(within(menu).queryByRole('menuitem', { name: 'Move to collection' })).toBeNull()
     expect(calls).not.toContainEqual({
-      url: '/admin/api/cms/data/authors',
+      url: '/cms/api/cms/data/authors',
       method: 'GET',
     })
   })
@@ -231,11 +231,11 @@ describe('capability-aware admin UI', () => {
       const method = init?.method ?? 'GET'
       calls.push({ url, method })
 
-      if (url === '/admin/api/cms/data/tables') {
+      if (url === '/cms/api/cms/data/tables') {
         return json({ tables: [makeTable('posts', 'Posts', 'posts')] })
       }
 
-      if (url === '/admin/api/cms/data/tables/posts/rows' && method === 'GET') {
+      if (url === '/cms/api/cms/data/tables/posts/rows' && method === 'GET') {
         return json({
           rows: [makeRow('entry_1', 'posts', {
             title: 'Publishable draft',
@@ -249,7 +249,7 @@ describe('capability-aware admin UI', () => {
         })
       }
 
-      if (url === '/admin/api/cms/data/rows/entry_1/publish' && method === 'POST') {
+      if (url === '/cms/api/cms/data/rows/entry_1/publish' && method === 'POST') {
         return json({
           row: makeRow('entry_1', 'posts', {
             title: 'Publishable draft',
@@ -267,13 +267,13 @@ describe('capability-aware admin UI', () => {
         })
       }
 
-      if (url === '/admin/api/cms/data/rows/entry_1' && method === 'PATCH') {
+      if (url === '/cms/api/cms/data/rows/entry_1' && method === 'PATCH') {
         return json({ error: 'edit forbidden' }, 403)
       }
 
-      if (url.endsWith('/admin/api/cms/plugins')) return json({ plugins: [], adminPages: [] })
-      if (url.endsWith('/admin/api/cms/site')) return json({ site: null }, 404)
-      if (url.endsWith('/admin/api/cms/publish/status')) return json({ ok: false }, 404)
+      if (url.endsWith('/cms/api/cms/plugins')) return json({ plugins: [], adminPages: [] })
+      if (url.endsWith('/cms/api/cms/site')) return json({ site: null }, 404)
+      if (url.endsWith('/cms/api/cms/publish/status')) return json({ ok: false }, 404)
       return json({ error: `Unhandled ${method} ${url}` }, 500)
     }
 
@@ -294,11 +294,11 @@ describe('capability-aware admin UI', () => {
 
     await screen.findByText('Published')
     expect(calls).toContainEqual({
-      url: '/admin/api/cms/data/rows/entry_1/publish',
+      url: '/cms/api/cms/data/rows/entry_1/publish',
       method: 'POST',
     })
     expect(calls).not.toContainEqual({
-      url: '/admin/api/cms/data/rows/entry_1',
+      url: '/cms/api/cms/data/rows/entry_1',
       method: 'PATCH',
     })
   })

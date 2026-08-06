@@ -6,7 +6,7 @@
  * functions. The JSON path previously wrote `bytesBase64` to
  * `join(uploadsDir, storagePath)` with only a traversal check, letting a
  * `data.import` caller plant arbitrary HTML/JS (e.g. `published/current/
- * index.html`) served same-origin as `/admin` → stored XSS / account takeover.
+ * index.html`) served same-origin as `/cms` → stored XSS / account takeover.
  * These tests prove the content gate and the destination gate close it.
  */
 import { describe, expect, it } from 'bun:test'

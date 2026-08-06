@@ -33,7 +33,7 @@ test.describe('dashboard', () => {
   test('renders first-party metric widgets and mobile layout (DASH-001)', async ({
     page,
   }) => {
-    await page.goto('/admin/dashboard')
+    await page.goto('/cms/dashboard')
     await expect(page).toHaveURL(/\/admin\/dashboard$/)
 
     await test.step('dashboard chrome and controls render', async () => {
@@ -121,7 +121,7 @@ test.describe('dashboard', () => {
   test('customizes the widget grid and persists changes (DASH-002)', async ({
     page,
   }) => {
-    await page.goto('/admin/dashboard')
+    await page.goto('/cms/dashboard')
     await expect(page).toHaveURL(/\/admin\/dashboard$/)
     await expect(page.getByText('09 blocks')).toBeVisible()
     await expect(gridWidget(page, 'ai-usage')).toHaveCount(0)
@@ -203,7 +203,7 @@ test.describe('dashboard', () => {
   test('shows onboarding tasks, routes actions, and persists dismiss (DASH-003)', async ({
     page,
   }) => {
-    await page.goto('/admin/dashboard')
+    await page.goto('/cms/dashboard')
     await expect(page).toHaveURL(/\/admin\/dashboard$/)
 
     const panel = onboardingPanel(page)
@@ -224,17 +224,17 @@ test.describe('dashboard', () => {
 
       await panel.getByRole('button', { name: 'New page' }).click()
       await expect(page).toHaveURL(/\/admin\/site$/)
-      await page.goto('/admin/dashboard')
+      await page.goto('/cms/dashboard')
       await expect(panel).toBeVisible({ timeout: 20_000 })
 
       await panel.getByRole('button', { name: 'Browse plugins' }).click()
       await expect(page).toHaveURL(/\/admin\/plugins$/)
-      await page.goto('/admin/dashboard')
+      await page.goto('/cms/dashboard')
       await expect(panel).toBeVisible({ timeout: 20_000 })
 
       await panel.getByRole('button', { name: 'Add members' }).click()
       await expect(page).toHaveURL(/\/admin\/users$/)
-      await page.goto('/admin/dashboard')
+      await page.goto('/cms/dashboard')
       await expect(panel).toBeVisible({ timeout: 20_000 })
     })
 
@@ -309,7 +309,7 @@ async function waitForDashboardLayoutSave(
   action: () => Promise<void>,
 ): Promise<DashboardLayoutSaveBody> {
   const responsePromise = page.waitForResponse((response) =>
-    response.url().includes('/admin/api/cms/me/preferences/dashboard-layout') &&
+    response.url().includes('/cms/api/cms/me/preferences/dashboard-layout') &&
     response.request().method() === 'PUT' &&
     response.status() === 200,
   )

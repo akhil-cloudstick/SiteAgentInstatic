@@ -55,7 +55,7 @@ export function tryHandleAiConversations(
   url: URL,
   pathname: string,
 ): Promise<Response> | null {
-  if (pathname === '/admin/api/ai/conversations') {
+  if (pathname === '/cms/api/ai/conversations') {
     return dispatchCollection(req, db, url)
   }
   const imageMatch = pathname.match(
@@ -212,7 +212,7 @@ function conversationImageUrl(
   messageId: string,
   blockIndex: number,
 ): string {
-  return `/admin/api/ai/conversations/${encodeURIComponent(conversationId)}/messages/${encodeURIComponent(messageId)}/images/${blockIndex}`
+  return `/cms/api/ai/conversations/${encodeURIComponent(conversationId)}/messages/${encodeURIComponent(messageId)}/images/${blockIndex}`
 }
 
 async function handleUpdate(req: Request, db: DbClient, id: string): Promise<Response> {

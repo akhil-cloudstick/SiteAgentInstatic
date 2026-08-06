@@ -140,6 +140,7 @@ export function PropertyControlRenderer({
           value={String(value ?? '')}
           placeholder={control.placeholder}
           normalize={control.normalize}
+          maxLength={control.maxLength}
         />
       )
       break
@@ -151,6 +152,7 @@ export function PropertyControlRenderer({
           value={String(value ?? '')}
           rows={control.rows}
           placeholder={control.placeholder}
+          maxLength={control.maxLength}
         />
       )
       break

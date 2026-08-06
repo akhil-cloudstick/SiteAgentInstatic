@@ -56,6 +56,24 @@ interface StyleSectionsEditorProps {
   onClearProperties: (properties: ReadonlyArray<keyof CSSPropertyBag>) => void
   onPreview: (patch: Partial<CSSPropertyBag>) => void
   onClearPreview: () => void
+  /**
+   * Restrict rendering to these `CLASS_STYLE_SECTIONS` ids. The approved Site
+   * screen splits the workbench across its Layout / Style / Visibility tabs, so
+   * each tab renders its own slice. Omitted → every section, which is what the
+   * Selectors inspector and the Advanced disclosure want.
+   */
+  sectionIds?: ReadonlyArray<string>
+  /** Hide the catch-all custom-properties section (tabs that own a slice do). */
+  hideCustomProperties?: boolean
+  /** Force every section closed on mount, ignoring the user's preference. */
+  collapsedByDefault?: boolean
+  /**
+   * Drop these individual properties from whatever sections they belong to.
+   * Responsive review edits four of them through named guided controls
+   * ("Content width", "Section height", …); rendering the raw row as well
+   * would put the same setting on screen twice.
+   */
+  excludeProperties?: ReadonlyArray<keyof CSSPropertyBag>
 }
 
 // ---------------------------------------------------------------------------
@@ -73,11 +91,20 @@ export function StyleSectionsEditor({
   onClearProperties,
   onPreview,
   onClearPreview,
+  sectionIds,
+  hideCustomProperties = false,
+  excludeProperties,
+  collapsedByDefault = false,
 }: StyleSectionsEditorProps) {
-  const visibleStyleSections = getVisibleStyleSections(styleQuery)
+  const visibleStyleSections = getVisibleStyleSections(styleQuery, sectionIds, excludeProperties)
 
   // Default open/closed state for every section, from the user preference.
-  const sectionsExpanded = useEditorPreference('propertiesSectionsExpanded')
+  // The approved Site inspector opens closed: every disclosure is a bar you
+  // click, so the panel presents a short list of choices rather than a long
+  // scroll of open forms. `collapsedByDefault` says "this is that inspector";
+  // everywhere else the user's preference still decides.
+  const preferenceExpanded = useEditorPreference('propertiesSectionsExpanded')
+  const sectionsExpanded = collapsedByDefault ? false : preferenceExpanded
 
   return (
     <div className={styles.styleSections}>
@@ -100,7 +127,7 @@ export function StyleSectionsEditor({
       ))}
       {/* Custom properties — generic editor for the long tail of CSS the curated
           sections don't claim. Hidden while a style search is active. */}
-      {!styleQuery.trim() && (
+      {!styleQuery.trim() && !hideCustomProperties && (
         <div data-style-section="custom">
           <CustomPropertiesSection
             key={sectionKey}
@@ -332,18 +359,26 @@ function AdvancedRows({
 // Section filtering by search query
 // ---------------------------------------------------------------------------
 
-function getVisibleStyleSections(query: string): ReadonlyArray<ClassStyleSectionDefinition> {
+function getVisibleStyleSections(
+  query: string,
+  sectionIds: ReadonlyArray<string> | undefined,
+  excludeProperties: ReadonlyArray<keyof CSSPropertyBag> | undefined,
+): ReadonlyArray<ClassStyleSectionDefinition> {
   const normalizedQuery = query.trim().toLowerCase()
+  const excluded = excludeProperties ? new Set<string>(excludeProperties.map(String)) : null
 
-  return CLASS_STYLE_SECTIONS.map((section) => ({
-    ...section,
-    properties: section.properties.filter(
-      (prop) =>
-        !normalizedQuery ||
-        sectionMatchesQuery(section, normalizedQuery) ||
-        propertyMatchesQuery(prop, normalizedQuery),
-    ),
-  })).filter((section) => section.properties.length > 0)
+  return CLASS_STYLE_SECTIONS.filter((section) => !sectionIds || sectionIds.includes(section.id))
+    .map((section) => ({
+      ...section,
+      properties: section.properties.filter(
+        (prop) =>
+          !excluded?.has(String(prop)) &&
+          (!normalizedQuery ||
+            sectionMatchesQuery(section, normalizedQuery) ||
+            propertyMatchesQuery(prop, normalizedQuery)),
+      ),
+    }))
+    .filter((section) => section.properties.length > 0)
 }
 
 function sectionMatchesQuery(section: ClassStyleSectionDefinition, query: string): boolean {

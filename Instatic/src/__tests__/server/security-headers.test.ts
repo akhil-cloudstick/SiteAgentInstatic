@@ -92,29 +92,29 @@ describe('applySecurityHeaders — global headers', () => {
 
 describe('applySecurityHeaders — admin framing protection', () => {
   it('sets X-Frame-Options: DENY on /admin HTML responses', () => {
-    const res = applySecurityHeaders(makeResponse('<html>admin</html>'), '/admin')
+    const res = applySecurityHeaders(makeResponse('<html>admin</html>'), '/cms')
     expect(res.headers.get('x-frame-options')).toBe('DENY')
   })
 
   it('sets the admin CSP (frame-ancestors + base-uri + object-src) on /admin HTML responses', () => {
-    const res = applySecurityHeaders(makeResponse('<html>admin</html>'), '/admin')
+    const res = applySecurityHeaders(makeResponse('<html>admin</html>'), '/cms')
     expect(res.headers.get('content-security-policy')).toBe(
       "frame-ancestors 'none'; base-uri 'self'; object-src 'none'",
     )
   })
 
   it("locks base-uri to 'self' so a <base href> injection can't rewrite relative URLs", () => {
-    const res = applySecurityHeaders(makeResponse('<html>admin</html>'), '/admin')
+    const res = applySecurityHeaders(makeResponse('<html>admin</html>'), '/cms')
     expect(res.headers.get('content-security-policy')).toContain("base-uri 'self'")
   })
 
   it("blocks <object>/<embed> plugin content with object-src 'none'", () => {
-    const res = applySecurityHeaders(makeResponse('<html>admin</html>'), '/admin')
+    const res = applySecurityHeaders(makeResponse('<html>admin</html>'), '/cms')
     expect(res.headers.get('content-security-policy')).toContain("object-src 'none'")
   })
 
   it('applies the admin CSP to /admin/* subpaths (admin SPA routes)', () => {
-    const res = applySecurityHeaders(makeResponse(), '/admin/site/123')
+    const res = applySecurityHeaders(makeResponse(), '/cms/site/123')
     expect(res.headers.get('x-frame-options')).toBe('DENY')
     expect(res.headers.get('content-security-policy')).toBe(
       "frame-ancestors 'none'; base-uri 'self'; object-src 'none'",
@@ -122,7 +122,7 @@ describe('applySecurityHeaders — admin framing protection', () => {
   })
 
   it('applies the admin CSP to /admin/api/* (admin API endpoints)', () => {
-    const res = applySecurityHeaders(makeResponse('{}'), '/admin/api/cms/login')
+    const res = applySecurityHeaders(makeResponse('{}'), '/cms/api/cms/login')
     expect(res.headers.get('x-frame-options')).toBe('DENY')
     expect(res.headers.get('content-security-policy')).toBe(
       "frame-ancestors 'none'; base-uri 'self'; object-src 'none'",

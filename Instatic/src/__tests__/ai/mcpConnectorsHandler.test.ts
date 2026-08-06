@@ -7,8 +7,8 @@ import {
 } from '../helpers/capabilityHarness'
 import type { CreateMcpAccessTokenResult, McpConnectionOverview } from '@core/ai'
 
-const CONNECTIONS = '/admin/api/ai/mcp/connections'
-const ACCESS_TOKENS = '/admin/api/ai/mcp/access-tokens'
+const CONNECTIONS = '/cms/api/ai/mcp/connections'
+const ACCESS_TOKENS = '/cms/api/ai/mcp/access-tokens'
 
 describe('MCP connection management handler', () => {
   let harness: CapabilityTestHarness

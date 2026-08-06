@@ -1,7 +1,7 @@
 /**
  * CMS media storage admin client.
  *
- * Backs the `/admin/media/storage` page. Talks to the four endpoints in
+ * Backs the `/cms/media/storage` page. Talks to the four endpoints in
  * `server/handlers/cms/mediaStorageAdmin.ts`:
  *
  *   GET    /admin/api/cms/media/storage            — snapshot
@@ -176,7 +176,7 @@ interface ClientBase {
 function resolveClient(opts: ClientBase | undefined) {
   return {
     fetchImpl: opts?.fetchImpl ?? globalThis.fetch.bind(globalThis),
-    basePath: opts?.basePath ?? '/admin/api/cms',
+    basePath: opts?.basePath ?? '/cms/api/cms',
   }
 }
 

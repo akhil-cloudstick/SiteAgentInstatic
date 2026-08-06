@@ -68,7 +68,7 @@ describe('AI audit usage persistence', () => {
       return originalFetch(input)
     }
 
-    const credentialRes = await harness.ai('/admin/api/ai/credentials', {
+    const credentialRes = await harness.ai('/cms/api/ai/credentials', {
       method: 'POST',
       cookie,
       json: {
@@ -81,7 +81,7 @@ describe('AI audit usage persistence', () => {
     expect(credentialRes.status).toBe(201)
     const { credential } = await readJson<{ credential: { id: string } }>(credentialRes)
 
-    const conversationRes = await harness.ai('/admin/api/ai/conversations', {
+    const conversationRes = await harness.ai('/cms/api/ai/conversations', {
       method: 'POST',
       cookie,
       json: {

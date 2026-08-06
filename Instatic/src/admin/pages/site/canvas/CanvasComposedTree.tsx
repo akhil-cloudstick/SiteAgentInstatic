@@ -29,12 +29,12 @@
 import { use, useEffect, type ReactNode } from 'react'
 import type { BaseNode, Page } from '@core/page-tree'
 import { classNamesForClassIds } from '@core/page-tree'
+import { resolveWrapperTemplates } from '@core/templates'
 import { useEditorStore } from '@site/store/store'
 import { ReadOnlyNodeTree } from '@modules/base/utils/ReadOnlyNodeTree'
 import { htmlAttributesForReact } from '@modules/base/shared/htmlAttributes'
 import { useResponsiveBackgroundStyle } from '@admin/pages/media/hooks/useResponsiveBackgroundStyle'
 import { NodeRenderer } from './NodeRenderer'
-import { resolveEditorWrapperTemplates } from './canvasComposition'
 import { CanvasDocumentContext, CanvasTemplateContext } from './CanvasContexts'
 import { applyIframeBodyPresentation } from './iframeBodyPresentation'
 
@@ -53,7 +53,7 @@ export function CanvasComposedTree({ page }: CanvasComposedTreeProps) {
 
   // Templates wrapping the active document (outermost-first). A Visual
   // Component edit surface is never a published route, so it is never wrapped.
-  const wrappers = !isVcMode && site ? resolveEditorWrapperTemplates(site, page) : NO_WRAPPERS
+  const wrappers = !isVcMode && site ? resolveWrapperTemplates(site, page) : NO_WRAPPERS
   const outerBody = wrappers[0]?.nodes[wrappers[0].rootNodeId]
 
   // No wrapping templates → render the document exactly as before; its own

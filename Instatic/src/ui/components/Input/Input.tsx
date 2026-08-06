@@ -45,7 +45,10 @@ interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
    * `min`, `max` and dispatch a synthetic `change` event so controlled
    * components stay in sync.
    *
-   * Pass `false` to opt out (e.g. for read-only numeric displays).
+   * Pass `false` to opt out (e.g. for read-only numeric displays, or where the
+   * row is too tight for the buttons). Opting out drops the custom buttons —
+   * it does NOT bring back the native spinner, which stays hidden for every
+   * `type="number"` field so the control looks the same either way.
    */
   numberSpinner?: boolean
   /** React 19: ref is a regular prop on function components. */
@@ -116,7 +119,10 @@ export function Input({
         styles[`size-${fieldSize}`],
         monospace && styles.monospace,
         invalid && styles.invalid,
-        showSpinner && styles.numberNoSpinner,
+        // Every number input hides the native spinner — not just the ones that
+        // render our own buttons. Keyed off `showSpinner`, opting out of the
+        // buttons *revealed* the browser's arrows, the opposite of the prop.
+        isNumber && styles.numberNoSpinner,
         hasAffix && styles.inputWithAffix,
         !hasAffix && className,
       )}

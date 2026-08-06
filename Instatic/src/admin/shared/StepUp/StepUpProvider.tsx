@@ -12,7 +12,7 @@
  *   3. If the action throws `Error('step_up_required')`, the provider
  *      records the pending action and opens the dialog.
  *   4. User enters password and submits. Provider posts to
- *      `/admin/api/cms/auth/step-up`. On success it retries the action
+ *      `/cms/api/cms/auth/step-up`. On success it retries the action
  *      and resolves with its result; on failure it shows the error in
  *      the dialog and lets the user retry.
  *   5. User clicks Cancel (or hits ESC) → the provider rejects with

@@ -57,7 +57,7 @@ export function isRenderableHtmlAttributeName(name: string): boolean {
  *     `data:` (via `hasDangerousUrlScheme`). This blocks e.g. a custom
  *     `href="javascript:…"` that would otherwise shadow a module's own checked
  *     href and execute in the page — on the published site AND, more
- *     seriously, inside the admin editor canvas (same-origin as `/admin`).
+ *     seriously, inside the admin editor canvas (same-origin as `/cms`).
  *
  * `hasDangerousUrlScheme` is deliberately used here rather than `isSafeUrl`:
  * this gate sees EVERY attribute value, not just URL-bearing ones, and

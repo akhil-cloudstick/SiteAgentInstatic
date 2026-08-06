@@ -20,7 +20,7 @@ function getMediaScopeCommands(): Command[] {
       workspaces: ['media'],
       run: (ctx) => {
         ctx.closeSpotlight()
-        ctx.navigate('/admin/media?action=upload')
+        ctx.navigate('/cms/media?action=upload')
       },
     },
     {
@@ -44,9 +44,9 @@ function getMediaScopeCommands(): Command[] {
         ctx.closeSpotlight()
         const name = ctx.args['name']
         if (name) {
-          ctx.navigate(`/admin/media?action=newFolder&name=${encodeURIComponent(name)}`)
+          ctx.navigate(`/cms/media?action=newFolder&name=${encodeURIComponent(name)}`)
         } else {
-          ctx.navigate('/admin/media?action=newFolder')
+          ctx.navigate('/cms/media?action=newFolder')
         }
       },
     },

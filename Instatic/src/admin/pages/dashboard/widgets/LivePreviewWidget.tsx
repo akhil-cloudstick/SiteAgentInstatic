@@ -215,7 +215,7 @@ export function LivePreviewWidget({ span, editing }: DashboardWidgetRendererProp
             <Button
               variant="ghost"
               className={cn(styles.actionBtn, styles.actionBtnEdit)}
-              onClick={() => navigate('/admin/site')}
+              onClick={() => navigate('/cms/site')}
             >
               <FaIcon name="plus" size={15} />
               Publish first page
@@ -234,7 +234,7 @@ export function LivePreviewWidget({ span, editing }: DashboardWidgetRendererProp
               <Button
                 variant="ghost"
                 className={cn(styles.actionBtn, styles.actionBtnEdit)}
-                onClick={() => navigate('/admin/site')}
+                onClick={() => navigate('/cms/site')}
               >
                 <FaIcon name="pen" size={15} />
                 Edit site

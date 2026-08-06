@@ -169,7 +169,7 @@ describe('agent image actions', () => {
           headers: { 'content-type': 'image/jpeg' },
         })
       }
-      if (url === '/admin/api/cms/media' && init?.method === 'POST') {
+      if (url === '/cms/api/cms/media' && init?.method === 'POST') {
         uploads += 1
         return uploadResponse
       }

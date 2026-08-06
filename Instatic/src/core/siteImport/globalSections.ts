@@ -16,13 +16,16 @@
 
 import type { PageNode } from '@core/page-tree'
 import type { ImportFragment } from '@core/htmlImport'
-import type { GlobalSectionCandidate, PagePlan } from './types'
+import type { GlobalSectionCandidate, PagePlan, SharedBlockCandidate } from './types'
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
 const GLOBAL_SECTION_TAGS = new Set(['nav', 'header', 'footer'])
+
+/** Authored marker that opts a block into becoming one shared Visual Component. */
+const SHARED_BLOCK_ATTRIBUTE = 'data-shared'
 
 /** Class names that indicate a per-page active/current state. Stripped before
  * comparison so two pages with the same nav (but different active items) hash
@@ -80,6 +83,57 @@ export function detectGlobalSections(pagePlans: PagePlan[]): GlobalSectionCandid
   }
 
   return [...byKey.values()].filter((c) => c.pageSources.length >= 2)
+}
+
+/**
+ * Blocks the design tool explicitly marked as shared, via `data-shared="name"`.
+ *
+ * `detectGlobalSections` above only ever promotes a top-level nav/header/footer,
+ * and moves it into the everywhere layout. This covers the other half: any block
+ * the author declares shared — a CTA band, a repeated card, a contact strip —
+ * wherever it sits in the tree. Each group becomes ONE Visual Component and each
+ * occurrence is replaced IN PLACE by a reference, so the canvas still shows the
+ * block exactly where it belongs and editing it once updates every page.
+ *
+ * Grouping is by `(name, structural hash)`, so a marked block only merges with
+ * copies that are genuinely identical — the same rule the shared chrome uses.
+ * Two occurrences are enough, whether they are on two pages or twice on one.
+ */
+export function detectSharedBlocks(pagePlans: PagePlan[]): SharedBlockCandidate[] {
+  const byKey = new Map<string, SharedBlockCandidate>()
+
+  for (const plan of pagePlans) {
+    for (const nodeId of Object.keys(plan.nodeFragment.nodes)) {
+      const node = plan.nodeFragment.nodes[nodeId]
+      if (!node) continue
+      const name = sharedBlockName(node)
+      if (!name) continue
+
+      const { fragment } = extractNormalizedSection(nodeId, plan.nodeFragment)
+      const key = `${name}:${hashFragment(fragment, plan.source)}`
+
+      const existing = byKey.get(key)
+      if (existing) {
+        existing.occurrences.push({ pageSource: plan.source, nodeId })
+      } else {
+        byKey.set(key, {
+          name,
+          occurrences: [{ pageSource: plan.source, nodeId }],
+          representativeFragment: fragment,
+        })
+      }
+    }
+  }
+
+  return [...byKey.values()].filter((c) => c.occurrences.length >= 2)
+}
+
+/** The author's `data-shared` name, or '' when the node is not marked. */
+function sharedBlockName(node: PageNode): string {
+  const attrs = node.props?.htmlAttributes
+  if (!attrs || typeof attrs !== 'object') return ''
+  const raw = (attrs as Record<string, unknown>)[SHARED_BLOCK_ATTRIBUTE]
+  return typeof raw === 'string' ? raw.trim() : ''
 }
 
 // ---------------------------------------------------------------------------

@@ -134,3 +134,131 @@
     display: grid;
     gap: var(--space-s);
 }
+
+/* ── Site screen ─────────────────────────────────────────────────────────
+ * Transcribed from the approved Site screen's `details` / `summary` /
+ * `details > p` (screens/site/src/styles.css). The reference draws every
+ * collapsible in the inspector as a bordered 44px bar on `--mms-surface`
+ * with a 10px/620 label — the generic pill accordion (32px, 12px radius,
+ * `--overlay-10`) is a different object entirely.
+ *
+ * Scoping it on the primitive rather than re-implementing a disclosure keeps
+ * the CSS sections nested inside "Advanced CSS, classes & attributes" on the
+ * same bar as the guided disclosures wrapping them.
+ */
+:global([data-editor-screen='site']) .section {
+    margin-top: 8px;
+    padding: 0;
+    border: 1px solid var(--mms-border);
+    border-radius: 6px;
+    background: var(--mms-surface);
+}
+
+:global([data-editor-screen='site']) .section.sectionOpen {
+    background: var(--mms-surface);
+}
+
+:global([data-editor-screen='site']) .sectionHeader,
+:global([data-editor-screen='site']) .sectionHeaderWithAction {
+    padding: 0;
+    border-radius: 0;
+    background: transparent;
+}
+
+:global([data-editor-screen='site']) .sectionToggle,
+:global([data-editor-screen='site']) .sectionHeaderWithAction .sectionToggle {
+    min-height: 44px;
+    padding: 0 11px;
+    border-radius: 0;
+    background: transparent;
+    color: var(--mms-text);
+    font-family: var(--font-mms);
+    font-size: 10px;
+    font-weight: 620;
+}
+
+:global([data-editor-screen='site']) .sectionToggle:hover {
+    background: transparent;
+    color: var(--mms-text);
+}
+
+/* The reference keeps the native disclosure triangle (`list-style-position:
+   inside`). This accordion is button-driven, so the marker is drawn here from
+   the same Font Awesome face the rest of the screen uses — caret-right when
+   closed, caret-down when open. */
+:global([data-editor-screen='site']) .sectionToggle::before {
+    flex-shrink: 0;
+    margin-right: 7px;
+    color: var(--mms-text-muted);
+    content: "\f0da";
+    font-family: "Font Awesome 6 Free";
+    font-size: 10px;
+    font-weight: 900;
+}
+
+:global([data-editor-screen='site']) .sectionToggle[aria-expanded='true']::before {
+    content: "\f0d7";
+}
+
+:global([data-editor-screen='site']) .sectionTitle {
+    color: var(--mms-text);
+    font-size: 10px;
+    font-weight: 620;
+}
+
+:global([data-editor-screen='site']) .sectionMeta {
+    color: var(--mms-text-muted);
+    font-size: 9px;
+}
+
+:global([data-editor-screen='site']) .sectionIcon {
+    color: var(--mms-text-muted);
+}
+
+:global([data-editor-screen='site']) .sectionContent {
+    padding: 0 11px 11px;
+}
+
+/* Row rhythm inside a section.
+ *
+ * `ControlRow` already carries the reference's 13px field margin, so the grid
+ * gap stays 0 and every child is given that same margin instead — otherwise
+ * the rows that are NOT control rows (the layout switchers, the spacing box,
+ * the position block) sit flush against their neighbours and read as one
+ * merged control. Setting the same 13px on the wrapper does not double the
+ * control row's own margin; it just brings everything else up to it. */
+:global([data-editor-screen='site']) .sectionBody {
+    gap: 0;
+}
+
+:global([data-editor-screen='site']) .sectionBody > * {
+    margin-bottom: 13px;
+}
+
+:global([data-editor-screen='site']) .sectionBody > *:last-child {
+    margin-bottom: 0;
+}
+
+/* A section nested inside another (a category accordion inside the reference's
+   "Spacing" / "Advanced …" bar) drops its own frame — two stacked borders read
+   as a box in a box. The parent bar is the frame; the children are rows in it. */
+:global([data-editor-screen='site']) .sectionContent .section {
+    margin-top: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    border-top: 1px solid var(--mms-border);
+}
+
+:global([data-editor-screen='site']) .sectionContent .section:first-child {
+    border-top: 0;
+}
+
+:global([data-editor-screen='site']) .sectionContent .sectionToggle {
+    padding-left: 0;
+    padding-right: 0;
+}
+
+:global([data-editor-screen='site']) .sectionContent .sectionContent {
+    padding: 0 0 11px;
+}

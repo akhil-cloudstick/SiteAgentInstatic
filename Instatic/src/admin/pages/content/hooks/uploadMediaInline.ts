@@ -33,7 +33,7 @@ export async function uploadMediaInline({ file, onProgress, signal }: UploadOpti
 
   return new Promise<CmsMediaAsset>((resolve, reject) => {
     const xhr = new XMLHttpRequest()
-    xhr.open('POST', '/admin/api/cms/media', true)
+    xhr.open('POST', '/cms/api/cms/media', true)
     xhr.withCredentials = true
     xhr.responseType = 'json'
 

@@ -56,6 +56,11 @@ function resetStore() {
     activeClassId: null,
     selectedSelectorClassId: null,
     selectorsPanelOpen: false,
+    // The inspector is per-mode since the approved Site re-skin; this test
+    // exercises the Live-edit body, so pin the mode rather than inheriting the
+    // store's 'design' default (which resolves to Responsive review).
+    canvasView: 'live',
+    sectionFocusNodeId: null,
     propertiesPanel: { collapsed: false, x: 0, y: 0, width: 360 },
     propertiesPanelMode: 'docked',
   } as Parameters<typeof useEditorStore.setState>[0])
@@ -98,6 +103,13 @@ describe('generated utility classes in editor panels', () => {
     } as Parameters<typeof useEditorStore.setState>[0])
 
     render(<PropertiesPanel variant="docked" />)
+
+    // The raw class workbench lives behind the approved screen's "Advanced
+    // instance styles, classes & attributes" disclosure — that is where a
+    // locked generated utility explains itself.
+    fireEvent.click(
+      screen.getByRole('button', { name: /advanced instance styles, classes & attributes/i }),
+    )
 
     const panel = screen.getByTestId('properties-panel')
     expect(within(panel).getByText('Generated utility')).toBeDefined()

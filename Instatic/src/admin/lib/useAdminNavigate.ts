@@ -14,7 +14,7 @@
  *      survive, accessibility is free. Programmatic navigations (clicking
  *      a button inside a dropdown) don't have that semantic, so a function
  *      reference is the right primitive.
- *   2. Keeps the call site flat — `navigate('/admin/account')` is one
+ *   2. Keeps the call site flat — `navigate('/cms/account')` is one
  *      line, no JSX wrapper.
  *
  * Must be used inside the admin `<Router>` — same constraint as the

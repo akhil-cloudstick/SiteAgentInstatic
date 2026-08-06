@@ -23,34 +23,63 @@ import { useEffect, useState, type RefObject } from 'react'
 /** Never blow a frame up past life size — only ever shrink to fit. */
 const MAX_SCALE = 1
 
+export interface ReviewFrameFit {
+  /** Shrink factor applied to the frame so its real width fits the column. */
+  scale: number
+  /**
+   * Layout height the frame box must declare, in its own (pre-`zoom`) CSS px,
+   * so that it renders exactly as tall as the cell: `cellHeight / scale`.
+   *
+   * This CANNOT be expressed as a percentage. `zoom` scales the layout box, and
+   * percentage heights inside a zoomed box resolve against a containing block
+   * the browser has already divided by the zoom factor — so `height: 100%` (or
+   * `calc(100% / scale)`, which was the bug) resolves to a box taller than the
+   * cell. The frame then hands its iframe an internal viewport far taller than
+   * anything visible: the document's end sits below the cell, the frame's own
+   * scrollbar reports a nearly-full thumb, and scrolling never reaches the
+   * bottom. Measuring the cell in px sidesteps the percentage resolution
+   * entirely.
+   */
+  height: number
+}
+
+const UNSCALED: ReviewFrameFit = { scale: 1, height: 0 }
+
 export function useReviewFrameScale(
   cellRef: RefObject<HTMLElement | null>,
   frameWidth: number,
   enabled: boolean,
-): number {
-  const [scale, setScale] = useState(1)
+): ReviewFrameFit {
+  const [fit, setFit] = useState<ReviewFrameFit>(UNSCALED)
 
   useEffect(() => {
     const cell = cellRef.current
     if (!enabled || !cell || frameWidth <= 0) {
-      setScale(1)
+      setFit(UNSCALED)
       return
     }
 
     const measure = () => {
       const available = cell.clientWidth
-      if (available <= 0) return
-      setScale(Math.min(MAX_SCALE, available / frameWidth))
+      const availableHeight = cell.clientHeight
+      if (available <= 0 || availableHeight <= 0) return
+      const scale = Math.min(MAX_SCALE, available / frameWidth)
+      setFit((current) => {
+        const height = availableHeight / scale
+        if (current.scale === scale && current.height === height) return current
+        return { scale, height }
+      })
     }
 
     measure()
     // The columns are `fr` units, so they change with the window, the sidebars
     // and the panel-track variables — all of which a ResizeObserver catches
-    // without listening to each source separately.
+    // without listening to each source separately. It also catches the height
+    // changes that `height` depends on.
     const observer = new ResizeObserver(measure)
     observer.observe(cell)
     return () => observer.disconnect()
   }, [cellRef, frameWidth, enabled])
 
-  return scale
+  return fit
 }

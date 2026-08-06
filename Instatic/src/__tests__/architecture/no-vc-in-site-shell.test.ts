@@ -14,7 +14,7 @@
  *   4. `server/repositories/site.ts` must NOT read or write `visualComponents`
  *      from/to the site row (it lives in data_rows now).
  *   5. The client adapter `src/core/persistence/cms.ts` fetches VCs from
- *      `/admin/api/cms/components` (not embedded in the shell GET).
+ *      `/cms/api/cms/components` (not embedded in the shell GET).
  *   6. `src/core/persistence/validate.ts` exports `validateVisualComponents`
  *      as a first-class function (not baked into `validateSite`).
  */

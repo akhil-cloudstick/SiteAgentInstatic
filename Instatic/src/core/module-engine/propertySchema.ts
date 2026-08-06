@@ -91,6 +91,12 @@ export const PropertyControlSchema = Type.Recursive((Self) => Type.Union([
       type: Type.Literal('text'),
       placeholder: Type.Optional(Type.String()),
       normalize: Type.Optional(TextControlNormalizeSchema),
+      /**
+       * Hard character limit. The editor enforces it on the input AND prints
+       * the approved Site screen's `used/max` counter under the field, which is
+       * how an author sees a heading is about to overflow its design.
+       */
+      maxLength: Type.Optional(Type.Number()),
     },
     { additionalProperties: false },
   ),
@@ -100,6 +106,8 @@ export const PropertyControlSchema = Type.Recursive((Self) => Type.Union([
       type: Type.Literal('textarea'),
       rows: Type.Optional(Type.Number()),
       placeholder: Type.Optional(Type.String()),
+      /** Hard character limit — see the `text` control above. */
+      maxLength: Type.Optional(Type.Number()),
     },
     { additionalProperties: false },
   ),

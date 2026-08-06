@@ -553,7 +553,7 @@ export function createEditorPluginApi(
         collection(resourceId) {
           assertPluginPermission(manifest, 'cms.storage')
           return {
-            list: (options) => listCmsPluginResourceRecords(manifest.id, resourceId, fetchImpl, '/admin/api/cms', options),
+            list: (options) => listCmsPluginResourceRecords(manifest.id, resourceId, fetchImpl, '/cms/api/cms', options),
             create: (data) => createCmsPluginResourceRecord(manifest.id, resourceId, data, fetchImpl),
             update: (recordId, data) => updateCmsPluginResourceRecord(manifest.id, resourceId, recordId, data, fetchImpl),
             delete: (recordId) => deleteCmsPluginResourceRecord(manifest.id, resourceId, recordId, fetchImpl),

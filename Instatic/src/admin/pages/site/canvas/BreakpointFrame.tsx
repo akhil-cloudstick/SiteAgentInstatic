@@ -36,6 +36,7 @@ import { useEditorStore } from '@site/store/store'
 import { clientPointToEditorDoc } from './canvasDomGeometry'
 import { closestReadonlyRegion } from './readonlyRegion'
 import { useReviewFrameScale } from './useReviewFrameScale'
+import { useBreakpointFrameWidth } from './useBreakpointFrameWidth'
 import styles from './BreakpointFrame.module.css'
 
 interface BreakpointFrameProps {
@@ -63,8 +64,12 @@ export function BreakpointFrame({
   runtimeScripts,
   reviewLayout = false,
 }: BreakpointFrameProps) {
+  // The width this frame is DRAWN at: the breakpoint's stored width unless the
+  // author is previewing another size from the Viewport context rows. Every
+  // width read below goes through it — see useBreakpointFrameWidth.
+  const frameWidth = useBreakpointFrameWidth(breakpoint)
   // --bp-width drives both label width and viewport width via CSS (dynamic value)
-  const bpStyle = { '--bp-width': `${breakpoint.width}px` } as CSSProperties
+  const bpStyle = { '--bp-width': `${frameWidth}px` } as CSSProperties
 
   // Outer viewport `<div>` wrapping the iframe. The selection overlay still
   // measures the viewport (not the iframe) for zoom/pan/toolbar positioning;
@@ -81,7 +86,7 @@ export function BreakpointFrame({
   const [iframeEl, setIframeEl] = useState<HTMLIFrameElement | null>(null)
   // Responsive Review sizes the frame from its grid column, not from the
   // breakpoint width, so the whole page fits without panning.
-  const reviewScale = useReviewFrameScale(viewportRef, breakpoint.width, reviewLayout)
+  const reviewFit = useReviewFrameScale(viewportRef, frameWidth, reviewLayout)
   const [activationHintPoint, setActivationHintPoint] = useState<CursorTooltipPoint | null>(null)
   const [readonlyHint, setReadonlyHint] = useState<{ text: string; point: CursorTooltipPoint } | null>(null)
 
@@ -185,7 +190,7 @@ export function BreakpointFrame({
             aria-pressed={isActive}
           >
             {breakpoint.label}
-            <span className={styles.pxBadge}>{breakpoint.width}px</span>
+            <span className={styles.pxBadge}>{frameWidth}px</span>
           </Button>
           {/* The reference labels this action in words on the companion
               frames ("Open full-size") rather than as a glyph — it is the one
@@ -245,12 +250,20 @@ export function BreakpointFrame({
             the transform, so the selection overlay needs no extra maths. */}
         <div
           className={reviewLayout ? styles.scaler : undefined}
-          style={reviewLayout ? ({ '--frame-scale': reviewScale } as CSSProperties) : undefined}
+          style={reviewLayout
+            ? ({
+                '--frame-scale': reviewFit.scale,
+                // Measured px, not a percentage — see useReviewFrameScale.
+                // Until the first measurement lands `height` is 0; fall back to
+                // the cell's own box so the frame is never zero-height.
+                '--frame-height': reviewFit.height > 0 ? `${reviewFit.height}px` : '100%',
+              } as CSSProperties)
+            : undefined}
         >
         <IframeFrameSurface
           ref={handleIframeRef}
           breakpointId={breakpoint.id}
-          width={breakpoint.width}
+          width={frameWidth}
           onClick={handleEmptyFrameClick}
           onCursorMove={handleFrameCursorMove}
           onCursorLeave={handleFrameCursorLeave}

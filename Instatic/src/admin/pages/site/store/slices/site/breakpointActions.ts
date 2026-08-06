@@ -13,7 +13,6 @@ type BreakpointActions = Pick<
 >
 
 export function createBreakpointActions({
-  get,
   set,
   mutateSite,
 }: SiteSliceHelpers): BreakpointActions {
@@ -47,9 +46,16 @@ export function createBreakpointActions({
         p.breakpoints = p.breakpoints.filter((b) => b.id !== id)
         return true
       })
-      // If the active breakpoint was removed, fall back to desktop
-      if (removed && get().activeBreakpointId === id) {
-        set((state) => { state.activeBreakpointId = 'desktop' })
+      if (removed) {
+        set((state) => {
+          // If the active breakpoint was removed, fall back to desktop
+          if (state.activeBreakpointId === id) state.activeBreakpointId = 'desktop'
+          // Drop the context's session-only preview width so a later breakpoint
+          // re-created under the same id can't inherit a dead override. Undoing
+          // the delete restores the breakpoint, not the preview width — that is
+          // session state and deliberately outside history.
+          delete state.breakpointPreviewWidths[id]
+        })
       }
     },
 

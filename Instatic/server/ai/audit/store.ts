@@ -1,6 +1,6 @@
 /**
  * AI usage repository — read-only rollups over `ai_conversations` +
- * `ai_messages` for the `/admin/ai` Audit tab and the dashboard widget.
+ * `ai_messages` for the `/cms/ai` Audit tab and the dashboard widget.
  *
  * Three rollups, each derived from the same per-message ledger:
  *

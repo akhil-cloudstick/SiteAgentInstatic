@@ -78,7 +78,7 @@ function postsTable() {
 
 function Providers({ children }: { children: ReactNode }) {
   return (
-    <MemoryRouter initialEntries={['/admin/content']}>
+    <MemoryRouter initialEntries={['/cms/content']}>
       <AdminSessionProvider user={adminUser()}>
         <StepUpProvider>{children}</StepUpProvider>
       </AdminSessionProvider>
@@ -120,25 +120,25 @@ describe('Content collection step-up flow', () => {
     globalThis.fetch = mock(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input)
 
-      if (url === '/admin/api/ai/editor-bridge?scope=content') {
+      if (url === '/cms/api/ai/editor-bridge?scope=content') {
         contentBridgeRequests += 1
         return json({ error: 'Unauthorized' }, 401)
       }
 
-      if (url === '/admin/api/cms/data/tables' && init?.method !== 'POST') {
+      if (url === '/cms/api/cms/data/tables' && init?.method !== 'POST') {
         return json({ tables: [postsTable()] })
       }
 
-      if (url === '/admin/api/cms/data/authors' && init?.method === 'GET') {
+      if (url === '/cms/api/cms/data/authors' && init?.method === 'GET') {
         return json({ authors: [] })
       }
 
       // Initial selected collection rows + any newly-created collection rows.
-      if (url.includes('/admin/api/cms/data/tables/') && url.endsWith('/rows') && init?.method === 'GET') {
+      if (url.includes('/cms/api/cms/data/tables/') && url.endsWith('/rows') && init?.method === 'GET') {
         return json({ rows: [] })
       }
 
-      if (url === '/admin/api/cms/data/tables' && init?.method === 'POST') {
+      if (url === '/cms/api/cms/data/tables' && init?.method === 'POST') {
         createAttempts += 1
         if (createAttempts === 1) return json({ error: 'step_up_required' }, 401)
         return json({
@@ -165,15 +165,15 @@ describe('Content collection step-up flow', () => {
         }, 201)
       }
 
-      if (url === '/admin/api/cms/auth/step-up' && init?.method === 'POST') {
+      if (url === '/cms/api/cms/auth/step-up' && init?.method === 'POST') {
         stepUpRequests.push(JSON.parse(String(init.body)) as Record<string, unknown>)
         return json({ ok: true, stepUpExpiresAt: '2026-06-10T10:15:00.000Z' })
       }
 
-      if (url.endsWith('/admin/api/cms/plugins')) return json({ plugins: [], adminPages: [] })
-      if (url.endsWith('/admin/api/cms/site')) return json({ site: null }, 404)
-      if (url.endsWith('/admin/api/cms/publish/status')) return json({ ok: false }, 404)
-      if (url.endsWith('/admin/api/cms/media/folders')) return json({ folders: [] })
+      if (url.endsWith('/cms/api/cms/plugins')) return json({ plugins: [], adminPages: [] })
+      if (url.endsWith('/cms/api/cms/site')) return json({ site: null }, 404)
+      if (url.endsWith('/cms/api/cms/publish/status')) return json({ ok: false }, 404)
+      if (url.endsWith('/cms/api/cms/media/folders')) return json({ folders: [] })
 
       return json({ error: `Unhandled ${url}` }, 500)
     }) as typeof fetch

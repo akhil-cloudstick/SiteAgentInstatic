@@ -169,27 +169,27 @@ function json(body: unknown, status = 200) {
  * `undefined` for non-ambient URLs so per-test handlers stay authoritative.
  */
 function ambientFetchFallback(url: string): Response | undefined {
-  if (url.endsWith('/admin/api/cms/plugins')) {
+  if (url.endsWith('/cms/api/cms/plugins')) {
     return json({ plugins: [], adminPages: [] })
   }
-  if (url.endsWith('/admin/api/cms/site')) {
+  if (url.endsWith('/cms/api/cms/site')) {
     return json({ site: makeSite({ name: 'Content Shell Site' }) })
   }
   if (
-    url.endsWith('/admin/api/cms/pages') ||
-    url.endsWith('/admin/api/cms/components') ||
-    url.endsWith('/admin/api/cms/layouts')
+    url.endsWith('/cms/api/cms/pages') ||
+    url.endsWith('/cms/api/cms/components') ||
+    url.endsWith('/cms/api/cms/layouts')
   ) {
     return json({ rows: [] })
   }
-  if (url.endsWith('/admin/api/cms/publish/status')) {
+  if (url.endsWith('/cms/api/cms/publish/status')) {
     return json({ ok: false }, 404)
   }
   // The shared MediaPickerModal (workspace modal that replaced the old
   // inline MediaPickerDialog) loads folders alongside assets on mount.
   // Without this fallback the modal's workspace hook errors out and the
   // asset grid never renders.
-  if (url.endsWith('/admin/api/cms/media/folders')) {
+  if (url.endsWith('/cms/api/cms/media/folders')) {
     return json({ folders: [] })
   }
   return undefined
@@ -330,21 +330,21 @@ beforeEach(() => {
     calls.push({ input, init })
     const url = String(input)
 
-    if (url === '/admin/api/cms/data/tables') {
+    if (url === '/cms/api/cms/data/tables') {
       return json({
         tables: [makeTable('posts', 'Posts', 'posts', '/posts', 'Post', 'Posts')],
       })
     }
 
-    if (url === '/admin/api/cms/data/tables/posts/rows' && init?.method === 'GET') {
+    if (url === '/cms/api/cms/data/tables/posts/rows' && init?.method === 'GET') {
       return json({ rows: [] })
     }
 
-    if (url === '/admin/api/cms/data/authors' && init?.method === 'GET') {
+    if (url === '/cms/api/cms/data/authors' && init?.method === 'GET') {
       return json({ authors: [ownerAuthor, editorAuthor, adminAuthor] })
     }
 
-    if (url === '/admin/api/cms/data/tables/posts/rows' && init?.method === 'POST') {
+    if (url === '/cms/api/cms/data/tables/posts/rows' && init?.method === 'POST') {
       return json({
         row: makeRow('entry_1', 'posts', { title: 'Untitled', slug: 'untitled' }, {
           authorUserId: ownerAuthor.id,
@@ -353,7 +353,7 @@ beforeEach(() => {
       }, 201)
     }
 
-    if (url === '/admin/api/cms/data/rows/entry_1' && init?.method === 'PATCH') {
+    if (url === '/cms/api/cms/data/rows/entry_1' && init?.method === 'PATCH') {
       const draft = JSON.parse(String(init.body))
       return json({
         row: {
@@ -363,7 +363,7 @@ beforeEach(() => {
       })
     }
 
-    if (url === '/admin/api/cms/data/rows/entry_1' && init?.method === 'DELETE') {
+    if (url === '/cms/api/cms/data/rows/entry_1' && init?.method === 'DELETE') {
       return json({
         row: makeRow('entry_1', 'posts', { title: 'Untitled', slug: 'untitled' }, {
           authorUserId: ownerAuthor.id,
@@ -373,7 +373,7 @@ beforeEach(() => {
       })
     }
 
-    if (url === '/admin/api/cms/data/rows/entry_1/publish' && init?.method === 'POST') {
+    if (url === '/cms/api/cms/data/rows/entry_1/publish' && init?.method === 'POST') {
       return json({
         row: {
           ...makeRow('entry_1', 'posts', { title: 'My first post', slug: 'untitled', body: '## Intro', featuredMedia: null, seoTitle: '', seoDescription: '' }),
@@ -384,7 +384,7 @@ beforeEach(() => {
       })
     }
 
-    if (url === '/admin/api/cms/data/rows/entry_1/status' && init?.method === 'PATCH') {
+    if (url === '/cms/api/cms/data/rows/entry_1/status' && init?.method === 'PATCH') {
       const body = JSON.parse(String(init.body))
       return json({
         row: {
@@ -395,7 +395,7 @@ beforeEach(() => {
       })
     }
 
-    if (url === '/admin/api/cms/media') {
+    if (url === '/cms/api/cms/media') {
       return json({ assets: [imageAsset, videoAsset] })
     }
 
@@ -415,10 +415,10 @@ afterEach(() => {
 describe('ContentPage', () => {
   it('uses SPA navigation with active Site and Content labels in the shared toolbar', () => {
     render(
-      <AdminTestProviders initialEntries={['/admin/site']}>
+      <AdminTestProviders initialEntries={['/cms/site']}>
         <Routes>
           <Route
-            path="/admin/site"
+            path="/cms/site"
             element={(
               <>
                 <Toolbar
@@ -431,7 +431,7 @@ describe('ContentPage', () => {
             )}
           />
           <Route
-            path="/admin/content"
+            path="/cms/content"
             element={(
               <>
                 <Toolbar
@@ -449,7 +449,7 @@ describe('ContentPage', () => {
 
     expect(screen.getByText('Site')).toBeDefined()
     fireEvent.click(screen.getByRole('link', { name: 'Content' }))
-    expect(screen.getByLabelText('current route').textContent).toBe('/admin/content')
+    expect(screen.getByLabelText('current route').textContent).toBe('/cms/content')
     expect(screen.getByText('Content')).toBeDefined()
     expect(screen.getByRole('link', { name: 'Site' })).toBeDefined()
   })
@@ -458,10 +458,10 @@ describe('ContentPage', () => {
     const transitionStarts: string[] = []
 
     render(
-      <AdminTestProviders initialEntries={['/admin/site']}>
+      <AdminTestProviders initialEntries={['/cms/site']}>
         <Routes>
           <Route
-            path="/admin/site"
+            path="/cms/site"
             element={(
               <>
                 <Toolbar
@@ -482,7 +482,7 @@ describe('ContentPage', () => {
             )}
           />
           <Route
-            path="/admin/content"
+            path="/cms/content"
             element={(
               <>
                 <Toolbar
@@ -501,7 +501,7 @@ describe('ContentPage', () => {
     fireEvent.click(screen.getByRole('link', { name: 'Content' }))
 
     expect(transitionStarts).toEqual(['content'])
-    expect(screen.getByLabelText('current route').textContent).toBe('/admin/content')
+    expect(screen.getByLabelText('current route').textContent).toBe('/cms/content')
     expect(screen.getByText('content controls')).toBeDefined()
 
     const layoutSource = readFileSync(join(process.cwd(), 'src/admin/layouts/AdminCanvasLayout/AdminCanvasLayout.tsx'), 'utf8')
@@ -522,10 +522,10 @@ describe('ContentPage', () => {
     let resolveNavigation: (() => void) | null = null
 
     render(
-      <AdminTestProviders initialEntries={['/admin/site']}>
+      <AdminTestProviders initialEntries={['/cms/site']}>
         <Routes>
           <Route
-            path="/admin/site"
+            path="/cms/site"
             element={(
               <>
                 <Toolbar
@@ -546,7 +546,7 @@ describe('ContentPage', () => {
             )}
           />
           <Route
-            path="/admin/content"
+            path="/cms/content"
             element={(
               <>
                 <Toolbar
@@ -565,13 +565,13 @@ describe('ContentPage', () => {
     fireEvent.click(screen.getByRole('link', { name: 'Content' }))
 
     expect(transitionStarts).toEqual(['content'])
-    expect(screen.getByLabelText('current route').textContent).toBe('/admin/site')
+    expect(screen.getByLabelText('current route').textContent).toBe('/cms/site')
     expect(screen.getByText('site controls')).toBeDefined()
 
     resolveNavigation?.()
 
     await waitFor(() => {
-      expect(screen.getByLabelText('current route').textContent).toBe('/admin/content')
+      expect(screen.getByLabelText('current route').textContent).toBe('/cms/content')
     })
     expect(screen.getByText('content controls')).toBeDefined()
   })
@@ -585,11 +585,11 @@ describe('ContentPage', () => {
     globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input)
 
-      if (url === '/admin/api/cms/data/tables') {
+      if (url === '/cms/api/cms/data/tables') {
         return json({ tables: [makeTable('posts', 'Posts', 'posts', '/posts', 'Post', 'Posts')] })
       }
 
-      if (url === '/admin/api/cms/data/tables/posts/rows' && init?.method === 'GET') {
+      if (url === '/cms/api/cms/data/tables/posts/rows' && init?.method === 'GET') {
         return entriesResponse
       }
 
@@ -738,7 +738,7 @@ describe('ContentPage', () => {
     const calls = (globalThis as typeof globalThis & { __contentFetchCalls?: FetchCall[] }).__contentFetchCalls ?? []
     await waitFor(() => {
       expect(calls.some((call) =>
-        String(call.input) === '/admin/api/cms/data/rows/entry_1' &&
+        String(call.input) === '/cms/api/cms/data/rows/entry_1' &&
         call.init?.method === 'DELETE'
       )).toBe(true)
     })
@@ -759,15 +759,15 @@ describe('ContentPage', () => {
       calls.push({ input, init })
       const url = String(input)
 
-      if (url === '/admin/api/cms/data/tables') {
+      if (url === '/cms/api/cms/data/tables') {
         return json({ tables: [makeTable('posts', 'Posts', 'posts', '/posts', 'Post', 'Posts')] })
       }
 
-      if (url === '/admin/api/cms/data/authors' && init?.method === 'GET') {
+      if (url === '/cms/api/cms/data/authors' && init?.method === 'GET') {
         return json({ authors: [editorAuthor, adminAuthor] })
       }
 
-      if (url === '/admin/api/cms/data/tables/posts/rows' && init?.method === 'GET') {
+      if (url === '/cms/api/cms/data/tables/posts/rows' && init?.method === 'GET') {
         return json({
           rows: [makeRow('entry_1', 'posts', {
             title: 'Authored post',
@@ -783,7 +783,7 @@ describe('ContentPage', () => {
         })
       }
 
-      if (url === '/admin/api/cms/data/rows/entry_1/author' && init?.method === 'PATCH') {
+      if (url === '/cms/api/cms/data/rows/entry_1/author' && init?.method === 'PATCH') {
         return json({
           row: makeRow('entry_1', 'posts', {
             title: 'Authored post',
@@ -800,7 +800,7 @@ describe('ContentPage', () => {
         })
       }
 
-      if (url === '/admin/api/cms/media') {
+      if (url === '/cms/api/cms/media') {
         return json({ assets: [] })
       }
 
@@ -828,7 +828,7 @@ describe('ContentPage', () => {
 
     await waitFor(() => {
       expect(calls.some((call) =>
-        String(call.input) === '/admin/api/cms/data/rows/entry_1/author' &&
+        String(call.input) === '/cms/api/cms/data/rows/entry_1/author' &&
         call.init?.method === 'PATCH' &&
         call.init?.body === JSON.stringify({ authorUserId: adminAuthor.id })
       )).toBe(true)
@@ -858,7 +858,7 @@ describe('ContentPage', () => {
       const url = String(input)
       const method = init?.method ?? 'GET'
 
-      if (url === '/admin/api/cms/data/tables' && method === 'GET') {
+      if (url === '/cms/api/cms/data/tables' && method === 'GET') {
         return json({
           tables: [
             makeTable('posts', 'Posts', 'posts', '/posts', 'Post', 'Posts'),
@@ -866,16 +866,16 @@ describe('ContentPage', () => {
           ],
         })
       }
-      if (url === '/admin/api/cms/data/tables/posts/rows' && method === 'GET') {
+      if (url === '/cms/api/cms/data/tables/posts/rows' && method === 'GET') {
         return json({ rows: [post] })
       }
-      if (url === '/admin/api/cms/data/tables/articles/rows' && method === 'GET') {
+      if (url === '/cms/api/cms/data/tables/articles/rows' && method === 'GET') {
         return articleList
       }
-      if (url === '/admin/api/cms/data/rows/article_2' && method === 'GET') {
+      if (url === '/cms/api/cms/data/rows/article_2' && method === 'GET') {
         return json({ row: article })
       }
-      if (url === '/admin/api/cms/data/rows/article_2' && method === 'PATCH') {
+      if (url === '/cms/api/cms/data/rows/article_2' && method === 'PATCH') {
         const body = JSON.parse(String(init?.body))
         return json({
           row: makeRow('article_2', 'articles', body.cells, {
@@ -883,10 +883,10 @@ describe('ContentPage', () => {
           }),
         })
       }
-      if (url === '/admin/api/cms/data/authors' && method === 'GET') {
+      if (url === '/cms/api/cms/data/authors' && method === 'GET') {
         return json({ authors: [ownerAuthor, editorAuthor, adminAuthor] })
       }
-      if (url === '/admin/api/cms/media' && method === 'GET') {
+      if (url === '/cms/api/cms/media' && method === 'GET') {
         return json({ assets: [] })
       }
 
@@ -921,7 +921,7 @@ describe('ContentPage', () => {
     expect(activationResult?.ok).toBe(true)
     expect(writeResult?.ok).toBe(true)
     const patchCall = calls.find((call) =>
-      String(call.input) === '/admin/api/cms/data/rows/article_2' &&
+      String(call.input) === '/cms/api/cms/data/rows/article_2' &&
       call.init?.method === 'PATCH'
     )
     expect(JSON.parse(String(patchCall?.init?.body))).toMatchObject({
@@ -1034,7 +1034,7 @@ describe('ContentPage', () => {
     expect(publishedButton.getAttribute('aria-disabled')).toBe('true')
 
     const calls = (globalThis as typeof globalThis & { __contentFetchCalls?: FetchCall[] }).__contentFetchCalls ?? []
-    const saveCall = calls.find((call) => String(call.input) === '/admin/api/cms/data/rows/entry_1' && call.init?.method === 'PATCH')
+    const saveCall = calls.find((call) => String(call.input) === '/cms/api/cms/data/rows/entry_1' && call.init?.method === 'PATCH')
     expect(saveCall?.init?.body).toBe(JSON.stringify({
       cells: {
         title: 'My first post',
@@ -1046,7 +1046,7 @@ describe('ContentPage', () => {
       },
     }))
     expect(calls.some((call) =>
-      String(call.input) === '/admin/api/cms/data/rows/entry_1/publish' &&
+      String(call.input) === '/cms/api/cms/data/rows/entry_1/publish' &&
       call.init?.method === 'POST'
     )).toBe(true)
   })
@@ -1086,26 +1086,26 @@ describe('ContentPage', () => {
       calls.push({ input, init })
       const url = String(input)
 
-      if (url === '/admin/api/cms/data/tables' && init?.method === 'GET') {
+      if (url === '/cms/api/cms/data/tables' && init?.method === 'GET') {
         return json({ tables: [makeTable('posts', 'Posts', 'posts', '/posts', 'Post', 'Posts')] })
       }
 
-      if (url === '/admin/api/cms/data/tables/posts/rows' && init?.method === 'GET') {
+      if (url === '/cms/api/cms/data/tables/posts/rows' && init?.method === 'GET') {
         return json({ rows: [] })
       }
 
-      if (url === '/admin/api/cms/data/tables' && init?.method === 'POST') {
+      if (url === '/cms/api/cms/data/tables' && init?.method === 'POST') {
         const body = JSON.parse(String(init.body))
         return json({
           table: makeTable('products', body.name ?? 'Products', 'products', '/products', body.singularLabel ?? 'Product', body.pluralLabel ?? 'Products', body.fields),
         }, 201)
       }
 
-      if (url === '/admin/api/cms/data/tables/products/rows' && init?.method === 'GET') {
+      if (url === '/cms/api/cms/data/tables/products/rows' && init?.method === 'GET') {
         return json({ rows: [] })
       }
 
-      if (url === '/admin/api/cms/data/tables/products/rows' && init?.method === 'POST') {
+      if (url === '/cms/api/cms/data/tables/products/rows' && init?.method === 'POST') {
         return json({
           row: makeRow('product_1', 'products', { title: 'Untitled', slug: 'untitled' }),
         }, 201)
@@ -1144,7 +1144,7 @@ describe('ContentPage', () => {
     expect(await screen.findByLabelText('Title')).toBeDefined()
 
     const createCollectionCall = calls.find((call) =>
-      String(call.input) === '/admin/api/cms/data/tables' &&
+      String(call.input) === '/cms/api/cms/data/tables' &&
       call.init?.method === 'POST'
     )
     expect(createCollectionCall?.init?.body).toBe(JSON.stringify({
@@ -1161,7 +1161,7 @@ describe('ContentPage', () => {
       kind: 'postType',
     }))
     expect(calls.some((call) =>
-      String(call.input) === '/admin/api/cms/data/tables/products/rows' &&
+      String(call.input) === '/cms/api/cms/data/tables/products/rows' &&
       call.init?.method === 'POST'
     )).toBe(true)
   })
@@ -1173,7 +1173,7 @@ describe('ContentPage', () => {
       calls.push({ input, init })
       const url = String(input)
 
-      if (url === '/admin/api/cms/data/tables') {
+      if (url === '/cms/api/cms/data/tables') {
         return json({
           tables: [
             makeTable('posts', 'Posts', 'posts', '/posts', 'Post', 'Posts'),
@@ -1182,7 +1182,7 @@ describe('ContentPage', () => {
         })
       }
 
-      if (url === '/admin/api/cms/data/tables/posts/rows' && init?.method === 'GET') {
+      if (url === '/cms/api/cms/data/tables/posts/rows' && init?.method === 'GET') {
         return json({
           rows: [makeRow('entry_1', 'posts', {
             title: 'Portable lamp',
@@ -1195,7 +1195,7 @@ describe('ContentPage', () => {
         })
       }
 
-      if (url === '/admin/api/cms/data/rows/entry_1/table' && init?.method === 'PATCH') {
+      if (url === '/cms/api/cms/data/rows/entry_1/table' && init?.method === 'PATCH') {
         return json({
           row: makeRow('entry_1', 'products', {
             title: 'Portable lamp',
@@ -1208,7 +1208,7 @@ describe('ContentPage', () => {
         })
       }
 
-      if (url === '/admin/api/cms/data/tables/products/rows' && init?.method === 'GET') {
+      if (url === '/cms/api/cms/data/tables/products/rows' && init?.method === 'GET') {
         return json({
           rows: [makeRow('entry_1', 'products', {
             title: 'Portable lamp',
@@ -1221,7 +1221,7 @@ describe('ContentPage', () => {
         })
       }
 
-      if (url === '/admin/api/cms/media') {
+      if (url === '/cms/api/cms/media') {
         return json({ assets: [imageAsset] })
       }
 
@@ -1245,7 +1245,7 @@ describe('ContentPage', () => {
 
     await waitFor(() => {
       expect(calls.some((call) =>
-        String(call.input) === '/admin/api/cms/data/rows/entry_1/table' &&
+        String(call.input) === '/cms/api/cms/data/rows/entry_1/table' &&
         call.init?.method === 'PATCH' &&
         call.init?.body === JSON.stringify({ tableId: 'products' })
       )).toBe(true)
@@ -1263,7 +1263,7 @@ describe('ContentPage', () => {
       calls.push({ input, init })
       const url = String(input)
 
-      if (url === '/admin/api/cms/data/tables' && init?.method === 'GET') {
+      if (url === '/cms/api/cms/data/tables' && init?.method === 'GET') {
         return json({
           tables: [
             makeTable('posts', 'Posts', 'posts', '/posts', 'Post', 'Posts'),
@@ -1272,7 +1272,7 @@ describe('ContentPage', () => {
         })
       }
 
-      if (url === '/admin/api/cms/data/tables/posts/rows' && init?.method === 'GET') {
+      if (url === '/cms/api/cms/data/tables/posts/rows' && init?.method === 'GET') {
         return json({
           rows: [
             makeRow('entry_1', 'posts', { title: 'Summer sale', slug: 'summer-sale', body: 'Sale copy', featuredMedia: null, seoTitle: '', seoDescription: '' }, { updatedAt: '2026-05-01T10:01:00.000Z' }),
@@ -1281,11 +1281,11 @@ describe('ContentPage', () => {
         })
       }
 
-      if (url === '/admin/api/cms/data/tables/products/rows' && init?.method === 'GET') {
+      if (url === '/cms/api/cms/data/tables/products/rows' && init?.method === 'GET') {
         return json({ rows: [] })
       }
 
-      if (url === '/admin/api/cms/data/rows/entry_1' && init?.method === 'PATCH') {
+      if (url === '/cms/api/cms/data/rows/entry_1' && init?.method === 'PATCH') {
         const draft = JSON.parse(String(init.body))
         return json({
           row: {
@@ -1295,26 +1295,26 @@ describe('ContentPage', () => {
         })
       }
 
-      if (url === '/admin/api/cms/data/rows/entry_1/publish' && init?.method === 'POST') {
+      if (url === '/cms/api/cms/data/rows/entry_1/publish' && init?.method === 'POST') {
         return json({
           row: makeRow('entry_1', 'posts', { title: 'Summer sale', slug: 'summer-sale', body: 'Sale copy', featuredMedia: null, seoTitle: '', seoDescription: '' }, { status: 'published', updatedAt: '2026-05-01T10:03:00.000Z', publishedAt: '2026-05-01T10:03:00.000Z' }),
         })
       }
 
-      if (url === '/admin/api/cms/data/rows/entry_2/status' && init?.method === 'PATCH') {
+      if (url === '/cms/api/cms/data/rows/entry_2/status' && init?.method === 'PATCH') {
         const body = JSON.parse(String(init.body))
         return json({
           row: makeRow('entry_2', 'posts', { title: 'Published story', slug: 'published-story', body: 'Published copy', featuredMedia: null, seoTitle: '', seoDescription: '' }, { status: body.status, updatedAt: '2026-05-01T10:04:00.000Z' }),
         })
       }
 
-      if (url === '/admin/api/cms/data/rows/entry_1' && init?.method === 'DELETE') {
+      if (url === '/cms/api/cms/data/rows/entry_1' && init?.method === 'DELETE') {
         return json({
           row: makeRow('entry_1', 'posts', { title: 'Winter sale', slug: 'winter-sale', body: 'Sale copy', featuredMedia: null, seoTitle: '', seoDescription: '' }, { updatedAt: '2026-05-01T10:06:00.000Z', deletedAt: '2026-05-01T10:06:00.000Z' }),
         })
       }
 
-      if (url === '/admin/api/cms/data/tables/products' && init?.method === 'PATCH') {
+      if (url === '/cms/api/cms/data/tables/products' && init?.method === 'PATCH') {
         const body = JSON.parse(String(init.body))
         return json({
           table: {
@@ -1325,13 +1325,13 @@ describe('ContentPage', () => {
         })
       }
 
-      if (url === '/admin/api/cms/data/tables/products' && init?.method === 'DELETE') {
+      if (url === '/cms/api/cms/data/tables/products' && init?.method === 'DELETE') {
         return json({
           table: makeTable('products', 'Catalog', 'catalog', '/catalog', 'Product', 'Catalog'),
         })
       }
 
-      if (url === '/admin/api/cms/media') {
+      if (url === '/cms/api/cms/media') {
         return json({ assets: [] })
       }
 
@@ -1358,7 +1358,7 @@ describe('ContentPage', () => {
     fireEvent.click(within(menu).getByRole('menuitem', { name: /convert to draft/i }))
     await waitFor(() => {
       expect(calls.some((call) =>
-        String(call.input) === '/admin/api/cms/data/rows/entry_2/status' &&
+        String(call.input) === '/cms/api/cms/data/rows/entry_2/status' &&
         call.init?.method === 'PATCH' &&
         call.init?.body === JSON.stringify({ status: 'draft' })
       )).toBe(true)
@@ -1375,7 +1375,7 @@ describe('ContentPage', () => {
     fireEvent.click(within(menu).getByRole('menuitem', { name: /^publish$/i }))
     await waitFor(() => {
       expect(calls.some((call) =>
-        String(call.input) === '/admin/api/cms/data/rows/entry_1/publish' &&
+        String(call.input) === '/cms/api/cms/data/rows/entry_1/publish' &&
         call.init?.method === 'POST'
       )).toBe(true)
     })
@@ -1391,7 +1391,7 @@ describe('ContentPage', () => {
 
     expect(await within(postsRegion).findByText('Winter sale')).toBeDefined()
     expect(calls.some((call) =>
-      String(call.input) === '/admin/api/cms/data/rows/entry_1' &&
+      String(call.input) === '/cms/api/cms/data/rows/entry_1' &&
       call.init?.method === 'PATCH' &&
       call.init?.body === JSON.stringify({
         cells: {
@@ -1424,7 +1424,7 @@ describe('ContentPage', () => {
 
     expect(await within(collectionsRegion).findByText('Catalog')).toBeDefined()
     expect(calls.some((call) =>
-      String(call.input) === '/admin/api/cms/data/tables/products' &&
+      String(call.input) === '/cms/api/cms/data/tables/products' &&
       call.init?.method === 'PATCH' &&
       call.init?.body === JSON.stringify({
         name: 'Catalog',
@@ -1444,7 +1444,7 @@ describe('ContentPage', () => {
 
     await waitFor(() => {
       expect(calls.some((call) =>
-        String(call.input) === '/admin/api/cms/data/rows/entry_1' &&
+        String(call.input) === '/cms/api/cms/data/rows/entry_1' &&
         call.init?.method === 'DELETE'
       )).toBe(true)
     })
@@ -1459,7 +1459,7 @@ describe('ContentPage', () => {
 
     await waitFor(() => {
       expect(calls.some((call) =>
-        String(call.input) === '/admin/api/cms/data/tables/products' &&
+        String(call.input) === '/cms/api/cms/data/tables/products' &&
         call.init?.method === 'DELETE'
       )).toBe(true)
     })
@@ -1554,7 +1554,7 @@ describe('ContentPage', () => {
     await screen.findByText('Draft saved')
 
     const calls = (globalThis as typeof globalThis & { __contentFetchCalls?: FetchCall[] }).__contentFetchCalls ?? []
-    const saveCalls = calls.filter((call) => String(call.input) === '/admin/api/cms/data/rows/entry_1' && call.init?.method === 'PATCH')
+    const saveCalls = calls.filter((call) => String(call.input) === '/cms/api/cms/data/rows/entry_1' && call.init?.method === 'PATCH')
     expect(saveCalls.at(-1)?.init?.body).toBe(JSON.stringify({
       cells: {
         title: 'Untitled',
@@ -1609,7 +1609,7 @@ describe('ContentPage', () => {
     await screen.findByText('Unpublished')
 
     const calls = (globalThis as typeof globalThis & { __contentFetchCalls?: FetchCall[] }).__contentFetchCalls ?? []
-    const saveCalls = calls.filter((call) => String(call.input) === '/admin/api/cms/data/rows/entry_1' && call.init?.method === 'PATCH')
+    const saveCalls = calls.filter((call) => String(call.input) === '/cms/api/cms/data/rows/entry_1' && call.init?.method === 'PATCH')
     expect(saveCalls.at(-1)?.init?.body).toBe(JSON.stringify({
       cells: {
         title: 'My first post',
@@ -1621,7 +1621,7 @@ describe('ContentPage', () => {
       },
     }))
     expect(calls.some((call) =>
-      String(call.input) === '/admin/api/cms/data/rows/entry_1/status' &&
+      String(call.input) === '/cms/api/cms/data/rows/entry_1/status' &&
       call.init?.method === 'PATCH' &&
       call.init?.body === JSON.stringify({ status: 'unpublished' })
     )).toBe(true)
@@ -1631,7 +1631,7 @@ describe('ContentPage', () => {
     const baseFetch = globalThis.fetch
     globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input)
-      if (url === '/admin/api/cms/data/tables/posts/rows' && init?.method === 'GET') {
+      if (url === '/cms/api/cms/data/tables/posts/rows' && init?.method === 'GET') {
         return json({
           rows: [makeRow('entry_1', 'posts', {
             title: 'First post',

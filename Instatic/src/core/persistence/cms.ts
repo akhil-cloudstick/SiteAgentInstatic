@@ -25,7 +25,7 @@ export class CmsAdapter implements IPersistenceAdapter {
 
   constructor(
     fetchImpl: FetchLike = defaultFetch,
-    basePath = '/admin/api/cms',
+    basePath = '/cms/api/cms',
   ) {
     this.fetchImpl = fetchImpl
     this.basePath = basePath

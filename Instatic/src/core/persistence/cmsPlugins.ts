@@ -60,7 +60,7 @@ function emptyPayload(body: Partial<CmsPluginsPayload>): CmsPluginsPayload {
 
 export async function listCmsPlugins(
   fetchImpl: FetchLike = globalThis.fetch.bind(globalThis),
-  basePath = '/admin/api/cms',
+  basePath = '/cms/api/cms',
 ): Promise<CmsPluginsPayload> {
   const body = await apiRequest(`${basePath}/plugins`, {
     schema: PluginsListEnvelope,
@@ -74,7 +74,7 @@ export async function installCmsPluginManifest(
   manifest: PluginManifest,
   grantedPermissions: PluginPermission[] = [],
   fetchImpl: FetchLike = globalThis.fetch.bind(globalThis),
-  basePath = '/admin/api/cms',
+  basePath = '/cms/api/cms',
 ): Promise<{ plugin?: InstalledPlugin } & CmsPluginsPayload> {
   const body = await apiRequest(`${basePath}/plugins`, {
     method: 'POST',
@@ -95,7 +95,7 @@ export async function installCmsPluginManifest(
 export async function inspectCmsPluginPackage(
   file: File,
   fetchImpl: FetchLike = globalThis.fetch.bind(globalThis),
-  basePath = '/admin/api/cms',
+  basePath = '/cms/api/cms',
 ): Promise<PluginManifest> {
   const formData = new FormData()
   formData.set('file', file)
@@ -114,7 +114,7 @@ export async function installCmsPluginPackage(
   file: File,
   grantedPermissions: PluginPermission[],
   fetchImpl: FetchLike = globalThis.fetch.bind(globalThis),
-  basePath = '/admin/api/cms',
+  basePath = '/cms/api/cms',
 ): Promise<{ plugin?: InstalledPlugin } & CmsPluginsPayload> {
   const formData = new FormData()
   formData.set('file', file)
@@ -137,7 +137,7 @@ export async function setCmsPluginEnabled(
   pluginId: string,
   enabled: boolean,
   fetchImpl: FetchLike = globalThis.fetch.bind(globalThis),
-  basePath = '/admin/api/cms',
+  basePath = '/cms/api/cms',
 ): Promise<{ plugin?: InstalledPlugin } & CmsPluginsPayload> {
   const body = await apiRequest(`${basePath}/plugins/${encodeURIComponent(pluginId)}`, {
     method: 'PATCH',
@@ -162,7 +162,7 @@ export async function removeCmsPlugin(
   pluginId: string,
   force = false,
   fetchImpl: FetchLike = globalThis.fetch.bind(globalThis),
-  basePath = '/admin/api/cms',
+  basePath = '/cms/api/cms',
 ): Promise<void> {
   const query = force ? '?force=true' : ''
   await apiRequest(`${basePath}/plugins/${encodeURIComponent(pluginId)}${query}`, {
@@ -182,7 +182,7 @@ export async function removeCmsPlugin(
 export async function restartCmsPlugin(
   pluginId: string,
   fetchImpl: FetchLike = globalThis.fetch.bind(globalThis),
-  basePath = '/admin/api/cms',
+  basePath = '/cms/api/cms',
 ): Promise<{ plugin?: InstalledPlugin } & CmsPluginsPayload> {
   const body = await apiRequest(`${basePath}/plugins/${encodeURIComponent(pluginId)}/restart`, {
     method: 'POST',
@@ -199,7 +199,7 @@ export async function restartCmsPlugin(
 export async function installCmsPluginPack(
   pluginId: string,
   fetchImpl: FetchLike = globalThis.fetch.bind(globalThis),
-  basePath = '/admin/api/cms',
+  basePath = '/cms/api/cms',
 ): Promise<CmsPluginPackInstallSummary> {
   return apiRequest(`${basePath}/plugins/${encodeURIComponent(pluginId)}/pack/install`, {
     method: 'POST',
@@ -236,7 +236,7 @@ interface CmsPluginSettingsResponse {
 export async function getCmsPluginSettings(
   pluginId: string,
   fetchImpl: FetchLike = globalThis.fetch.bind(globalThis),
-  basePath = '/admin/api/cms',
+  basePath = '/cms/api/cms',
 ): Promise<CmsPluginSettingsResponse> {
   const body = await apiRequest(`${basePath}/plugins/${encodeURIComponent(pluginId)}/settings`, {
     schema: PluginSettingsEnvelope,
@@ -254,7 +254,7 @@ export async function updateCmsPluginSettings(
   pluginId: string,
   settings: PluginSettingsRecord,
   fetchImpl: FetchLike = globalThis.fetch.bind(globalThis),
-  basePath = '/admin/api/cms',
+  basePath = '/cms/api/cms',
 ): Promise<PluginSettingsRecord> {
   const body = await apiRequest(`${basePath}/plugins/${encodeURIComponent(pluginId)}/settings`, {
     method: 'PUT',
@@ -307,7 +307,7 @@ interface CmsPluginSchedulesResponse {
 export async function listCmsPluginSchedules(
   pluginId: string,
   fetchImpl: FetchLike = globalThis.fetch.bind(globalThis),
-  basePath = '/admin/api/cms',
+  basePath = '/cms/api/cms',
 ): Promise<CmsPluginSchedulesResponse> {
   const body = await apiRequest(`${basePath}/plugins/${encodeURIComponent(pluginId)}/schedules`, {
     schema: CmsPluginSchedulesResponseEnvelopeSchema,
@@ -326,7 +326,7 @@ export async function runCmsPluginScheduleNow(
   pluginId: string,
   scheduleId: string,
   fetchImpl: FetchLike = globalThis.fetch.bind(globalThis),
-  basePath = '/admin/api/cms',
+  basePath = '/cms/api/cms',
 ): Promise<{ outcome: { ok: boolean; status: string; error?: string; durationMs: number } }> {
   const url = `${basePath}/plugins/${encodeURIComponent(pluginId)}/schedules/${encodeURIComponent(scheduleId)}/run-now`
   return apiRequest(url, {
@@ -341,7 +341,7 @@ export async function pauseCmsPluginSchedule(
   pluginId: string,
   scheduleId: string,
   fetchImpl: FetchLike = globalThis.fetch.bind(globalThis),
-  basePath = '/admin/api/cms',
+  basePath = '/cms/api/cms',
 ): Promise<void> {
   const url = `${basePath}/plugins/${encodeURIComponent(pluginId)}/schedules/${encodeURIComponent(scheduleId)}/pause`
   await apiRequest(url, { method: 'POST', fetchImpl, fallbackMessage: 'CMS plugin schedule pause failed' })
@@ -351,7 +351,7 @@ export async function resumeCmsPluginSchedule(
   pluginId: string,
   scheduleId: string,
   fetchImpl: FetchLike = globalThis.fetch.bind(globalThis),
-  basePath = '/admin/api/cms',
+  basePath = '/cms/api/cms',
 ): Promise<void> {
   const url = `${basePath}/plugins/${encodeURIComponent(pluginId)}/schedules/${encodeURIComponent(scheduleId)}/resume`
   await apiRequest(url, { method: 'POST', fetchImpl, fallbackMessage: 'CMS plugin schedule resume failed' })

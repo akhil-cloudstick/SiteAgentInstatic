@@ -9,8 +9,8 @@ const FILE_EXTENSION_RE = /\.[a-zA-Z0-9]+$/
 
 function isEditorAppPath(pathname: string): boolean {
   return (
-    pathname === '/admin' ||
-    pathname.startsWith('/admin/') ||
+    pathname === '/cms' ||
+    pathname.startsWith('/cms/') ||
     pathname === '/index.html' ||
     pathname.startsWith('/@') ||
     pathname.startsWith('/__vite') ||
@@ -231,14 +231,14 @@ export default defineConfig({
       ignored: ['**/.tmp/**', '**/uploads/**', '**/dist/**'],
     },
     proxy: {
-      // The whole `/admin/api/` prefix (CMS + agent) is forwarded to the
-      // Bun backend. Agent endpoints live under `/admin/api/agent` (and
-      // `/admin/api/agent/tool-result`) so the admin session cookie —
-      // scoped to `Path=/admin` to keep it off the public site — actually
+      // The whole `/cms/api/` prefix (CMS + agent) is forwarded to the
+      // Bun backend. Agent endpoints live under `/cms/api/agent` (and
+      // `/cms/api/agent/tool-result`) so the admin session cookie —
+      // scoped to `Path=/cms` to keep it off the public site — actually
       // accompanies the request. The `ws: false` default suffices; we do
       // not need WebSocket upgrades for the agent (NDJSON streams over a
       // standard HTTP response).
-      '/admin/api': {
+      '/cms/api': {
         target: CMS_DEV_SERVER_ORIGIN,
         changeOrigin: true,
       },

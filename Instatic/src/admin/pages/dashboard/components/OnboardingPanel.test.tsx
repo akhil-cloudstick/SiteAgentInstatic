@@ -60,7 +60,7 @@ describe('OnboardingPanel framework import', () => {
 
     try {
       render(
-        <MemoryRouter initialEntries={['/admin/dashboard']}>
+        <MemoryRouter initialEntries={['/cms/dashboard']}>
           <OnboardingPanel
             facts={FACTS}
             onDismiss={() => {}}

@@ -3,13 +3,42 @@
  * `.advanced-toggle`, `.advanced-shortcuts` and `.advanced-tools`
  * (screens/site/src/styles.css).
  */
-.block {
+/* ── Docked switcher ─────────────────────────────────────────────────────
+ * The dock holds the switcher's collapsed footprint in the column layout. The
+ * block inside it floats out of flow while open, so expanding the tool grid
+ * moves NOTHING else — the outline, and Review's Viewport context, stay where
+ * the author left them. Because the block is bottom-anchored it grows upward,
+ * carrying its own "Advanced options" header with it: the header stays above
+ * its tiles, exactly as when collapsed.
+ *
+ * The min-height is the collapsed block: the 48px toggle + the 48px shortcut
+ * strip + its 1px divider and the block's own borders.
+ */
+.dock {
+    position: relative;
+    min-height: 99px;
     margin-top: auto;
+}
+
+.block {
     border: 1px solid var(--mms-border);
     border-radius: var(--site-radius);
     background: var(--mms-surface);
 }
 
+.blockOpen {
+    position: absolute;
+    z-index: 3;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    box-shadow: var(--mms-shadow-frame);
+}
+
+/* Top corners only: the toggle is the block's first row, so its hover surface
+   follows the block's rounded top and meets the shortcut strip below it square.
+   Rounding all four left a floating lozenge with a sliver of block showing
+   under it. */
 .toggle {
     display: flex;
     width: 100%;
@@ -18,7 +47,7 @@
     justify-content: space-between;
     padding: 0 12px;
     border: 0;
-    border-radius: var(--site-radius);
+    border-radius: var(--site-radius) var(--site-radius) 0 0;
     background: transparent;
     font-weight: 650;
     text-align: left;
@@ -101,12 +130,17 @@
     white-space: nowrap;
 }
 
-/* Expanded: the full tool grid. */
+/* Expanded: the full tool grid. However many tools the caller's permissions
+   and plugins expose, it scrolls rather than growing past the top of the
+   column. */
 .grid {
     display: grid;
+    max-height: 46vh;
     padding: 12px;
+    overflow-y: auto;
     gap: 8px;
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    scrollbar-width: thin;
 }
 
 .tool {

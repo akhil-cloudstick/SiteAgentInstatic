@@ -16,7 +16,7 @@ async function listRoles(
   harness: CapabilityTestHarness,
   cookie: string,
 ): Promise<RoleListItem[]> {
-  const res = await harness.cms('/admin/api/cms/roles', { cookie })
+  const res = await harness.cms('/cms/api/cms/roles', { cookie })
   expect(res.status).toBe(200)
   const body = await readJson<{ roles: RoleListItem[] }>(res)
   return body.roles
@@ -32,7 +32,7 @@ describe('role management edge semantics', () => {
     const harness = await createCapabilityTestHarness()
     const ownerCookie = await harness.setupOwner()
 
-    const first = await harness.cms('/admin/api/cms/roles', {
+    const first = await harness.cms('/cms/api/cms/roles', {
       method: 'POST',
       cookie: ownerCookie,
       json: {
@@ -43,7 +43,7 @@ describe('role management edge semantics', () => {
     })
     expect(first.status).toBe(201)
 
-    const duplicate = await harness.cms('/admin/api/cms/roles', {
+    const duplicate = await harness.cms('/cms/api/cms/roles', {
       method: 'POST',
       cookie: ownerCookie,
       json: {
@@ -75,7 +75,7 @@ describe('role management edge semantics', () => {
       capabilities: ['media.read'],
     })
 
-    const duplicateUpdate = await harness.cms(`/admin/api/cms/roles/${secondRoleId}`, {
+    const duplicateUpdate = await harness.cms(`/cms/api/cms/roles/${secondRoleId}`, {
       method: 'PATCH',
       cookie: ownerCookie,
       json: {
@@ -98,7 +98,7 @@ describe('role management edge semantics', () => {
     const harness = await createCapabilityTestHarness()
     const ownerCookie = await harness.setupOwner()
 
-    const empty = await harness.cms('/admin/api/cms/roles', {
+    const empty = await harness.cms('/cms/api/cms/roles', {
       method: 'POST',
       cookie: ownerCookie,
       json: {
@@ -111,7 +111,7 @@ describe('role management edge semantics', () => {
     const emptyPayload = await readJson<{ role: RoleListItem }>(empty)
     expect(emptyPayload.role.capabilities).toEqual([])
 
-    const normalized = await harness.cms('/admin/api/cms/roles', {
+    const normalized = await harness.cms('/cms/api/cms/roles', {
       method: 'POST',
       cookie: ownerCookie,
       json: {
@@ -129,7 +129,7 @@ describe('role management edge semantics', () => {
     const harness = await createCapabilityTestHarness()
     const ownerCookie = await harness.setupOwner()
 
-    const systemDelete = await harness.cms('/admin/api/cms/roles/admin', {
+    const systemDelete = await harness.cms('/cms/api/cms/roles/admin', {
       method: 'DELETE',
       cookie: ownerCookie,
     })
@@ -150,7 +150,7 @@ describe('role management edge semantics', () => {
       roleId: assignedRoleId,
     })
 
-    const assignedDelete = await harness.cms(`/admin/api/cms/roles/${assignedRoleId}`, {
+    const assignedDelete = await harness.cms(`/cms/api/cms/roles/${assignedRoleId}`, {
       method: 'DELETE',
       cookie: ownerCookie,
     })

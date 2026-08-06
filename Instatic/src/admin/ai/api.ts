@@ -176,7 +176,7 @@ const ConversationDetailResponseSchema = Type.Object({
 // ---------------------------------------------------------------------------
 
 export async function listCredentials(signal?: AbortSignal): Promise<CredentialView[]> {
-  const body = await apiRequest('/admin/api/ai/credentials', { schema: CredentialListResponseSchema, signal })
+  const body = await apiRequest('/cms/api/ai/credentials', { schema: CredentialListResponseSchema, signal })
   return body.credentials
 }
 
@@ -196,7 +196,7 @@ export type CreateCredentialBody =
     }
 
 export async function createCredential(body: CreateCredentialBody): Promise<CredentialView> {
-  const parsed = await apiRequest('/admin/api/ai/credentials', {
+  const parsed = await apiRequest('/cms/api/ai/credentials', {
     method: 'POST',
     body,
     schema: CredentialItemResponseSchema,
@@ -205,7 +205,7 @@ export async function createCredential(body: CreateCredentialBody): Promise<Cred
 }
 
 export async function deleteCredential(id: string): Promise<void> {
-  await apiRequest(`/admin/api/ai/credentials/${encodeURIComponent(id)}`, { method: 'DELETE' })
+  await apiRequest(`/cms/api/ai/credentials/${encodeURIComponent(id)}`, { method: 'DELETE' })
   clearModelListCache(id)
 }
 
@@ -220,7 +220,7 @@ export async function testCredential(id: string): Promise<TestResult> {
   // `{ ok: false, error }`) so callers can render the error inline. A 404
   // means the credential row is gone — surface a friendly message.
   try {
-    return await apiRequest(`/admin/api/ai/credentials/${encodeURIComponent(id)}/test`, {
+    return await apiRequest(`/cms/api/ai/credentials/${encodeURIComponent(id)}/test`, {
       method: 'POST',
       schema: TestResponseSchema,
     })
@@ -265,7 +265,7 @@ export async function listModels(
 
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), MODEL_LIST_TIMEOUT_MS)
-  const request = apiRequest(`/admin/api/ai/providers/${providerId}/models`, {
+  const request = apiRequest(`/cms/api/ai/providers/${providerId}/models`, {
     query: { credentialId },
     schema: ModelListResponseSchema,
     signal: controller.signal,
@@ -290,7 +290,7 @@ export async function listModels(
 // ---------------------------------------------------------------------------
 
 export async function listDefaults(): Promise<AiDefaults> {
-  const body = await apiRequest('/admin/api/ai/defaults', { schema: DefaultsResponseSchema })
+  const body = await apiRequest('/cms/api/ai/defaults', { schema: DefaultsResponseSchema })
   return body.defaults
 }
 
@@ -298,11 +298,11 @@ export async function setDefault(
   scope: 'site' | 'content' | 'data' | 'plugin',
   body: { credentialId: string; modelId: string },
 ): Promise<void> {
-  await apiRequest(`/admin/api/ai/defaults/${scope}`, { method: 'PUT', body })
+  await apiRequest(`/cms/api/ai/defaults/${scope}`, { method: 'PUT', body })
 }
 
 export async function clearDefault(scope: 'site' | 'content' | 'data' | 'plugin'): Promise<void> {
-  await apiRequest(`/admin/api/ai/defaults/${scope}`, { method: 'DELETE' })
+  await apiRequest(`/cms/api/ai/defaults/${scope}`, { method: 'DELETE' })
 }
 
 // ---------------------------------------------------------------------------
@@ -310,7 +310,7 @@ export async function clearDefault(scope: 'site' | 'content' | 'data' | 'plugin'
 // ---------------------------------------------------------------------------
 
 export async function listConversations(scope: 'site' | 'content' | 'data' | 'plugin'): Promise<ConversationView[]> {
-  const body = await apiRequest('/admin/api/ai/conversations', {
+  const body = await apiRequest('/cms/api/ai/conversations', {
     query: { scope },
     schema: ConversationListResponseSchema,
   })
@@ -321,7 +321,7 @@ export async function getConversation(
   id: string,
   signal?: AbortSignal,
 ): Promise<ConversationDetail> {
-  const body = await apiRequest(`/admin/api/ai/conversations/${encodeURIComponent(id)}`, {
+  const body = await apiRequest(`/cms/api/ai/conversations/${encodeURIComponent(id)}`, {
     schema: ConversationDetailResponseSchema,
     signal,
   })
@@ -329,7 +329,7 @@ export async function getConversation(
 }
 
 export async function deleteConversation(id: string): Promise<void> {
-  await apiRequest(`/admin/api/ai/conversations/${encodeURIComponent(id)}`, { method: 'DELETE' })
+  await apiRequest(`/cms/api/ai/conversations/${encodeURIComponent(id)}`, { method: 'DELETE' })
 }
 
 export async function updateConversationProvider(
@@ -338,7 +338,7 @@ export async function updateConversationProvider(
   modelId: string,
   signal?: AbortSignal,
 ): Promise<ConversationView> {
-  const body = await apiRequest(`/admin/api/ai/conversations/${encodeURIComponent(id)}`, {
+  const body = await apiRequest(`/cms/api/ai/conversations/${encodeURIComponent(id)}`, {
     method: 'PUT',
     body: { credentialId, modelId },
     schema: ConversationItemResponseSchema,
@@ -418,7 +418,7 @@ export async function listAiAudit(
   since?: string,
   timeZone?: string,
 ): Promise<AiAuditResponse> {
-  return apiRequest('/admin/api/ai/audit', {
+  return apiRequest('/cms/api/ai/audit', {
     query: { since, tz: timeZone },
     schema: AuditResponseSchema,
   })
@@ -430,9 +430,9 @@ export async function listAiAudit(
 // `createMcpAccessToken` and is never persisted client-side.
 // ---------------------------------------------------------------------------
 
-const MCP_CONNECTIONS_BASE = '/admin/api/ai/mcp/connections'
-const MCP_ACCESS_TOKENS_PATH = '/admin/api/ai/mcp/access-tokens'
-const MCP_OAUTH_AUTHORIZATION_PATH = '/admin/api/ai/mcp/oauth/authorization'
+const MCP_CONNECTIONS_BASE = '/cms/api/ai/mcp/connections'
+const MCP_ACCESS_TOKENS_PATH = '/cms/api/ai/mcp/access-tokens'
+const MCP_OAUTH_AUTHORIZATION_PATH = '/cms/api/ai/mcp/oauth/authorization'
 
 export async function getMcpConnectionOverview(signal?: AbortSignal): Promise<McpConnectionOverview> {
   return apiRequest(MCP_CONNECTIONS_BASE, { schema: McpConnectionOverviewSchema, signal })

@@ -3,7 +3,7 @@
  *
  * When the SiteAgent control-plane runs this instance for a tenant it sets
  * INSTATIC_SSO_SECRET (a shared HMAC secret) and INSTATIC_TENANT_SLUG. The hub
- * redirects the tenant to `/admin/api/cms/sso?token=<signed>`; this module
+ * redirects the tenant to `/cms/api/cms/sso?token=<signed>`; this module
  * verifies that token. The format mirrors the control-plane's signValue():
  *   base64url(JSON incl. `exp` in ms) + "." + base64url(HMAC-SHA256(base64url part)).
  * When the secret is unset (a plain self-hosted install) verification always

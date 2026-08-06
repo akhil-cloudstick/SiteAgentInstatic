@@ -57,7 +57,7 @@ describe('server router', () => {
       { db: makeFakeDb({ site: 0, owners: 0 }) },
     )
     expect(res.status).toBe(302)
-    expect(res.headers.get('location')).toBe('/admin')
+    expect(res.headers.get('location')).toBe('/cms')
   })
 
   it('returns 404 for unknown routes once setup is complete', async () => {

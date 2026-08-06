@@ -17,7 +17,7 @@ import { clientIp } from '../../auth/security'
 import { UserMutationError } from '../../repositories/users'
 import { RoleMutationError } from '../../repositories/roles'
 
-export const CMS_API_PREFIX = '/admin/api/cms'
+export const CMS_API_PREFIX = '/cms/api/cms'
 
 export const UserStatusSchema = Type.Union([Type.Literal('active'), Type.Literal('suspended')])
 

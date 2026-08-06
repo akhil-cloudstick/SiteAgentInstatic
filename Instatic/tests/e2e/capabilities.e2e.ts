@@ -13,7 +13,7 @@ import {
   saveDraft,
   setPropValue,
   canvasFrame,
-  insertNotchModule,
+  insertModule,
 } from './helpers'
 
 const PNG_1X1 = Buffer.from(
@@ -97,7 +97,9 @@ test.describe.serial('capability boundaries', () => {
       await openNamedPage(personaPage, pageName)
       await canvasFrame(personaPage).getByText(seededText, { exact: true }).click()
       await setPropValue(personaPage, 'text', contentText)
-      await expectAbsentOrDisabled(personaPage.getByTestId('canvas-notch-text-btn'))
+      // Structure is read-only for this role, so the Layers panel's insert
+      // trigger — the canvas's module-insertion entry point — is unavailable.
+      await expectAbsentOrDisabled(personaPage.getByTestId('dom-tree-insert-module'))
       await expect(
         personaPage.getByText('Styles are read-only for your role'),
       ).toBeVisible()
@@ -155,7 +157,7 @@ test.describe.serial('capability boundaries', () => {
       await openLayersPanel(personaPage)
       const tree = personaPage.getByRole('tree', { name: 'Page element tree' })
       await expect(tree.getByRole('treeitem', { name: 'Text' })).toHaveCount(2)
-      await insertNotchModule(personaPage, 'text')
+      await insertModule(personaPage, 'text')
       await expect(tree.getByRole('treeitem', { name: 'Text' })).toHaveCount(3)
 
       await saveDraft(personaPage)
@@ -210,7 +212,7 @@ test.describe.serial('media capability boundaries', () => {
     const ownerPage = await context.newPage()
     try {
       await login(ownerPage)
-      await ownerPage.goto('/admin/media')
+      await ownerPage.goto('/cms/media')
       await uploadMediaFile(ownerPage, seededFilename)
       await uploadMediaFile(ownerPage, replaceOriginalFilename)
       await uploadMediaFile(ownerPage, deleteFilename)
@@ -1060,9 +1062,9 @@ async function seedCapabilityPage(
   await openSiteEditor(page)
   const pageName = `Capability boundaries ${suffix}`
   await createPage(page, pageName, `capability-boundaries-${suffix}`)
-  await insertNotchModule(page, 'text')
+  await insertModule(page, 'text')
   await setPropValue(page, 'text', seededText)
-  await insertNotchModule(page, 'text')
+  await insertModule(page, 'text')
   await setPropValue(page, 'text', secondText)
   await saveDraft(page)
   return pageName
@@ -1073,7 +1075,7 @@ async function createRole(
   name: string,
   capabilityLabels: readonly string[],
 ): Promise<void> {
-  await page.goto('/admin/users')
+  await page.goto('/cms/users')
   await page.getByRole('button', { name: 'Roles', exact: true }).click()
   await page.getByRole('button', { name: 'Create Role', exact: true }).click()
 
@@ -1092,7 +1094,7 @@ async function createUser(
   page: Page,
   user: { email: string; displayName: string; password: string; role: string },
 ): Promise<void> {
-  await page.goto('/admin/users')
+  await page.goto('/cms/users')
   await page.getByRole('button', { name: 'Create User', exact: true }).click()
   await page.locator('input[name="new-user-email-address"]').fill(user.email)
   await page.locator('input[name="new-user-display-name"]').fill(user.displayName)
@@ -1128,7 +1130,7 @@ async function openNamedPage(page: Page, name: string): Promise<void> {
 
 async function openReadableSiteEditor(page: Page): Promise<void> {
   if (!(await page.getByTestId('canvas-root').isVisible({ timeout: 1_000 }).catch(() => false))) {
-    await page.goto('/admin/site')
+    await page.goto('/cms/site')
   }
   await expect(page.getByTestId('canvas-root')).toBeVisible({ timeout: 20_000 })
 }
@@ -1139,7 +1141,7 @@ async function expectAbsentOrDisabled(locator: ReturnType<Page['getByTestId']>):
 }
 
 async function openContentWorkspace(page: Page): Promise<void> {
-  await page.goto('/admin/content')
+  await page.goto('/cms/content')
   await expect(page.getByTestId('content-explorer-panel')).toBeVisible({
     timeout: 20_000,
   })
@@ -1196,22 +1198,22 @@ function contentEntryRow(page: Page, title: string) {
 }
 
 async function openMediaWorkspace(page: Page): Promise<void> {
-  await page.goto('/admin/media')
+  await page.goto('/cms/media')
   await expect(page.getByTestId('media-canvas')).toBeVisible({ timeout: 20_000 })
 }
 
 async function openDataWorkspace(page: Page): Promise<void> {
-  await page.goto('/admin/data')
+  await page.goto('/cms/data')
   await expect(page.getByTestId('data-left-sidebar')).toBeVisible({ timeout: 20_000 })
 }
 
 async function openPluginsWorkspace(page: Page): Promise<void> {
-  await page.goto('/admin/plugins')
+  await page.goto('/cms/plugins')
   await expect(page.getByTestId('plugins-admin-canvas')).toBeVisible({ timeout: 20_000 })
 }
 
 async function openAiWorkspace(page: Page): Promise<void> {
-  await page.goto('/admin/ai')
+  await page.goto('/cms/ai')
   await expect(page.getByRole('heading', { name: 'AI', exact: true })).toBeVisible({
     timeout: 20_000,
   })
@@ -1237,7 +1239,7 @@ async function createCustomDataTable(page: Page, tableName: string): Promise<voi
 
 async function exportCmsBundle(page: Page): Promise<Buffer> {
   const bytes = await page.evaluate(async () => {
-    const response = await fetch('/admin/api/cms/export', {
+    const response = await fetch('/cms/api/cms/export', {
       method: 'POST',
       credentials: 'include',
       headers: { 'content-type': 'application/json' },
@@ -1299,7 +1301,7 @@ async function dataTableExists(page: Page, tableName: string): Promise<boolean> 
       return typeof value === 'object' && value !== null
     }
 
-    const response = await fetch('/admin/api/cms/data/tables', { credentials: 'include' })
+    const response = await fetch('/cms/api/cms/data/tables', { credentials: 'include' })
     if (!response.ok) {
       throw new Error(`Table list failed with HTTP ${response.status}: ${await response.text()}`)
     }
@@ -1330,7 +1332,7 @@ async function uploadMediaFile(page: Page, filename: string): Promise<void> {
 async function waitForMediaReplace(page: Page): Promise<void> {
   await page.waitForResponse((response) =>
     response.request().method() === 'POST' &&
-    response.url().includes('/admin/api/cms/media/') &&
+    response.url().includes('/cms/api/cms/media/') &&
     response.url().endsWith('/replace') &&
     response.ok(),
   )
@@ -1339,7 +1341,7 @@ async function waitForMediaReplace(page: Page): Promise<void> {
 async function waitForMediaDelete(page: Page): Promise<void> {
   await page.waitForResponse((response) =>
     response.request().method() === 'DELETE' &&
-    response.url().includes('/admin/api/cms/media/') &&
+    response.url().includes('/cms/api/cms/media/') &&
     response.ok(),
   )
 }

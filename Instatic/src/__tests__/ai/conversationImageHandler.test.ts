@@ -51,7 +51,7 @@ describe('conversation image delivery', () => {
     })
 
     const detailResponse = await harness.ai(
-      `/admin/api/ai/conversations/${conversation.id}`,
+      `/cms/api/ai/conversations/${conversation.id}`,
       { cookie: ownerCookie },
     )
     expect(detailResponse.status).toBe(200)
@@ -64,7 +64,7 @@ describe('conversation image delivery', () => {
     expect(image).toEqual({
       kind: 'image',
       mimeType: 'image/jpeg',
-      url: `/admin/api/ai/conversations/${conversation.id}/messages/${message.id}/images/1`,
+      url: `/cms/api/ai/conversations/${conversation.id}/messages/${message.id}/images/1`,
     })
 
     const response = await harness.ai(String(image.url), { cookie: ownerCookie })
@@ -75,7 +75,7 @@ describe('conversation image delivery', () => {
     expect(Buffer.from(await response.arrayBuffer())).toEqual(bytes)
 
     const textBlock = await harness.ai(
-      `/admin/api/ai/conversations/${conversation.id}/messages/${message.id}/images/0`,
+      `/cms/api/ai/conversations/${conversation.id}/messages/${message.id}/images/0`,
       { cookie: ownerCookie },
     )
     expect(textBlock.status).toBe(404)

@@ -91,9 +91,20 @@ prompt conflicts with the contract below, the contract wins.
    real image file under the site before it publishes, so never worry that a file
    "doesn't exist yet". No avif/ico. Never hardcode an asset path inside \`<script>\`
    text (it 404s — read it from the DOM).
-6. **Wrap every text run.** If any part of a heading/sentence is wrapped in an
-   inline element (span/strong/em/link), wrap EVERY part in its own element so
-   each is editable — never leave bare text beside a wrapped word.
+6. **Every piece of text must be individually editable — wrap it, name it, style
+   it by its own class.** (a) NEVER leave bare text: text written directly inside
+   a container (\`<div>\`, \`<li>\`, \`<td>\`, \`<blockquote>\`, \`<b>\`, …) — or a loose
+   run beside a child element inside a heading — has **no element of its own**, so
+   the tenant cannot click it, highlight it, or restyle it at all.
+   ❌ \`<div class="stat"><strong>84</strong> Trips per year</div>\`
+   ✅ \`<div class="stat"><span class="stat-value">84</span><span class="stat-label">Trips per year</span></div>\`
+   (b) Give every text element its **own single meaningful class**, PLUS a
+   **unique class listed first** so the tenant can restyle that one element
+   without changing its siblings — \`class="stat-label-4 stat-label"\` — and
+   declare the unique class even if empty (\`.stat-label-4 {}\`). (c) Style it
+   **through that class** — \`.stat-label { … }\`, never a descendant selector like
+   \`.stat strong { … }\`, which edits every match at once instead of the one
+   element the tenant selected.
 7. **Every section is visible WITHOUT JavaScript.** The importer strips your
    \`<script>\`s from the editing canvas, so anything hidden until JS runs shows
    **blank** there. Never gate content on JS: no full-screen loading overlay that
@@ -153,8 +164,20 @@ you wrote and verify it against the rule above:
    hardcoded in \`<script>\` text.
 6. JS is behaviour only on existing markup; no \`on*=\` inline handlers; component
    scripts scoped to a wrapper class.
-7. No bare text beside an inline element. Shared nav/footer identical across
-   pages; nav active state set at runtime.
+6b. **Mark every repeated block \`data-shared="a-name"\`.** Any block that appears
+   on more than one page (or twice on one page) — CTA band, contact strip,
+   newsletter box, a repeated card — becomes ONE shared component in the CMS, so
+   the tenant edits it once instead of on every page. The copies must be
+   byte-identical (same markup, same classes, same order), and a shared block's
+   unique per-element classes must be the SAME on every page — name them from the
+   block (\`cta-band-title\`), never from a per-page counter. \`<header>\`/\`<nav>\`/
+   \`<footer>\` must likewise be byte-identical across pages; only \`is-active\` may
+   differ.
+7. No bare text anywhere — never text directly inside a \`<div>\`/\`<li>\`/\`<td>\`/
+   \`<b>\`, never a loose run beside a child element. Every text element has its
+   own single class, plus a UNIQUE class listed first (declared even if empty),
+   and is styled through those classes, not a descendant selector.
+   Shared nav/footer identical across pages; nav active state set at runtime.
 8. **Every section is visible with CSS alone** — no full-screen loading overlay
    that only JS removes, no \`opacity:0\`/\`visibility:hidden\` content that only a
    JS-added class reveals (it would be blank in the editing canvas).
@@ -235,13 +258,22 @@ const EMBEDDED_TEMPLATE_RULE = `### The #1 rule — all content is static HTML
 - Every page contains its **real content as static HTML**. Never ship an empty
   \`<div id="root">\` hydrated by a client bundle — it imports blank.
 
-### Editable text — wrap every text run
+### Editable text — wrap it, name it, style it by its own class
 
 - Elements become editable automatically by type (write real \`<h1>\`/\`<p>\`/\`<img>\`);
-  no marker attribute is needed. **Never leave bare text next to an inline element**
-  — if any part of a heading/sentence is wrapped (color/bold/link), wrap **every**
-  run in its own element (keep the spaces). If a whole line needs one accent color,
-  put it on the heading itself so it stays a single editable Text node.
+  no marker attribute is needed.
+- **Never leave bare text.** Text sitting directly inside a container (\`<div>\`,
+  \`<li>\`, \`<td>\`, \`<blockquote>\`, \`<b>\`, \`<i>\`, …) has no element of its own, so
+  it is un-selectable and un-styleable in the editor. The same applies to a loose
+  run beside a child element inside a heading — wrap **every** run in its own
+  element (keep the spaces). Safe parents are \`<h1>\`–\`<h6>\`/\`<p>\`/\`<span>\`/
+  \`<small>\`/\`<strong>\`/\`<em>\`/\`<label>\` **while they hold no child element**, plus
+  \`<a>\` and \`<button>\`. If a whole line needs one accent color, put it on the
+  heading itself so it stays a single editable Text node.
+- **Every text element carries its own single, meaningful class** and is styled
+  **through that class** — \`.stat-label { … }\`, never \`.stat-item strong { … }\`.
+  A descendant selector imports as an ambient rule: it renders, but editing it
+  changes every element it matches instead of the one the tenant selected.
 
 ### Pages & shared sections
 

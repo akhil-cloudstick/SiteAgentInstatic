@@ -56,10 +56,14 @@ export function start(tenant) {
     UPLOADS_DIR: p.uploads,
     STATIC_DIR: distDir(),
     INSTATIC_SECRET_KEY: tenant.secretKey,
-    // Tenant SSO: the hub redirects the tenant to /admin/sso?token=<signed>; the
+    // Tenant SSO: the hub redirects the tenant to /cms/sso?token=<signed>; the
     // instance verifies it with this shared secret and mints an Owner session.
     INSTATIC_SSO_SECRET: config.tokenSecret,
     INSTATIC_TENANT_SLUG: slug,
+    // ONE LOGIN: where to bounce an unauthenticated page load. The hub silently
+    // re-mints an SSO token when the hub session is alive, so an expired admin
+    // session never surfaces Instatic's own login form. See hub.mjs `/sso/<tool>`.
+    INSTATIC_HUB_SSO_URL: `${config.gatewayOrigin}/sso/cms`,
     PUBLIC_ORIGIN: `http://127.0.0.1:${port}`,
     // Public gateway: the browser reaches this tenant's Instatic through the
     // single funnel origin (funnel :443 -> control-plane -> session-routed proxy),
@@ -69,7 +73,7 @@ export function start(tenant) {
     // tenants from this mapped network drive makes Bun load server/auth/security.ts
     // twice — the request-time copy never sees the configured publicOrigins, but
     // the static DEV_ORIGIN_ALLOWLIST is identical in both copies. The SSO handler
-    // redirects to a RELATIVE /admin, so no localhost bounce. See security.ts.
+    // redirects to a RELATIVE /cms, so no localhost bounce. See security.ts.
     VITE_ALLOWED_ORIGIN: config.gatewayOrigin,
     // Managed AI: point the tenant's OpenRouter driver at this tenant's signed
     // AI-Gateway URL. This alone enables managed mode (gateway credential
@@ -135,7 +139,7 @@ export function stop(slug) {
 // Poll until the instance answers HTTP (any status = the port is bound + serving).
 export async function waitHealthy(port, timeoutMs = 45000) {
   const deadline = Date.now() + timeoutMs;
-  const url = `http://127.0.0.1:${port}/admin`;
+  const url = `http://127.0.0.1:${port}/cms`;
   while (Date.now() < deadline) {
     try {
       const r = await fetch(url, { redirect: 'manual' });

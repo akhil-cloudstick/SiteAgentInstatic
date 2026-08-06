@@ -273,7 +273,8 @@
  * alpha-bordered transparent field the rest of the admin uses. Scoped to the
  * Site screen so no other workspace shifts.
  */
-:global([data-editor-screen='site']) .input {
+:global([data-editor-screen='site']) .input,
+:global([data-editor-screen='site']) .inputWrapper {
     min-height: 44px;
     padding: 10px;
     border: 1px solid var(--mms-border-strong);
@@ -285,8 +286,33 @@
     font-weight: 430;
 }
 
+/* An affixed field (a `unit`, a `prefix`, the number spinner) puts the chrome on
+   the WRAPPER — `.inputWithAffix` strips it from the inner input. The block
+   above out-specifies that reset, so without this the Site screen drew a second
+   44px bordered box inside the first. */
+:global([data-editor-screen='site']) .inputWithAffix {
+    min-height: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+}
+
 :global([data-editor-screen='site']) .input:focus,
-:global([data-editor-screen='site']) .input:focus-within {
+:global([data-editor-screen='site']) .input:focus-within,
+:global([data-editor-screen='site']) .inputWrapper:focus-within {
     background: var(--mms-surface-raised);
     border-color: var(--mms-action);
+}
+
+:global([data-editor-screen='site']) .inputWithAffix:focus {
+    background: transparent;
+}
+
+/* `.field textarea` in the approved Site screen is 76px tall — the shared 44px
+   input block above already gives it the right chassis, so only the height and
+   the reference's vertical-only resize are restated. */
+:global([data-editor-screen='site']) .textarea {
+    min-height: 76px;
+    resize: vertical;
 }

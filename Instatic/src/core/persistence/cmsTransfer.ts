@@ -83,7 +83,7 @@ export function submitSiteBundleExport(opts: ExportRequest): void {
 
   const form = document.createElement('form')
   form.method = 'POST'
-  form.action = '/admin/api/cms/export'
+  form.action = '/cms/api/cms/export'
   form.target = targetName
   form.enctype = 'application/x-www-form-urlencoded'
   form.hidden = true
@@ -125,7 +125,7 @@ export async function estimateSiteBundle(
   opts: ExportRequest,
   signal?: AbortSignal,
 ): Promise<ExportEstimate> {
-  return apiRequest('/admin/api/cms/export/estimate', {
+  return apiRequest('/cms/api/cms/export/estimate', {
     method: 'POST',
     body: opts,
     schema: ExportEstimateSchema,
@@ -147,7 +147,7 @@ export async function estimateSiteBundle(
  * the workspace, not this endpoint.
  */
 export async function getExportSummary(signal?: AbortSignal): Promise<ExportSummary> {
-  return apiRequest('/admin/api/cms/export/summary', {
+  return apiRequest('/cms/api/cms/export/summary', {
     method: 'GET',
     schema: ExportSummarySchema,
     signal,
@@ -167,7 +167,7 @@ export async function getExportSummary(signal?: AbortSignal): Promise<ExportSumm
  * happen before they commit an import.
  */
 export async function previewSiteBundle(bundle: SiteBundle): Promise<BundlePreview> {
-  const res = await fetch('/admin/api/cms/import/preview', {
+  const res = await fetch('/cms/api/cms/import/preview', {
     method: 'POST',
     credentials: 'include',
     headers: { 'content-type': 'application/json' },
@@ -192,7 +192,7 @@ export async function importSiteBundle(
   bundle: SiteBundle,
   strategy: ImportStrategy,
 ): Promise<ImportResult> {
-  const res = await fetch(`/admin/api/cms/import?strategy=${encodeURIComponent(strategy)}`, {
+  const res = await fetch(`/cms/api/cms/import?strategy=${encodeURIComponent(strategy)}`, {
     method: 'POST',
     credentials: 'include',
     headers: { 'content-type': 'application/json' },
@@ -209,7 +209,7 @@ export async function importSiteBundleArchive(
   const params = new URLSearchParams({ strategy })
   if (selection) params.set('selection', JSON.stringify(selection))
 
-  const res = await fetch(`/admin/api/cms/import/archive?${params.toString()}`, {
+  const res = await fetch(`/cms/api/cms/import/archive?${params.toString()}`, {
     method: 'POST',
     credentials: 'include',
     headers: { 'content-type': 'application/zip' },

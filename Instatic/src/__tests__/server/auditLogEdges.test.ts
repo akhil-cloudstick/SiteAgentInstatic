@@ -38,7 +38,7 @@ async function userIdForEmail(harness: CapabilityTestHarness, email: string): Pr
 async function listAuditPayload(
   harness: CapabilityTestHarness,
   cookie: string,
-  path = '/admin/api/cms/audit',
+  path = '/cms/api/cms/audit',
 ): Promise<AuditEventPayload[]> {
   const res = await harness.cms(path, { cookie })
   expect(res.status).toBe(200)
@@ -72,9 +72,9 @@ describe('audit log edge semantics', () => {
         userAgent: 'Audit test',
       })
 
-      await expectForbidden(await harness.cms('/admin/api/cms/audit', { cookie: siteReader.cookie }))
+      await expectForbidden(await harness.cms('/cms/api/cms/audit', { cookie: siteReader.cookie }))
 
-      const wrongMethod = await harness.cms('/admin/api/cms/audit', {
+      const wrongMethod = await harness.cms('/cms/api/cms/audit', {
         method: 'POST',
         cookie: reader.cookie,
         json: {},
@@ -84,7 +84,7 @@ describe('audit log edge semantics', () => {
       const queriedEvents = await listAuditPayload(
         harness,
         reader.cookie,
-        '/admin/api/cms/audit?limit=0&cursor=ignored',
+        '/cms/api/cms/audit?limit=0&cursor=ignored',
       )
       expect(queriedEvents).toHaveLength(1)
       expect(queriedEvents[0]).toMatchObject({
@@ -166,13 +166,13 @@ describe('audit log edge semantics', () => {
         capabilities: ['site.read'],
       })
 
-      const userDelete = await harness.cms(`/admin/api/cms/users/${deletedUserId}`, {
+      const userDelete = await harness.cms(`/cms/api/cms/users/${deletedUserId}`, {
         method: 'DELETE',
         cookie: steppedManagerCookie,
       })
       expect(userDelete.status).toBe(200)
 
-      const roleDelete = await harness.cms(`/admin/api/cms/roles/${deletedRoleId}`, {
+      const roleDelete = await harness.cms(`/cms/api/cms/roles/${deletedRoleId}`, {
         method: 'DELETE',
         cookie: steppedManagerCookie,
       })

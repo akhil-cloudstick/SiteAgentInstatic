@@ -282,9 +282,9 @@ export function writeStoredPanelSize(panelId: FloatingPanelId, size: PanelSize) 
  * eager bundle.
  */
 export function workspaceFromPathname(pathname: string): EditorWorkspaceId | null {
-  if (pathname.startsWith('/admin/site')) return 'site'
-  if (pathname.startsWith('/admin/content')) return 'content'
-  if (pathname.startsWith('/admin/data')) return 'data'
-  if (pathname.startsWith('/admin/media')) return 'media'
+  if (pathname.startsWith('/cms/site')) return 'site'
+  if (pathname.startsWith('/cms/content')) return 'content'
+  if (pathname.startsWith('/cms/data')) return 'data'
+  if (pathname.startsWith('/cms/media')) return 'media'
   return null
 }

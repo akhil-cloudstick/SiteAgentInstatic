@@ -62,7 +62,7 @@ beforeEach(() => {
   __resetModuleInserterPreferenceForTests()
   globalThis.fetch = (async (input: RequestInfo | URL) => {
     const url = typeof input === 'string' ? input : input.toString()
-    if (url.includes('/admin/api/cms/me/preferences/module-inserter')) {
+    if (url.includes('/cms/api/cms/me/preferences/module-inserter')) {
       return new Response(JSON.stringify({ value: DEFAULT_MODULE_INSERTER_PREFERENCE }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
@@ -320,14 +320,14 @@ describe('agent breakpoint snapshot capture', () => {
     const rowsGate = deferred()
     globalThis.fetch = (async (input: RequestInfo | URL) => {
       const url = String(input)
-      if (url.includes('/admin/api/cms/me/preferences/module-inserter')) {
+      if (url.includes('/cms/api/cms/me/preferences/module-inserter')) {
         return jsonResponse({ value: DEFAULT_MODULE_INSERTER_PREFERENCE })
       }
-      if (url === '/admin/api/cms/data/tables/posts') {
+      if (url === '/cms/api/cms/data/tables/posts') {
         await tableGate.promise
         return jsonResponse({ table: POSTS_TABLE })
       }
-      if (url.startsWith('/admin/api/cms/data/tables/posts/loop-preview')) {
+      if (url.startsWith('/cms/api/cms/data/tables/posts/loop-preview')) {
         await rowsGate.promise
         return jsonResponse({
           items: [{ id: 'post-1', fields: { title: 'Delayed loop row' } }],
@@ -409,14 +409,14 @@ describe('agent breakpoint snapshot capture', () => {
     const rowsGate = deferred()
     globalThis.fetch = (async (input: RequestInfo | URL) => {
       const url = String(input)
-      if (url.includes('/admin/api/cms/me/preferences/module-inserter')) {
+      if (url.includes('/cms/api/cms/me/preferences/module-inserter')) {
         return jsonResponse({ value: DEFAULT_MODULE_INSERTER_PREFERENCE })
       }
-      if (url === '/admin/api/cms/data/tables') {
+      if (url === '/cms/api/cms/data/tables') {
         await tablesGate.promise
         return jsonResponse({ tables: [POSTS_TABLE] })
       }
-      if (url.startsWith('/admin/api/cms/data/tables/posts/loop-preview')) {
+      if (url.startsWith('/cms/api/cms/data/tables/posts/loop-preview')) {
         await rowsGate.promise
         return jsonResponse({
           items: [{ id: 'post-1', fields: { title: 'Delayed template row' } }],

@@ -1,7 +1,7 @@
 /**
  * Sliding-window rate limiter — in-memory, per-process.
  *
- * Used to throttle login attempts on `/admin/api/cms/login`. The bucket key is a
+ * Used to throttle login attempts on `/cms/api/cms/login`. The bucket key is a
  * `(client-ip, email)` tuple so a single attacker IP can be slowed down even
  * across many target accounts, AND a single account can be defended against
  * across many attacker IPs.

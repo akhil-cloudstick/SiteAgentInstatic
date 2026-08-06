@@ -35,6 +35,12 @@ export const ContainerModule: ModuleDefinition<ContainerStoredProps> = {
   trusted: true,
   canHaveChildren: true,
 
+  // Deliberately NO `defaultChildren`. A Container's whole job is to hold
+  // whatever the author puts in it, and `ContainerEditor` already renders a
+  // first-class empty state ("Empty container" + `data-canvas-empty-container`,
+  // which the canvas treats as a pickable drop affordance). Seeding a child
+  // would replace that drop target with something to delete first.
+
   schema: {
     tag: htmlTagControl(),
     customTag: customHtmlTagControl(),

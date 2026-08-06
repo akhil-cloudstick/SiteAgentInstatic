@@ -8,7 +8,7 @@
  * runtime-preview server) can stay tree-agnostic.
  *
  * The synthesis lives here, in `@core`, rather than in the admin store
- * because the server's `/admin/api/cms/runtime/preview` endpoint also needs
+ * because the server's `/cms/api/cms/runtime/preview` endpoint also needs
  * to materialize a virtual page when the client previews a VC. Both ends
  * use the same prefix and the same flatten function so the round-trip
  * through `pageId` stays unambiguous.

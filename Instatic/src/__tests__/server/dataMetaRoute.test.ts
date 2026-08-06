@@ -132,7 +132,7 @@ describe('GET /admin/api/cms/data/_meta', () => {
     const db = createFakeDb(async (sql) => {
       throw new Error(`Unexpected DB query for unauthenticated request: ${sql}`)
     })
-    const res = await handleCmsRequest(makeRequest('/admin/api/cms/data/_meta'), db)
+    const res = await handleCmsRequest(makeRequest('/cms/api/cms/data/_meta'), db)
     expect(res.status).toBe(401)
   })
 
@@ -142,7 +142,7 @@ describe('GET /admin/api/cms/data/_meta', () => {
     const db = makeAuthDb(idHash)
     const cookie = `${SESSION_COOKIE_NAME}=${token}`
 
-    const res = await handleCmsRequest(makeRequest('/admin/api/cms/data/_meta', cookie), db)
+    const res = await handleCmsRequest(makeRequest('/cms/api/cms/data/_meta', cookie), db)
     expect(res.status).toBe(200)
 
     const body = await res.json() as { meta: { tables: Array<Record<string, unknown>> } }
@@ -167,7 +167,7 @@ describe('GET /admin/api/cms/data/_meta', () => {
     const db = makeAuthDb(idHash)
     const cookie = `${SESSION_COOKIE_NAME}=${token}`
 
-    const res = await handleCmsRequest(makeRequest('/admin/api/cms/data/_meta', cookie), db)
+    const res = await handleCmsRequest(makeRequest('/cms/api/cms/data/_meta', cookie), db)
     expect(res.status).toBe(200)
 
     const body = await res.json() as { meta: unknown }

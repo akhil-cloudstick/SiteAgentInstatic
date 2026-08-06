@@ -54,7 +54,7 @@ function installMediaFetchStub(
 ): () => void {
   const originalFetch = globalThis.fetch
   globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
-    if (String(input).endsWith('/admin/api/cms/media')) {
+    if (String(input).endsWith('/cms/api/cms/media')) {
       if (init?.method === 'POST') {
         if (!uploadAsset) throw new Error('Unexpected media upload')
         return new Response(JSON.stringify({ asset: uploadAsset }), { status: 200 })

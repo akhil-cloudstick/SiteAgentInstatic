@@ -3,7 +3,7 @@
  *
  *   POST /admin/api/cms/import/archive?strategy=<strategy>
  *
- * Accepts the user-facing ZIP archive emitted by `/admin/api/cms/export`.
+ * Accepts the user-facing ZIP archive emitted by `/cms/api/cms/export`.
  * The manifest is the first stored entry, so the handler can validate the
  * selected media stream before applying site data. Selected media bytes are
  * staged in temporary files first, then moved into uploads after the data

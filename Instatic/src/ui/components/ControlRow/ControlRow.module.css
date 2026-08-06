@@ -63,6 +63,7 @@
  */
 :global([data-editor-screen='site']) .controlWrapper {
     gap: 7px;
+    margin-bottom: 13px;
     grid-template-columns: 1fr;
 }
 

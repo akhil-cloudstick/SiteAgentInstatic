@@ -689,6 +689,12 @@
     --mms-shadow-frame: 0 4px 16px rgba(8, 39, 49, 0.08);
     /* NEW — the neutral gutter the canvas frames float on. */
     --mms-canvas-bg: #ecebea;
+    /* NEW — the inspector's "no overrides yet" note. The reference hardcodes
+       these three literals rather than reusing its warning ramp, so they are
+       transcribed as tokens here (module CSS may not carry hex). */
+    --mms-note-border: #efd8ac;
+    --mms-note-bg: #fff8e9;
+    --mms-note-text: #273e46;
 
     /* Geometry — Live Edit / Responsive Review defaults. Section Focus shrinks
        the shell, see the per-mode block below. `--site-*-track` are the
@@ -701,6 +707,21 @@
     --site-radius: 8px;
     --site-control-radius: 7px;
     --site-panel-pad: 20px;
+    /* Inset between the canvas surface and the frame card(s) it holds. One
+       value so Responsive Review's three-frame board and the single Live edit /
+       Focus section frame sit on the same margins — they read as one layout,
+       and a change here moves both. Fixed px (not a --space-* step) because it
+       is transcribed from the approved Site screen, like the rest of this
+       block, and the two modes must agree at every viewport width. */
+    --canvas-frame-inset: 9px 18px 18px;
+
+    /* The admin's generic control radius is a pill (`1em`), which the approved
+       Site screen never uses — so every Button/Select/SearchBar on this screen
+       drew a lozenge-shaped hover surface inside square-cornered chrome. Retune
+       the token for the whole screen rather than overriding `border-radius` per
+       component: it inherits, so component rules that DO want another radius
+       still win on specificity. */
+    --input-radius: var(--site-control-radius);
 
     /* Type. The approved screen sets Inter at a FIXED 13px base and sizes
        everything off it. The admin's generic ramp is fluid (`clamp()`) and
@@ -733,15 +754,14 @@
     --canvas-hover-ring-color: rgba(21, 150, 78, 0.45);
 }
 
-/* The left track is deliberately NOT per-mode. The reference narrows the
-   outline column in Focus and Review; here the mode only changes what that
-   column SHOWS (heading, actions, row density, viewport context), never how
-   wide it is — a column that resizes itself under the pointer as the mode
-   changes reads as a layout glitch, and the width is the author's to set via
-   the resize handle. The right track still follows the reference. */
+/* The shell chrome is deliberately NOT per-mode. The reference shrinks the
+   header and toolbar in Focus (54/56px against 61/69px) and narrows the outline
+   column in Focus and Review; here the mode changes only what those surfaces
+   SHOW — heading, actions, row density, viewport context — never their
+   geometry. Chrome that resizes itself as the mode changes makes the whole page
+   jump under the pointer, and the column width belongs to the author's resize
+   handle. The right track still follows the reference. */
 [data-editor-screen='site'][data-site-mode='focus'] {
-    --site-shell-height: 54px;
-    --site-toolbar-height: 56px;
     --site-right-track: 380px;
 }
 
@@ -769,6 +789,12 @@
     --mms-shadow-frame: 0 8px 24px rgba(0, 0, 0, 0.25);
     --mms-canvas-bg: #071c24;
     --mms-selected-inset: rgba(39, 186, 102, 0.16);
+
+    /* The reference re-themes only the note's face and ink; its border keeps
+       the shared dark hairline. */
+    --mms-note-border: rgba(248, 241, 223, 0.14);
+    --mms-note-bg: #3a321e;
+    --mms-note-text: #f8f1df;
 }
 
 /* The reference narrows every track between 1101–1399px rather than letting
@@ -789,17 +815,18 @@
     }
 }
 
+/* Narrow viewports stack the toolbar, so the chrome grows — for every mode
+   alike. The focus-mode selectors these rules used to repeat are gone with the
+   per-mode chrome they existed to override. */
 @media (max-width: 1100px) {
-    [data-editor-screen='site'],
-    [data-editor-screen='site'][data-site-mode='focus'] {
+    [data-editor-screen='site'] {
         --site-shell-height: 58px;
         --site-toolbar-height: 98px;
     }
 }
 
 @media (max-width: 620px) {
-    [data-editor-screen='site'],
-    [data-editor-screen='site'][data-site-mode='focus'] {
+    [data-editor-screen='site'] {
         --site-shell-height: 56px;
         --site-toolbar-height: 104px;
     }

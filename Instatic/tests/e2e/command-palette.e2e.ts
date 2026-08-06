@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { createPage, insertNotchModule, openSiteEditor } from './helpers'
+import { createPage, insertModule, openSiteEditor } from './helpers'
 
 /**
  * SPOT-001 through SPOT-013 — open and close the ⌘K command palette, navigate
@@ -17,7 +17,7 @@ test.describe('command palette', () => {
   test('opens with the shortcut and closes with Esc (SPOT-001)', async ({
     page,
   }) => {
-    await page.goto('/admin/dashboard')
+    await page.goto('/cms/dashboard')
 
     const palette = await openPalette(page)
     await expect(input(page)).toBeFocused()
@@ -31,7 +31,7 @@ test.describe('command palette', () => {
   })
 
   test('navigates to a workspace from a query (SPOT-002)', async ({ page }) => {
-    await page.goto('/admin/dashboard')
+    await page.goto('/cms/dashboard')
 
     await openPalette(page)
     await input(page).fill('go to content')
@@ -109,7 +109,7 @@ test.describe('command palette', () => {
   test('shows an empty state for a no-match query (SPOT-006)', async ({
     page,
   }) => {
-    await page.goto('/admin/dashboard')
+    await page.goto('/cms/dashboard')
 
     await openPalette(page)
     await input(page).fill('zzz-no-match-xkq')
@@ -139,14 +139,14 @@ test.describe('command palette', () => {
   test('boosts selected-layer commands near the top (SPOT-007)', async ({
     page,
   }) => {
-    await page.goto('/admin/dashboard')
+    await page.goto('/cms/dashboard')
     await openPalette(page)
     await expect(page.getByRole('option', { name: /Duplicate layer/ })).toHaveCount(0)
     await page.keyboard.press('Escape')
     await expect(palette(page)).toBeHidden()
 
     await openSiteEditor(page)
-    await insertNotchModule(page, 'text')
+    await insertModule(page, 'text')
     await expect(
       page.getByRole('button', { name: 'Duplicate selected layers' }),
     ).toBeVisible()
@@ -181,7 +181,7 @@ test.describe('command palette', () => {
   })
 
   test('runs a command with the keyboard only (SPOT-011)', async ({ page }) => {
-    await page.goto('/admin/dashboard')
+    await page.goto('/cms/dashboard')
     const focusOrigin = page.getByTestId('account-menu-trigger')
     await focusOrigin.focus()
     await expect(focusOrigin).toBeFocused()
@@ -236,7 +236,7 @@ test.describe('command palette', () => {
       })
     })
 
-    await page.goto('/admin/dashboard')
+    await page.goto('/cms/dashboard')
     await openPalette(page)
     await input(page).fill('async skeleton probe')
 
@@ -290,7 +290,7 @@ test.describe('command palette', () => {
     page,
   }) => {
     await page.emulateMedia({ contrast: 'more', forcedColors: 'active' })
-    await page.goto('/admin/dashboard')
+    await page.goto('/cms/dashboard')
 
     await openPalette(page)
     await input(page).fill('go to content')
@@ -326,7 +326,7 @@ test.describe('command palette', () => {
   test('boosts a recently run command to the top on reopen (SPOT-008)', async ({
     page,
   }) => {
-    await page.goto('/admin/dashboard')
+    await page.goto('/cms/dashboard')
 
     await openPalette(page)
     await input(page).fill('go to content')
@@ -335,7 +335,7 @@ test.describe('command palette', () => {
 
     // Reopen with an empty query: recency boosts the just-run command to the top
     // of the list (it outranks the default first nav command, "Go to Site editor").
-    await page.goto('/admin/dashboard')
+    await page.goto('/cms/dashboard')
     await openPalette(page)
     await expect(palette(page).getByRole('option').first()).toContainText(
       'Go to Content',

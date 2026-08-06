@@ -56,3 +56,37 @@
     align-items: center;
     justify-content: center;
 }
+
+/* ── Site screen ─────────────────────────────────────────────────────────
+ * This editor was built to fill a panel of its own — a flex column that
+ * stretches, scrolls internally and pads itself away from a panel edge. Inside
+ * the approved Site inspector it is one block in a disclosure, so it flattens:
+ * no growth, no second scroll container, no padding of its own. The disclosure
+ * owns the frame; this owns only its rows.
+ */
+:global([data-editor-screen='site']) .panel {
+    display: block;
+    flex: none;
+    min-height: 0;
+    overflow: visible;
+}
+
+:global([data-editor-screen='site']) .scroll {
+    overflow: visible;
+    padding: 0;
+}
+
+:global([data-editor-screen='site']) .header {
+    margin-bottom: 11px;
+}
+
+/* A 160px void where "No attributes set" sits is most of a screenful in a
+   280px column. */
+:global([data-editor-screen='site']) .empty {
+    min-height: 0;
+    justify-content: flex-start;
+}
+
+:global([data-editor-screen='site']) .rows {
+    gap: 7px;
+}

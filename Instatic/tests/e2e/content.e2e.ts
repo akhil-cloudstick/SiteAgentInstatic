@@ -5,7 +5,7 @@ import {
   canvasFrame,
   completeStepUp,
   insertModuleViaPicker,
-  insertNotchModule,
+  insertModule,
   login,
   openSiteEditor,
   openSitePanel,
@@ -40,7 +40,7 @@ test.describe('content', () => {
     page,
   }) => {
     const title = `E2E Rich Body ${Date.now().toString(36)}`
-    await page.goto('/admin/content')
+    await page.goto('/cms/content')
 
     await test.step('create a draft and open the rich body editor', async () => {
       await startNewPost(page)
@@ -81,7 +81,7 @@ test.describe('content', () => {
   test('opens the content AI assistant with no-provider guidance (CONTENT-007)', async ({
     page,
   }) => {
-    await page.goto('/admin/content')
+    await page.goto('/cms/content')
     await page.getByTestId('panel-rail-agent').click()
 
     const assistantPanel = page.getByRole('complementary', { name: 'AI Assistant' })
@@ -225,7 +225,7 @@ test.describe('content', () => {
       const shortcutModifier = process.platform === 'darwin' ? 'Meta' : 'Control'
 
       await test.step('create formatted body content and save it', async () => {
-        await page.goto('/admin/content')
+        await page.goto('/cms/content')
         await startNewPost(page)
         await page.getByRole('textbox', { name: 'Title', exact: true }).fill(title)
         await page.getByRole('textbox', { name: 'Slug' }).fill(slug)
@@ -296,7 +296,7 @@ test.describe('content', () => {
       page,
     }) => {
       await login(page)
-      await page.goto('/admin/content')
+      await page.goto('/cms/content')
 
       const suffix = Date.now().toString(36)
       const collectionName = `Catalog ${suffix}`
@@ -405,7 +405,7 @@ test.describe('content', () => {
 
       await test.step('insert the custom field from the Site builder binding picker', async () => {
         await createPostsTemplate(page, templateName, templateSlug)
-        await insertNotchModule(page, 'text')
+        await insertModule(page, 'text')
         await setPropValue(page, 'text', 'Custom subtitle:')
         await page.getByRole('button', { name: 'Insert binding for Text' }).click()
 
@@ -444,7 +444,7 @@ async function createPostDraft(
   title: string,
   body: string,
 ): Promise<void> {
-  await page.goto('/admin/content')
+  await page.goto('/cms/content')
 
   await test.step('create a new post', async () => {
     // The posts collection is selected by default; the New action enables once
@@ -467,7 +467,7 @@ async function createPostDraftWithSlug(
   slug: string,
   body: string,
 ): Promise<void> {
-  await page.goto('/admin/content')
+  await page.goto('/cms/content')
 
   await test.step('create a new post with a stable public slug', async () => {
     await startNewPost(page)
@@ -484,7 +484,7 @@ async function addPostsTextField(
   fieldId: string,
   fieldLabel: string,
 ): Promise<void> {
-  await page.goto('/admin/data')
+  await page.goto('/cms/data')
   await expect(page.getByTestId('data-left-sidebar')).toBeVisible({ timeout: 20_000 })
 
   await page.getByRole('option', { name: /^Posts\b/ }).click()
@@ -577,7 +577,7 @@ async function createPublishedPostsTemplate(
   await dialog.getByRole('button', { name: 'Save' }).click()
   await expect(dialog).toBeHidden()
 
-  await insertNotchModule(page, 'text')
+  await insertModule(page, 'text')
   await setPropValue(page, 'text', '{currentEntry.title}')
   await page.locator('#ctrl-tag').click()
   await page.getByRole('option', { name: 'Heading 1', exact: true }).click()

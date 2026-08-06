@@ -33,7 +33,7 @@ beforeEach(() => {
   __resetModuleInserterPreferenceForTests()
   globalThis.fetch = (async (input: RequestInfo | URL) => {
     const url = typeof input === 'string' ? input : input.toString()
-    if (url.includes('/admin/api/cms/me/preferences/module-inserter')) {
+    if (url.includes('/cms/api/cms/me/preferences/module-inserter')) {
       return new Response(JSON.stringify({ value: DEFAULT_MODULE_INSERTER_PREFERENCE }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },

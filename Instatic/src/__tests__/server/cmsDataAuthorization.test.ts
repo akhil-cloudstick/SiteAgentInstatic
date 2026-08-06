@@ -25,7 +25,7 @@ async function request(
 }
 
 async function setupOwner(db: DbClient): Promise<string> {
-  const setup = await request(db, '/admin/api/cms/setup', {
+  const setup = await request(db, '/cms/api/cms/setup', {
     method: 'POST',
     body: JSON.stringify({
       siteName: 'Ownership Test',
@@ -38,7 +38,7 @@ async function setupOwner(db: DbClient): Promise<string> {
 }
 
 async function login(db: DbClient, email: string): Promise<string> {
-  const res = await request(db, '/admin/api/cms/login', {
+  const res = await request(db, '/cms/api/cms/login', {
     method: 'POST',
     body: JSON.stringify({ email, password: ownedPassword }),
   })
@@ -49,7 +49,7 @@ async function login(db: DbClient, email: string): Promise<string> {
 }
 
 async function stepUp(db: DbClient, cookie: string): Promise<string> {
-  const res = await request(db, '/admin/api/cms/auth/step-up', {
+  const res = await request(db, '/cms/api/cms/auth/step-up', {
     method: 'POST',
     cookie,
     body: JSON.stringify({ password: ownedPassword }),
@@ -65,7 +65,7 @@ async function createUser(
   ownerCookie: string,
   input: { email: string; displayName: string; roleId: string },
 ): Promise<string> {
-  const res = await request(db, '/admin/api/cms/users', {
+  const res = await request(db, '/cms/api/cms/users', {
     method: 'POST',
     cookie: ownerCookie,
     body: JSON.stringify({ ...input, password: ownedPassword }),
@@ -86,7 +86,7 @@ async function createCustomRole(
   ownerCookie: string,
   input: { slug: string; name: string; capabilities: string[] },
 ): Promise<string> {
-  const res = await request(db, '/admin/api/cms/roles', {
+  const res = await request(db, '/cms/api/cms/roles', {
     method: 'POST',
     cookie: ownerCookie,
     body: JSON.stringify({
@@ -125,7 +125,7 @@ async function createRow(
   cookie: string,
   title: string,
 ): Promise<string> {
-  const res = await request(db, '/admin/api/cms/data/tables/posts/rows', {
+  const res = await request(db, '/cms/api/cms/data/tables/posts/rows', {
     method: 'POST',
     cookie,
     body: JSON.stringify({ cells: { title } }),
@@ -148,7 +148,7 @@ async function createTable(
     : [
         { id: 'title', label: 'Title', type: 'text', required: true },
       ]
-  const res = await request(db, '/admin/api/cms/data/tables', {
+  const res = await request(db, '/cms/api/cms/data/tables', {
     method: 'POST',
     cookie,
     body: JSON.stringify({
@@ -180,7 +180,7 @@ async function createRowInTableWithCells(
   tableId: string,
   cells: Record<string, unknown>,
 ): Promise<string> {
-  const res = await request(db, `/admin/api/cms/data/tables/${tableId}/rows`, {
+  const res = await request(db, `/cms/api/cms/data/tables/${tableId}/rows`, {
     method: 'POST',
     cookie,
     body: JSON.stringify({ cells }),
@@ -207,7 +207,7 @@ describe('CMS data ownership authorization', () => {
     const { db } = await makeDb()
     const ownerCookie = await setupOwner(db)
 
-    const list = await request(db, '/admin/api/cms/data/tables/pages/rows', {
+    const list = await request(db, '/cms/api/cms/data/tables/pages/rows', {
       method: 'GET',
       cookie: ownerCookie,
     })
@@ -219,7 +219,7 @@ describe('CMS data ownership authorization', () => {
     const home = rows[0]
     expect(home).toBeDefined()
 
-    const update = await request(db, `/admin/api/cms/data/rows/${home.id}`, {
+    const update = await request(db, `/cms/api/cms/data/rows/${home.id}`, {
       method: 'PATCH',
       cookie: ownerCookie,
       body: JSON.stringify({
@@ -255,7 +255,7 @@ describe('CMS data ownership authorization', () => {
     await createRow(db, editorOneCookie, 'Editor One Draft')
     await createRow(db, editorTwoCookie, 'Editor Two Draft')
 
-    const ownList = await request(db, '/admin/api/cms/data/tables/posts/rows', {
+    const ownList = await request(db, '/cms/api/cms/data/tables/posts/rows', {
       method: 'GET',
       cookie: editorOneCookie,
     })
@@ -263,7 +263,7 @@ describe('CMS data ownership authorization', () => {
     const ownRows = (await body(ownList)).rows as Array<{ cells: { title: string } }>
     expect(ownRows.map((r) => r.cells.title)).toEqual(['Editor One Draft'])
 
-    const allList = await request(db, '/admin/api/cms/data/tables/posts/rows', {
+    const allList = await request(db, '/cms/api/cms/data/tables/posts/rows', {
       method: 'GET',
       cookie: managerCookie,
     })
@@ -291,13 +291,13 @@ describe('CMS data ownership authorization', () => {
     const secondEditorCookie = await login(db, 'second-editor@example.com')
     const secondRowId = await createRow(db, secondEditorCookie, 'Second Editor Draft')
 
-    const readOther = await request(db, `/admin/api/cms/data/rows/${secondRowId}`, {
+    const readOther = await request(db, `/cms/api/cms/data/rows/${secondRowId}`, {
       method: 'GET',
       cookie: firstEditorCookie,
     })
     expect(readOther.status).toBe(403)
 
-    const saveOther = await request(db, `/admin/api/cms/data/rows/${secondRowId}`, {
+    const saveOther = await request(db, `/cms/api/cms/data/rows/${secondRowId}`, {
       method: 'PATCH',
       cookie: firstEditorCookie,
       body: JSON.stringify({
@@ -313,7 +313,7 @@ describe('CMS data ownership authorization', () => {
     })
     expect(saveOther.status).toBe(403)
 
-    const reassignOther = await request(db, `/admin/api/cms/data/rows/${secondRowId}/author`, {
+    const reassignOther = await request(db, `/cms/api/cms/data/rows/${secondRowId}/author`, {
       method: 'PATCH',
       cookie: firstEditorCookie,
       body: JSON.stringify({ authorUserId: editorTwoId }),
@@ -344,14 +344,14 @@ describe('CMS data ownership authorization', () => {
     const managerCookie = await login(db, 'assign-manager@example.com')
     const rowId = await createRow(db, editorCookie, 'Publishable Draft')
 
-    const publish = await request(db, `/admin/api/cms/data/rows/${rowId}/publish`, {
+    const publish = await request(db, `/cms/api/cms/data/rows/${rowId}/publish`, {
       method: 'POST',
       cookie: editorCookie,
     })
     expect(publish.status).toBe(200)
     expect(await body(publish)).toMatchObject({ row: { status: 'published', authorUserId: editorOneId } })
 
-    const reassign = await request(db, `/admin/api/cms/data/rows/${rowId}/author`, {
+    const reassign = await request(db, `/cms/api/cms/data/rows/${rowId}/author`, {
       method: 'PATCH',
       cookie: managerCookie,
       body: JSON.stringify({ authorUserId: managerId }),
@@ -365,7 +365,7 @@ describe('CMS data ownership authorization', () => {
     const ownerCookie = await setupOwner(db)
     const rowId = await createRow(db, ownerCookie, 'Scheduled Draft')
 
-    const past = await request(db, `/admin/api/cms/data/rows/${rowId}/schedule`, {
+    const past = await request(db, `/cms/api/cms/data/rows/${rowId}/schedule`, {
       method: 'POST',
       cookie: ownerCookie,
       body: JSON.stringify({ at: '2001-01-01T00:00:00.000Z' }),
@@ -374,7 +374,7 @@ describe('CMS data ownership authorization', () => {
     expect(await body(past)).toEqual({ error: 'Scheduled time must be in the future' })
 
     const scheduledAt = new Date(Date.now() + 60 * 60 * 1000).toISOString()
-    const schedule = await request(db, `/admin/api/cms/data/rows/${rowId}/schedule`, {
+    const schedule = await request(db, `/cms/api/cms/data/rows/${rowId}/schedule`, {
       method: 'POST',
       cookie: ownerCookie,
       body: JSON.stringify({ at: scheduledAt }),
@@ -388,7 +388,7 @@ describe('CMS data ownership authorization', () => {
       },
     })
 
-    const cancel = await request(db, `/admin/api/cms/data/rows/${rowId}/schedule`, {
+    const cancel = await request(db, `/cms/api/cms/data/rows/${rowId}/schedule`, {
       method: 'DELETE',
       cookie: ownerCookie,
     })
@@ -401,7 +401,7 @@ describe('CMS data ownership authorization', () => {
       },
     })
 
-    const cancelAgain = await request(db, `/admin/api/cms/data/rows/${rowId}/schedule`, {
+    const cancelAgain = await request(db, `/cms/api/cms/data/rows/${rowId}/schedule`, {
       method: 'DELETE',
       cookie: ownerCookie,
     })
@@ -415,7 +415,7 @@ describe('CMS data ownership authorization', () => {
     const rowId = await createRow(db, ownerCookie, 'Scheduled Status Retraction')
     const scheduledAt = new Date(Date.now() + 60 * 60 * 1000).toISOString()
 
-    const schedule = await request(db, `/admin/api/cms/data/rows/${rowId}/schedule`, {
+    const schedule = await request(db, `/cms/api/cms/data/rows/${rowId}/schedule`, {
       method: 'POST',
       cookie: ownerCookie,
       body: JSON.stringify({ at: scheduledAt }),
@@ -429,7 +429,7 @@ describe('CMS data ownership authorization', () => {
       },
     })
 
-    const retract = await request(db, `/admin/api/cms/data/rows/${rowId}/status`, {
+    const retract = await request(db, `/cms/api/cms/data/rows/${rowId}/status`, {
       method: 'PATCH',
       cookie: ownerCookie,
       body: JSON.stringify({ status: 'draft' }),
@@ -449,7 +449,7 @@ describe('CMS data ownership authorization', () => {
     const ownerCookie = await setupOwner(db)
     const rowId = await createRow(db, ownerCookie, 'Status Boundary')
 
-    const invalidStatus = await request(db, `/admin/api/cms/data/rows/${rowId}/status`, {
+    const invalidStatus = await request(db, `/cms/api/cms/data/rows/${rowId}/status`, {
       method: 'PATCH',
       cookie: ownerCookie,
       body: JSON.stringify({ status: 'published' }),
@@ -457,14 +457,14 @@ describe('CMS data ownership authorization', () => {
     expect(invalidStatus.status).toBe(400)
     expect(await body(invalidStatus)).toEqual({ error: 'Status must be draft or unpublished' })
 
-    const publish = await request(db, `/admin/api/cms/data/rows/${rowId}/publish`, {
+    const publish = await request(db, `/cms/api/cms/data/rows/${rowId}/publish`, {
       method: 'POST',
       cookie: ownerCookie,
     })
     expect(publish.status).toBe(200)
     expect(await body(publish)).toMatchObject({ row: { id: rowId, status: 'published' } })
 
-    const unpublish = await request(db, `/admin/api/cms/data/rows/${rowId}/status`, {
+    const unpublish = await request(db, `/cms/api/cms/data/rows/${rowId}/status`, {
       method: 'PATCH',
       cookie: ownerCookie,
       body: JSON.stringify({ status: 'unpublished' }),
@@ -491,7 +491,7 @@ describe('CMS data ownership authorization', () => {
     })
     await db`update users set status = ${'suspended'} where id = ${inactiveAuthorId}`
 
-    const blank = await request(db, `/admin/api/cms/data/rows/${rowId}/author`, {
+    const blank = await request(db, `/cms/api/cms/data/rows/${rowId}/author`, {
       method: 'PATCH',
       cookie: ownerCookie,
       body: JSON.stringify({ authorUserId: '   ' }),
@@ -499,7 +499,7 @@ describe('CMS data ownership authorization', () => {
     expect(blank.status).toBe(400)
     expect(await body(blank)).toEqual({ error: 'Author is required' })
 
-    const inactive = await request(db, `/admin/api/cms/data/rows/${rowId}/author`, {
+    const inactive = await request(db, `/cms/api/cms/data/rows/${rowId}/author`, {
       method: 'PATCH',
       cookie: ownerCookie,
       body: JSON.stringify({ authorUserId: inactiveAuthorId }),
@@ -507,7 +507,7 @@ describe('CMS data ownership authorization', () => {
     expect(inactive.status).toBe(400)
     expect(await body(inactive)).toEqual({ error: 'Author must be an active user' })
 
-    const row = await request(db, `/admin/api/cms/data/rows/${rowId}`, {
+    const row = await request(db, `/cms/api/cms/data/rows/${rowId}`, {
       method: 'GET',
       cookie: ownerCookie,
     })
@@ -525,7 +525,7 @@ describe('CMS data ownership authorization', () => {
     })
     const rowId = await createRowInTable(db, ownerCookie, tableId, 'Plain Data Row')
 
-    const preview = await request(db, `/admin/api/cms/data/rows/${rowId}/preview`, {
+    const preview = await request(db, `/cms/api/cms/data/rows/${rowId}/preview`, {
       method: 'POST',
       cookie: ownerCookie,
       body: JSON.stringify({ cells: { title: 'Draft title' } }),
@@ -556,7 +556,7 @@ describe('CMS data ownership authorization', () => {
       slug: 'shared-slug',
     })
 
-    const move = await request(db, `/admin/api/cms/data/rows/${sourceRowId}/table`, {
+    const move = await request(db, `/cms/api/cms/data/rows/${sourceRowId}/table`, {
       method: 'PATCH',
       cookie: ownerCookie,
       body: JSON.stringify({ tableId: targetTableId }),
@@ -564,7 +564,7 @@ describe('CMS data ownership authorization', () => {
     expect(move.status).toBe(409)
     expect(await body(move)).toEqual({ error: 'A row with this slug already exists in the target table' })
 
-    const row = await request(db, `/admin/api/cms/data/rows/${sourceRowId}`, {
+    const row = await request(db, `/cms/api/cms/data/rows/${sourceRowId}`, {
       method: 'GET',
       cookie: ownerCookie,
     })

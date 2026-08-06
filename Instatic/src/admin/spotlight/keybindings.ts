@@ -3,7 +3,7 @@
  *
  * Single source of truth for every keyboard shortcut in the admin/editor.
  * Both the keyboard handlers (PanelRail, CanvasRoot, usePersistence,
- * SpotlightProvider, UndoRedoButtons) and the help screen (HelpKeybindingsList)
+ * SpotlightProvider, useUndoRedoShortcuts) and the help screen (HelpKeybindingsList)
  * read exclusively from this registry.
  *
  * Shape:

@@ -65,7 +65,7 @@ const CUSTOM_TAG_PATTERN = /^[a-z][a-z0-9-]{0,31}$/i
  * hatch — they execute script, load external/plugin resources, or hijack the
  * document's base URL, and would run in the published page AND the admin editor
  * canvas (which renders these trusted modules directly, same-origin as
- * `/admin`). `base.video` emits its own trusted `<iframe>` via its module
+ * `/cms`). `base.video` emits its own trusted `<iframe>` via its module
  * `htmlTag`, not this resolver, so blocking `iframe` here does not affect video
  * embeds — it only stops a container/loop/outlet author typing a dangerous tag.
  */

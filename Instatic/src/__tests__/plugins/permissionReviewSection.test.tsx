@@ -138,7 +138,7 @@ describe('PermissionReviewSection — fresh install', () => {
             adminPages: [{
               id: 'dashboard',
               title: 'Dashboard',
-              route: '/admin/plugins/acme.test/dashboard',
+              route: '/cms/plugins/acme.test/dashboard',
               content: { kind: 'app', heading: 'Dashboard', entry: 'admin/dashboard.js' },
             }],
           },

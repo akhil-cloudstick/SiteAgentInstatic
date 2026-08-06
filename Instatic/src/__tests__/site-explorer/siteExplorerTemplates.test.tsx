@@ -106,7 +106,7 @@ describe('SiteExplorerPanel templates', () => {
   it('targets a chosen post type via the Applies-to selector', async () => {
     let collectionRequests = 0
     globalThis.fetch = async (input: RequestInfo | URL) => {
-      if (String(input) === '/admin/api/cms/data/tables') {
+      if (String(input) === '/cms/api/cms/data/tables') {
         collectionRequests += 1
         return new Response(JSON.stringify({
           tables: [

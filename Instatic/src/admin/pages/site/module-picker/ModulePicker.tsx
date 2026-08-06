@@ -132,11 +132,14 @@ export function ModulePicker({
         className={styles.searchHeader}
         // Clicks on the header (e.g. the search input) inside a
         // ContextMenuSubmenu must not bubble to the panel-level click handler
-        // — those are handled by the closeOnItemClickOnly flag, but
-        // stopPropagation here is a defensive belt to also cover any
-        // pointerdown-driven dismiss elsewhere.
+        // — handled by the closeOnItemClickOnly flag.
+        //
+        // There is deliberately no `onMouseDown` stopPropagation here: the
+        // menu's outside-click dismiss is a NATIVE capture-phase listener on
+        // `document`, which runs before React's target-phase delegation, so a
+        // synthetic handler can never stop it. That is handled properly by the
+        // panel registry in `ContextMenu`/`contextMenuPanels.ts`.
         onClick={(e) => e.stopPropagation()}
-        onMouseDown={(e) => e.stopPropagation()}
       >
         <SearchBar
           ref={searchRef}

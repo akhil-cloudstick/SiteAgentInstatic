@@ -21,7 +21,7 @@ export function getDataCommands(): Command[] {
       capability: 'data.custom.tables.manage',
       run: (ctx) => {
         queuePendingAction('data.newTable')
-        ctx.navigate('/admin/data')
+        ctx.navigate('/cms/data')
       },
     },
   ]

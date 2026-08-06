@@ -2,7 +2,7 @@
  * CMS handler entry point.
  *
  * `handleCmsRequest` is invoked by `server/router.ts` for every request
- * whose path starts with `/admin/api/cms/`. It does two things in order:
+ * whose path starts with `/cms/api/cms/`. It does two things in order:
  *
  *  1. Defense-in-depth CSRF: state-changing methods (POST/PUT/PATCH/DELETE)
  *     must come from an Origin that matches the request's own origin (or
@@ -17,14 +17,14 @@
  *     we fall through to a 404.
  *
  * Routes are not nested into a tree because the prefix is short
- * (`/admin/api/cms/`) and each group's match logic is small enough that
+ * (`/cms/api/cms/`) and each group's match logic is small enough that
  * a simple ordered chain is faster *and* easier to read than a router
  * abstraction with config objects. New route groups just need a new
  * file in this directory and one entry in `routeGroups` below.
  *
  * Loop traffic (`/_instatic/loop/...`) lives next door in `./loop.ts` and is
  * dispatched directly by the top-level router, not through this entry
- * point — its prefix is outside `/admin/api/cms/`.
+ * point — its prefix is outside `/cms/api/cms/`.
  */
 import type { DbClient } from '../../db/client'
 import { jsonResponse } from '../../http'
@@ -86,7 +86,7 @@ export async function handleCmsRequest(
     ?? (await handleAuthRoutes(req, db))
     // User preferences sit next to /me/* because they share the same
     // self-targeted "anything an authenticated user can do to their own
-    // account" surface. Routes mount under `/admin/api/cms/me/preferences/`.
+    // account" surface. Routes mount under `/cms/api/cms/me/preferences/`.
     ?? (await handleUserPreferencesRoutes(req, db))
     ?? (await handleUsersRoutes(req, db))
     ?? (await handleRolesRoutes(req, db))
@@ -99,10 +99,10 @@ export async function handleCmsRequest(
     ?? (await handleComponentsRoutes(req, db))
     ?? (await handleLayoutsRoutes(req, db))
     ?? (await handleRuntimeRoutes(req, db))
-    // The folder routes match `/admin/api/cms/media/folders/...` so they must
-    // run BEFORE the asset routes whose `/admin/api/cms/media/:id` pattern
+    // The folder routes match `/cms/api/cms/media/folders/...` so they must
+    // run BEFORE the asset routes whose `/cms/api/cms/media/:id` pattern
     // would otherwise eat them (treating "folders" as an asset id). The
-    // storage-admin routes (`/admin/api/cms/media/storage/...`) follow
+    // storage-admin routes (`/cms/api/cms/media/storage/...`) follow
     // the same rule — `/media/:id` would otherwise consume "storage".
     ?? (await handleMediaFolderRoutes(req, db))
     ?? (await handleMediaStorageAdminRoutes(req, db, options))

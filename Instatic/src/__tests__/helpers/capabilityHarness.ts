@@ -112,7 +112,7 @@ export async function createCapabilityTestHarness(
   }
 
   async function sessionForEmail(email: string): Promise<string> {
-    const res = await cms('/admin/api/cms/login', {
+    const res = await cms('/cms/api/cms/login', {
       method: 'POST',
       json: {
         email,
@@ -126,7 +126,7 @@ export async function createCapabilityTestHarness(
   }
 
   async function stepUp(cookie: string): Promise<string> {
-    const res = await cms('/admin/api/cms/auth/step-up', {
+    const res = await cms('/cms/api/cms/auth/step-up', {
       method: 'POST',
       cookie,
       json: { password: CAPABILITY_TEST_PASSWORD },
@@ -140,7 +140,7 @@ export async function createCapabilityTestHarness(
   }
 
   async function setupOwner(): Promise<string> {
-    const res = await cms('/admin/api/cms/setup', {
+    const res = await cms('/cms/api/cms/setup', {
       method: 'POST',
       json: {
         siteName: 'Capability Matrix',
@@ -162,7 +162,7 @@ export async function createCapabilityTestHarness(
     slug: string
     capabilities: CoreCapability[]
   }): Promise<string> {
-    const res = await cms('/admin/api/cms/roles', {
+    const res = await cms('/cms/api/cms/roles', {
       method: 'POST',
       cookie: await requireOwnerCookie(),
       json: input,
@@ -177,7 +177,7 @@ export async function createCapabilityTestHarness(
     displayName?: string
     roleId: string
   }): Promise<void> {
-    const res = await cms('/admin/api/cms/users', {
+    const res = await cms('/cms/api/cms/users', {
       method: 'POST',
       cookie: await requireOwnerCookie(),
       json: {

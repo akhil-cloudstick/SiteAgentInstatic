@@ -307,25 +307,25 @@ export function firstAccessibleWorkspace(user: CmsCurrentUser | null): AdminWork
 export function workspacePath(workspace: AdminWorkspace): string {
   switch (workspace) {
     case 'dashboard':
-      return '/admin/dashboard'
+      return '/cms/dashboard'
     case 'site':
-      return '/admin/site'
+      return '/cms/site'
     case 'content':
-      return '/admin/content'
+      return '/cms/content'
     case 'data':
-      return '/admin/data'
+      return '/cms/data'
     case 'media':
-      return '/admin/media'
+      return '/cms/media'
     case 'plugins':
-      return '/admin/plugins'
+      return '/cms/plugins'
     case 'users':
-      return '/admin/users'
+      return '/cms/users'
     case 'ai':
-      return '/admin/ai'
+      return '/cms/ai'
     case 'pluginPage':
-      return '/admin/plugins'
+      return '/cms/plugins'
     case 'account':
-      return '/admin/account'
+      return '/cms/account'
   }
 }
 

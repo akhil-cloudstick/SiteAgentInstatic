@@ -18,6 +18,8 @@
  * @see MIN_ZOOM, MAX_ZOOM, MAX_PAN constants in canvasSlice.ts
  */
 import { describe, it, expect, beforeEach } from 'bun:test'
+import { readFileSync } from 'fs'
+import { join } from 'path'
 import { useEditorStore } from '@site/store/store'
 import {
   MIN_ZOOM,
@@ -27,7 +29,11 @@ import {
   MAX_PAN,
   clampZoom,
   clampPan,
+  clampFrameWidth,
+  MIN_PREVIEW_FRAME_WIDTH,
+  MAX_PREVIEW_FRAME_WIDTH,
 } from '@site/canvas/math'
+import { createDefaultSiteDocument } from '@site/store/slices/site/defaults'
 
 // ---------------------------------------------------------------------------
 // Store reset helper
@@ -332,7 +338,7 @@ describe('resetView', () => {
     useEditorStore.setState({ zoom: 2.5 })
     useEditorStore.getState().resetView()
     expect(canvas().zoom).toBe(RESET_ZOOM)
-    expect(INITIAL_ZOOM).toBe(0.5)
+    expect(INITIAL_ZOOM).toBe(1)
   })
 
   it('resets pan to (0, 0)', () => {
@@ -350,5 +356,109 @@ describe('resetView', () => {
     expect(zoom).toBe(RESET_ZOOM)
     expect(panX).toBe(0)
     expect(panY).toBe(0)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Preview frame widths — ephemeral Responsive Review overrides
+// ---------------------------------------------------------------------------
+
+describe('clampFrameWidth — pure function', () => {
+  it('leaves an in-range width unchanged', () => {
+    expect(clampFrameWidth(1220)).toBe(1220)
+    expect(clampFrameWidth(MIN_PREVIEW_FRAME_WIDTH)).toBe(MIN_PREVIEW_FRAME_WIDTH)
+    expect(clampFrameWidth(MAX_PREVIEW_FRAME_WIDTH)).toBe(MAX_PREVIEW_FRAME_WIDTH)
+  })
+
+  it('clamps below the minimum and above the maximum', () => {
+    expect(clampFrameWidth(0)).toBe(MIN_PREVIEW_FRAME_WIDTH)
+    expect(clampFrameWidth(-500)).toBe(MIN_PREVIEW_FRAME_WIDTH)
+    expect(clampFrameWidth(99_999)).toBe(MAX_PREVIEW_FRAME_WIDTH)
+  })
+
+  it('rounds to a whole pixel', () => {
+    expect(clampFrameWidth(1220.4)).toBe(1220)
+    expect(clampFrameWidth(1220.6)).toBe(1221)
+  })
+})
+
+describe('breakpoint preview widths', () => {
+  beforeEach(() => {
+    useEditorStore.setState({ breakpointPreviewWidths: {} })
+  })
+
+  it('sets a preview width per breakpoint id', () => {
+    useEditorStore.getState().setBreakpointPreviewWidth('desktop', 1220)
+    expect(useEditorStore.getState().breakpointPreviewWidths).toEqual({ desktop: 1220 })
+  })
+
+  it('clamps inside the setter, not at the call site', () => {
+    useEditorStore.getState().setBreakpointPreviewWidth('desktop', 10)
+    useEditorStore.getState().setBreakpointPreviewWidth('mobile', 99_999)
+    expect(useEditorStore.getState().breakpointPreviewWidths).toEqual({
+      desktop: MIN_PREVIEW_FRAME_WIDTH,
+      mobile: MAX_PREVIEW_FRAME_WIDTH,
+    })
+  })
+
+  it('ignores a non-finite width rather than writing it', () => {
+    useEditorStore.getState().setBreakpointPreviewWidth('desktop', Number.NaN)
+    useEditorStore.getState().setBreakpointPreviewWidth('tablet', Number.POSITIVE_INFINITY)
+    expect(useEditorStore.getState().breakpointPreviewWidths).toEqual({})
+  })
+
+  it('keeps each breakpoint independent', () => {
+    useEditorStore.getState().setBreakpointPreviewWidth('desktop', 1220)
+    useEditorStore.getState().setBreakpointPreviewWidth('mobile', 320)
+    useEditorStore.getState().clearBreakpointPreviewWidth('desktop')
+    expect(useEditorStore.getState().breakpointPreviewWidths).toEqual({ mobile: 320 })
+  })
+
+  it('clearing an id that has no override is a no-op', () => {
+    useEditorStore.getState().setBreakpointPreviewWidth('mobile', 320)
+    useEditorStore.getState().clearBreakpointPreviewWidth('desktop')
+    expect(useEditorStore.getState().breakpointPreviewWidths).toEqual({ mobile: 320 })
+  })
+
+  it('never touches the document: no width change, no dirty flag, no undo entry', () => {
+    const site = createDefaultSiteDocument('Preview width isolation')
+    useEditorStore.getState().loadSite(site)
+    const before = useEditorStore.getState().site!.breakpoints
+      .map((bp) => ({ id: bp.id, width: bp.width, mediaQuery: bp.mediaQuery }))
+
+    useEditorStore.getState().setBreakpointPreviewWidth('desktop', 1220)
+
+    const after = useEditorStore.getState().site!.breakpoints
+      .map((bp) => ({ id: bp.id, width: bp.width, mediaQuery: bp.mediaQuery }))
+    expect(after).toEqual(before)
+    expect(useEditorStore.getState().hasUnsavedChanges).toBe(false)
+    expect(useEditorStore.getState().canUndo).toBe(false)
+  })
+
+  it('is cleared when another site is loaded — default ids repeat across sites', () => {
+    useEditorStore.getState().setBreakpointPreviewWidth('desktop', 1220)
+    useEditorStore.getState().loadSite(createDefaultSiteDocument('Another site'))
+    expect(useEditorStore.getState().breakpointPreviewWidths).toEqual({})
+  })
+
+  it('drops the override when its breakpoint is removed', () => {
+    useEditorStore.getState().loadSite(createDefaultSiteDocument('Removal'))
+    useEditorStore.getState().setBreakpointPreviewWidth('tablet', 900)
+    useEditorStore.getState().removeBreakpoint('tablet')
+    expect(useEditorStore.getState().breakpointPreviewWidths).toEqual({})
+  })
+
+  /**
+   * Layout persistence is a hand-written whitelist, so a field is ephemeral by
+   * omission — which is exactly the kind of guarantee that gets broken by a
+   * well-meaning "persist the rest of the canvas state too" change. Pin it at
+   * the source: reloading must restore the stored widths.
+   */
+  it('is absent from the layout persistence projection', () => {
+    const projection = readFileSync(
+      join(import.meta.dir, '../../admin/pages/site/layout/siteEditorLayoutPersistence.ts'),
+      'utf8',
+    )
+    expect(projection).not.toContain('breakpointPreviewWidths')
   })
 })

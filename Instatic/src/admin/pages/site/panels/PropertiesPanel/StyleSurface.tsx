@@ -73,6 +73,38 @@ interface StyleSurfaceProps {
   moduleContent?: ReactNode
   /** Called when 'Add class' is clicked in the locked preview. */
   onFocusClassPicker?: () => void
+  /**
+   * Restrict the CSS area to these `CLASS_STYLE_SECTIONS` ids. The approved
+   * Site screen splits the workbench across its Layout / Style / Visibility
+   * tabs; each renders its own slice. Omitted → every section.
+   */
+  sectionIds?: ReadonlyArray<string>
+  /** Hide the catch-all custom-properties section (a slice owner does). */
+  hideCustomProperties?: boolean
+  /**
+   * Individual properties a named guided control already owns on this screen.
+   * Dropped from their sections so the same setting never appears twice.
+   */
+  excludeProperties?: ReadonlyArray<keyof CSSPropertyBag>
+  /**
+   * Drop the sticky search bar and the 32px category rail, and treat a node
+   * with no class as an inline-style target. The approved screen's guided
+   * surfaces are "style this element" — no search, no rail, no teaser.
+   */
+  chromeless?: boolean
+  /**
+   * Drop just the 32px category rail. The raw workbench keeps its search bar
+   * inside the "Advanced …" disclosure, but the rail is a scroll-anchor
+   * shortcut for a full-height panel and reads as a stray icon strip once the
+   * workbench is nested inside a disclosure.
+   */
+  hideRail?: boolean
+  /**
+   * Force every section closed on mount, ignoring the `propertiesSectionsExpanded`
+   * preference. The approved Site inspector opens closed — a short list of bars
+   * to click rather than a long scroll of open forms.
+   */
+  collapsedByDefault?: boolean
 }
 
 // ---------------------------------------------------------------------------
@@ -88,6 +120,12 @@ export function StyleSurface({
   inlineStyles,
   moduleContent,
   onFocusClassPicker,
+  sectionIds,
+  hideCustomProperties,
+  excludeProperties,
+  chromeless = false,
+  hideRail = false,
+  collapsedByDefault = false,
 }: StyleSurfaceProps) {
   // scrollRef → outer grid which is also the scroll container
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -118,7 +156,8 @@ export function StyleSurface({
   // Default open/closed state for every property section (Module + CSS), driven
   // by the `propertiesSectionsExpanded` preference. Read once here; the CSS
   // sections receive it through StyleRuleComposer → StyleSectionsEditor.
-  const sectionsExpanded = useEditorPreference('propertiesSectionsExpanded')
+  const preferenceExpanded = useEditorPreference('propertiesSectionsExpanded')
+  const sectionsExpanded = collapsedByDefault ? false : preferenceExpanded
 
   const clearStyleQuery = () => setStyleQuery('')
 
@@ -141,10 +180,18 @@ export function StyleSurface({
   // base-only, so the breakpoint/condition context is irrelevant here.
   const permissions = useEditorPermissions()
   const canEditStyleHere = permissions.canEditStyle
-  // `inlineStyleEditing` is the single source of truth for the edit target
-  // (seeded on selection for inline-only nodes, toggled via the Inline pill /
-  // "Style inline" button). It's mutually exclusive with an active class.
-  const showInline = canEditStyleHere && nodeId != null && activeClass == null && inlineStyleEditing
+  // `inlineStyleEditing` is the single source of truth for the edit target on
+  // the raw workbench (seeded on selection for inline-only nodes, toggled via
+  // the Inline pill / "Style inline" button). It's mutually exclusive with an
+  // active class.
+  //
+  // A GUIDED slice never asks that question. The approved screen's Layout /
+  // Style / Visibility tabs are just "style this element": with no class in
+  // play they edit the node's own `style=""` rather than showing a teaser or,
+  // worse, an empty tab. Opting a class in is what the Advanced disclosure's
+  // class picker is for.
+  const showInline =
+    canEditStyleHere && nodeId != null && activeClass == null && (inlineStyleEditing || chromeless)
 
   const storedStyles: Record<string, unknown> = showInline
     ? (inlineStyles ?? {})
@@ -163,7 +210,7 @@ export function StyleSurface({
   //   - no active class selected → LockedStylePreview teaser is shown instead
   //   - active class is a locked generated utility → GeneratedUtilityLockedState
   //     is shown instead (no editable CSS rows to search)
-  const searchableClass = activeClass != null && !isGeneratedClassLocked(activeClass)
+  const searchableClass = !chromeless && activeClass != null && !isGeneratedClassLocked(activeClass)
     ? activeClass
     : null
 
@@ -174,7 +221,15 @@ export function StyleSurface({
   //  - active class is a locked generated utility → utility notice
   //  - no active class                          → teaser + "Add class"/"Style inline"
   let cssContent: ReactNode
-  if (!canEditStyleHere) {
+  if (chromeless && !canEditStyleHere) {
+    // A guided slice with no editable target draws nothing — and in particular
+    // must NOT draw a notice. The role-locked message, the "Add class" CTA and
+    // the generated-utility explainer belong to the Advanced disclosure, which
+    // owns the class picker; repeating them would put the same message on
+    // screen once per slice. (A style-capable caller always has a target here:
+    // the active class, or the node's inline styles via `showInline` above.)
+    cssContent = null
+  } else if (!canEditStyleHere) {
     cssContent = (
       <div className={styles.lockedContent}>
         <EmptyState
@@ -191,6 +246,10 @@ export function StyleSurface({
         nodeId={nodeId!}
         inlineStyles={inlineStyles}
         styleQuery={styleQuery}
+        sectionIds={sectionIds}
+        hideCustomProperties={hideCustomProperties}
+        excludeProperties={excludeProperties}
+        collapsedByDefault={collapsedByDefault}
       />
     )
   } else if (activeClass != null) {
@@ -207,6 +266,10 @@ export function StyleSurface({
           classId={activeClassId!}
           cls={activeClass}
           styleQuery={styleQuery}
+          sectionIds={sectionIds}
+          hideCustomProperties={hideCustomProperties}
+          excludeProperties={excludeProperties}
+          collapsedByDefault={collapsedByDefault}
         />
       )
     }
@@ -223,7 +286,12 @@ export function StyleSurface({
   const ModuleIcon = definition?.icon
 
   return (
-    <div ref={scrollRef} className={styles.surface}>
+    <div
+      ref={scrollRef}
+      className={styles.surface}
+      data-chromeless={chromeless ? 'true' : undefined}
+      data-railless={chromeless || hideRail ? 'true' : undefined}
+    >
       {/* ── Left column: search + module section + CSS area ─────────── */}
       <div className={styles.surfaceContent}>
 
@@ -270,17 +338,22 @@ export function StyleSurface({
         {cssContent}
       </div>
 
-      {/* ── Right column: sticky rail ────────────────────────────── */}
-      <div className={styles.railSticky}>
-        <StyleCategoryRail
-          activeAnchorId={activeAnchorId}
-          sectionSetCounts={sectionSetCounts}
-          onSectionClick={handleSectionClick}
-          definition={definition ?? null}
-          activeClass={activeClass}
-          editingInline={showInline}
-        />
-      </div>
+      {/* ── Right column: sticky rail ──────────────────────────────
+          Dropped on the guided surfaces: the approved screen navigates by tab
+          and disclosure, not by a scroll-anchor rail. The rail still ships with
+          the raw workbench inside the Advanced disclosure. */}
+      {!chromeless && !hideRail && (
+        <div className={styles.railSticky}>
+          <StyleCategoryRail
+            activeAnchorId={activeAnchorId}
+            sectionSetCounts={sectionSetCounts}
+            onSectionClick={handleSectionClick}
+            definition={definition ?? null}
+            activeClass={activeClass}
+            editingInline={showInline}
+          />
+        </div>
+      )}
     </div>
   )
 }

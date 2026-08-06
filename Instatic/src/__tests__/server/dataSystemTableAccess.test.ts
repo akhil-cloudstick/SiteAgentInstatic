@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test'
 import { createCapabilityTestHarness, expectForbidden, readJson } from '../helpers/capabilityHarness'
 import type { DataTable } from '@core/data/schemas'
 
-const TABLES = '/admin/api/cms/data/tables'
+const TABLES = '/cms/api/cms/data/tables'
 
 describe('data system-table visibility + lockdown', () => {
   it('does not create a template page when creating a post-type table', async () => {

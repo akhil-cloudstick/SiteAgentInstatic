@@ -75,7 +75,7 @@ describe('ClassStyleInjector media backgrounds', () => {
     resetEditorStore()
     globalThis.fetch = (async (input: RequestInfo | URL) => {
       const url = typeof input === 'string' ? input : input.toString()
-      if (url.endsWith('/admin/api/cms/media')) return mediaResponse()
+      if (url.endsWith('/cms/api/cms/media')) return mediaResponse()
       return new Response('', { status: 404 })
     }) as typeof globalThis.fetch
   })

@@ -1,11 +1,11 @@
 /**
- * AI usage widget — "this month" rollup from `/admin/api/ai/audit`.
+ * AI usage widget — "this month" rollup from `/cms/api/ai/audit`.
  *
  * Headline number: total USD cost. Caption: chat count + top scope. A
  * Sparkline below tracks daily cost for the current month so the operator
  * can spot a runaway day at a glance.
  *
- * The widget calls the same audit endpoint the `/admin/ai` Audit tab uses;
+ * The widget calls the same audit endpoint the `/cms/ai` Audit tab uses;
  * it just narrows `since` to the start of the calendar month. If the user
  * lacks `ai.audit.read` (e.g. a Client-role admin who can edit content
  * but not see site-wide AI spend) the endpoint returns 403 and the widget
@@ -50,7 +50,7 @@ interface UsageState {
 /**
  * Standalone fetcher hook (rather than re-using the dashboard's shared
  * `useDashboardEndpoint`) because the AI audit lives under
- * `/admin/api/ai/*` — a different namespace from `/admin/api/cms/dashboard/*`
+ * `/cms/api/ai/*` — a different namespace from `/cms/api/cms/dashboard/*`
  * — and uses a `since` query param the dashboard helper doesn't carry.
  *
  * The loader maps a 403 (caller lacks `ai.audit.read`) to the `forbidden`

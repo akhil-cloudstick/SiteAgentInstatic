@@ -1,5 +1,5 @@
 /**
- * AiPage — `/admin/ai`.
+ * AiPage — `/cms/ai`.
  *
  * Capability-gated workspace for managing AI provider credentials, per-scope
  * defaults, MCP connections, and the AI usage audit log.
@@ -58,7 +58,7 @@ export function AiPage() {
     ? section
     : availableSections[0] ?? 'providers'
 
-  if (location.pathname === '/admin/ai/oauth/authorize') {
+  if (location.pathname === '/cms/ai/oauth/authorize') {
     return <McpOAuthAuthorizePage />
   }
 

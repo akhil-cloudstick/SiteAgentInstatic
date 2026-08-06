@@ -66,7 +66,7 @@ test.describe('forms', () => {
     })
 
     await test.step('verify the submission appears in the Data workspace', async () => {
-      await page.goto('/admin/data')
+      await page.goto('/cms/data')
       await openCustomTable(page, tableName)
       await expect(
         page.getByRole('row').filter({ hasText: visitorName }),
@@ -125,7 +125,7 @@ test.describe('forms', () => {
     })
 
     await test.step('verify only the accepted retry appears in the Data workspace', async () => {
-      await page.goto('/admin/data')
+      await page.goto('/cms/data')
       await openCustomTable(page, tableName)
       await expect(
         page.getByRole('row').filter({ hasText: visitorName }),
@@ -135,7 +135,7 @@ test.describe('forms', () => {
 })
 
 async function createCustomDataTable(page: Page, tableName: string): Promise<void> {
-  await page.goto('/admin/data')
+  await page.goto('/cms/data')
   await page.getByRole('button', { name: 'New table' }).click()
   const dialog = page.getByRole('dialog', { name: 'New table' })
   await expect(dialog).toBeVisible()

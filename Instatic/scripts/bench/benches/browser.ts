@@ -138,7 +138,7 @@ async function scenarioAdminRouteCycle(
   // Frame stability isn't measured across navigations — each goto wipes the
   // in-page accumulator. Instead we measure per-route transition latency,
   // which is what the user-facing question actually is.
-  const routes = ['/admin/dashboard', '/admin/content', '/admin/data', '/admin/site']
+  const routes = ['/cms/dashboard', '/cms/content', '/cms/data', '/cms/site']
   const perRoute: Record<string, number[]> = {}
   for (const r of routes) perRoute[r] = []
 
@@ -250,7 +250,7 @@ async function scenarioIdleFrames(session: BrowserSession, durationMs: number): 
 /**
  * Authenticated cold-load measurement. Opens a fresh browser context (no
  * disk cache, no warm JIT cache) with the session cookie pre-installed,
- * then measures the cold load of the heavy `/admin/site` route.
+ * then measures the cold load of the heavy `/cms/site` route.
  *
  * This simulates the realistic scenario "user reloads the editor tab
  * while logged in" — the most common workflow path. Unlike the other
@@ -274,7 +274,7 @@ async function measureAuthenticatedColdLoad(
         name: 'instatic_admin_session',
         value: sessionCookieValue,
         domain: target.hostname,
-        path: '/admin',
+        path: '/cms',
         httpOnly: true,
         secure: false,
         sameSite: 'Lax',
@@ -363,7 +363,7 @@ export const browserBench: BenchModule = {
       // ── 1. Cold load metrics ────────────────────────────────────────────
       log.step('Page load metrics')
       const loadScenarios: LoadScenario[] = []
-      loadScenarios.push(await runLoadScenario(session, baseUrl, 'cold /admin (login screen)', '/admin'))
+      loadScenarios.push(await runLoadScenario(session, baseUrl, 'cold /admin (login screen)', '/cms'))
 
       const credentials = readBenchCredentials()
       let authOk = false
@@ -391,8 +391,8 @@ export const browserBench: BenchModule = {
       }
 
       if (authOk) {
-        loadScenarios.push(await runLoadScenario(session, baseUrl, 'warm /admin/dashboard (same context)', '/admin/dashboard'))
-        loadScenarios.push(await runLoadScenario(session, baseUrl, 'warm /admin/site (same context)', '/admin/site'))
+        loadScenarios.push(await runLoadScenario(session, baseUrl, 'warm /admin/dashboard (same context)', '/cms/dashboard'))
+        loadScenarios.push(await runLoadScenario(session, baseUrl, 'warm /admin/site (same context)', '/cms/site'))
       }
 
       // ── 1b. Authenticated COLD-LOAD scenarios ───────────────────────────
@@ -407,7 +407,7 @@ export const browserBench: BenchModule = {
             baseUrl,
             sessionCookieValue,
             overrideChromeForCold ?? findSystemChrome() ?? undefined,
-            '/admin/site',
+            '/cms/site',
             'AUTHENTICATED COLD /admin/site (fresh context)',
           ),
         )
@@ -416,7 +416,7 @@ export const browserBench: BenchModule = {
             baseUrl,
             sessionCookieValue,
             overrideChromeForCold ?? findSystemChrome() ?? undefined,
-            '/admin/dashboard',
+            '/cms/dashboard',
             'AUTHENTICATED COLD /admin/dashboard (fresh context)',
           ),
         )
@@ -432,7 +432,7 @@ export const browserBench: BenchModule = {
 
       // ── 3. Idle frame stability ─────────────────────────────────────────
       log.step(authOk ? 'Idle frame stability (5s on /admin/site)' : 'Idle frame stability (login screen)')
-      if (authOk) await session.page.goto(`${baseUrl}/admin/site`, { waitUntil: 'load' })
+      if (authOk) await session.page.goto(`${baseUrl}/cms/site`, { waitUntil: 'load' })
       const idleFrames = await scenarioIdleFrames(session, ctx.quick ? 2000 : 5000)
 
       // ── 4. Spotlight churn ──────────────────────────────────────────────

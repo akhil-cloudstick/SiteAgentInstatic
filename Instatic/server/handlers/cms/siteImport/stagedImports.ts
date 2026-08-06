@@ -8,7 +8,7 @@
  * Flow: `stageFileMap` (server-to-server POST, e.g. from the OpenDesign
  * daemon) stores the FileMap keyed by an unguessable token and returns it;
  * the caller redirects the tenant's browser (via the existing SSO route) to
- * `/admin/site?importToken=<token>`; the admin app fetches it ONCE
+ * `/cms/site?importToken=<token>`; the admin app fetches it ONCE
  * (`takeStagedFileMap` burns it on read) to hydrate the wizard.
  *
  * In-memory, per-process — Instatic runs one process per tenant, so this

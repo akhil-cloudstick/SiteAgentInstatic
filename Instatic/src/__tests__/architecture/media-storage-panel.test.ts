@@ -11,7 +11,7 @@
  *      (`server/handlers/cms/mediaStorageAdmin.ts`) require. Mismatch
  *      would either let a user open a panel that 403s on first action,
  *      or hide a panel from someone who can use it.
- *   3. There is NO standalone `/admin/media/storage` page or
+ *   3. There is NO standalone `/cms/media/storage` page or
  *      `mediaStorage` workspace value — those were folded into the
  *      sidebar panel. Re-introducing them silently would split the
  *      surface again.
@@ -70,7 +70,7 @@ describe('media storage settings panel', () => {
     const router = await read('src/admin/router.tsx')
     expect(workspace).not.toContain("'mediaStorage'")
     expect(access).not.toContain("'mediaStorage'")
-    expect(router).not.toContain('/admin/media/storage')
+    expect(router).not.toContain('/cms/media/storage')
     expect(await exists('src/admin/pages/mediaStorage')).toBe(false)
   })
 

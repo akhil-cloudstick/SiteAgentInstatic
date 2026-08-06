@@ -13,8 +13,8 @@ import {
   type CapabilityTestHarness,
 } from '../helpers/capabilityHarness'
 
-const AUTHORIZATION = '/admin/api/ai/mcp/oauth/authorization'
-const CONNECTIONS = '/admin/api/ai/mcp/connections'
+const AUTHORIZATION = '/cms/api/ai/mcp/oauth/authorization'
+const CONNECTIONS = '/cms/api/ai/mcp/connections'
 const CALLBACK = 'https://claude.ai/api/mcp/auth_callback'
 const VERIFIER = 'v'.repeat(64)
 

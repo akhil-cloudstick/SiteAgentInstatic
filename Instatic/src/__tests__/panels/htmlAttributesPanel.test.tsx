@@ -18,6 +18,11 @@ function resetStore() {
     selectedNodeIds: [],
     hoveredNodeId: null,
     activeBreakpointId: 'desktop',
+    // The inspector is per-mode since the approved Site re-skin; these tests
+    // exercise the Live-edit body, so pin the mode rather than inheriting the
+    // store's 'design' default (which resolves to Responsive review).
+    canvasView: 'live',
+    sectionFocusNodeId: null,
     activeClassId: null,
     previewClassAssignment: null,
     propertiesPanel: { collapsed: false, x: 0, y: 0, width: 360 },
@@ -80,16 +85,27 @@ function loadSiteWithPlainText(): string {
   return nodeId
 }
 
+/**
+ * Open the approved Site screen's "Advanced instance styles, classes &
+ * attributes" disclosure — the inspector's home for the class picker, the raw
+ * property workbench and the HTML attribute editor. They sit together behind
+ * one disclosure now; the old Styles ⇄ Attributes switcher is gone.
+ */
+function openAdvanced() {
+  fireEvent.click(
+    screen.getByRole('button', { name: /advanced instance styles, classes & attributes/i }),
+  )
+}
+
 describe('HtmlAttributesPanel', () => {
-  it('switches from styles to attributes and applies HTML attribute edits immediately', () => {
+  it('applies HTML attribute edits immediately from the Advanced disclosure', () => {
     const nodeId = loadSiteWithTrackedImage()
     render(<PropertiesPanel />)
 
+    openAdvanced()
+
+    // Class picker and attribute editor are both reachable at once.
     expect(screen.getByRole('textbox', { name: /add or create a css selector/i })).toBeDefined()
-
-    fireEvent.click(screen.getByRole('button', { name: /^attributes$/i }))
-
-    expect(screen.queryByRole('textbox', { name: /add or create a css selector/i })).toBeNull()
     const attributesPanel = screen.getByTestId('html-attributes-panel')
     expect(attributesPanel).toBeDefined()
     expect(within(attributesPanel).queryByText(/^Attributes$/i)).toBeNull()
@@ -131,16 +147,13 @@ describe('HtmlAttributesPanel', () => {
       'id',
     ])
 
-    fireEvent.click(screen.getByRole('button', { name: /^styles$/i }))
-
-    expect(screen.getByRole('textbox', { name: /add or create a css selector/i })).toBeDefined()
   })
 
   it('applies the first authored attribute from an empty attributes panel', () => {
     const nodeId = loadSiteWithPlainText()
     render(<PropertiesPanel />)
 
-    fireEvent.click(screen.getByRole('button', { name: /^attributes$/i }))
+    openAdvanced()
     fireEvent.click(screen.getByRole('button', { name: /^add attribute$/i }))
     fireEvent.change(screen.getByRole('textbox', { name: /^attribute name$/i }), {
       target: { value: 'id' },

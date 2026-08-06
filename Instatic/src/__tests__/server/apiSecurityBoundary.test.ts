@@ -72,103 +72,103 @@ interface MutationRoute {
 }
 
 const CMS_MUTATION_ROUTES: MutationRoute[] = [
-  { method: 'POST', path: '/admin/api/cms/setup' },
-  { method: 'POST', path: '/admin/api/cms/login' },
-  { method: 'POST', path: '/admin/api/cms/auth/mfa/verify' },
-  { method: 'POST', path: '/admin/api/cms/logout' },
-  { method: 'DELETE', path: '/admin/api/cms/auth/sessions/session-1' },
-  { method: 'POST', path: '/admin/api/cms/auth/step-up' },
-  { method: 'POST', path: '/admin/api/cms/auth/logout-all' },
-  { method: 'PATCH', path: '/admin/api/cms/me' },
-  { method: 'POST', path: '/admin/api/cms/me/avatar' },
-  { method: 'DELETE', path: '/admin/api/cms/me/avatar' },
-  { method: 'PATCH', path: '/admin/api/cms/me/password' },
-  { method: 'POST', path: '/admin/api/cms/me/mfa/totp/start' },
-  { method: 'POST', path: '/admin/api/cms/me/mfa/totp/enable' },
-  { method: 'DELETE', path: '/admin/api/cms/me/mfa/totp' },
-  { method: 'POST', path: '/admin/api/cms/me/mfa/recovery-codes' },
-  { method: 'PATCH', path: '/admin/api/cms/me/security/step-up' },
-  { method: 'PUT', path: '/admin/api/cms/me/preferences/editor.panel' },
-  { method: 'DELETE', path: '/admin/api/cms/me/preferences/editor.panel' },
-  { method: 'POST', path: '/admin/api/cms/users' },
-  { method: 'PATCH', path: '/admin/api/cms/users/user-1' },
-  { method: 'DELETE', path: '/admin/api/cms/users/user-1' },
-  { method: 'POST', path: '/admin/api/cms/roles' },
-  { method: 'PATCH', path: '/admin/api/cms/roles/role-1' },
-  { method: 'DELETE', path: '/admin/api/cms/roles/role-1' },
-  { method: 'PUT', path: '/admin/api/cms/site-document' },
-  { method: 'POST', path: '/admin/api/cms/runtime/dependencies/resolve' },
-  { method: 'POST', path: '/admin/api/cms/runtime/preview' },
-  { method: 'POST', path: '/admin/api/cms/media/folders' },
-  { method: 'PATCH', path: '/admin/api/cms/media/folders/folder-1' },
-  { method: 'DELETE', path: '/admin/api/cms/media/folders/folder-1' },
-  { method: 'POST', path: '/admin/api/cms/media/storage/elect' },
-  { method: 'POST', path: '/admin/api/cms/media/storage/delegate' },
-  { method: 'POST', path: '/admin/api/cms/media/storage/migrate' },
-  { method: 'POST', path: '/admin/api/cms/media/storage/verify/adapter-1' },
-  { method: 'POST', path: '/admin/api/cms/media' },
-  { method: 'PATCH', path: '/admin/api/cms/media/asset-1' },
-  { method: 'DELETE', path: '/admin/api/cms/media/asset-1' },
-  { method: 'POST', path: '/admin/api/cms/media/asset-1/restore' },
-  { method: 'POST', path: '/admin/api/cms/media/asset-1/replace' },
-  { method: 'POST', path: '/admin/api/cms/media/asset-1/folders' },
-  { method: 'POST', path: '/admin/api/cms/plugins' },
-  { method: 'POST', path: '/admin/api/cms/plugins/package' },
-  { method: 'POST', path: '/admin/api/cms/plugins/inspect-package' },
-  { method: 'PATCH', path: '/admin/api/cms/plugins/plugin-1' },
-  { method: 'DELETE', path: '/admin/api/cms/plugins/plugin-1' },
-  { method: 'POST', path: '/admin/api/cms/plugins/plugin-1/restart' },
-  { method: 'PUT', path: '/admin/api/cms/plugins/plugin-1/settings' },
-  { method: 'POST', path: '/admin/api/cms/plugins/plugin-1/pack/install' },
-  { method: 'POST', path: '/admin/api/cms/plugins/plugin-1/schedules/schedule-1/run-now' },
-  { method: 'POST', path: '/admin/api/cms/plugins/plugin-1/schedules/schedule-1/pause' },
-  { method: 'POST', path: '/admin/api/cms/plugins/plugin-1/schedules/schedule-1/resume' },
+  { method: 'POST', path: '/cms/api/cms/setup' },
+  { method: 'POST', path: '/cms/api/cms/login' },
+  { method: 'POST', path: '/cms/api/cms/auth/mfa/verify' },
+  { method: 'POST', path: '/cms/api/cms/logout' },
+  { method: 'DELETE', path: '/cms/api/cms/auth/sessions/session-1' },
+  { method: 'POST', path: '/cms/api/cms/auth/step-up' },
+  { method: 'POST', path: '/cms/api/cms/auth/logout-all' },
+  { method: 'PATCH', path: '/cms/api/cms/me' },
+  { method: 'POST', path: '/cms/api/cms/me/avatar' },
+  { method: 'DELETE', path: '/cms/api/cms/me/avatar' },
+  { method: 'PATCH', path: '/cms/api/cms/me/password' },
+  { method: 'POST', path: '/cms/api/cms/me/mfa/totp/start' },
+  { method: 'POST', path: '/cms/api/cms/me/mfa/totp/enable' },
+  { method: 'DELETE', path: '/cms/api/cms/me/mfa/totp' },
+  { method: 'POST', path: '/cms/api/cms/me/mfa/recovery-codes' },
+  { method: 'PATCH', path: '/cms/api/cms/me/security/step-up' },
+  { method: 'PUT', path: '/cms/api/cms/me/preferences/editor.panel' },
+  { method: 'DELETE', path: '/cms/api/cms/me/preferences/editor.panel' },
+  { method: 'POST', path: '/cms/api/cms/users' },
+  { method: 'PATCH', path: '/cms/api/cms/users/user-1' },
+  { method: 'DELETE', path: '/cms/api/cms/users/user-1' },
+  { method: 'POST', path: '/cms/api/cms/roles' },
+  { method: 'PATCH', path: '/cms/api/cms/roles/role-1' },
+  { method: 'DELETE', path: '/cms/api/cms/roles/role-1' },
+  { method: 'PUT', path: '/cms/api/cms/site-document' },
+  { method: 'POST', path: '/cms/api/cms/runtime/dependencies/resolve' },
+  { method: 'POST', path: '/cms/api/cms/runtime/preview' },
+  { method: 'POST', path: '/cms/api/cms/media/folders' },
+  { method: 'PATCH', path: '/cms/api/cms/media/folders/folder-1' },
+  { method: 'DELETE', path: '/cms/api/cms/media/folders/folder-1' },
+  { method: 'POST', path: '/cms/api/cms/media/storage/elect' },
+  { method: 'POST', path: '/cms/api/cms/media/storage/delegate' },
+  { method: 'POST', path: '/cms/api/cms/media/storage/migrate' },
+  { method: 'POST', path: '/cms/api/cms/media/storage/verify/adapter-1' },
+  { method: 'POST', path: '/cms/api/cms/media' },
+  { method: 'PATCH', path: '/cms/api/cms/media/asset-1' },
+  { method: 'DELETE', path: '/cms/api/cms/media/asset-1' },
+  { method: 'POST', path: '/cms/api/cms/media/asset-1/restore' },
+  { method: 'POST', path: '/cms/api/cms/media/asset-1/replace' },
+  { method: 'POST', path: '/cms/api/cms/media/asset-1/folders' },
+  { method: 'POST', path: '/cms/api/cms/plugins' },
+  { method: 'POST', path: '/cms/api/cms/plugins/package' },
+  { method: 'POST', path: '/cms/api/cms/plugins/inspect-package' },
+  { method: 'PATCH', path: '/cms/api/cms/plugins/plugin-1' },
+  { method: 'DELETE', path: '/cms/api/cms/plugins/plugin-1' },
+  { method: 'POST', path: '/cms/api/cms/plugins/plugin-1/restart' },
+  { method: 'PUT', path: '/cms/api/cms/plugins/plugin-1/settings' },
+  { method: 'POST', path: '/cms/api/cms/plugins/plugin-1/pack/install' },
+  { method: 'POST', path: '/cms/api/cms/plugins/plugin-1/schedules/schedule-1/run-now' },
+  { method: 'POST', path: '/cms/api/cms/plugins/plugin-1/schedules/schedule-1/pause' },
+  { method: 'POST', path: '/cms/api/cms/plugins/plugin-1/schedules/schedule-1/resume' },
   {
     method: 'POST',
-    path: '/admin/api/cms/plugins/plugin-1/resources/resource-1/records',
+    path: '/cms/api/cms/plugins/plugin-1/resources/resource-1/records',
   },
   {
     method: 'PATCH',
-    path: '/admin/api/cms/plugins/plugin-1/resources/resource-1/records/record-1',
+    path: '/cms/api/cms/plugins/plugin-1/resources/resource-1/records/record-1',
   },
   {
     method: 'DELETE',
-    path: '/admin/api/cms/plugins/plugin-1/resources/resource-1/records/record-1',
+    path: '/cms/api/cms/plugins/plugin-1/resources/resource-1/records/record-1',
   },
-  { method: 'POST', path: '/admin/api/cms/data/tables' },
-  { method: 'PATCH', path: '/admin/api/cms/data/tables/table-1' },
-  { method: 'DELETE', path: '/admin/api/cms/data/tables/table-1' },
-  { method: 'POST', path: '/admin/api/cms/data/tables/table-1/rows' },
-  { method: 'PUT', path: '/admin/api/cms/data/rows/row-1' },
-  { method: 'PATCH', path: '/admin/api/cms/data/rows/row-1' },
-  { method: 'DELETE', path: '/admin/api/cms/data/rows/row-1' },
-  { method: 'POST', path: '/admin/api/cms/data/rows/row-1/publish' },
-  { method: 'PATCH', path: '/admin/api/cms/data/rows/row-1/status' },
-  { method: 'PATCH', path: '/admin/api/cms/data/rows/row-1/author' },
-  { method: 'PATCH', path: '/admin/api/cms/data/rows/row-1/table' },
-  { method: 'POST', path: '/admin/api/cms/fonts/estimate' },
-  { method: 'POST', path: '/admin/api/cms/fonts/install' },
-  { method: 'POST', path: '/admin/api/cms/fonts/custom' },
-  { method: 'DELETE', path: '/admin/api/cms/fonts/family/Inter' },
-  { method: 'POST', path: '/admin/api/cms/publish' },
-  { method: 'POST', path: '/admin/api/cms/export' },
-  { method: 'POST', path: '/admin/api/cms/export/estimate' },
-  { method: 'POST', path: '/admin/api/cms/import/preview' },
-  { method: 'POST', path: '/admin/api/cms/import' },
+  { method: 'POST', path: '/cms/api/cms/data/tables' },
+  { method: 'PATCH', path: '/cms/api/cms/data/tables/table-1' },
+  { method: 'DELETE', path: '/cms/api/cms/data/tables/table-1' },
+  { method: 'POST', path: '/cms/api/cms/data/tables/table-1/rows' },
+  { method: 'PUT', path: '/cms/api/cms/data/rows/row-1' },
+  { method: 'PATCH', path: '/cms/api/cms/data/rows/row-1' },
+  { method: 'DELETE', path: '/cms/api/cms/data/rows/row-1' },
+  { method: 'POST', path: '/cms/api/cms/data/rows/row-1/publish' },
+  { method: 'PATCH', path: '/cms/api/cms/data/rows/row-1/status' },
+  { method: 'PATCH', path: '/cms/api/cms/data/rows/row-1/author' },
+  { method: 'PATCH', path: '/cms/api/cms/data/rows/row-1/table' },
+  { method: 'POST', path: '/cms/api/cms/fonts/estimate' },
+  { method: 'POST', path: '/cms/api/cms/fonts/install' },
+  { method: 'POST', path: '/cms/api/cms/fonts/custom' },
+  { method: 'DELETE', path: '/cms/api/cms/fonts/family/Inter' },
+  { method: 'POST', path: '/cms/api/cms/publish' },
+  { method: 'POST', path: '/cms/api/cms/export' },
+  { method: 'POST', path: '/cms/api/cms/export/estimate' },
+  { method: 'POST', path: '/cms/api/cms/import/preview' },
+  { method: 'POST', path: '/cms/api/cms/import' },
 ]
 
 const AI_MUTATION_ROUTES: MutationRoute[] = [
-  { method: 'POST', path: '/admin/api/ai/chat/site' },
-  { method: 'POST', path: '/admin/api/ai/tool-result' },
-  { method: 'POST', path: '/admin/api/ai/credentials' },
-  { method: 'PUT', path: '/admin/api/ai/credentials/credential-1' },
-  { method: 'DELETE', path: '/admin/api/ai/credentials/credential-1' },
-  { method: 'POST', path: '/admin/api/ai/credentials/credential-1/test' },
-  { method: 'POST', path: '/admin/api/ai/conversations' },
-  { method: 'PUT', path: '/admin/api/ai/conversations/conversation-1' },
-  { method: 'DELETE', path: '/admin/api/ai/conversations/conversation-1' },
-  { method: 'PUT', path: '/admin/api/ai/defaults/site' },
-  { method: 'DELETE', path: '/admin/api/ai/defaults/site' },
+  { method: 'POST', path: '/cms/api/ai/chat/site' },
+  { method: 'POST', path: '/cms/api/ai/tool-result' },
+  { method: 'POST', path: '/cms/api/ai/credentials' },
+  { method: 'PUT', path: '/cms/api/ai/credentials/credential-1' },
+  { method: 'DELETE', path: '/cms/api/ai/credentials/credential-1' },
+  { method: 'POST', path: '/cms/api/ai/credentials/credential-1/test' },
+  { method: 'POST', path: '/cms/api/ai/conversations' },
+  { method: 'PUT', path: '/cms/api/ai/conversations/conversation-1' },
+  { method: 'DELETE', path: '/cms/api/ai/conversations/conversation-1' },
+  { method: 'PUT', path: '/cms/api/ai/defaults/site' },
+  { method: 'DELETE', path: '/cms/api/ai/defaults/site' },
 ]
 
 describe('admin API security boundary', () => {
@@ -215,7 +215,7 @@ describe('admin API security boundary', () => {
         await harness.setupOwner()
 
         for (const origin of ['https://cms.example.com', 'https://site.onrender.com']) {
-          const response = await harness.cms('/admin/api/cms/login', {
+          const response = await harness.cms('/cms/api/cms/login', {
             method: 'POST',
             headers: { origin },
             json: { email: 'owner@example.com', password: 'wrong-password' },
@@ -237,7 +237,7 @@ describe('admin API security boundary', () => {
       const harness = await createCapabilityTestHarness()
       try {
         for (const origin of ['https://cms.example.com', 'https://site.onrender.com']) {
-          const response = await harness.ai('/admin/api/ai/defaults/site', {
+          const response = await harness.ai('/cms/api/ai/defaults/site', {
             method: 'PUT',
             headers: { origin },
             json: { credentialId: 'cred-1', modelId: 'model-1' },
@@ -260,7 +260,7 @@ describe('admin API security boundary', () => {
         const { db, wasQueried } = makeThrowingDb()
         const req = makeRequest(
           'POST',
-          '/admin/api/cms/login',
+          '/cms/api/cms/login',
           { email: 'owner@example.com', password: 'password' },
           {
             origin: 'https://evil.example.com',
@@ -287,7 +287,7 @@ describe('admin API security boundary', () => {
         const { db, wasQueried } = makeThrowingDb()
         const req = makeRequest(
           'PUT',
-          '/admin/api/ai/defaults/site',
+          '/cms/api/ai/defaults/site',
           { credentialId: 'cred-1', modelId: 'model-1' },
           {
             origin: 'https://evil.example.com',
@@ -312,7 +312,7 @@ describe('admin API security boundary', () => {
     const { db, wasQueried } = makeThrowingDb()
 
     const response = await handleServerRequest(
-      makeRequest('POST', '/admin/api/cms/login', { email: 'owner@example.com', password: 'password' }, {
+      makeRequest('POST', '/cms/api/cms/login', { email: 'owner@example.com', password: 'password' }, {
         origin: 'https://evil.example',
       }),
       { db },
@@ -327,7 +327,7 @@ describe('admin API security boundary', () => {
     const { db, wasQueried } = makeThrowingDb()
 
     const response = await handleServerRequest(
-      makeRequest('PUT', '/admin/api/ai/defaults/site', { credentialId: 'cred-1', modelId: 'model-1' }, {
+      makeRequest('PUT', '/cms/api/ai/defaults/site', { credentialId: 'cred-1', modelId: 'model-1' }, {
         origin: 'https://evil.example',
       }),
       { db },
@@ -341,7 +341,7 @@ describe('admin API security boundary', () => {
   it('does not apply the Origin gate to safe CMS reads', async () => {
     const harness = await createCapabilityTestHarness()
     try {
-      const response = await harness.cms('/admin/api/cms/site', {
+      const response = await harness.cms('/cms/api/cms/site', {
         method: 'GET',
         headers: { origin: 'https://evil.example' },
       })
@@ -357,7 +357,7 @@ describe('admin API security boundary', () => {
     const { db, wasQueried } = makeThrowingDb()
 
     const response = await handleServerRequest(
-      makeRequest('PATCH', '/admin/api/cms/pages'),
+      makeRequest('PATCH', '/cms/api/cms/pages'),
       { db },
     )
 
@@ -376,7 +376,7 @@ describe('admin API security boundary', () => {
         capabilities: ['site.read'],
       })
 
-      const response = await harness.cms('/admin/api/cms/site-document', {
+      const response = await harness.cms('/cms/api/cms/site-document', {
         method: 'PUT',
         cookie: reader.cookie,
         json: { definitelyNotThePagesEnvelope: true },
@@ -394,7 +394,7 @@ describe('admin API security boundary', () => {
     try {
       const ownerCookie = await harness.setupOwner()
 
-      const response = await harness.cms('/admin/api/cms/site-document', {
+      const response = await harness.cms('/cms/api/cms/site-document', {
         method: 'PUT',
         cookie: ownerCookie,
         json: { definitelyNotThePagesEnvelope: true },
@@ -412,7 +412,7 @@ describe('admin API security boundary', () => {
     try {
       const ownerCookie = await harness.setupOwner()
 
-      const response = await harness.cms('/admin/api/cms/site-document', {
+      const response = await harness.cms('/cms/api/cms/site-document', {
         method: 'PUT',
         cookie: ownerCookie,
         headers: { 'content-type': 'application/json' },
@@ -436,7 +436,7 @@ describe('admin API security boundary', () => {
         capabilities: ['ai.chat'],
       })
 
-      const response = await harness.ai('/admin/api/ai/defaults/site', {
+      const response = await harness.ai('/cms/api/ai/defaults/site', {
         method: 'PUT',
         cookie: chatOnly.cookie,
         json: { credentialId: 'cred-1', modelId: 'model-1' },
@@ -454,7 +454,7 @@ describe('admin API security boundary', () => {
     try {
       const ownerCookie = await harness.setupOwner()
 
-      const response = await harness.ai('/admin/api/ai/defaults/site', {
+      const response = await harness.ai('/cms/api/ai/defaults/site', {
         method: 'PUT',
         cookie: ownerCookie,
         headers: { 'content-type': 'application/json' },
@@ -473,7 +473,7 @@ describe('admin API security boundary', () => {
     try {
       const ownerCookie = await harness.setupOwner()
 
-      const response = await harness.ai('/admin/api/ai/defaults/site', {
+      const response = await harness.ai('/cms/api/ai/defaults/site', {
         method: 'PUT',
         cookie: ownerCookie,
         json: { credentialId: '', modelId: '' },

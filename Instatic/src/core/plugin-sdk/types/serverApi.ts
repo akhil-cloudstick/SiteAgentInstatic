@@ -57,7 +57,7 @@ export interface ServerPluginApi {
   cms: {
     /**
      * Register backend HTTP routes scoped under
-     * `/admin/api/cms/plugins/:id/runtime/<path>`. Three access shapes:
+     * `/cms/api/cms/plugins/:id/runtime/<path>`. Three access shapes:
      *
      *   api.cms.routes.get(path, capability, handler)
      *       Standard gated route — caller must hold the named core capability

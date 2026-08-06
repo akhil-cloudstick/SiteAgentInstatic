@@ -236,7 +236,7 @@ async function mediaVariantSummary(page: Page): Promise<Array<{
   variantCount: number
 }>> {
   return page.evaluate(async () => {
-    const response = await fetch('/admin/api/cms/media', { credentials: 'include' })
+    const response = await fetch('/cms/api/cms/media', { credentials: 'include' })
     if (!response.ok) throw new Error(`Media list failed: ${response.status}`)
     const json: unknown = await response.json()
     const assets = getField(json, 'assets')

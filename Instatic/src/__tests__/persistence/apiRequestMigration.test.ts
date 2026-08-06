@@ -62,7 +62,7 @@ describe('persistence → apiRequest migration invariants', () => {
     expect(table.id).toBe('products')
 
     // apiRequest owns the transport policy: include + JSON serialization.
-    expect(calls[0].input).toBe('/admin/api/cms/data/tables')
+    expect(calls[0].input).toBe('/cms/api/cms/data/tables')
     expect(calls[0].init).toMatchObject({
       method: 'POST',
       credentials: 'include',
@@ -107,7 +107,7 @@ describe('persistence → apiRequest migration invariants', () => {
       },
     )
 
-    expect(calls[0].input).toBe('/admin/api/cms/me/preferences/module-inserter')
+    expect(calls[0].input).toBe('/cms/api/cms/me/preferences/module-inserter')
     expect(calls[0].init).toMatchObject({ method: 'PUT', credentials: 'include' })
   })
 })

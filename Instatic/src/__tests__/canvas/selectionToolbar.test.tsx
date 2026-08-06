@@ -2,6 +2,10 @@ import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { useRef, type ReactNode } from 'react'
 import { BreakpointFrame } from '@site/canvas/BreakpointFrame'
+import {
+  TOOLBAR_GAP,
+  TOOLBAR_HEIGHT_FALLBACK,
+} from '@site/canvas/canvasSelectionOverlayPositioning'
 import { CanvasViewportActionsContext } from '@site/canvas/CanvasContexts'
 import { useEditorStore } from '@site/store/store'
 import type { Page } from '@core/page-tree'
@@ -288,7 +292,12 @@ describe('canvas selection toolbar', () => {
       // error instead of a confusing empty-CSS-var assertion.
       expect(hasNode).toBe(true)
       expect(toolbar.style.left).toBe('20px')
-      expect(toolbar.style.top).toBe('-20px')
+      // The toolbar is anchored fully ABOVE the selection (y=10) rather than
+      // overlapping its top edge. happy-dom reports `offsetHeight === 0`, so
+      // the height fallback decides — derived from the exported constants
+      // instead of a literal so a CSS height change can't silently drift.
+      expect(toolbar.style.top).toBe(`${10 - TOOLBAR_HEIGHT_FALLBACK - TOOLBAR_GAP}px`)
+      expect(toolbar.dataset.placement).toBe('above')
       expect(screen.getByRole('button', { name: 'Drag selected layers' })).toBeTruthy()
       expect(screen.getByRole('button', { name: 'Duplicate selected layers' })).toBeTruthy()
       // Delete moved behind "More" — see the approved selection-actions test.

@@ -14,7 +14,7 @@ function json(body: unknown, status = 200): Response {
 function mockEmptyCredentials() {
   globalThis.fetch = mock(async (input: RequestInfo | URL) => {
     const url = typeof input === 'string' ? input : input.toString()
-    if (url.endsWith('/admin/api/ai/credentials')) return json({ credentials: [] })
+    if (url.endsWith('/cms/api/ai/credentials')) return json({ credentials: [] })
     throw new Error(`Unexpected fetch: ${url}`)
   }) as typeof fetch
 }
@@ -57,7 +57,7 @@ describe('ProvidersTab', () => {
   it('opens configured credentials in the detail inspector', async () => {
     globalThis.fetch = mock(async (input: RequestInfo | URL) => {
       const url = typeof input === 'string' ? input : input.toString()
-      if (url.endsWith('/admin/api/ai/credentials')) {
+      if (url.endsWith('/cms/api/ai/credentials')) {
         return json({
           credentials: [{
             id: 'cred-1',
@@ -71,7 +71,7 @@ describe('ProvidersTab', () => {
           }],
         })
       }
-      if (url.includes('/admin/api/ai/providers/anthropic/models')) {
+      if (url.includes('/cms/api/ai/providers/anthropic/models')) {
         return json({
           models: [{
             id: 'claude-sonnet-4',

@@ -29,7 +29,7 @@ const defaultFetch: FetchLike = (input, init) => globalThis.fetch(input, init)
 
 export async function listCmsGoogleFonts(
   fetchImpl: FetchLike = defaultFetch,
-  basePath = '/admin/api/cms',
+  basePath = '/cms/api/cms',
 ): Promise<GoogleFontFamilyDto[]> {
   const payload = await apiRequest(`${basePath}/fonts/google`, {
     schema: CmsGoogleFontsEnvelopeSchema,
@@ -54,7 +54,7 @@ interface InstallGoogleFontRequest {
 export async function estimateCmsGoogleFont(
   request: InstallGoogleFontRequest,
   fetchImpl: FetchLike = defaultFetch,
-  basePath = '/admin/api/cms',
+  basePath = '/cms/api/cms',
   init?: { signal?: AbortSignal },
 ): Promise<CmsFontEstimateDto> {
   return apiRequest(`${basePath}/fonts/estimate`, {
@@ -70,7 +70,7 @@ export async function estimateCmsGoogleFont(
 export async function installCmsGoogleFont(
   request: InstallGoogleFontRequest,
   fetchImpl: FetchLike = defaultFetch,
-  basePath = '/admin/api/cms',
+  basePath = '/cms/api/cms',
 ): Promise<FontEntry> {
   // The envelope validates the inner shape against the canonical
   // `FontEntrySchema`, so `payload.font` is already a fully-typed FontEntry.
@@ -98,7 +98,7 @@ interface RegisterCustomFontRequest {
 export async function registerCustomFont(
   request: RegisterCustomFontRequest,
   fetchImpl: FetchLike = defaultFetch,
-  basePath = '/admin/api/cms',
+  basePath = '/cms/api/cms',
 ): Promise<FontEntry> {
   const payload = await apiRequest(`${basePath}/fonts/custom`, {
     method: 'POST',
@@ -113,7 +113,7 @@ export async function registerCustomFont(
 export async function deleteCmsFontFamily(
   family: string,
   fetchImpl: FetchLike = defaultFetch,
-  basePath = '/admin/api/cms',
+  basePath = '/cms/api/cms',
 ): Promise<void> {
   await apiRequest(`${basePath}/fonts/family/${encodeURIComponent(family)}`, {
     method: 'DELETE',

@@ -169,6 +169,7 @@ The Zustand store is created with `mutative({ enableAutoFreeze: true })`. That k
 
 - `src/admin/pages/site/store/slices/site/helpers.ts` — `runHistoricMutation`, `commitHistory`, all six `mutate*` helpers
 - `src/admin/pages/site/store/slices/site/undoRedoActions.ts` — `undo`, `redo`
+- `src/admin/pages/site/canvas/useUndoRedoShortcuts.ts` — the only non-palette way in: Ctrl/Cmd+Z, Ctrl/Cmd+Shift+Z (Ctrl+Y alias). The canvas chrome has no Undo/Redo buttons.
 - `src/admin/pages/site/store/slices/site/types.ts` — `HistoryEntry`, `SiteSliceHelpers`
 - `src/admin/pages/site/store/slices/site/defaults.ts` — `MAX_HISTORY`
 - `docs/editor.md` — editor store overview

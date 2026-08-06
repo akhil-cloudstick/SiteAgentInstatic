@@ -88,3 +88,74 @@
     .clearOverlay {
     opacity: 1;
 }
+
+/* ── Site screen ─────────────────────────────────────────────────────────
+ * Transcribed from the approved Site screen's `.segmented`
+ * (screens/site/src/styles.css). The reference fuses its segments edge to
+ * edge — one 44px track on `--mms-surface-tint`, hairline dividers between
+ * buttons, and the active face lifted to `--mms-surface-raised` with a
+ * 12%-green inset hairline. The generic gapped 12px pill is a different
+ * object, so every value is restated rather than tweaked.
+ */
+:global([data-editor-screen='site']) .group {
+    min-height: 44px;
+    padding: 0;
+    gap: 0;
+    overflow: hidden;
+    border: 1px solid var(--mms-border);
+    border-radius: 7px;
+    background: var(--mms-surface-tint);
+}
+
+/* `fullWidth` is the reference's `.responsive-inspector .segmented` — equal
+   tracks across the panel with tighter padding, used for every guided control
+   in Responsive review. */
+:global([data-editor-screen='site']) .group.fullWidth {
+    display: grid;
+    width: 100%;
+    grid-auto-columns: 1fr;
+    grid-auto-flow: column;
+}
+
+:global([data-editor-screen='site']) .group .segment.segment {
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0 17px;
+    gap: 8px;
+    border: 0;
+    border-right: 1px solid var(--mms-border);
+    border-radius: 0;
+    background: transparent;
+    color: var(--mms-text);
+    font-family: var(--font-mms);
+    font-weight: 650;
+}
+
+:global([data-editor-screen='site']) .group.fullWidth .segment.segment {
+    padding: 0 8px;
+}
+
+:global([data-editor-screen='site']) .group .segment.segment:last-child {
+    border-right: 0;
+}
+
+:global([data-editor-screen='site']) .group .segment.segment:hover {
+    background: transparent;
+}
+
+:global([data-editor-screen='site']) .group .segment.segment[aria-pressed="true"] {
+    background: var(--mms-surface-raised);
+    box-shadow: inset 0 0 0 1px var(--mms-selected-inset);
+    color: var(--mms-action-strong);
+    font-weight: 720;
+}
+
+/* The clear affordance REPLACES the segment's label on hover; it must be
+   opaque, or the ✕ lands on top of the word and both are unreadable. The
+   generic overlay is a translucent scrim, which works on the admin's darker
+   chrome but not on this segment's near-white pressed face. */
+:global([data-editor-screen='site']) .group .segment .clearOverlay {
+    border-radius: 0;
+    background: var(--mms-surface-raised);
+    color: var(--mms-danger);
+}

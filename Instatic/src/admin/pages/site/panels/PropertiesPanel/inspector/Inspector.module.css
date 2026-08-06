@@ -1,0 +1,486 @@
+/**
+ * Inspector — the approved Site screen's right-panel surfaces.
+ *
+ * Transcribed from `.inspector-heading`, `.inspector-tabs`, `.inspector-body`,
+ * `.component-card`, `.visual-badge`, `.panel-kicker`, `.text-action`,
+ * `.slot-list`, `.slot-drag`, `.slot-delete`, `.add-slot`, `.helper`,
+ * `.info-note`, `.override-note`, `.responsive-title`, `.review-actions`,
+ * `.field-image`, `.input-with-icon`, `.parameter-grid`, `.button` and
+ * `.icon-button` in `screens/site/src/styles.css`.
+ *
+ * Two conventions carried over from the reference and worth not "fixing":
+ *   - `.componentCard`, `.visualBadge` and `.tabs` are SIBLINGS of the body, so
+ *     their horizontal insets (18px, 18px, 0) differ from the body's 17px
+ *     padding. The asymmetry is in the approved screen.
+ *   - There are no transitions anywhere in the reference inspector. Do not add
+ *     hover tweens here.
+ *
+ * The button classes double their own selector (`.x.x`) to out-specify
+ * `Button.module.css`'s `.btn.variant-*` pairings regardless of stylesheet
+ * order — the same trick `SegmentedControl.module.css` uses. They live here
+ * rather than in the Button primitive so the already-approved toolbar, outline
+ * and dock buttons are not disturbed.
+ */
+
+/* ── Heading ─────────────────────────────────────────────────────────────── */
+
+.heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 44px;
+    padding: 8px 14px 8px 19px;
+    gap: 8px;
+}
+
+.heading h2 {
+    margin: 0;
+    font-size: 16px;
+    letter-spacing: -0.015em;
+}
+
+/* ── Tabs ────────────────────────────────────────────────────────────────── */
+
+.tabs {
+    display: grid;
+    min-height: 48px;
+    margin-top: 8px;
+    border-top: 1px solid var(--mms-border);
+    border-bottom: 1px solid var(--mms-border);
+    grid-auto-columns: 1fr;
+    grid-auto-flow: column;
+}
+
+.tabs .tab.tab {
+    position: relative;
+    min-height: 48px;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: var(--mms-text-muted);
+    font-size: 13px;
+    font-weight: 560;
+    line-height: 1.4;
+}
+
+.tabs .tab.tab:hover {
+    background: transparent;
+    color: var(--mms-text);
+}
+
+.tabs .tab.tab[data-active='true'] {
+    color: var(--mms-action-strong);
+    font-weight: 680;
+}
+
+.tabs .tab.tab[data-active='true']::after {
+    position: absolute;
+    right: 9px;
+    bottom: -1px;
+    left: 9px;
+    height: 2px;
+    background: var(--mms-action);
+    content: '';
+}
+
+/* ── Body ────────────────────────────────────────────────────────────────── */
+
+.body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 14px 17px 24px;
+    scrollbar-width: thin;
+}
+
+.body > h3,
+.groupTitle {
+    margin: 4px 0 11px;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.helper {
+    margin: 0;
+    color: var(--mms-text-muted);
+    font-size: 9px;
+    font-weight: 450;
+}
+
+.kicker {
+    margin: 0 0 8px;
+    color: var(--mms-text-muted);
+    font-size: 11px;
+}
+
+/* ── Component card / Visual component badge ─────────────────────────────── */
+
+.componentCard {
+    display: flex;
+    align-items: flex-start;
+    gap: 11px;
+    margin: 0 18px 13px;
+    padding: 12px;
+    border: 1px solid var(--mms-border);
+    border-radius: 8px;
+    background: var(--mms-surface);
+}
+
+.componentGlyph {
+    display: grid;
+    width: 32px;
+    height: 32px;
+    flex: 0 0 32px;
+    place-items: center;
+    border-radius: 50%;
+    background: var(--mms-surface-green);
+    color: var(--mms-action-strong);
+}
+
+.componentMeta {
+    display: grid;
+    flex: 1;
+    min-width: 0;
+    gap: 3px;
+}
+
+.componentName {
+    font-weight: 700;
+}
+
+.componentCount {
+    color: var(--mms-text-muted);
+    font-size: 10px;
+}
+
+.visualBadge {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    min-height: 30px;
+    margin: 0 18px 3px;
+    padding: 0 9px;
+    border: 1px solid var(--mms-border);
+    border-radius: 6px;
+    background: var(--mms-surface);
+    font-size: 10px;
+}
+
+/* ── Text action ("Open component in canvas") ────────────────────────────── */
+
+.textAction.textAction {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 44px;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: var(--mms-action-strong);
+    font-weight: 430;
+    text-align: left;
+    text-decoration: underline;
+}
+
+.textAction.textAction:hover {
+    background: transparent;
+    color: var(--mms-action-strong);
+}
+
+/* ── Slot content list ───────────────────────────────────────────────────── */
+
+.slotList {
+    display: grid;
+    gap: 7px;
+}
+
+.slotRow {
+    display: grid;
+    min-height: 57px;
+    overflow: hidden;
+    align-items: center;
+    border: 1px solid var(--mms-border);
+    border-radius: 7px;
+    background: var(--mms-surface);
+    grid-template-columns: 44px 48px minmax(0, 1fr) 44px;
+}
+
+.slotThumb {
+    display: grid;
+    width: 48px;
+    height: 54px;
+    place-items: center;
+    object-fit: cover;
+    background: var(--mms-surface-tint);
+    color: var(--mms-text-muted);
+}
+
+.slotLabel {
+    overflow: hidden;
+    padding: 0 10px;
+    font-size: 11px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.slotGrip.slotGrip,
+.slotDelete.slotDelete {
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+    min-height: 44px;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: var(--mms-text-muted);
+}
+
+.slotGrip.slotGrip:hover,
+.slotDelete.slotDelete:hover {
+    background: transparent;
+}
+
+.slotDelete.slotDelete {
+    color: var(--mms-danger);
+}
+
+.addSlot.addSlot {
+    display: inline-flex;
+    width: 100%;
+    min-height: 44px;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
+    margin-top: 11px;
+    border: 1px solid var(--mms-action);
+    border-radius: 7px;
+    background: transparent;
+    color: var(--mms-action-strong);
+    font-weight: 650;
+}
+
+.addSlot.addSlot:hover {
+    background: transparent;
+    color: var(--mms-action-strong);
+}
+
+/* ── Notes ───────────────────────────────────────────────────────────────── */
+
+.note {
+    display: flex;
+    align-items: flex-start;
+    gap: 9px;
+    margin: 14px 0 0;
+    padding: 12px;
+    border: 1px solid var(--mms-border);
+    border-radius: 7px;
+    background: var(--mms-surface);
+    color: var(--mms-text-muted);
+    font-size: 10px;
+}
+
+.note .noteIcon {
+    color: var(--mms-action-strong);
+}
+
+/* The override note is the reference's one warm surface — its own border, face
+   and ink, none of which come from the note above. `.overrideActive` re-tints
+   border + face but deliberately leaves the ink alone, as the reference does. */
+.overrideNote {
+    min-height: 64px;
+    border-color: var(--mms-note-border);
+    background: var(--mms-note-bg);
+    color: var(--mms-note-text);
+}
+
+.overrideNote .noteIcon {
+    color: var(--mms-warning);
+}
+
+.overrideActive {
+    border-color: var(--mms-action);
+    background: var(--mms-surface-green);
+}
+
+/* ── Responsive review chrome ────────────────────────────────────────────── */
+
+.responsiveTitle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 48px;
+    padding: 0 18px;
+    border-top: 1px solid var(--mms-border);
+}
+
+.responsiveTitle h3 {
+    margin: 0;
+    overflow: hidden;
+    font-size: 16px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.responsivePill {
+    flex-shrink: 0;
+    padding: 5px 9px;
+    border: 1px solid var(--mms-border);
+    border-radius: 6px;
+    background: var(--mms-surface-green);
+    color: var(--mms-action-strong);
+    font-size: 9px;
+}
+
+.reviewActions {
+    display: grid;
+    margin-top: 28px;
+    gap: 10px;
+    grid-template-columns: 1fr 1fr;
+}
+
+/* `.icon-segment` — glyph-only segmented pickers draw their icons a step
+   larger than body text. */
+.iconSegment :global(.fa-solid) {
+    --fa-size: 16px;
+}
+
+/* ── Buttons ─────────────────────────────────────────────────────────────── */
+
+.button.button {
+    display: inline-flex;
+    min-width: 44px;
+    min-height: 44px;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 0 17px;
+    border: 1px solid var(--mms-border-strong);
+    border-radius: 6px;
+    background: var(--mms-surface-raised);
+    color: var(--mms-text);
+    font-weight: 650;
+}
+
+.button.fullWidth {
+    width: 100%;
+}
+
+/* The reference's `.button.secondary.success` — the "Done" action. */
+.button.success {
+    border-color: var(--mms-action);
+    color: var(--mms-action-strong);
+}
+
+.iconButton.iconButton {
+    display: inline-grid;
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+    min-height: 44px;
+    flex: 0 0 44px;
+    padding: 0;
+    place-items: center;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+}
+
+.iconButton.iconButton:hover {
+    background: var(--mms-surface-tint);
+}
+
+/* ── Field extras ────────────────────────────────────────────────────────── */
+
+.fieldImage {
+    width: 100%;
+    height: 120px;
+    border-radius: 6px;
+    object-fit: cover;
+}
+
+.inputWithIcon {
+    display: grid;
+    overflow: hidden;
+    align-items: center;
+    border: 1px solid var(--mms-border-strong);
+    border-radius: 6px;
+    background: var(--mms-surface-raised);
+    grid-template-columns: minmax(0, 1fr) 44px;
+}
+
+.inputWithIcon :global(input) {
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+}
+
+.inputWithIcon .inputIcon {
+    color: var(--mms-text-muted);
+    text-align: center;
+}
+
+.parameterGrid {
+    display: grid;
+    padding: 10px 0;
+    gap: 10px;
+    grid-template-columns: 1fr 1fr;
+}
+
+.parameterGrid > *:last-child {
+    grid-column: 1 / -1;
+}
+
+/* ── Advanced disclosure ─────────────────────────────────────────────────────
+ * The class picker, the raw property workbench and the HTML attribute editor
+ * were each built to fill a panel of their own, so stacking them inside one
+ * disclosure left their spacing fighting: a floating "+ Add", a centred "No
+ * attributes set", a fade running into nothing. This is the single column that
+ * owns their rhythm — one gap between blocks, a hairline where one ends and the
+ * next begins, and no surface of their own to argue with the bar around them.
+ */
+
+.advancedStack {
+    display: grid;
+    min-width: 0;
+    gap: 16px;
+}
+
+/* One group per surface — Classes, Styles, Attributes. Each is separated by a
+   hairline rather than by guesswork, so it is always obvious which control
+   belongs to which. The first has no rule above it; the disclosure's own bar
+   is its boundary. */
+.advancedGroup {
+    display: grid;
+    min-width: 0;
+    gap: 9px;
+    padding-top: 16px;
+    border-top: 1px solid var(--mms-border);
+}
+
+.advancedGroup:first-child {
+    padding-top: 0;
+    border-top: 0;
+}
+
+.advancedGroupTitle {
+    margin: 0;
+    color: var(--mms-text-muted);
+    font-size: 9px;
+    font-weight: 620;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.advancedClassPicker {
+    min-width: 0;
+    padding: 0;
+}
+
+/* The picker's own bottom fade exists to blur content scrolling under it in a
+   full-height panel. There is nothing to scroll here. */
+.advancedClassPicker::after {
+    display: none;
+}

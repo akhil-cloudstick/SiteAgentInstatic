@@ -404,8 +404,10 @@ The Site workspace presents **three** modes in its toolbar — Live edit, Focus 
 
 `CanvasRoot` switches between two rendering surfaces based on `canvasView`:
 
-- **Design mode** (`canvasView === 'design'`): `CanvasRoot` → `CanvasTransformLayer` → `BreakpointFrame` → `IframeFrameSurface` → `NodeRenderer`. Each breakpoint gets its own iframe rendered side-by-side inside the pan/zoom transform layer. The author sees all breakpoints at once and can zoom in/out. The canvas opens at 50% (`INITIAL_ZOOM`) so several frames fit in view; reset (Cmd/Ctrl+0, the toolbar % button) goes to 100% (`RESET_ZOOM`).
-- **Live mode** (`canvasView === 'live'`): `CanvasRoot` → `CanvasLiveSurface` → `IframeFrameSurface` → `NodeRenderer`. A single real-size frame at 100% width (optionally clamped to a selected breakpoint's width) scrolls normally. The toolbar zoom controls pin to 100% and disable with the reason in their tooltip ("Live mode always shows 100% zoom.") — the stored design-canvas zoom is preserved for the return to design mode. Resizable with side handles. Because the live frame is flush with the top of the canvas surface, both chrome controls — `CanvasNotch` (top-center) and `CanvasModeToggle` (top-left) — render in **peek** mode: they park above the top edge and roll down on hover/`:focus-within`, so they do not overlay the page's own header. In design mode they are always pinned.
+- **Design mode** (`canvasView === 'design'`): `CanvasRoot` → `CanvasTransformLayer` → `BreakpointFrame` → `IframeFrameSurface` → `NodeRenderer`. Each breakpoint gets its own iframe rendered side-by-side inside the pan/zoom transform layer. The author sees all breakpoints at once and can zoom in/out. The canvas opens at 100% (`INITIAL_ZOOM`) — Responsive Review is a fixed grid that already fits all three frames, so 100% IS the fit. The toolbar +/− only ever change the zoom level; they never write pan, and `.reviewGrid` scales about `transform-origin: 50% 50%`, so every step stays concentric. Reset (Cmd/Ctrl+0, the toolbar % button) returns to 100% (`RESET_ZOOM`).
+- **Live mode** (`canvasView === 'live'`): `CanvasRoot` → `CanvasLiveSurface` → `IframeFrameSurface` → `NodeRenderer`. A single real-size frame at 100% width (optionally clamped to a selected breakpoint's width) scrolls normally. The toolbar zoom controls pin to 100% and disable with the reason in their tooltip ("Live mode always shows 100% zoom.") — the stored design-canvas zoom is preserved for the return to design mode. Resizable with side handles. Because the live frame is flush with the top of the canvas surface, the one remaining top-edge control — `CanvasDocumentModeDock` (top-center, VC / Template only) — renders in **peek** mode: it parks above the top edge and rolls down on hover/`:focus-within`, so it does not overlay the page's own header. In design mode it stays pinned.
+
+**Preview frame widths.** In Responsive review, each row of the Viewport context block carries an editable px field. Typing a width redraws that frame immediately — the iframe's own width changes, so the site's `@media` rules re-evaluate at the new size and `vw`/`vmin`/`vmax` re-bake, the same as dragging a browser window's edge. It is a *preview*, not a setting: the value lives in `canvasSlice.breakpointPreviewWidths` (session-only, cleared on reload, on `loadSite`/`createSite`/`clearSite`, and when the breakpoint is deleted), never touches `site.breakpoints[].width`, the context's `mediaQuery`, dirty tracking, undo history or published CSS, and does not change which viewport context the author is editing. Widths clamp to `MIN_PREVIEW_FRAME_WIDTH`–`MAX_PREVIEW_FRAME_WIDTH` (`canvas/math.ts`) inside the setter, and a per-row reset restores the stored width without a reload. Every surface that *draws* a frame resolves its width through `useBreakpointFrameWidth`; surfaces that describe the document — the "Edit viewport" dialog, the review column sort, the agent snapshot frame, the publisher — keep reading the stored width. Changing the real width is still the Explorer → Edit viewport dialog's job.
 
 Both modes use the same `IframeFrameSurface` and the same `NodeRenderer` — they are fully editable (click-to-select, properties panel, structural edits all work). The only difference is the layout wrapper. They also share the loading treatment: while the page is hydrating, design mode renders a `CanvasFrameSkeletonFrame` per breakpoint and live mode renders the same `CanvasFrameSkeleton` inside its single frame's width model.
 
@@ -479,8 +481,7 @@ Why this matters: selection rings and the floating selection toolbar are portale
 | PluginCanvasOverlayLayer              | 50                |
 | Selection ring, hover ring, selection toolbar | 51        |
 | Alt/Option inspect ladder             | 52                |
-| CanvasNotch                           | 53                |
-| CanvasModeToggle                      | 53                |
+| CanvasDocumentModeDock                | 53                |
 | CanvasContextSelector                 | 60                |
 | TemplateModeControl / VisualComponentModeControl | 200      |
 | Drop-indicator inside iframe          | 2147483647 (max)  |
@@ -501,8 +502,9 @@ Canvas-internal values are not CSS tokens — they are raw integers intentionall
 | `CanvasTransformLayer.tsx`      | Zoom + pan transform (design view)                              |
 | `CanvasLiveSurface.tsx`         | "Live" view — single real-size editable frame, normal scroll    |
 | `RuntimeScriptInjector.tsx`     | Injects bundled runtime scripts into an editable iframe         |
-| `CanvasNotch.tsx`               | Top-center chrome: history controls + favorite insert shortcuts; peek mode in live view |
-| `CanvasModeToggle.tsx`          | Design/Live view toggle + Run-scripts toggle + breakpoint switch; peek mode in live view |
+| `CanvasNotch.tsx`               | Content document canvas quick-actions — NOT mounted on the site canvas |
+| `CanvasDocumentModeDock.tsx`    | Top-center host for the VC / Template mode control; peek mode in live view |
+| `useUndoRedoShortcuts.ts`       | Document-level Ctrl/Cmd+Z / Ctrl/Cmd+Shift+Z (+ Ctrl+Y) history listener; mounted by `CanvasRoot` |
 | `CanvasContextSelector.tsx`     | Editing-context switcher: viewports + custom conditions (@media/@container/@supports) |
 | `CanvasLayerContextMenu.tsx`    | Right-click on a layer                                          |
 | `canvasDnd.ts`                  | Drag-and-drop (insert / move / wrap)                            |
@@ -518,8 +520,7 @@ Canvas-internal values are not CSS tokens — they are raw integers intentionall
 | `useCanvasKeyboardShortcuts.ts` | Editor keyboard shortcuts (delete, duplicate, wrap, …)          |
 | `useRuntimeScriptBuild.ts`      | Builds the bundled runtime scripts for the Run-scripts toggle    |
 | `useIframeCursorBridge.ts`      | Bridges iframe-native cursor movement to parent-doc callbacks (used by breakpoint activation tooltip) |
-| `CanvasComposedTree.tsx`        | Renders the active document inside its matching template chain (wrappers read-only, active doc editable) |
-| `canvasComposition.ts`          | `resolveEditorWrapperTemplates` — editor-side mirror of `resolveTemplateChain` for canvas wrapping |
+| `CanvasComposedTree.tsx`        | Renders the active document inside its matching template chain (wrappers read-only, active doc editable) — chain from `resolveWrapperTemplates` (`@core/templates`) |
 | `DocumentSwitcher.tsx`          | Compact grouped dropdown (Pages / Templates / Components) for jumping to any other document — shared by `TemplateModeControl` and `VisualComponentModeControl` |
 | `TemplateModeControl.tsx`       | Floating control shown while editing a template: document switcher + preview-source selector |
 | `VisualComponentModeControl.tsx`| Floating control shown while editing a Visual Component: "Back to page" exit + document switcher |
@@ -610,8 +611,15 @@ The sidebar shell expands/collapses by animating `--*-panel-width`. The panel sl
 - `PublishButton`, `PublishActionGroup` — publish current site / page
 - `SettingsButton` — opens the Settings modal (see below)
 - `ZoomControls` — canvas zoom
-- `ModulePickerDropdown` — opens the module inserter modal
 - `OpenLivePageButton` (`src/admin/shared/OpenLivePageButton/`) — toolbar icon (always visible, not Site-editor-only) that opens the live site in a new tab. Target URL is read from `adminUi.activeLivePath`: active document's public path when an editor is open, site root (`/`) otherwise. Tooltip changes between "Open live page" (active path) and "Open live site" (null). Component stays outside `src/admin/pages/site/` so it mounts on every admin route without touching the editor graph.
+- `PreviewOverlay` **browses the draft**. Because the preview renders the page inside its template chrome, the real site nav is present and clickable — but the *frame itself* must never navigate: its srcDoc document has no URL, and the authored hrefs point at PUBLIC routes, which serve the last published output (or a 404 for anything unpublished), so following one would replace the draft the author asked to see. Every activation is therefore cancelled in the capture phase (`click`/`auxclick`/`submit` on the iframe's `contentDocument`, mirroring `IframeFrameSurface`'s `NAVIGABLE_SELECTOR` guard) and re-interpreted by `resolvePreviewLink` (`preview/previewLinks.ts`) against the in-memory draft:
+  - a path matching a non-template draft page → the overlay re-renders the preview for **that** page, pushing onto a session-only `visited` trail that the header's **Back** button walks in reverse;
+  - a bare `#hash` → scrolls within the document (resolved from the *raw attribute*, since `<base href>` would otherwise turn it into a link to the home page);
+  - a cross-origin / `target="_blank"` / `mailto:` link → opens a real new tab;
+  - an internal path with no draft page → does nothing, rather than 404ing the preview.
+
+  The listeners are installed from the parent because the iframe is same-origin but script-less — `sandbox="allow-same-origin"` and never `allow-scripts`. `preparePreviewHtml` additionally pins a `<base href>` (the srcDoc document has no URL, so `/uploads/…` would not resolve) and rewrites `loading="lazy"` → `eager` (nothing scrolls or scripts in a static snapshot). Preview navigation never touches the editor's own selection or dirties the document.
+- `PreviewOverlay` carries its own labelled **Open live** action (`OpenLiveAction`) on the same `activeLivePath` target — but **only once `getCmsPublishStatus().hasPublishedVersion` is true**. Before the first publish the public URL 404s, so the overlay hides the action rather than offering a dead link; a failed status check hides it too. The status request fires when Preview opens (the component mounts with the overlay), not on every editor load.
 
 **Global trailer.** `Toolbar.tsx` renders a fixed trailer at the right end of every admin route, regardless of which layout mounted it or what the caller passes in `rightSlot`: `SettingsButton` → `OpenLivePageButton` → `AccountMenuButton`. These are not layout- or page-owned — the settings cog, live-page link, and account menu are identical everywhere, the same way the left nav is. `SettingsButton` reads only the tiny `adminUi` store, so hosting it in the shell keeps the editor toolchain out of the lightweight admin bundles. Layouts use `rightSlot` only for surface-specific controls *before* the trailer (e.g. `ZoomControls` + `PublishButton` on the Site editor, the Uploads toggle on Media); pages must never inject their own `SettingsButton`.
 
@@ -645,7 +653,7 @@ Because the controller is imported only by the lazy section components, the edit
 
 `src/admin/pages/site/module-picker/` has two insertion surfaces:
 
-- `ModuleInserterDialog` — the full modal (category rail, search, grid/list view, wireframe previews, recents, drag-to-canvas insertion). Two entry points open it: the toolbar `+` button (`ModulePickerDropdown`) and the canvas selection toolbar's "Insert module" button (`CanvasInsertModuleButton`). Both share `useInsertInserterItem` (`src/admin/pages/site/hooks/useInsertInserterItem.ts`), so target resolution and dispatch are identical for both flows.
+- `ModuleInserterDialog` — the full modal (category rail, search, grid/list view, wireframe previews, recents, drag-to-canvas insertion). Three entry points open it: the canvas selection toolbar's "Insert module" button (`CanvasInsertModuleButton`), the Layers panel's `+` (`DomPanel`), and the Page Outline panel. All share `useInsertInserterItem` (`src/admin/pages/site/hooks/useInsertInserterItem.ts`), so target resolution and dispatch are identical for both flows.
 - DOM-panel context menus keep the compact `ModulePicker` inside `ContextMenuSubmenu`; those flows need a small anchored submenu rather than the full modal.
 
 Data sources:
@@ -654,7 +662,7 @@ Data sources:
 - **Layouts:** a single source — user-saved layouts from `site.layouts` (see "Saved layouts" below), which persist as `data_rows` (table_id `layouts`). There are no code-defined presets; any built-ins we ship later are seeded rows in that same table, indistinguishable from a user save.
 - **Components:** `site.visualComponents`.
 - **Recent:** per-browser local state in `instatic-module-inserter-v1`, validated with TypeBox before use.
-- **Favorites:** per-user server state in `user_preferences` key `module-inserter`, validated with TypeBox by `src/core/persistence/userPreferences.ts` and used by `CanvasNotch`.
+- **Favorites:** per-user server state in `user_preferences` key `module-inserter`, validated with TypeBox by `src/core/persistence/userPreferences.ts` and used by `ModuleInserterDialog`.
 
 The modal uses the tile-card pattern from `docs/design.md`: `--bg-surface` parent, 1px grid gap, `--bg-surface-2` tiles, `--card-radius`, categorical accents via `data-accent`, and an achromatic `--focus-ring` selection state. Wireframe image regions reuse `--canvas-placeholder-bg`.
 
@@ -771,9 +779,14 @@ See [docs/features/plugin-system.md](features/plugin-system.md) for the plugin S
   - `src/admin/pages/site/store/slices/site/nodeActions.ts` — tree mutation actions that call `mutateActiveTree`
   - `src/admin/pages/site/canvas/CanvasRoot.tsx` — canvas mount
   - `src/admin/spotlight/SpotlightRoot.tsx` — Cmd+K palette
-  - `src/admin/pages/site/panels/PropertiesPanel/PropertiesPanelBody.tsx` — branch router for selector, multi-select, VC, and selected-node inspector surfaces; owns the node-level Styles/Attributes switch
-  - `src/admin/pages/site/panels/PropertiesPanel/ClassPicker.tsx` — unified selector picker UI (entry point: pill strip, input, creation flow)
-  - `src/admin/pages/site/panels/PropertiesPanel/HtmlAttributesPanel.tsx` — selected-node Attributes view for editing safe `props.htmlAttributes`
+  - `src/admin/pages/site/panels/PropertiesPanel/PropertiesPanelBody.tsx` — branch router for selector, multi-select and VC surfaces; for a selected node it dispatches on `selectSiteWorkspaceMode` to one of the three per-mode inspector bodies below (the approved MMSBUILD Site screen draws a different inspector in each mode)
+  - `src/admin/pages/site/panels/PropertiesPanel/{Live,Focus,Review}InspectorBody.tsx` — the three mode bodies. Live edit: badge → Instance parameters → `Layout & spacing` → `Advanced instance styles, classes & attributes`. Focus section: component card → Content/Layout/Style tabs → slot-content list. Responsive review: Layout/Style/Visibility tabs → guided CSS controls → editing context → override note → Review mobile / Done
+  - `src/admin/pages/site/panels/PropertiesPanel/InspectorSurfaces.tsx` — `StyleSlice` (one tab's worth of the CSS workbench, no search bar or rail) and `AdvancedDisclosure` (the reference's collapsed home for the class picker, the raw workbench and the HTML attribute editor). The old node-level Styles/Attributes switcher is gone; both surfaces live inside the disclosure together
+  - `src/admin/pages/site/panels/PropertiesPanel/inspectorSections.ts` — the one-home partition of the nine `CLASS_STYLE_SECTIONS` across Layout / Style / Visibility slices, so no setting is ever on screen twice. Gated by `inspectorSectionPartition.test.ts`
+  - `src/admin/pages/site/panels/PropertiesPanel/guidedCssControls.ts` — Responsive review's named controls (Content width → `maxWidth`, Text alignment → `textAlign`, Image position → `objectPosition`, Section height → `minHeight`) and the `GUIDED_PROPERTIES` list those controls shadow out of the raw sections
+  - `src/admin/pages/site/panels/PropertiesPanel/inspector/` — the approved screen's inspector furniture (tab strip, component card, Visual-component badge, slot-content list, info/override notes, guided segmented field) plus `Inspector.module.css`, transcribed from `screens/site/src/styles.css`
+  - `src/admin/pages/site/panels/PropertiesPanel/ClassPicker.tsx` — unified selector picker UI (entry point: pill strip, input, creation flow); reached through the Advanced disclosure
+  - `src/admin/pages/site/panels/PropertiesPanel/HtmlAttributesPanel.tsx` — selected-node Attributes view for editing safe `props.htmlAttributes`; reached through the Advanced disclosure
   - `src/admin/pages/site/panels/PropertiesPanel/htmlAttributesModel.ts` — pure row normalization, validation, and dirty-key helpers for the Attributes view
   - `src/admin/pages/site/panels/PropertiesPanel/classPickerUiState.ts` — reducer + action types for the picker's local UI state (`query`, `showSuggestions`, `contextMenu`, `renameTarget`, `highlightedIndex`)
   - `src/admin/pages/site/panels/PropertiesPanel/useClassPickerDerivedState.ts` — hook that derives selector model, suggestions, and keyboard-nav indices from store state; exports `cssAttrSelectorValue`
@@ -796,6 +809,7 @@ See [docs/features/plugin-system.md](features/plugin-system.md) for the plugin S
   - `src/__tests__/architecture/admin-startup-imports.test.ts` — pre-auth code must not import the full `@core/persistence` barrel
   - `src/__tests__/architecture/bundle-size-budgets.test.ts` — per-chunk byte budgets (AdminPageLayout, AdminWorkspaceCanvasLayout, SitePage, AdminCanvasEditorBody, ContentPage, …)
   - `src/__tests__/architecture/site-editor-shell-lazy-body.test.ts` — keeps the real Site shell separate from the heavy editor body
+  - `src/__tests__/architecture/inspectorSectionPartition.test.ts` — the inspector's "one home" rule: the Layout / Style / Visibility slices must be disjoint and together cover every `CLASS_STYLE_SECTIONS` entry, and no two guided controls may point at the same CSS property
   - `src/__tests__/architecture/no-vc-mode-branches-in-mutations.test.ts`
   - `src/__tests__/architecture/centralized-site-mutation-history.test.ts`
   - `src/__tests__/architecture/canvasFastRefreshBoundaries.test.ts`

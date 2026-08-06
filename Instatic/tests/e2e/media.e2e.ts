@@ -4,7 +4,7 @@ import {
   PUBLIC_BASE_URL,
   canvasFrame,
   createPage,
-  insertNotchModule,
+  insertModule,
   login,
   openExplorerTab,
   openSiteEditor,
@@ -50,7 +50,7 @@ test.describe('media', () => {
     await createPage(page, `Media ${suffix}`, slug)
     await page.getByRole('treeitem', { name: `Open page Media ${suffix}` }).click()
 
-    await insertNotchModule(page, 'image')
+    await insertModule(page, 'image')
     await expect(page.getByTestId('property-control-src')).toBeVisible()
 
     await test.step('upload and select an image in the picker', async () => {
@@ -86,7 +86,7 @@ test.describe('media', () => {
     page,
   }) => {
     await login(page)
-    await page.goto('/admin/media')
+    await page.goto('/cms/media')
 
     await uploadFile(page, {
       name: `not-an-image-${Date.now().toString(36)}.txt`,
@@ -111,7 +111,7 @@ test.describe('media', () => {
     await page.getByRole('treeitem', { name: `Open page Reuse ${suffix}` }).click()
 
     await test.step('upload the asset into the library on a first image', async () => {
-      await insertNotchModule(page, 'image')
+      await insertModule(page, 'image')
       await expect(page.getByTestId('property-control-src')).toBeVisible()
       await page.getByRole('button', { name: 'Browse image library' }).click()
       const picker = page.getByTestId('media-picker-modal')
@@ -124,7 +124,7 @@ test.describe('media', () => {
     })
 
     await test.step('place the same asset on a second image with no upload', async () => {
-      await insertNotchModule(page, 'image')
+      await insertModule(page, 'image')
       await page.getByRole('button', { name: 'Browse image library' }).click()
       const picker = page.getByTestId('media-picker-modal')
       // The asset is already in the library — selecting it proves reuse.
@@ -154,7 +154,7 @@ test.describe('media', () => {
     await createPage(page, `Site media ${suffix}`, slug)
     await page.getByRole('treeitem', { name: `Open page Site media ${suffix}` }).click()
 
-    await insertNotchModule(page, 'image')
+    await insertModule(page, 'image')
     await expect(page.getByTestId('property-control-src')).toBeVisible()
 
     await openExplorerTab(page, 'Media')
@@ -196,7 +196,7 @@ test.describe('media', () => {
     const tag = `tag-${suffix}`
 
     await login(page)
-    await page.goto('/admin/media')
+    await page.goto('/cms/media')
 
     await uploadFile(page, {
       name: originalFilename,
@@ -251,7 +251,7 @@ test.describe('media', () => {
     })
     await page.setViewportSize({ width: 390, height: 844 })
     await login(page)
-    await page.goto('/admin/media')
+    await page.goto('/cms/media')
 
     await uploadFile(page, {
       name: filename,
@@ -294,7 +294,7 @@ test.describe('media', () => {
     const replacementFilename = `replacement-${suffix}.png`
 
     await login(page)
-    await page.goto('/admin/media')
+    await page.goto('/cms/media')
 
     await uploadFile(page, {
       name: filename,
@@ -369,7 +369,7 @@ test.describe('media', () => {
     })
     await page.setViewportSize({ width: 390, height: 844 })
     await login(page)
-    await page.goto('/admin/media')
+    await page.goto('/cms/media')
 
     await uploadFile(page, {
       name: filename,
@@ -440,7 +440,7 @@ test.describe('media', () => {
       localStorage.removeItem('instatic-editor-layout-v2')
     })
     await login(page)
-    await page.goto('/admin/media')
+    await page.goto('/cms/media')
 
     await Promise.all([
       waitForMediaStorageState(page),
@@ -476,7 +476,7 @@ test.describe('media', () => {
     })
     await page.setViewportSize({ width: 390, height: 844 })
     await login(page)
-    await page.goto('/admin/media')
+    await page.goto('/cms/media')
 
     await Promise.all([
       waitForMediaStorageState(page),
@@ -518,7 +518,7 @@ test.describe('media', () => {
     const filename = `unsafe-svg-${Date.now().toString(36)}.svg`
 
     await login(page)
-    await page.goto('/admin/media')
+    await page.goto('/cms/media')
 
     await uploadFile(page, {
       name: filename,
@@ -662,7 +662,7 @@ async function expectMobilePageContained(page: Page): Promise<void> {
 async function waitForMediaPatch(page: Page): Promise<void> {
   await page.waitForResponse((response) =>
     response.request().method() === 'PATCH' &&
-    response.url().includes('/admin/api/cms/media/') &&
+    response.url().includes('/cms/api/cms/media/') &&
     response.ok(),
   )
 }
@@ -670,7 +670,7 @@ async function waitForMediaPatch(page: Page): Promise<void> {
 async function waitForMediaUpload(page: Page): Promise<void> {
   await page.waitForResponse((response) =>
     response.request().method() === 'POST' &&
-    response.url().endsWith('/admin/api/cms/media') &&
+    response.url().endsWith('/cms/api/cms/media') &&
     response.ok(),
   )
 }
@@ -704,7 +704,7 @@ async function closeUploadQueueIfOpen(page: Page): Promise<void> {
 async function waitForMediaReplace(page: Page): Promise<void> {
   await page.waitForResponse((response) =>
     response.request().method() === 'POST' &&
-    response.url().includes('/admin/api/cms/media/') &&
+    response.url().includes('/cms/api/cms/media/') &&
     response.url().endsWith('/replace') &&
     response.ok(),
   )
@@ -713,7 +713,7 @@ async function waitForMediaReplace(page: Page): Promise<void> {
 async function waitForMediaRestore(page: Page): Promise<void> {
   await page.waitForResponse((response) =>
     response.request().method() === 'POST' &&
-    response.url().includes('/admin/api/cms/media/') &&
+    response.url().includes('/cms/api/cms/media/') &&
     response.url().endsWith('/restore') &&
     response.ok(),
   )
@@ -722,7 +722,7 @@ async function waitForMediaRestore(page: Page): Promise<void> {
 async function waitForMediaDelete(page: Page): Promise<void> {
   await page.waitForResponse((response) =>
     response.request().method() === 'DELETE' &&
-    response.url().includes('/admin/api/cms/media/') &&
+    response.url().includes('/cms/api/cms/media/') &&
     response.ok(),
   )
 }
@@ -730,7 +730,7 @@ async function waitForMediaDelete(page: Page): Promise<void> {
 async function waitForMediaStorageState(page: Page): Promise<void> {
   await page.waitForResponse((response) =>
     response.request().method() === 'GET' &&
-    response.url().endsWith('/admin/api/cms/media/storage') &&
+    response.url().endsWith('/cms/api/cms/media/storage') &&
     response.ok(),
   )
 }

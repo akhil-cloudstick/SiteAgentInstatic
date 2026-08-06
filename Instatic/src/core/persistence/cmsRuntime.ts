@@ -49,7 +49,7 @@ interface CmsRuntimeDependencyResolveResult {
 export async function resolveCmsRuntimeDependencies(
   packageJson: SitePackageJson,
   fetchImpl: FetchLike = globalThis.fetch.bind(globalThis),
-  basePath = '/admin/api/cms',
+  basePath = '/cms/api/cms',
 ): Promise<CmsRuntimeDependencyResolveResult> {
   // The envelope schema validates SiteDependencyLock + RuntimePackageImportmap
   // in full (both own canonical schemas in @core/site-runtime), so the parsed
@@ -74,7 +74,7 @@ export async function buildCmsRuntimePreview(
   const {
     signal,
     fetchImpl = globalThis.fetch.bind(globalThis),
-    basePath = '/admin/api/cms',
+    basePath = '/cms/api/cms',
   } = options
   // The envelope schema validates the assets, runtimeAssets, and diagnostics
   // shapes in full against the canonical @core/site-runtime schemas, so the

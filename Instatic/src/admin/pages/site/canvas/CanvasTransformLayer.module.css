@@ -60,8 +60,17 @@
     display: grid;
     width: 100%;
     height: 100%;
+    /* The board is a fixed grid, not a pannable plane: the toolbar's +/− only
+       ever scales it, and it must scale about its own middle so the frames
+       stay centred instead of drifting toward a corner. `useCanvas` writes an
+       inline `transform` here (its `transform: none` below is only the resting
+       value), so the origin has to be pinned explicitly — the default 50% 50%
+       is what we want, but stating it keeps it from being inherited away. */
+    transform-origin: 50% 50%;
     align-items: stretch;
-    padding: 9px 18px 18px;
+    /* Shared with CanvasLiveSurface so all three modes sit on one set of
+       margins — see --canvas-frame-inset in globals.css. */
+    padding: var(--canvas-frame-inset);
     gap: 12px;
     grid-template-columns:
         minmax(360px, 3.34fr)

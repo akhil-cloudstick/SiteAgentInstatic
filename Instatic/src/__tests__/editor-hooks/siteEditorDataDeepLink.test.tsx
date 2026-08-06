@@ -118,7 +118,7 @@ describe('Site editor Data workspace deep links', () => {
     window.history.replaceState(
       {},
       '',
-      '/admin/site?table=components&row=component-from-data',
+      '/cms/site?table=components&row=component-from-data',
     )
 
     renderHook(() => useDeepLinkedSiteEditor(adapter))

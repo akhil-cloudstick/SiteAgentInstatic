@@ -70,6 +70,7 @@ import { LinkIcon } from 'pixel-art-icons/icons/link'
 import { ListBoxSolidIcon } from 'pixel-art-icons/icons/list-box-solid'
 import { FileTextSolidIcon } from 'pixel-art-icons/icons/file-text-solid'
 import { VideoSolidIcon } from 'pixel-art-icons/icons/video-solid'
+import { useSiteColumnHost } from '@site/sidebars/PageOutlinePanel/siteColumnContext'
 import styles from './DomPanel.module.css'
 
 // ─── Search results (flat filtered list) ─────────────────────────────────────
@@ -142,7 +143,12 @@ function SearchResults({ rows, showTag, showClasses, onSelect }: SearchResultsPr
 
 // ─── Inner panel (needs context from DomTreeProvider) ─────────────────────────
 
-function DomPanelInner({ editable = true }: { editable?: boolean }) {
+interface DomPanelProps {
+  /** Whether the caller can perform structural edits (drives DnD/insert). */
+  editable?: boolean
+}
+
+function DomPanelInner({ editable = true }: DomPanelProps) {
   const page = useEditorStore(selectActiveCanvasPage)
   const activeDocument = useEditorStore((s) => s.activeDocument)
   const setFocusedPanel = useEditorStore((s) => s.setFocusedPanel)
@@ -171,7 +177,14 @@ function DomPanelInner({ editable = true }: { editable?: boolean }) {
   const insertTriggerRef = useRef<HTMLButtonElement>(null)
   const store = useExpansionStore()
 
-  const [searchQuery, setSearchQuery] = useState('')
+  // Inside the Site column the header owns the one search field (and drops the
+  // insert affordance the approved screen doesn't draw beside it), so the tree
+  // reads that column's query instead of keeping a second field of its own.
+  // Everywhere else this panel is self-contained and owns both.
+  const column = useSiteColumnHost()
+  const [localQuery, setLocalQuery] = useState('')
+  const searchQuery = column ? column.query : localQuery
+  const setSearchQuery = column ? column.setQuery : setLocalQuery
 
   // Module-insert affordance next to the search field. Reuses the exact same
   // command surface (ModuleInserterDialog) and target resolution
@@ -277,10 +290,14 @@ function DomPanelInner({ editable = true }: { editable?: boolean }) {
         e.preventDefault()
         store.collapseAll()
       }
-      // Ctrl+F = focus search
+      // Ctrl+F = focus search. Inside the Site column the field lives in the
+      // column header rather than in this panel, so focus that one — it is the
+      // query this tree reads.
       if (e.key === 'f') {
         e.preventDefault()
-        searchInputRef.current?.focus()
+        const field = searchInputRef.current
+          ?? document.querySelector<HTMLInputElement>('input[data-testid="site-column-search"]')
+        field?.focus()
       }
     }
   }
@@ -401,33 +418,35 @@ function DomPanelInner({ editable = true }: { editable?: boolean }) {
       {/* ─── Panel content. The ExplorerPanel shell owns the header + tabs +
           close button, so this body renders chrome-free. ────────────────── */}
       <>
-        <div className={styles.searchRow}>
-          <SearchBar
-            ref={searchInputRef}
-            data-testid="dom-tree-search"
-            value={searchQuery}
-            onValueChange={setSearchQuery}
-            placeholder="Search layers…"
-            aria-label="Search layers"
-            className={styles.searchFill}
-          />
-          {editable && (
-            <Button
-              ref={insertTriggerRef}
-              variant="secondary"
-              size="sm"
-              iconOnly
-              aria-label="Insert module"
-              aria-haspopup="dialog"
-              aria-expanded={insertOpen}
-              tooltip="Insert module"
-              data-testid="dom-tree-insert-module"
-              onClick={() => setInsertOpen(true)}
-            >
-              <AppGridPlusGlyphIcon size={13} aria-hidden="true" />
-            </Button>
-          )}
-        </div>
+        {!column && (
+          <div className={styles.searchRow}>
+            <SearchBar
+              ref={searchInputRef}
+              data-testid="dom-tree-search"
+              value={searchQuery}
+              onValueChange={setSearchQuery}
+              placeholder="Search layers…"
+              aria-label="Search layers"
+              className={styles.searchFill}
+            />
+            {editable && (
+              <Button
+                ref={insertTriggerRef}
+                variant="secondary"
+                size="sm"
+                iconOnly
+                aria-label="Insert module"
+                aria-haspopup="dialog"
+                aria-expanded={insertOpen}
+                tooltip="Insert module"
+                data-testid="dom-tree-insert-module"
+                onClick={() => setInsertOpen(true)}
+              >
+                <AppGridPlusGlyphIcon size={13} aria-hidden="true" />
+              </Button>
+            )}
+          </div>
+        )}
 
         {/* ── Tree / search results — scrollable area ─────────────────────
             onContextMenu fires only for right-clicks on EMPTY space inside
@@ -523,7 +542,7 @@ function DomPanelInner({ editable = true }: { editable?: boolean }) {
   )
 }
 
-export function DomPanel({ editable = true }: { editable?: boolean }) {
+export function DomPanel({ editable = true }: DomPanelProps) {
   return (
     <DomTreeProvider>
       <DomPanelInner editable={editable} />

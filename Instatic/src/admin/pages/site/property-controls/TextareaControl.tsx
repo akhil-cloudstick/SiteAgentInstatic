@@ -1,10 +1,13 @@
 import type { ControlProps } from './shared'
 import { Textarea } from '@ui/components/Input'
 import { ControlRow } from '@ui/components/ControlRow'
+import { charCounter } from '@site/panels/PropertiesPanel/inspector/charCounter'
 
 interface TextareaControlProps extends ControlProps<string> {
   rows?: number
   placeholder?: string
+  /** Hard character limit; also prints the reference's `used/max` counter. */
+  maxLength?: number
 }
 
 export function TextareaControl({
@@ -14,6 +17,7 @@ export function TextareaControl({
   label,
   rows = 3,
   placeholder,
+  maxLength,
   isOverride,
   disabled,
   layout,
@@ -25,6 +29,7 @@ export function TextareaControl({
       layout={layout}
       isOverride={isOverride}
       disabled={disabled}
+      description={charCounter(value, maxLength)}
     >
       <Textarea
         id={`ctrl-${propKey}`}
@@ -32,6 +37,7 @@ export function TextareaControl({
         rows={rows}
         placeholder={placeholder}
         disabled={disabled}
+        maxLength={maxLength}
         onChange={(e) => onChange(propKey, e.target.value)}
       />
     </ControlRow>

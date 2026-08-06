@@ -174,3 +174,31 @@
     line-height: 1;
     padding: var(--space-3xs) var(--space-s);
 }
+
+/* Nested in the approved Site inspector — either as a guided slice
+   (`chromeless`) or as the raw workbench inside the "Advanced …" disclosure
+   (`hideRail`).
+
+   Both drop the category rail, so the content column takes the full width. The
+   surface also stops being its own scroll container and sheds the standalone
+   panel's generous top/bottom padding: the inspector body owns the scroll, and
+   inside a disclosure that padding read as a large empty gap under the last
+   row. */
+.surface[data-railless='true'] {
+    padding: 0;
+    overflow: visible;
+    grid-template-columns: minmax(0, 1fr);
+}
+
+.surface[data-railless='true'] .surfaceContent {
+    padding-bottom: 0;
+}
+
+/* The sticky search bar is positioned against the standalone panel's bottom
+   edge with a tall gradient run-up. Nested in a disclosure there is no such
+   edge, so it becomes an ordinary row at the top of the workbench. */
+.surface[data-railless='true'] .searchBarRow {
+    position: static;
+    padding: 0 0 var(--space-m);
+    background: none;
+}

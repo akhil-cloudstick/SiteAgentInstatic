@@ -19,7 +19,7 @@ const mapManifest: PluginManifest = {
     title: 'Map Studio',
     navLabel: 'Map',
     icon: 'map',
-    route: '/admin/plugins/local.map/overview',
+    route: '/cms/plugins/local.map/overview',
     content: {
       kind: 'map',
       heading: 'Store Map',
@@ -55,9 +55,9 @@ describe('CMS plugins client', () => {
     })
 
     expect(payload.plugins[0].id).toBe('local.map')
-    expect(payload.adminPages[0].route).toBe('/admin/plugins/local.map/overview')
+    expect(payload.adminPages[0].route).toBe('/cms/plugins/local.map/overview')
     expect(calls[0]).toMatchObject({
-      input: '/admin/api/cms/plugins',
+      input: '/cms/api/cms/plugins',
       init: { method: 'GET', credentials: 'include' },
     })
   })
@@ -85,7 +85,7 @@ describe('CMS plugins client', () => {
     })
 
     expect(calls[0]).toMatchObject({
-      input: '/admin/api/cms/plugins',
+      input: '/cms/api/cms/plugins',
       init: {
         method: 'POST',
         credentials: 'include',
@@ -94,7 +94,7 @@ describe('CMS plugins client', () => {
     })
     expect(calls[0].init?.body).toBe(JSON.stringify(mapManifest))
     expect(calls[1]).toMatchObject({
-      input: '/admin/api/cms/plugins/local.map',
+      input: '/cms/api/cms/plugins/local.map',
       init: {
         method: 'PATCH',
         credentials: 'include',
@@ -103,7 +103,7 @@ describe('CMS plugins client', () => {
     })
     expect(calls[1].init?.body).toBe(JSON.stringify({ enabled: false }))
     expect(calls[2]).toMatchObject({
-      input: '/admin/api/cms/plugins/local.map',
+      input: '/cms/api/cms/plugins/local.map',
       init: { method: 'DELETE', credentials: 'include' },
     })
   })

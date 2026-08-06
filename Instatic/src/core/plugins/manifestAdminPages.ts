@@ -14,7 +14,7 @@ import type {
 } from '@core/plugin-sdk'
 
 export function pluginAdminPageRoute(pluginId: string, pageId: string): string {
-  return `/admin/plugins/${pluginId}/${pageId}`
+  return `/cms/plugins/${pluginId}/${pageId}`
 }
 
 export function collectEnabledAdminPages(

@@ -4,6 +4,7 @@ import { isValidUrl } from '@core/utils/urlValidation'
 import { isPageRef, parsePageRef, makePageRef, pagePublicPath } from '@core/page-tree'
 import { useEditorStore } from '@site/store/store'
 import { Input } from '@ui/components/Input'
+import { FaIcon } from '@ui/components/FaIcon'
 import { Select } from '@ui/components/Select'
 import { SegmentedControl } from '@ui/components/SegmentedControl'
 import { ControlRow } from '@ui/components/ControlRow'
@@ -68,6 +69,8 @@ export function UrlControl({
       layout={layout}
       isOverride={isOverride}
       disabled={disabled}
+      // Reference helper copy for a link field.
+      description="Use / for internal pages or full URL for external"
       labelSuffix={
         error ? (
           <span className={controlRowStyles.labelError} role="alert">
@@ -107,6 +110,11 @@ export function UrlControl({
             fieldSize="sm"
             onChange={handleUrlChange}
             invalid={error}
+            // The approved Site screen draws its link field as
+            // `.input-with-icon` — a 44px trailing cell carrying the FA link
+            // glyph. `trailingSlot` is the primitive's own affix channel, so
+            // the field keeps one border rather than nesting a second box.
+            trailingSlot={<FaIcon name="link" size={13} />}
           />
         )}
       </div>

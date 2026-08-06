@@ -62,6 +62,9 @@ importers:
       '@open-design/diagnostics':
         specifier: workspace:*
         version: link:../../packages/diagnostics
+      '@open-design/launcher-proto':
+        specifier: workspace:*
+        version: link:../../packages/launcher-proto
       '@open-design/platform':
         specifier: workspace:*
         version: link:../../packages/platform
@@ -93,8 +96,8 @@ importers:
         specifier: 1.2.0
         version: 1.2.0
       chokidar:
-        specifier: 5.0.0
-        version: 5.0.0
+        specifier: 3.6.0
+        version: 3.6.0
       express:
         specifier: 5.2.1
         version: 5.2.1
@@ -251,6 +254,9 @@ importers:
 
   apps/packaged:
     dependencies:
+      '@open-design/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
       '@open-design/daemon':
         specifier: workspace:*
         version: link:../daemon
@@ -288,15 +294,6 @@ importers:
       typescript:
         specifier: 6.0.3
         version: 6.0.3
-      vitest:
-        specifier: 4.1.6
-        version: 4.1.6(@opentelemetry/api@1.9.1)(@types/node@24.12.2)(jsdom@29.1.1)(vite@7.3.3(@types/node@24.12.2)(jiti@2.6.1)(lightningcss@1.32.0)(tsx@4.22.3)(yaml@2.9.0))
-
-  apps/telemetry-worker:
-    devDependencies:
-      typescript:
-        specifier: 5.9.3
-        version: 5.9.3
       vitest:
         specifier: 4.1.6
         version: 4.1.6(@opentelemetry/api@1.9.1)(@types/node@24.12.2)(jsdom@29.1.1)(vite@7.3.3(@types/node@24.12.2)(jiti@2.6.1)(lightningcss@1.32.0)(tsx@4.22.3)(yaml@2.9.0))
@@ -361,8 +358,8 @@ importers:
         specifier: 12.40.0
         version: 12.40.0(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       next:
-        specifier: 16.2.10
-        version: 16.2.10(@opentelemetry/api@1.9.1)(@playwright/test@1.60.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+        specifier: 16.2.6
+        version: 16.2.6(@opentelemetry/api@1.9.1)(@playwright/test@1.60.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       openai:
         specifier: 6.38.0
         version: 6.38.0(zod@4.4.2)
@@ -801,8 +798,8 @@ importers:
         version: 4.1.6(@opentelemetry/api@1.9.1)(@types/node@24.12.2)(jsdom@29.1.1)(vite@7.3.3(@types/node@24.12.2)(jiti@2.6.1)(lightningcss@1.32.0)(tsx@4.22.3)(yaml@2.9.0))
     optionalDependencies:
       '@powerformer/vela-cli':
-        specifier: 0.0.19
-        version: 0.0.19
+        specifier: 0.0.26
+        version: 0.0.26
 
   tools/release:
     dependencies:
@@ -812,6 +809,9 @@ importers:
       cac:
         specifier: 6.7.14
         version: 6.7.14
+      yaml:
+        specifier: 2.9.0
+        version: 2.9.0
     devDependencies:
       '@types/node':
         specifier: 24.12.2
@@ -1885,57 +1885,57 @@ packages:
       '@cfworker/json-schema':
         optional: true
 
-  '@next/env@16.2.10':
-    resolution: {integrity: sha512-zLPxg9M0MEHmygpj5OuxjQ+vHMiy/K7cSp74G8ecYolmgUWw0RwN02tF56npup/+qaI8JB97hQgS/r2Hb6QwVA==}
+  '@next/env@16.2.6':
+    resolution: {integrity: sha512-gd8HoHN4ufj73WmR3JmVolrpJR47ILK6LouP5xElPglaVxir6e1a7VzvTvDWkOoPXT9rkkTzyCxBu4yeZfZwcw==}
 
-  '@next/swc-darwin-arm64@16.2.10':
-    resolution: {integrity: sha512-v9IdJCa0H0mbo+8z5zwUpOk1Vj7RjkcI5uNYf5Ws1y6szf/p3Mzl9hLaST8SCt6L9h8NGnruZcd2+o0NTNwDhA==}
+  '@next/swc-darwin-arm64@16.2.6':
+    resolution: {integrity: sha512-ZJGkkcNfYgrrMkqOdZ7zoLa1TOy0qpcMfk/z4Mh/FKUz40gVO+HNQWqmLxf67Z5WB64DRp0dhEbyHfel+6sJUg==}
     engines: {node: '>= 10'}
     cpu: [arm64]
     os: [darwin]
 
-  '@next/swc-darwin-x64@16.2.10':
-    resolution: {integrity: sha512-17IS0jJRViROGmA9uGdNR8VPJpfbnaVG7E9qhso5jDLkmyd0lSDORWxbcKINzcFqzZqGwGtMSnrFRxBpuUYjLQ==}
+  '@next/swc-darwin-x64@16.2.6':
+    resolution: {integrity: sha512-v/YLBHIY132Ced3puBJ7YJKw1lqsCrgcNo2aRJlCEyQrrCeRJlvGlnmxhPxNQI3KE3N1DN5r9TPNPvka3nq5RQ==}
     engines: {node: '>= 10'}
     cpu: [x64]
     os: [darwin]
 
-  '@next/swc-linux-arm64-gnu@16.2.10':
-    resolution: {integrity: sha512-GRQRsRtuciNJvB54AvvuQTiq0oZtFwa1owQqtZD8wwnGpM2L39MV22kpI72YSXLKIyY40LC66EiLFv4PiicXxg==}
+  '@next/swc-linux-arm64-gnu@16.2.6':
+    resolution: {integrity: sha512-RPOvqlYBbcQjkz9VQQDZ2T2bARIjXZV1KFlt+V2Mr6SW/e4I9fcKsaA0hdyf2FHoTlsV2xnBd5Y912rP/1Ce6w==}
     engines: {node: '>= 10'}
     cpu: [arm64]
     os: [linux]
     libc: [glibc]
 
-  '@next/swc-linux-arm64-musl@16.2.10':
-    resolution: {integrity: sha512-zkN9MQYS7UQBro+FnISUq1itaQjXI9xqISzuQ+2bc921NcJ1x4yPCqrn77tVN6/dOOXaaWVX3k6/bR07pPwK+A==}
+  '@next/swc-linux-arm64-musl@16.2.6':
+    resolution: {integrity: sha512-URUTu1+dMkxJsPFgm+OeEvq9wf5sujw0EvgYy80TDGHTSLTnIHeqb0Eu8A3sC95IRgjejQL+kC4mw+4yPxiAXA==}
     engines: {node: '>= 10'}
     cpu: [arm64]
     os: [linux]
     libc: [musl]
 
-  '@next/swc-linux-x64-gnu@16.2.10':
-    resolution: {integrity: sha512-iCVJnwvrPYECvA6WM/7+oo+OiTvedIKLxtCLAZP4xZR3nXa1zmzZyLPbYCmWvpd4CvMYF1EMTafd0ii3DygLvA==}
+  '@next/swc-linux-x64-gnu@16.2.6':
+    resolution: {integrity: sha512-DOj182mPV8G3UkrayLoREM5YEYI+Dk5wv7Ox9xl1fFibAELEsFD0lDPfHIeILlutMMfdyhlzYPELG3peuKaurw==}
     engines: {node: '>= 10'}
     cpu: [x64]
     os: [linux]
     libc: [glibc]
 
-  '@next/swc-linux-x64-musl@16.2.10':
-    resolution: {integrity: sha512-ov2g4H0dHY9bPoOU83m91hWT7Iq5qy13bUnyyshLU3HGR1Ownn0X9QpmDPc5iIUaahTp7f7LeGAhV4DSFtackw==}
+  '@next/swc-linux-x64-musl@16.2.6':
+    resolution: {integrity: sha512-HKQ5SP/V/ub73UvF7n/zeJlxk2kLmtL7Wzrg4WfmkjmNos5onJ2tKu7yZOPdL18A6Svfn3max29ym+ry7NkK4g==}
     engines: {node: '>= 10'}
     cpu: [x64]
     os: [linux]
     libc: [musl]
 
-  '@next/swc-win32-arm64-msvc@16.2.10':
-    resolution: {integrity: sha512-DwAnhLX76HQiFFQNgWlcK+JzlnD1rZ+UK/WY0ZMI/deXpvgnesjNYrqcfo1JzBuz4Kf7o3brIBL0glI1junatA==}
+  '@next/swc-win32-arm64-msvc@16.2.6':
+    resolution: {integrity: sha512-LZXpTlPyS5v7HhSmnvsLGP3iIYgYOBnc8r8ArlT55sGHV89bR2HlDdBjWQ+PY6SJMmk8TuVGFuxalnP3k/0Dwg==}
     engines: {node: '>= 10'}
     cpu: [arm64]
     os: [win32]
 
-  '@next/swc-win32-x64-msvc@16.2.10':
-    resolution: {integrity: sha512-0JXq3b85Jk9Jg4ntLUbXSPvoDw3gpZou7twuKdoFG2jOw635v7+IiXfTaa0TxVMyx78pUjnrVYwLgjKfX4e6/A==}
+  '@next/swc-win32-x64-msvc@16.2.6':
+    resolution: {integrity: sha512-F0+4i0h9J6C4eE3EAPWsoCk7UW/dbzOjyzxY0qnDUOYFu6FFmdZ6l97/XdV3/Nz3VYyO7UWjyEJUXkGqcoXfMA==}
     engines: {node: '>= 10'}
     cpu: [x64]
     os: [win32]
@@ -2035,33 +2035,33 @@ packages:
   '@posthog/types@1.374.2':
     resolution: {integrity: sha512-ZghQSFMi+HFJNPvPjBoyY/jWQ+q6mSQVtWQxOHMSbBidUZjsyYbxYxBFbHy2qWLNe4mEpX+Wqir2Q4I/4AVvJQ==}
 
-  '@powerformer/vela-cli-darwin-arm64@0.0.19':
-    resolution: {integrity: sha512-18sQlsfLiMDHxOfYjV05alWabbCQ20xtXRhACoIWVPdcqcQp5+SJHE9nwyAuoQV5xkTJiPSc3niuzH3RicpCDg==}
+  '@powerformer/vela-cli-darwin-arm64@0.0.26':
+    resolution: {integrity: sha512-tSUREO2bNQZho4PVdh/53+k7mNko2ylkCF6cC3leZe1TIAoNzLK95Ulj3Jq74qPisj5lG9r538lfvqHU16nH4g==}
     cpu: [arm64]
     os: [darwin]
 
-  '@powerformer/vela-cli-darwin-x64@0.0.19':
-    resolution: {integrity: sha512-ttOzkUwYuBgBCfQqxpxUjh4trfCGwg2cs1+n+AK5UUAzZxzukyexRgSkWFoONcnYZ9f1Yg4ItwJ4eeFr/vF5yQ==}
+  '@powerformer/vela-cli-darwin-x64@0.0.26':
+    resolution: {integrity: sha512-+YpPawJ05ONP5kNOw9HunyfkbndoBeEx752rHwBbjWYkMMvM547kJX55drgU2bpBewC9Kowz2nM55GfSbgCcIQ==}
     cpu: [x64]
     os: [darwin]
 
-  '@powerformer/vela-cli-linux-arm64@0.0.19':
-    resolution: {integrity: sha512-qWzTTMOpEo54jnlhgMrt8p8NrOpx9ou9SQyWc4nDqcNCm47evonvVrXY9SCZzGUdBJnDJCMtjRshzkp5H1OM+g==}
+  '@powerformer/vela-cli-linux-arm64@0.0.26':
+    resolution: {integrity: sha512-Ni1E2q8Q6tsCjYQDxUdRyDBAZ+pPK9+qjIbWGzBvlOAewR+t13nS+MrGDIv/o5HQrEZ/lo9YvRfmUskotB+nvw==}
     cpu: [arm64]
     os: [linux]
 
-  '@powerformer/vela-cli-linux-x64@0.0.19':
-    resolution: {integrity: sha512-J2JUnvfOgi6uHqE1sripaFFGI4LArJlfo7WKmfadB1s4fk5rVkSP3koRmqtTLOBPayVgGfqksBifCkrSsOP7Pg==}
+  '@powerformer/vela-cli-linux-x64@0.0.26':
+    resolution: {integrity: sha512-RJVJ2tvFiTF/moCY5qei7xU8cMwsjnBXaxOd0p2Mxomx5HLv43kQfhTrqwMccSDqEZFHSmOuhXQMZe7FTQwhww==}
     cpu: [x64]
     os: [linux]
 
-  '@powerformer/vela-cli-win32-x64@0.0.19':
-    resolution: {integrity: sha512-0HKqydALitrcUM3ntk+iGR10DoMqI/7lx4WdhgLYBz5nFlX/Flpbe2Vn1GYrexWqm+x5q8m5pEp4YeIjpGKfmw==}
+  '@powerformer/vela-cli-win32-x64@0.0.26':
+    resolution: {integrity: sha512-SmlWYYLP2b82i+HTnI1mRY+CmAB7oOS1t3nLgQ3Ehc33ZHOea0T9TYjwZJ7oTBl/IHz4N+mLnmC2UTeAvShNXw==}
     cpu: [x64]
     os: [win32]
 
-  '@powerformer/vela-cli@0.0.19':
-    resolution: {integrity: sha512-gjE+DfF67c6V9asJfOSPpNSBGryiQD2OicsilLsX1p8cXNOpnTkQecDeTDntdHRWTi0ZQ31MQEuKilTH6WdXUg==}
+  '@powerformer/vela-cli@0.0.26':
+    resolution: {integrity: sha512-io6Tg73UFfRcPPXNogsdpwUyR6oHTv2SE3AQS8AKfBNO32elbT4/ALDBPWTRNSbNDfnWJocVCMK6ZW4PXOQIlg==}
     hasBin: true
 
   '@preact/signals-core@1.14.2':
@@ -4992,8 +4992,8 @@ packages:
     resolution: {integrity: sha512-Z4SmBUweYa09+o6pG+eASabEpP6QkQ70yHj351pQoEXIs8uHbaU2DWVmzBANKgflPa47A50PtB2+NgRpQvr7vA==}
     engines: {node: '>= 10'}
 
-  next@16.2.10:
-    resolution: {integrity: sha512-2som5AVXb3kE6Yjine3/mNbBayYF58eguBWIVVUdr1y/L426xyVEgYxgBG+1QC34P2x5E+tcDup6XkuOAX3dCA==}
+  next@16.2.6:
+    resolution: {integrity: sha512-qOVgKJg1+At15NpeUP+eJgCHvTCgXsogweq87Ri/Ix7PkqQHg4sdaXmSFqKlgaIXE4kW0g25LE68W87UANlHtw==}
     engines: {node: '>=20.9.0'}
     hasBin: true
     peerDependencies:
@@ -7749,30 +7749,30 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@next/env@16.2.10': {}
+  '@next/env@16.2.6': {}
 
-  '@next/swc-darwin-arm64@16.2.10':
+  '@next/swc-darwin-arm64@16.2.6':
     optional: true
 
-  '@next/swc-darwin-x64@16.2.10':
+  '@next/swc-darwin-x64@16.2.6':
     optional: true
 
-  '@next/swc-linux-arm64-gnu@16.2.10':
+  '@next/swc-linux-arm64-gnu@16.2.6':
     optional: true
 
-  '@next/swc-linux-arm64-musl@16.2.10':
+  '@next/swc-linux-arm64-musl@16.2.6':
     optional: true
 
-  '@next/swc-linux-x64-gnu@16.2.10':
+  '@next/swc-linux-x64-gnu@16.2.6':
     optional: true
 
-  '@next/swc-linux-x64-musl@16.2.10':
+  '@next/swc-linux-x64-musl@16.2.6':
     optional: true
 
-  '@next/swc-win32-arm64-msvc@16.2.10':
+  '@next/swc-win32-arm64-msvc@16.2.6':
     optional: true
 
-  '@next/swc-win32-x64-msvc@16.2.10':
+  '@next/swc-win32-x64-msvc@16.2.6':
     optional: true
 
   '@nodable/entities@2.1.0': {}
@@ -7873,28 +7873,28 @@ snapshots:
 
   '@posthog/types@1.374.2': {}
 
-  '@powerformer/vela-cli-darwin-arm64@0.0.19':
+  '@powerformer/vela-cli-darwin-arm64@0.0.26':
     optional: true
 
-  '@powerformer/vela-cli-darwin-x64@0.0.19':
+  '@powerformer/vela-cli-darwin-x64@0.0.26':
     optional: true
 
-  '@powerformer/vela-cli-linux-arm64@0.0.19':
+  '@powerformer/vela-cli-linux-arm64@0.0.26':
     optional: true
 
-  '@powerformer/vela-cli-linux-x64@0.0.19':
+  '@powerformer/vela-cli-linux-x64@0.0.26':
     optional: true
 
-  '@powerformer/vela-cli-win32-x64@0.0.19':
+  '@powerformer/vela-cli-win32-x64@0.0.26':
     optional: true
 
-  '@powerformer/vela-cli@0.0.19':
+  '@powerformer/vela-cli@0.0.26':
     optionalDependencies:
-      '@powerformer/vela-cli-darwin-arm64': 0.0.19
-      '@powerformer/vela-cli-darwin-x64': 0.0.19
-      '@powerformer/vela-cli-linux-arm64': 0.0.19
-      '@powerformer/vela-cli-linux-x64': 0.0.19
-      '@powerformer/vela-cli-win32-x64': 0.0.19
+      '@powerformer/vela-cli-darwin-arm64': 0.0.26
+      '@powerformer/vela-cli-darwin-x64': 0.0.26
+      '@powerformer/vela-cli-linux-arm64': 0.0.26
+      '@powerformer/vela-cli-linux-x64': 0.0.26
+      '@powerformer/vela-cli-win32-x64': 0.0.26
     optional: true
 
   '@preact/signals-core@1.14.2': {}
@@ -11309,9 +11309,9 @@ snapshots:
 
   neotraverse@0.6.18: {}
 
-  next@16.2.10(@opentelemetry/api@1.9.1)(@playwright/test@1.60.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1):
+  next@16.2.6(@opentelemetry/api@1.9.1)(@playwright/test@1.60.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1):
     dependencies:
-      '@next/env': 16.2.10
+      '@next/env': 16.2.6
       '@swc/helpers': 0.5.15
       baseline-browser-mapping: 2.10.23
       caniuse-lite: 1.0.30001791
@@ -11320,14 +11320,14 @@ snapshots:
       react-dom: 18.3.1(react@18.3.1)
       styled-jsx: 5.1.6(react@18.3.1)
     optionalDependencies:
-      '@next/swc-darwin-arm64': 16.2.10
-      '@next/swc-darwin-x64': 16.2.10
-      '@next/swc-linux-arm64-gnu': 16.2.10
-      '@next/swc-linux-arm64-musl': 16.2.10
-      '@next/swc-linux-x64-gnu': 16.2.10
-      '@next/swc-linux-x64-musl': 16.2.10
-      '@next/swc-win32-arm64-msvc': 16.2.10
-      '@next/swc-win32-x64-msvc': 16.2.10
+      '@next/swc-darwin-arm64': 16.2.6
+      '@next/swc-darwin-x64': 16.2.6
+      '@next/swc-linux-arm64-gnu': 16.2.6
+      '@next/swc-linux-arm64-musl': 16.2.6
+      '@next/swc-linux-x64-gnu': 16.2.6
+      '@next/swc-linux-x64-musl': 16.2.6
+      '@next/swc-win32-arm64-msvc': 16.2.6
+      '@next/swc-win32-x64-msvc': 16.2.6
       '@opentelemetry/api': 1.9.1
       '@playwright/test': 1.60.0
       sharp: 0.34.5

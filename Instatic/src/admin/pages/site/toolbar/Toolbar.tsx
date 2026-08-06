@@ -5,9 +5,11 @@
  *   [MMSBUILD brand lockup] [admin nav]
  *   [Plugin buttons] [spacer→] [right slot]    [Account menu]
  *
- * Undo/Redo lives inside the canvas notch (CanvasNotch), not the toolbar —
- * those controls only operate on the visual editor's page tree, so they have
- * no meaning on admin pages outside the canvas (Content, Plugins, …).
+ * Undo/Redo has no button anywhere in the chrome — it is keyboard-only
+ * (Ctrl/Cmd+Z, Ctrl/Cmd+Shift+Z), owned by `canvas/useUndoRedoShortcuts` and
+ * mounted by CanvasRoot. History only operates on the visual editor's page
+ * tree, so it has no meaning on admin pages outside the canvas (Content,
+ * Plugins, …) and must never be surfaced in this shared toolbar.
  *
  * Composition contract:
  *   - The brand is a FIXED MMS product lockup (mascot + "MMSBUILD" wordmark),
@@ -252,7 +254,7 @@ function BrandLockup() {
   return (
     <Link
       className={styles.brand}
-      to="/admin/dashboard"
+      to="/cms/dashboard"
       aria-label={BRAND_WORDMARK}
       data-testid="toolbar-brand"
     >
@@ -273,43 +275,43 @@ function DefaultAdminNavigation({ section }: { section: AdminWorkspace }) {
   return (
     <>
       <DefaultNavSlot
-        to="/admin/dashboard"
+        to="/cms/dashboard"
         icon={<FaIcon name="table-cells-large" size={NAV_ICON_SIZE} />}
         label="Dashboard"
         active={section === 'dashboard'}
       />
       <DefaultNavSlot
-        to="/admin/site"
+        to="/cms/site"
         icon={<FaIcon name="window-maximize" size={NAV_ICON_SIZE} />}
         label="Site"
         active={section === 'site'}
       />
       <DefaultNavSlot
-        to="/admin/content"
+        to="/cms/content"
         icon={<FaIcon name="file-lines" size={NAV_ICON_SIZE} />}
         label="Content"
         active={section === 'content'}
       />
       <DefaultNavSlot
-        to="/admin/data"
+        to="/cms/data"
         icon={<FaIcon name="database" size={NAV_ICON_SIZE} />}
         label="Data"
         active={section === 'data'}
       />
       <DefaultNavSlot
-        to="/admin/media"
+        to="/cms/media"
         icon={<FaIcon name="image" size={NAV_ICON_SIZE} />}
         label="Media"
         active={section === 'media'}
       />
       <DefaultNavSlot
-        to="/admin/plugins"
+        to="/cms/plugins"
         icon={<FaIcon name="cube" size={NAV_ICON_SIZE} />}
         label="Plugins"
         active={section === 'plugins'}
       />
       <DefaultNavSlot
-        to="/admin/ai"
+        to="/cms/ai"
         icon={<FaIcon name="robot" size={NAV_ICON_SIZE} />}
         label="AI"
         active={section === 'ai'}

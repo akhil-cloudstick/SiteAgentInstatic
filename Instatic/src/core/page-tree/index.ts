@@ -92,6 +92,9 @@ export {
   type ExplorerPathChangePlan,
 } from './explorerPathPlans'
 
+// Starter subtrees for freshly inserted container modules.
+export { materializeDefaultChildren } from './defaultChildren'
+
 // Slug → public path + internal page-reference links.
 export {
   normalizePageSlug,

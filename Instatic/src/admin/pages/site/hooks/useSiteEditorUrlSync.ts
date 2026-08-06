@@ -75,7 +75,7 @@ export function useSiteEditorUrlSync({ enabled, loaded }: UseSiteEditorUrlSyncOp
 
   // ── WRITE: mirror the active page's slug into the URL. ─────────────────────
   // `null` while a visual component is active (VC mode is page-less) or when
-  // the home page is active (the bare `/admin/site` is the canonical form).
+  // the home page is active (the bare `/cms/site` is the canonical form).
   const activePageSlug = useEditorStore((s) => {
     if (!enabled) return null
     if (s.activeDocument?.kind === 'visualComponent') return null

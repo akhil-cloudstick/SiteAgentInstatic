@@ -16,7 +16,7 @@ export const mediaProvider = makeServerProvider({
   id: 'media',
   label: 'Media',
   debounceMs: 150,
-  endpoint: '/admin/api/cms/media',
+  endpoint: '/cms/api/cms/media',
   schema: MediaListResponseSchema,
   select: (body) => body.assets,
   toCommand: (asset): Command => ({
@@ -28,7 +28,7 @@ export const mediaProvider = makeServerProvider({
     keywords: ['media', 'file', 'upload', asset.filename, asset.mimeType],
     run: (ctx) => {
       ctx.closeSpotlight()
-      ctx.navigate(`/admin/media?file=${encodeURIComponent(asset.id)}`)
+      ctx.navigate(`/cms/media?file=${encodeURIComponent(asset.id)}`)
     },
   }),
 })

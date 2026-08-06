@@ -55,7 +55,7 @@ beforeEach(() => {
   } as Parameters<typeof useEditorStore.setState>[0])
 
   globalThis.fetch = (async (input: RequestInfo | URL) => {
-    if (String(input) === '/admin/api/cms/data/tables') {
+    if (String(input) === '/cms/api/cms/data/tables') {
       return new Response(JSON.stringify({ tables: [postsTable] }), { status: 200 })
     }
 
@@ -153,10 +153,10 @@ describe('canvas template preview bindings', () => {
   it('resolves loop currentEntry tokens when an everywhere template previews a page in its outlet', async () => {
     globalThis.fetch = (async (input: RequestInfo | URL) => {
       const url = String(input)
-      if (url === '/admin/api/cms/data/tables/posts') {
+      if (url === '/cms/api/cms/data/tables/posts') {
         return new Response(JSON.stringify({ table: postsTable }), { status: 200 })
       }
-      if (url.startsWith('/admin/api/cms/data/tables/posts/loop-preview')) {
+      if (url.startsWith('/cms/api/cms/data/tables/posts/loop-preview')) {
         return new Response(JSON.stringify({
           items: [
             {
@@ -174,7 +174,7 @@ describe('canvas template preview bindings', () => {
           totalItems: 1,
         }), { status: 200 })
       }
-      if (url === '/admin/api/cms/data/tables') {
+      if (url === '/cms/api/cms/data/tables') {
         return new Response(JSON.stringify({ tables: [postsTable] }), { status: 200 })
       }
 

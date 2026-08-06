@@ -17,9 +17,12 @@ declare global {
 }
 
 if (typeof window !== 'undefined' && !window.__odBasePathPatched) {
-  // The app always lives under /od/<slug>; take that as the basePath. Empty when
-  // served at the root, which makes every helper below a no-op.
-  const match = window.location.pathname.match(/^\/od\/[a-z0-9-]+/);
+  // Behind the gateway the app lives under a FIXED, tenant-agnostic `/design`; take
+  // that as the basePath. Empty when served at the root, which makes every
+  // helper below a no-op. (It used to be `/od/<slug>` — that forced one Next
+  // build per tenant, because basePath is baked in at build time. The tenant is
+  // now resolved by the gateway from the hub session cookie instead.)
+  const match = window.location.pathname.match(/^\/design(?=\/|$)/);
   const BASE = match ? match[0] : '';
 
   if (BASE) {
@@ -64,9 +67,13 @@ if (typeof window !== 'undefined' && !window.__odBasePathPatched) {
         return new OrigES(url as string, config);
       } as unknown as typeof EventSource;
       Patched.prototype = OrigES.prototype;
-      Patched.CONNECTING = OrigES.CONNECTING;
-      Patched.OPEN = OrigES.OPEN;
-      Patched.CLOSED = OrigES.CLOSED;
+      // `typeof EventSource` declares CONNECTING/OPEN/CLOSED readonly, so copy
+      // them through a mutable alias — we are building this constructor here,
+      // not mutating a live one.
+      const statics = Patched as unknown as { CONNECTING: number; OPEN: number; CLOSED: number };
+      statics.CONNECTING = OrigES.CONNECTING;
+      statics.OPEN = OrigES.OPEN;
+      statics.CLOSED = OrigES.CLOSED;
       window.EventSource = Patched;
     }
   }

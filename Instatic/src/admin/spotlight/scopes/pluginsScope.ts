@@ -22,7 +22,7 @@ function getPluginsScopeCommands(): Command[] {
       workspaces: ['plugins'],
       run: (ctx) => {
         ctx.closeSpotlight()
-        ctx.navigate('/admin/plugins?action=install')
+        ctx.navigate('/cms/plugins?action=install')
       },
     },
     {

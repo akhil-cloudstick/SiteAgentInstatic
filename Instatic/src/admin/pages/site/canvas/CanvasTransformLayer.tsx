@@ -58,6 +58,9 @@ export function CanvasTransformLayer({
    * Presentation only: storage order is untouched, so Settings › Viewport
    * contexts still lists and reorders them exactly as authored.
    */
+  // Sorted on the STORED width, never the session preview width: a column order
+  // that re-shuffled while the author typed a new px value would move the frame
+  // out from under them mid-edit.
   const framedBreakpoints = [...previewable].sort((a, b) => b.width - a.width)
 
   const fallbackBreakpoints = framedBreakpoints.length > 0 ? framedBreakpoints : DEFAULT_BREAKPOINTS

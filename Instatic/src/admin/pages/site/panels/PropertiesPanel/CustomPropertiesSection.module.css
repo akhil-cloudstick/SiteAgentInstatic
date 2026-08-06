@@ -53,3 +53,12 @@
     gap: var(--space-xs);
     color: var(--text-muted);
 }
+
+/* ── Site screen ─────────────────────────────────────────────────────────
+ * The add trigger sits flush left, matching the attribute editor's own "Add"
+ * rather than floating centred between the two.
+ */
+:global([data-editor-screen='site']) .addTrigger {
+    align-self: flex-start;
+    margin-top: 7px;
+}

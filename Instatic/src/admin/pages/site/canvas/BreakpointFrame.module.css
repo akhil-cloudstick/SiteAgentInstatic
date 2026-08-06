@@ -126,10 +126,23 @@
  */
 .scaler {
     /* Fill the cell exactly after zoom, so the iframe inside can be 100% tall
-       and scroll its own document — see IframeFrameSurface's fillHeight. */
-    height: calc(100% / var(--frame-scale));
+       and scroll its own document — see IframeFrameSurface's fillHeight.
+       The height is a MEASURED px value (cellHeight / scale) supplied by
+       useReviewFrameScale, not a percentage: percentages inside a `zoom`ed box
+       resolve against an already-divided containing block, which made the
+       frame — and therefore the iframe's internal viewport — far taller than
+       the cell. That is what left the frame's scrollbar with an oversized
+       thumb whose end sat below the visible box. */
+    height: var(--frame-height);
     width: var(--bp-width);
     zoom: var(--frame-scale);
+    /* Clip the frame to the card's corners here as well as on `.viewport`.
+       A `zoom`ed box paints its own square corners over an ancestor's rounded
+       clip, which is what left the bottom corners of the review frames sharp.
+       The radius is divided by the scale so it RENDERS at the same radius as
+       the unscaled card once `zoom` has been applied. */
+    overflow: hidden;
+    border-radius: calc(var(--site-control-radius) / var(--frame-scale));
 }
 
 /* Frame heading in Responsive Review — `Desktop  1440 px` on the left, and

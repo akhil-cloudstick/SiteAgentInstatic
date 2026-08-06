@@ -64,7 +64,7 @@ export function applySecurityHeaders(res: Response, pathname: string): Response 
   // ── Admin-specific — prevent clickjacking ────────────────────────────────
   // Both the admin HTML shell and admin API responses must not be frameable.
   // A framed CMS admin is a clickjacking vector for one-click publish/delete.
-  if (pathname.startsWith('/admin')) {
+  if (pathname.startsWith('/cms')) {
     headers.set('x-frame-options', 'DENY')
     headers.set(
       'content-security-policy',

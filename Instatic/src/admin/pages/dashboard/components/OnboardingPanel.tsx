@@ -88,7 +88,7 @@ const STEPS: readonly StepDef[] = [
       'Start from a blank canvas, a starter layout, or import HTML and we will scaffold a tree.',
     cta: 'New page',
     icon: FileTextSolidIcon,
-    action: { kind: 'navigate', to: '/admin/site' },
+    action: { kind: 'navigate', to: '/cms/site' },
   },
   {
     id: 'plugin',
@@ -97,7 +97,7 @@ const STEPS: readonly StepDef[] = [
       'Add SEO, comments, image optimization or workflow extensions from the registry.',
     cta: 'Browse plugins',
     icon: PackageSolidIcon,
-    action: { kind: 'navigate', to: '/admin/plugins' },
+    action: { kind: 'navigate', to: '/cms/plugins' },
   },
   {
     id: 'team',
@@ -106,7 +106,7 @@ const STEPS: readonly StepDef[] = [
       'Editors, designers and developers — each role gets a tuned set of editor permissions.',
     cta: 'Add members',
     icon: UsersSolidIcon,
-    action: { kind: 'navigate', to: '/admin/users' },
+    action: { kind: 'navigate', to: '/cms/users' },
   },
 ]
 

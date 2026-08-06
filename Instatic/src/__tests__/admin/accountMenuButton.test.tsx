@@ -74,7 +74,7 @@ function jsonResponse(body: unknown, status = 200): Response {
  */
 function renderWithUser(user: CmsCurrentUser) {
   return render(
-    <MemoryRouter initialEntries={['/admin/site']}>
+    <MemoryRouter initialEntries={['/cms/site']}>
       <AdminSessionProvider user={user}>
         <StepUpProvider>
           <AccountMenuButton />
@@ -142,7 +142,7 @@ describe('AccountMenuButton', () => {
     let logoutCalled = false
     globalThis.fetch = mock(async (input: RequestInfo | URL) => {
       const url = typeof input === 'string' ? input : input.toString()
-      if (url.endsWith('/admin/api/cms/logout')) {
+      if (url.endsWith('/cms/api/cms/logout')) {
         logoutCalled = true
         return jsonResponse({ ok: true })
       }
@@ -158,14 +158,14 @@ describe('AccountMenuButton', () => {
       expect(logoutCalled).toBe(true)
     })
     await waitFor(() => {
-      expect(assignSpy).toHaveBeenCalledWith('/admin')
+      expect(assignSpy).toHaveBeenCalledWith('/cms')
     })
   })
 
   it('calls /logout-all and surfaces the revoked count in the menu', async () => {
     globalThis.fetch = mock(async (input: RequestInfo | URL) => {
       const url = typeof input === 'string' ? input : input.toString()
-      if (url.endsWith('/admin/api/cms/auth/logout-all')) {
+      if (url.endsWith('/cms/api/cms/auth/logout-all')) {
         return jsonResponse({ ok: true, revokedCount: 3 })
       }
       throw new Error(`Unexpected fetch: ${url}`)
@@ -205,13 +205,13 @@ describe('AccountMenuButton', () => {
     }
 
     render(
-      <MemoryRouter initialEntries={['/admin/site']}>
+      <MemoryRouter initialEntries={['/cms/site']}>
         <AdminSessionProvider user={makeUser()}>
           <StepUpProvider>
             <AccountMenuButton />
             <Routes>
-              <Route path="/admin/site" element={<PathProbe />} />
-              <Route path="/admin/account" element={<PathProbe />} />
+              <Route path="/cms/site" element={<PathProbe />} />
+              <Route path="/cms/account" element={<PathProbe />} />
             </Routes>
           </StepUpProvider>
         </AdminSessionProvider>
@@ -222,7 +222,7 @@ describe('AccountMenuButton', () => {
     fireEvent.click(screen.getByTestId('account-menu-go-to-account'))
 
     await waitFor(() => {
-      expect(screen.getByTestId('probe-pathname').textContent).toBe('/admin/account')
+      expect(screen.getByTestId('probe-pathname').textContent).toBe('/cms/account')
     })
     expect(assignSpy).not.toHaveBeenCalled()
   })

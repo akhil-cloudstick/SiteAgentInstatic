@@ -20,7 +20,7 @@ const ResponseSchema = Type.Object(
   { additionalProperties: true },
 )
 
-const ENDPOINT = '/admin/api/test/search'
+const ENDPOINT = '/cms/api/test/search'
 const ctx = {} as CommandContext
 const signal = new AbortController().signal
 

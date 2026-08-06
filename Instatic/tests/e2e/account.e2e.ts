@@ -137,7 +137,7 @@ async function createAccountActivityUser(
   page: Page,
   user: AccountActivityUser,
 ): Promise<void> {
-  await page.goto('/admin/users')
+  await page.goto('/cms/users')
   await page.getByRole('button', { name: 'Create User', exact: true }).click()
   await page.locator('input[name="new-user-email-address"]').fill(user.email)
   await page.locator('input[name="new-user-display-name"]').fill(user.displayName)
@@ -179,7 +179,7 @@ test.describe('account', () => {
       const displayName = `Account Persona ${Date.now().toString(36)}`
 
       await login(page)
-      await page.goto('/admin/account')
+      await page.goto('/cms/account')
       await page.getByTestId('account-tab-profile').click()
 
       await page.getByTestId('profile-display-name').fill(displayName)
@@ -199,7 +199,7 @@ test.describe('account', () => {
     }) => {
       await page.setViewportSize({ width: 390, height: 844 })
       await login(page)
-      await page.goto('/admin/account')
+      await page.goto('/cms/account')
       await page.getByTestId('account-tab-profile').click()
 
       const originalDisplayName = await page.getByTestId('profile-display-name').inputValue()
@@ -230,7 +230,7 @@ test.describe('account', () => {
 
   test('uploads a profile picture that persists (ADMIN-002 / ACCOUNT-002)', async ({ page }) => {
     await login(page)
-    await page.goto('/admin/account')
+    await page.goto('/cms/account')
     await page.getByTestId('account-tab-profile').click()
 
     // The file input is hidden behind the upload button; set files on it directly.
@@ -251,7 +251,7 @@ test.describe('account', () => {
     page,
   }) => {
     await login(page)
-    await page.goto('/admin/account')
+    await page.goto('/cms/account')
     await page.getByTestId('account-tab-profile').click()
 
     await page
@@ -279,7 +279,7 @@ test.describe('account', () => {
     page,
   }) => {
     await login(page)
-    await page.goto('/admin/account')
+    await page.goto('/cms/account')
     await page.getByTestId('account-tab-profile').click()
 
     await clearUploadedAvatarIfPresent(page)
@@ -299,7 +299,7 @@ test.describe('account', () => {
     page,
   }) => {
     await login(page)
-    await page.goto('/admin/account')
+    await page.goto('/cms/account')
     await page.getByTestId('account-tab-profile').click()
 
     await clearUploadedAvatarIfPresent(page)
@@ -319,7 +319,7 @@ test.describe('account', () => {
   }) => {
     await page.setViewportSize({ width: 390, height: 844 })
     await login(page)
-    await page.goto('/admin/account')
+    await page.goto('/cms/account')
     await page.getByTestId('account-tab-profile').click()
 
     await clearUploadedAvatarIfPresent(page)
@@ -351,7 +351,7 @@ test.describe('account', () => {
       page,
     }) => {
       await login(page)
-      await page.goto('/admin/account')
+      await page.goto('/cms/account')
       await page.getByTestId('account-tab-security').click()
 
       const mfaCard = page.getByTestId('security-mfa-card')
@@ -386,7 +386,7 @@ test.describe('account', () => {
       page,
     }) => {
       await login(page)
-      await page.goto('/admin/account')
+      await page.goto('/cms/account')
       await page.getByTestId('account-tab-security').click()
 
       const stepUpCard = page.getByTestId('security-step-up-card')
@@ -419,7 +419,7 @@ test.describe('account', () => {
     }) => {
       await page.setViewportSize({ width: 390, height: 844 })
       await login(page)
-      await page.goto('/admin/account')
+      await page.goto('/cms/account')
       await page.getByTestId('account-tab-security').click()
 
       const stepUpCard = page.getByTestId('security-step-up-card')
@@ -446,7 +446,7 @@ test.describe('account', () => {
     test('shows failed and successful login attempts in sign-in history (AUTH-006)', async ({
       page,
     }) => {
-      await page.goto('/admin')
+      await page.goto('/cms')
       await expect(page.getByRole('heading', { name: 'Admin Login' })).toBeVisible()
 
       await page.getByLabel('Email').fill(ACCOUNT_PERSONA.email)
@@ -458,7 +458,7 @@ test.describe('account', () => {
       await page.getByRole('button', { name: 'Sign In' }).click()
       await expectLoggedIn(page)
 
-      await page.goto('/admin/account')
+      await page.goto('/cms/account')
       await page.getByTestId('account-tab-activity').click()
 
       await expect(page.getByRole('heading', { name: 'Sign-in history' })).toBeVisible()
@@ -499,7 +499,7 @@ test.describe('account', () => {
         await loginAs(accountPage, accountUser.email, accountUser.password)
 
         const attackerPage = await attackerContext.newPage()
-        await attackerPage.goto('/admin')
+        await attackerPage.goto('/cms')
         await expect(attackerPage.getByRole('heading', { name: 'Admin Login' })).toBeVisible()
 
         for (let attempt = 1; attempt <= 4; attempt += 1) {
@@ -517,7 +517,7 @@ test.describe('account', () => {
         await submitLoginAttempt(attackerPage, accountUser.email, `${accountUser.password}-wrong-6`)
         await expect(attackerPage.getByRole('alert')).toHaveText(/too many login attempts/i)
 
-        await accountPage.goto('/admin/account')
+        await accountPage.goto('/cms/account')
         await accountPage.getByTestId('account-tab-activity').click()
 
         await expect(accountPage.getByRole('heading', { name: 'Sign-in history' })).toBeVisible()
@@ -558,7 +558,7 @@ test.describe('account', () => {
         const otherPage = await otherContext.newPage()
         await login(otherPage)
 
-        await page.goto('/admin/account')
+        await page.goto('/cms/account')
         await page.getByTestId('account-tab-sessions').click()
 
         await expect(page.getByRole('heading', { name: 'Active devices' })).toBeVisible()
@@ -577,7 +577,7 @@ test.describe('account', () => {
         await expect(signOutOthers).toBeDisabled()
         await expectLoggedIn(page)
 
-        await otherPage.goto('/admin/account')
+        await otherPage.goto('/cms/account')
         await expect(otherPage.getByRole('heading', { name: 'Admin Login' })).toBeVisible()
       } finally {
         await otherContext.close()
@@ -596,7 +596,7 @@ test.describe('account', () => {
         const otherPage = await otherContext.newPage()
         await login(otherPage)
 
-        await page.goto('/admin/account')
+        await page.goto('/cms/account')
         await page.getByTestId('account-tab-sessions').click()
 
         await expect(page.getByRole('heading', { name: 'Active devices' })).toBeVisible()
@@ -617,7 +617,7 @@ test.describe('account', () => {
     test('keeps MFA setup dialog usable at mobile width (ACCOUNT-004)', async ({ page }) => {
       await page.setViewportSize({ width: 390, height: 844 })
       await login(page)
-      await page.goto('/admin/account')
+      await page.goto('/cms/account')
       await page.getByTestId('account-tab-security').click()
 
       const mfaCard = page.getByTestId('security-mfa-card')
@@ -654,7 +654,7 @@ test.describe('account', () => {
       page,
     }) => {
       await login(page)
-      await page.goto('/admin/account')
+      await page.goto('/cms/account')
       await page.getByTestId('account-tab-security').click()
 
       const mfaCard = page.getByTestId('security-mfa-card')
@@ -695,7 +695,7 @@ test.describe('account', () => {
       page,
     }) => {
       await login(page)
-      await page.goto('/admin/account')
+      await page.goto('/cms/account')
       await page.getByTestId('account-tab-security').click()
 
       await expect(page.getByTestId('security-mfa-card')).toContainText('Off')
@@ -745,7 +745,7 @@ test.describe('account', () => {
       await page.getByRole('button', { name: 'Verify' }).click()
       await expectLoggedIn(page)
 
-      await page.goto('/admin/account')
+      await page.goto('/cms/account')
       await page.getByTestId('account-tab-security').click()
       await expect(page.getByTestId('security-mfa-card')).toContainText('On')
 
@@ -763,7 +763,7 @@ test.describe('account', () => {
       page,
     }) => {
       await login(page)
-      await page.goto('/admin/account')
+      await page.goto('/cms/account')
       await page.getByTestId('account-tab-security').click()
 
       await expect(page.getByTestId('security-mfa-card')).toContainText('Off')
@@ -782,7 +782,7 @@ test.describe('account', () => {
       await expectLoggedIn(page)
 
       const email = `mfa-stepup-${Date.now().toString(36)}@example.com`
-      await page.goto('/admin/users')
+      await page.goto('/cms/users')
       await page.getByRole('button', { name: 'Create User', exact: true }).click()
       await page.locator('input[name="new-user-email-address"]').fill(email)
       await page.locator('input[name="new-user-display-name"]').fill('MFA Step-Up Guard')
@@ -808,7 +808,7 @@ test.describe('account', () => {
       await expect(stepUpDialog).toBeHidden({ timeout: 20_000 })
       await expect(page.getByText(email)).toBeVisible()
 
-      await page.goto('/admin/account')
+      await page.goto('/cms/account')
       await page.getByTestId('account-tab-security').click()
       await page.getByTestId('security-mfa-disable').click()
       await completeStepUpWithMfaIfOpened(page, secret)
@@ -818,7 +818,7 @@ test.describe('account', () => {
 
     test('keeps MFA login challenge usable at mobile width (AUTH-002)', async ({ page }) => {
       await login(page)
-      await page.goto('/admin/account')
+      await page.goto('/cms/account')
       await page.getByTestId('account-tab-security').click()
 
       await expect(page.getByTestId('security-mfa-card')).toContainText('Off')
@@ -848,7 +848,7 @@ test.describe('account', () => {
       await page.getByRole('button', { name: 'Verify' }).click()
       await expectLoggedIn(page)
 
-      await page.goto('/admin/account')
+      await page.goto('/cms/account')
       await page.getByTestId('account-tab-security').click()
       await page.getByTestId('security-mfa-disable').click()
       await completeStepUpWithMfaIfOpened(page, secret)
@@ -858,7 +858,7 @@ test.describe('account', () => {
 
     test('uses a recovery code once and rejects reuse on MFA login (AUTH-002)', async ({ page }) => {
       await login(page)
-      await page.goto('/admin/account')
+      await page.goto('/cms/account')
       await page.getByTestId('account-tab-security').click()
 
       await expect(page.getByTestId('security-mfa-card')).toContainText('Off')
@@ -878,7 +878,7 @@ test.describe('account', () => {
       await page.getByRole('button', { name: 'Verify' }).click()
       await expectLoggedIn(page)
 
-      await page.goto('/admin/account')
+      await page.goto('/cms/account')
       await page.getByTestId('account-tab-security').click()
       await expect(page.getByTestId('security-mfa-card')).toContainText('On')
       await expect(page.getByTestId('security-recovery-card')).toContainText(
@@ -900,7 +900,7 @@ test.describe('account', () => {
       await page.getByRole('button', { name: 'Verify' }).click()
       await expectLoggedIn(page)
 
-      await page.goto('/admin/account')
+      await page.goto('/cms/account')
       await page.getByTestId('account-tab-security').click()
       await page.getByTestId('security-mfa-disable').click()
       await completeStepUpWithMfaIfOpened(page, secret)
@@ -913,7 +913,7 @@ test.describe('account', () => {
     test('keeps password change usable at mobile width (ACCOUNT-003)', async ({ page }) => {
       await page.setViewportSize({ width: 390, height: 844 })
       await login(page)
-      await page.goto('/admin/account')
+      await page.goto('/cms/account')
       await page.getByTestId('account-tab-security').click()
 
       const passwordCard = page.getByTestId('security-password-card')
@@ -949,7 +949,7 @@ test.describe('account', () => {
       const temporaryPassword = `changed-pass-${Date.now().toString(36)}`
 
       await login(page)
-      await page.goto('/admin/account')
+      await page.goto('/cms/account')
       await page.getByTestId('account-tab-security').click()
 
       await page.getByTestId('security-change-password').click()
@@ -982,7 +982,7 @@ test.describe('account', () => {
       await page.getByRole('button', { name: 'Sign In' }).click()
       await expectLoggedIn(page)
 
-      await page.goto('/admin/account')
+      await page.goto('/cms/account')
       await page.getByTestId('account-tab-security').click()
       await page.getByTestId('security-change-password').click()
       await expect(dialog).toBeVisible()
@@ -994,7 +994,7 @@ test.describe('account', () => {
 
       await logout(page)
       await login(page)
-      await page.goto('/admin/account')
+      await page.goto('/cms/account')
       await page.getByTestId('account-tab-security').click()
       await expect(page.getByTestId('security-password-card')).toContainText('Last changed:')
     })

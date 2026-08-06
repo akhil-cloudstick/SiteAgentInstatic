@@ -147,15 +147,15 @@ const SiteExportModal = lazy(() =>
 if (typeof window !== 'undefined') {
   const pathname = window.location.pathname
   const activePage =
-    pathname.startsWith('/admin/site') ? SitePage :
-    pathname.startsWith('/admin/content') ? ContentPage :
-    pathname.startsWith('/admin/data') ? DataPage :
-    pathname.startsWith('/admin/media') ? MediaPage :
-    pathname.startsWith('/admin/plugins/') ? PluginPage :
-    pathname.startsWith('/admin/plugins') ? PluginsPage :
-    pathname.startsWith('/admin/users') ? UsersPage :
-    pathname.startsWith('/admin/ai') ? AiPage :
-    pathname.startsWith('/admin/account') ? AccountPage :
+    pathname.startsWith('/cms/site') ? SitePage :
+    pathname.startsWith('/cms/content') ? ContentPage :
+    pathname.startsWith('/cms/data') ? DataPage :
+    pathname.startsWith('/cms/media') ? MediaPage :
+    pathname.startsWith('/cms/plugins/') ? PluginPage :
+    pathname.startsWith('/cms/plugins') ? PluginsPage :
+    pathname.startsWith('/cms/users') ? UsersPage :
+    pathname.startsWith('/cms/ai') ? AiPage :
+    pathname.startsWith('/cms/account') ? AccountPage :
     DashboardPage
   void activePage.preload().catch(() => {
     // Cold-render retry will re-fire preload via prewarmedLazy's throw.
@@ -255,7 +255,7 @@ export default function AuthenticatedAdmin({ section, currentUser }: Authenticat
     }
 
     if (section === 'site') {
-      // `/admin/site` has a second, active-route post-paint import:
+      // `/cms/site` has a second, active-route post-paint import:
       // AdminCanvasEditorBody. Let that editor body claim the first idle
       // slot before warming sibling workspace pages; otherwise Content/Data
       // preloads start first and delay the canvas/dnd work the user actually

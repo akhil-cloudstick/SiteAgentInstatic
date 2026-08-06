@@ -73,9 +73,9 @@ export async function handleSsoRoutes(req: Request, db: DbClient): Promise<Respo
   // Restricted to in-app /admin paths so this can't be turned into an open redirect.
   const requested = url.searchParams.get('redirect') ?? ''
   const dest =
-    requested.startsWith('/admin') && !requested.startsWith('//') && !requested.includes('..')
+    requested.startsWith('/cms') && !requested.startsWith('//') && !requested.includes('..')
       ? requested
-      : '/admin'
+      : '/cms'
 
   return setCookieHeader(
     new Response(null, { status: 302, headers: { location: dest } }),

@@ -13,7 +13,7 @@ import { OWNER } from './constants'
  * path the owner is authenticated and the admin shell is reachable.
  */
 export async function completeSetupOrLogin(page: Page): Promise<void> {
-  await page.goto('/admin')
+  await page.goto('/cms')
   const setupHeading = page.getByRole('heading', { name: 'Set Up CMS' })
   const onSetup = await setupHeading
     .waitFor({ state: 'visible', timeout: 15_000 })
@@ -41,7 +41,7 @@ export async function loginAs(
   email: string,
   password: string,
 ): Promise<void> {
-  await page.goto('/admin')
+  await page.goto('/cms')
   await expect(page.getByRole('heading', { name: 'Admin Login' })).toBeVisible()
   await page.getByLabel('Email').fill(email)
   await page.getByLabel('Password').fill(password)

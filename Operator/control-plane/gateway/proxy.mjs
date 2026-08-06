@@ -3,14 +3,19 @@
 //
 //   /operator/*    -> the Astro operator console (open access, no login).
 //
-//   /od/<slug>/*   -> that tenant's OpenDesign web (od_web_port), path preserved.
-//                     The Next.js app runs with basePath=/od/<slug>, so it already
-//                     emits its own assets/links/rewrites under the prefix. Because
-//                     the slug is in the path, MANY tenants' OD can be open at once.
+//   /design/*      -> the ONE shared OpenDesign web build, path preserved (its
+//                     Next basePath is a fixed `/design`). Daemon-owned paths under
+//                     it (/design/api, /design/sso, /design/artifacts, /design/frames) are split
+//                     off to the CURRENT hub session's own OD daemon.
+//                     The slug is deliberately NOT in the path: basePath is a
+//                     build-time constant, so `/od/<slug>` forced one Next build
+//                     and one `next start` per tenant, which does not scale.
+//                     Tenant isolation is unchanged — each tenant still has its
+//                     own daemon + data dir; only the UI shell is shared.
 //
 //   everything the -> the CURRENT hub session's tenant Instatic (root preserved).
 //   control-plane     Instatic serves published pages at arbitrary ROOT slugs
-//   did not claim     (`/about`) plus `/admin`, `/assets`, `/uploads`, all
+//   did not claim     (`/about`) plus `/cms`, `/assets`, `/uploads`, all
 //                     root-absolute and baked by Vite. Prefixing that would fight
 //                     Instatic's root-only design, so instead we multiplex tenants
 //                     by the signed `sa_hub` cookie — ONE tenant per browser.
@@ -20,8 +25,12 @@ import http from 'node:http';
 import config from '../lib/env.mjs';
 import { getTenant } from '../registry/tenants.mjs';
 import { verifyValue } from '../lib/crypto.mjs';
+import * as odRuntime from '../runtime/odRuntime.mjs';
 
 const HUB_COOKIE = 'sa_hub';
+// Fixed, tenant-agnostic mount point for the ONE shared OpenDesign web build.
+// It must match the Next basePath in odRuntime.buildWeb()/startSharedWeb().
+const OD_PREFIX = '/design';
 
 // Resolve the tenant slug from the signed hub session cookie (same cookie
 // hub.mjs issues on login). Returns null when there is no valid session.
@@ -37,7 +46,7 @@ function sessionSlug(req) {
   return null;
 }
 
-// A backend served behind a path prefix (OpenDesign under /od/<slug>) may issue a
+// A backend served behind a path prefix (OpenDesign under /design) may issue a
 // ROOT-relative redirect — e.g. the OD daemon's SSO handler does `res.redirect('/')`
 // and Next.js proxies that Location through untouched. Left as-is it lands on the
 // gateway root; rewrite it to live under the prefix so the browser stays in the app.
@@ -50,20 +59,34 @@ function rewriteLocation(headers, prefix) {
 }
 
 // The OpenDesign SPA emits ABSOLUTE URLs (/api, /artifacts, /frames, /sso, public
-// assets) with no /od/<slug> basePath — Next.js only prefixes its own <Link> and
-// _next assets, not raw fetch/EventSource/<img>/<iframe>/css url(). Those requests
-// arrive base-less at the gateway root. But every one carries a Referer of the OD
-// page that issued it, so we can recover the tenant + restore the prefix here —
-// covering ALL request types at once, with zero app-side patching.
-function odSlugFromReferer(req) {
+// assets) with no basePath — Next.js only prefixes its own <Link> and _next
+// assets, not raw fetch/EventSource/<img>/<iframe>/css url(). The client-side
+// shim (apps/web/app/gateway-basepath-shim.ts) patches most of those, but any it
+// misses arrive base-less at the gateway root. They all carry a Referer of the OD
+// page that issued them, so we can recognise them and restore the prefix here.
+// The TENANT is never taken from the Referer — it comes from the session cookie,
+// so a forged Referer cannot reach another tenant's daemon.
+function isFromOdPage(req) {
   const ref = req.headers.referer || req.headers.referrer;
-  if (!ref) return null;
+  if (!ref) return false;
   try {
-    const m = new URL(ref).pathname.match(/^\/od\/([a-z0-9-]+)(?=\/|$)/);
-    return m ? m[1] : null;
+    const p = new URL(ref).pathname;
+    return p === OD_PREFIX || p.startsWith(`${OD_PREFIX}/`);
   } catch {
-    return null;
+    return false;
   }
+}
+
+// No usable session on a request that needs one. A top-level navigation gets a
+// 302 to /login carrying where it was headed, so signing in lands the user back
+// on the exact page (mid-edit deep links included) instead of dumping them on the
+// hub. Sub-resource requests (fetch/XHR/iframe) cannot follow a login redirect
+// usefully, so they get a plain 401 for the app to handle.
+function unauthenticated(req, path) {
+  const isDocument = req.headers['sec-fetch-dest'] === 'document'
+    || (!req.headers['sec-fetch-dest'] && (req.headers.accept || '').includes('text/html'));
+  if (!isDocument) return { status: 401, body: 'not signed in' };
+  return { redirect: `/login?next=${encodeURIComponent(req.url || path)}` };
 }
 
 // Paths owned by the OD DAEMON (not the Next web): its HTTP API, SSO entry, and
@@ -109,35 +132,56 @@ async function resolveBackend(req, path) {
   if (path === '/operator' || path.startsWith('/operator/')) {
     return { port: config.operatorConsolePort, kind: 'operator' };
   }
-  // Explicit /od/<slug>/... — daemon-owned paths (/api,/sso,/artifacts,/frames) go
-  // STRAIGHT to the daemon with the prefix stripped (works in dev AND pre-built,
-  // unlike Next's dev-only proxy); everything else (SPA + _next assets + public)
-  // goes to the Next web.
-  const od = path.match(/^\/od\/([a-z0-9-]+)(?:\/|$)/);
-  if (od) {
-    const slug = od[1];
-    const prefix = `/od/${slug}`;
-    const t = await getTenant(slug);
-    if (!t?.od_web_port) return { notFound: 'unknown OpenDesign tenant' };
-    const restPath = path.slice(prefix.length) || '/';
-    if (t.od_port && isDaemonPath(restPath)) {
-      return { port: t.od_port, kind: 'od-daemon', prefix, rewritePath: req.url.slice(prefix.length) || '/' };
+  // Explicit /design/... — ONE shared web build serves every tenant, so the slug
+  // is NOT in the path any more. Daemon-owned paths (/api,/sso,/artifacts,/frames)
+  // go STRAIGHT to the SESSION's own daemon with the prefix stripped (works in dev
+  // AND pre-built, unlike Next's dev-only proxy); everything else (SPA + _next
+  // assets + public) goes to the single shared Next web, path preserved because
+  // that build's basePath IS this prefix.
+  //
+  // This is the same multiplexing Instatic already uses below: the tenant comes
+  // from the signed `sa_hub` cookie, ONE tenant per browser. It is also the data
+  // isolation boundary — a request can only ever reach the daemon of the tenant
+  // whose session cookie it carries.
+  if (path === OD_PREFIX || path.startsWith(`${OD_PREFIX}/`)) {
+    const restPath = path.slice(OD_PREFIX.length) || '/';
+    if (isDaemonPath(restPath)) {
+      const slug = sessionSlug(req);
+      // No (or expired) session. For a top-level page load, bounce to /login and
+      // come back afterwards — never dead-end on a bare error string. For a
+      // sub-resource (fetch/XHR/iframe) a redirect would be useless, so answer
+      // 401 and let the app react.
+      if (!slug) return unauthenticated(req, path);
+      const t = await getTenant(slug);
+      if (!t?.od_port) return { notFound: 'unknown OpenDesign tenant' };
+      return {
+        port: t.od_port,
+        kind: 'od-daemon',
+        prefix: OD_PREFIX,
+        rewritePath: req.url.slice(OD_PREFIX.length) || '/',
+      };
     }
-    return { port: t.od_web_port, kind: 'od', prefix };
+    return { port: odRuntime.sharedWebPort(), kind: 'od', prefix: OD_PREFIX };
   }
-  // Base-less SUB-RESOURCE request FROM an OD page (its absolute /api, /artifacts,
-  // asset URLs). Recover the tenant from the Referer: daemon paths -> the daemon
-  // as-is; asset paths -> the OD web with the /od/<slug> prefix restored. Exclude
-  // top-level document navigations (Sec-Fetch-Dest: document) — clicking from OD
-  // back to /hub or /login must still reach the control-plane, not get pushed to OD.
-  const odRef = odSlugFromReferer(req);
-  if (odRef && req.headers['sec-fetch-dest'] !== 'document') {
-    const t = await getTenant(odRef);
-    if (t?.od_web_port) {
-      if (t.od_port && isDaemonPath(path)) {
-        return { port: t.od_port, kind: 'od-daemon', prefix: `/od/${odRef}`, rewritePath: req.url };
+  // Base-less SUB-RESOURCE request FROM an OD page (an absolute /api, /artifacts
+  // or asset URL that escaped the client-side basePath shim). Recognise it by the
+  // Referer and restore the `/design` prefix. Exclude top-level document navigations
+  // (Sec-Fetch-Dest: document) — clicking from OD back to /hub or /login must
+  // still reach the control-plane, not get pushed to OD.
+  if (isFromOdPage(req) && req.headers['sec-fetch-dest'] !== 'document') {
+    if (isDaemonPath(path)) {
+      const slug = sessionSlug(req);
+      if (slug) {
+        const t = await getTenant(slug);
+        if (t?.od_port) return { port: t.od_port, kind: 'od-daemon', prefix: OD_PREFIX, rewritePath: req.url };
       }
-      return { port: t.od_web_port, kind: 'od', prefix: `/od/${odRef}`, rewritePath: `/od/${odRef}${req.url}` };
+    } else {
+      return {
+        port: odRuntime.sharedWebPort(),
+        kind: 'od',
+        prefix: OD_PREFIX,
+        rewritePath: `${OD_PREFIX}${req.url}`,
+      };
     }
   }
   const slug = sessionSlug(req);
@@ -153,6 +197,16 @@ async function resolveBackend(req, path) {
 export async function handleGatewayProxy(req, res, method, path) {
   const target = await resolveBackend(req, path);
   if (!target) return false;
+  if (target.redirect) {
+    res.writeHead(302, { location: target.redirect, 'cache-control': 'no-store' });
+    res.end();
+    return true;
+  }
+  if (target.status) {
+    res.writeHead(target.status, { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' });
+    res.end(target.body ?? '');
+    return true;
+  }
   if (target.notFound) {
     res.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' });
     res.end(target.notFound);
@@ -168,7 +222,8 @@ export async function handleGatewayUpgrade(req, socket, head) {
   const path = new URL(req.url, 'http://x').pathname;
   let target;
   try { target = await resolveBackend(req, path); } catch { target = null; }
-  if (!target || target.notFound) { socket.destroy(); return; }
+  // A redirect/401 verdict is meaningless for a socket upgrade — just refuse it.
+  if (!target || target.notFound || target.redirect || target.status) { socket.destroy(); return; }
 
   const headers = { ...req.headers };
   headers.host = `127.0.0.1:${target.port}`;

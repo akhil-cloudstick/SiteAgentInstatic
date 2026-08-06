@@ -48,7 +48,7 @@ export async function listCmsPluginResourceRecords(
   pluginId: string,
   resourceId: string,
   fetchImpl: FetchLike = globalThis.fetch.bind(globalThis),
-  basePath = '/admin/api/cms',
+  basePath = '/cms/api/cms',
   options?: StorageListOptions,
 ): Promise<{ records: PluginRecord[]; totalCount: number }> {
   const url = recordsPath(basePath, pluginId, resourceId) + buildQueryString(options)
@@ -68,7 +68,7 @@ export async function getCmsPluginResource(
   pluginId: string,
   resourceId: string,
   fetchImpl: FetchLike = globalThis.fetch.bind(globalThis),
-  basePath = '/admin/api/cms',
+  basePath = '/cms/api/cms',
 ): Promise<{ resource: PluginResource; records: PluginRecord[]; totalCount: number }> {
   const body = await apiRequest(recordsPath(basePath, pluginId, resourceId), {
     schema: PluginRecordsEnvelope,
@@ -89,7 +89,7 @@ export async function createCmsPluginResourceRecord(
   resourceId: string,
   data: Record<string, unknown>,
   fetchImpl: FetchLike = globalThis.fetch.bind(globalThis),
-  basePath = '/admin/api/cms',
+  basePath = '/cms/api/cms',
 ): Promise<PluginRecord> {
   const body = await apiRequest(recordsPath(basePath, pluginId, resourceId), {
     method: 'POST',
@@ -108,7 +108,7 @@ export async function updateCmsPluginResourceRecord(
   recordId: string,
   data: Record<string, unknown>,
   fetchImpl: FetchLike = globalThis.fetch.bind(globalThis),
-  basePath = '/admin/api/cms',
+  basePath = '/cms/api/cms',
 ): Promise<PluginRecord> {
   const body = await apiRequest(`${recordsPath(basePath, pluginId, resourceId)}/${encodeURIComponent(recordId)}`, {
     method: 'PATCH',
@@ -126,7 +126,7 @@ export async function deleteCmsPluginResourceRecord(
   resourceId: string,
   recordId: string,
   fetchImpl: FetchLike = globalThis.fetch.bind(globalThis),
-  basePath = '/admin/api/cms',
+  basePath = '/cms/api/cms',
 ): Promise<void> {
   await apiRequest(`${recordsPath(basePath, pluginId, resourceId)}/${encodeURIComponent(recordId)}`, {
     method: 'DELETE',

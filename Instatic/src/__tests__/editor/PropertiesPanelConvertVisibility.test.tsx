@@ -20,7 +20,7 @@
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
 import React from 'react'
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { PropertiesPanel } from '@site/panels/PropertiesPanel/PropertiesPanel'
 import { useEditorStore } from '@site/store/store'
 import type { VisualComponent, VCNode } from '@core/visualComponents'
@@ -45,6 +45,11 @@ function resetStore() {
     selectedNodeIds: [],
     hoveredNodeId: null,
     activeBreakpointId: 'desktop',
+    // The inspector is per-mode since the approved Site re-skin; these tests
+    // exercise the Live-edit body, so pin the mode rather than inheriting the
+    // store's 'design' default (which resolves to Responsive review).
+    canvasView: 'live',
+    sectionFocusNodeId: null,
     propertiesPanel: { collapsed: false, x: 0, y: 0, width: 280 },
     focusedPanel: 'canvas',
     _historyPast: [],
@@ -237,6 +242,13 @@ describe('PPVC-5 — regular node on page → Convert button present', () => {
     } as Parameters<typeof useEditorStore.setState>[0])
 
     render(<PropertiesPanel />)
+
+    // Componentize rides along with the class picker, which the approved Site
+    // screen keeps behind its "Advanced instance styles, classes & attributes"
+    // disclosure.
+    fireEvent.click(
+      screen.getByRole('button', { name: /advanced instance styles, classes & attributes/i }),
+    )
 
     expect(
       screen.getByRole('button', { name: /Componentize/i }),

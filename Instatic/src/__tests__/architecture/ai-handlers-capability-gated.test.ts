@@ -4,7 +4,7 @@
  * work.
  *
  * This catches accidental bypasses: an unauthenticated POST against
- * `/admin/api/ai/conversations` would let any visitor enumerate or
+ * `/cms/api/ai/conversations` would let any visitor enumerate or
  * create chat history. Capability gating is the single chokepoint.
  */
 

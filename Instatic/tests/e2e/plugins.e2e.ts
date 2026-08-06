@@ -17,7 +17,7 @@ test.describe('plugin uploads', () => {
   test('rejects an invalid plugin manifest and recovers on the next upload (PLUGIN-008)', async ({
     page,
   }) => {
-    await page.goto('/admin/plugins')
+    await page.goto('/cms/plugins')
     await expect(page.getByTestId('plugins-admin-canvas')).toBeVisible({
       timeout: 20_000,
     })
@@ -63,7 +63,7 @@ test.describe.serial('plugin settings', () => {
 
   test('saves normal settings and reopens secrets masked (PLUGIN-003)', async ({ page }) => {
     await login(page)
-    await page.goto('/admin/plugins')
+    await page.goto('/cms/plugins')
     await expect(page.getByTestId('plugins-admin-canvas')).toBeVisible({
       timeout: 20_000,
     })
@@ -106,7 +106,7 @@ test.describe.serial('plugin settings', () => {
     await expect(reopenedDialog.getByLabel('API token')).toHaveValue('***')
 
     const settingsResponse = await page.evaluate(async (id) => {
-      const response = await fetch(`/admin/api/cms/plugins/${id}/settings`, {
+      const response = await fetch(`/cms/api/cms/plugins/${id}/settings`, {
         credentials: 'include',
       })
       return {
@@ -140,7 +140,7 @@ test.describe.serial('plugin lifecycle', () => {
 
   test('disables, enables, and removes a packaged plugin (PLUGIN-002)', async ({ page }) => {
     await login(page)
-    await page.goto('/admin/plugins')
+    await page.goto('/cms/plugins')
     await expect(page.getByTestId('plugins-admin-canvas')).toBeVisible({
       timeout: 20_000,
     })
@@ -209,7 +209,7 @@ test.describe.serial('plugin schedules', () => {
 
   test('lists, runs, pauses, and resumes a packaged schedule (PLUGIN-005)', async ({ page }) => {
     await login(page)
-    await page.goto('/admin/plugins')
+    await page.goto('/cms/plugins')
     await expect(page.getByTestId('plugins-admin-canvas')).toBeVisible({
       timeout: 20_000,
     })
@@ -272,7 +272,7 @@ test.describe.serial('plugin packs', () => {
 
   test('installs and re-syncs a packaged site pack (PLUGIN-006)', async ({ page }) => {
     await login(page)
-    await page.goto('/admin/plugins')
+    await page.goto('/cms/plugins')
     await expect(page.getByTestId('plugins-admin-canvas')).toBeVisible({
       timeout: 20_000,
     })
@@ -295,7 +295,7 @@ test.describe.serial('plugin packs', () => {
     await page.getByRole('button', { name: 'Approve and Install' }).click()
     await completeStepUp(page)
 
-    await page.goto('/admin/site')
+    await page.goto('/cms/site')
     await openSiteEditor(page)
     await openSitePanel(page)
     const packPage = page.getByRole('treeitem', { name: `Open page ${packPageTitle}` })
@@ -303,7 +303,7 @@ test.describe.serial('plugin packs', () => {
     await packPage.click()
     await expect(canvasFrame(page).getByText(packText)).toBeVisible()
 
-    await page.goto('/admin/plugins')
+    await page.goto('/cms/plugins')
     const pluginCard = page.locator('article').filter({
       has: page.getByRole('heading', { name: pluginName }),
     })
@@ -336,7 +336,7 @@ test.describe.serial('packaged plugin surfaces', () => {
     page,
   }) => {
     await login(page)
-    await page.goto('/admin/plugins')
+    await page.goto('/cms/plugins')
     await expect(page.getByTestId('plugins-admin-canvas')).toBeVisible({
       timeout: 20_000,
     })
@@ -364,22 +364,22 @@ test.describe.serial('packaged plugin surfaces', () => {
     await expect(pluginCard.getByText('Active', { exact: true })).toBeVisible()
 
     await pluginCard.getByRole('link', { name: 'Guide' }).click()
-    await expect(page).toHaveURL(new RegExp(`/admin/plugins/${escapeRegExp(pluginId)}/guide$`))
+    await expect(page).toHaveURL(new RegExp(`/cms/plugins/${escapeRegExp(pluginId)}/guide$`))
     await expect(page.getByRole('heading', { name: 'E2E Guide' })).toBeVisible()
     await expect(page.getByText(`Guide body ${suffix}`)).toBeVisible()
 
-    await page.goto(`/admin/plugins/${pluginId}/map`)
+    await page.goto(`/cms/plugins/${pluginId}/map`)
     await expect(page.getByRole('heading', { name: 'E2E Map' })).toBeVisible()
     await expect(page.getByText('North dock')).toBeVisible()
 
-    await page.goto(`/admin/plugins/${pluginId}/dashboard`)
+    await page.goto(`/cms/plugins/${pluginId}/dashboard`)
     await expect(page.getByTestId('plugin-e2e-dashboard')).toBeVisible({
       timeout: 20_000,
     })
     await expect(page.getByTestId('plugin-e2e-dashboard')).toContainText(pluginName)
 
     const runtime = await page.evaluate(async (id) => {
-      const response = await fetch(`/admin/api/cms/plugins/${id}/runtime/status`, {
+      const response = await fetch(`/cms/api/cms/plugins/${id}/runtime/status`, {
         credentials: 'include',
       })
       return {
@@ -397,7 +397,7 @@ test.describe.serial('packaged plugin surfaces', () => {
       },
     })
 
-    await page.goto(`/admin/plugins/${pluginId}/approvals`)
+    await page.goto(`/cms/plugins/${pluginId}/approvals`)
     await expect(page.getByRole('heading', { name: 'Approvals' })).toBeVisible()
     await expect(page.getByText('No records yet.')).toBeVisible()
 
@@ -698,7 +698,7 @@ async function pluginRuntimeStatus(
   pluginId: string,
 ): Promise<{ status: number; body: unknown }> {
   return page.evaluate(async (id) => {
-    const response = await fetch(`/admin/api/cms/plugins/${id}/runtime/status`, {
+    const response = await fetch(`/cms/api/cms/plugins/${id}/runtime/status`, {
       credentials: 'include',
     })
     return {

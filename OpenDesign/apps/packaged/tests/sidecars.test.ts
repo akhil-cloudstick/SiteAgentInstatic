@@ -19,13 +19,14 @@ import { EventEmitter } from 'node:events';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { delimiter, dirname, join, posix } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { createJsonIpcServer, resolveAppIpcPath } from '@open-design/sidecar';
 import { APP_KEYS, OPEN_DESIGN_SIDECAR_CONTRACT } from '@open-design/sidecar-proto';
 
 import {
   buildPackagedDaemonSpawnEnv,
+  createPackagedSidecarSpawnOptions,
   resolveDaemonStatusTimeoutMs,
   resolvePackagedChildBaseEnv,
   resolvePackagedElectronNodeCommand,
@@ -39,12 +40,21 @@ function slashPath(value: string): string {
 }
 
 describe('resolveDaemonStatusTimeoutMs', () => {
-  it('uses the default 35-second budget for normal cold boots', () => {
-    expect(resolveDaemonStatusTimeoutMs({})).toBe(35_000);
+  it('uses the 35-second baseline budget on non-win32 for normal cold boots', () => {
+    expect(resolveDaemonStatusTimeoutMs({}, 'linux')).toBe(35_000);
+    expect(resolveDaemonStatusTimeoutMs({}, 'darwin')).toBe(35_000);
+  });
+
+  it('widens the baseline to 90 seconds on win32 for AV-scan-slow first launches', () => {
+    // Windows Defender scanning freshly-written packaged binaries inflates the
+    // daemon cold start (native better-sqlite3 load + first SQLite open + pipe
+    // bind) past 35s; PostHog showed ~90% of the status-timeout devices did open
+    // on a later launch, so the wider budget lets the first launch succeed.
+    expect(resolveDaemonStatusTimeoutMs({}, 'win32')).toBe(90_000);
   });
 
   it('treats an empty OD_LEGACY_DATA_DIR as unset', () => {
-    expect(resolveDaemonStatusTimeoutMs({ OD_LEGACY_DATA_DIR: '' })).toBe(35_000);
+    expect(resolveDaemonStatusTimeoutMs({ OD_LEGACY_DATA_DIR: '' }, 'linux')).toBe(35_000);
   });
 
   it('extends the budget to 30 minutes when OD_LEGACY_DATA_DIR is set', () => {
@@ -53,18 +63,22 @@ describe('resolveDaemonStatusTimeoutMs', () => {
     // minutes was historically observed to time out on real installs.
     const value = resolveDaemonStatusTimeoutMs({
       OD_LEGACY_DATA_DIR: '/path/to/old/.od',
-    });
+    }, 'linux');
     expect(value).toBeGreaterThanOrEqual(10 * 60 * 1000);
     expect(value).toBe(30 * 60 * 1000);
+    // The migration override beats the widened win32 baseline too.
+    expect(
+      resolveDaemonStatusTimeoutMs({ OD_LEGACY_DATA_DIR: '/path/to/old/.od' }, 'win32'),
+    ).toBe(30 * 60 * 1000);
   });
 
   it('falls back to process.env when called with no argument', () => {
     const original = process.env.OD_LEGACY_DATA_DIR;
     try {
       delete process.env.OD_LEGACY_DATA_DIR;
-      expect(resolveDaemonStatusTimeoutMs()).toBe(35_000);
+      expect(resolveDaemonStatusTimeoutMs(undefined, 'linux')).toBe(35_000);
       process.env.OD_LEGACY_DATA_DIR = '/some/legacy/path';
-      expect(resolveDaemonStatusTimeoutMs()).toBe(30 * 60 * 1000);
+      expect(resolveDaemonStatusTimeoutMs(undefined, 'linux')).toBe(30 * 60 * 1000);
     } finally {
       if (original == null) delete process.env.OD_LEGACY_DATA_DIR;
       else process.env.OD_LEGACY_DATA_DIR = original;
@@ -328,6 +342,28 @@ describe('buildPackagedDaemonSpawnEnv', () => {
       webIdentityPath: '/tmp/od-pkg/runtime/web-root.json',
     };
   }
+
+  it('uses the namespace runtime root for child processes without reading cwd', () => {
+    const cwd = vi.spyOn(process, 'cwd').mockImplementation(() => {
+      throw new Error('uv_cwd');
+    });
+
+    try {
+      expect(createPackagedSidecarSpawnOptions({
+        env: { NODE_ENV: 'production' },
+        logFd: 42,
+        paths: fakePaths(),
+      })).toEqual({
+        cwd: '/tmp/od-pkg/runtime',
+        env: { NODE_ENV: 'production' },
+        stdio: ['ignore', 42, 42],
+        windowsHide: true,
+      });
+      expect(cwd).not.toHaveBeenCalled();
+    } finally {
+      cwd.mockRestore();
+    }
+  });
 
   it('sets OD_REQUIRE_DESKTOP_AUTH=1 when requireDesktopAuth=true (Electron entry)', () => {
     const env = buildPackagedDaemonSpawnEnv(fakePaths(), {

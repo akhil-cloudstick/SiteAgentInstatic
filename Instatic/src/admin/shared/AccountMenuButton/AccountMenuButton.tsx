@@ -46,7 +46,7 @@ import { logoutAllOtherCmsSessions, logoutCms } from '@core/persistence'
 import styles from './AccountMenuButton.module.css'
 import { getErrorMessage } from '@core/utils/errorMessage'
 
-const ACCOUNT_ROUTE = '/admin/account'
+const ACCOUNT_ROUTE = '/cms/account'
 
 export function AccountMenuButton(): ReactNode {
   const user = useAuthenticatedAdminUser()
@@ -75,7 +75,7 @@ export function AccountMenuButton(): ReactNode {
       // Hard navigation is intentional here — the next request must boot the
       // admin shell from scratch so the unauth login form renders. A soft
       // navigate would keep the React tree alive with stale session state.
-      window.location.assign('/admin')
+      window.location.assign('/cms')
     } catch (err) {
       console.error('[account-menu] sign out failed:', err)
       setBusy(null)

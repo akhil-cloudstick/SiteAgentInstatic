@@ -124,7 +124,7 @@ describe('admin capability access helpers', () => {
 
     expect(canAccessWorkspace(null, 'account')).toBe(false)
     expect(firstAccessibleWorkspace(null)).toBeNull()
-    expect(workspacePath('pluginPage')).toBe('/admin/plugins')
+    expect(workspacePath('pluginPage')).toBe('/cms/plugins')
   })
 
   it('keeps editor write modes independent in the UI policy layer', () => {

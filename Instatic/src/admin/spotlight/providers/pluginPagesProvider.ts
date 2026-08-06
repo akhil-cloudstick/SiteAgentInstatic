@@ -15,7 +15,7 @@ import { MAX_RESULTS, fetchOnAbortEmpty } from './serverProvider'
 
 // Unlike the other server providers, this endpoint takes no query param — the
 // full plugin list is cheap, cached by the providerRunner, and filtered below.
-const ENDPOINT = '/admin/api/cms/plugins'
+const ENDPOINT = '/cms/api/cms/plugins'
 
 export const pluginPagesProvider: SpotlightProvider = {
   id: 'pluginPages',
@@ -39,7 +39,7 @@ export const pluginPagesProvider: SpotlightProvider = {
           continue
         }
 
-        const route = page.route ?? `/admin/plugins/${plugin.id}/${page.id}`
+        const route = page.route ?? `/cms/plugins/${plugin.id}/${page.id}`
 
         results.push({
           id: `pluginPage:${plugin.id}:${page.id}`,

@@ -1,37 +1,35 @@
-// Pre-build tenants' OpenDesign web so they serve FAST via `next start` instead of
-// the slow on-demand `next dev` compiler. Safe to run while the control plane is
-// up — it builds to a separate `.next-prod-<slug>` dir and never touches projects.
+// Build the ONE shared OpenDesign web bundle so tenants serve it FAST via
+// `next start` instead of the slow on-demand `next dev`.
 //
-// Usage:  node Operator/scripts/build-od-web.mjs [slug]
-//   (no slug) -> build every advanced tenant that isn't built yet
-//   <slug>    -> (re)build just that tenant (force)
-import { listTenants, getTenant } from '../control-plane/registry/tenants.mjs';
+// There is deliberately no per-tenant build: the bundle's Next basePath is a
+// fixed, tenant-agnostic `/od`, and the gateway routes each request to the right
+// daemon using the hub session cookie. One build serves every tenant — run this
+// once per OpenDesign source upgrade, not once per tenant.
+// See docs/opendesign-shared-web-build.md.
+//
+// Safe to run while the control plane is up: it builds into a fresh versioned
+// dir (`.next-prod-shared-<ms>`) and never touches the one currently being
+// served or any tenant's projects.
+//
+// Usage:  node Operator/scripts/build-od-web.mjs [--force]
+//   (no flag) -> build only if no shared build exists yet
+//   --force   -> always rebuild (what you want after an OD source upgrade)
 import { buildWeb, isWebBuilt } from '../control-plane/runtime/odRuntime.mjs';
 
-const only = (process.argv[2] ?? '').trim();
+const force = process.argv.slice(2).some((a) => a === '--force' || a === '-f');
 
-const list = only
-  ? [await getTenant(only)].filter(Boolean)
-  : (await listTenants()).filter((t) => t.od_web_port && t.od_port);
+if (!force && isWebBuilt()) {
+  console.log('Shared OD web build already exists — skipping (pass --force to rebuild).');
+  process.exit(0);
+}
 
-if (only && list.length === 0) {
-  console.error(`No tenant "${only}".`);
+process.stdout.write(`Building shared OD web (basePath=/design)${force ? ' [forced]' : ''}... `);
+try {
+  await buildWeb();
+  console.log('done ✓');
+  console.log('Restart the control plane so the shared web serves the new build.');
+} catch (e) {
+  console.error(`FAILED: ${e.message}`);
   process.exit(1);
 }
-
-console.log(`OD web build — ${list.length} tenant(s): ${list.map((t) => t.slug).join(', ') || '(none)'}`);
-for (const t of list) {
-  if (!only && isWebBuilt(t.slug)) {
-    console.log(`  ${t.slug}: already built — skipping (pass the slug to force a rebuild)`);
-    continue;
-  }
-  process.stdout.write(`  ${t.slug}: building (daemon :${t.od_port})... `);
-  try {
-    await buildWeb(t.slug, t.od_port);
-    console.log('done ✓');
-  } catch (e) {
-    console.error(`FAILED: ${e.message}`);
-  }
-}
-console.log('Finished. Restart the control plane so tenants start pre-built (fast).');
 process.exit(0);

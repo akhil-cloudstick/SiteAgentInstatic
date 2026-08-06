@@ -15,14 +15,14 @@
  *   - CanvasRoot.tsx           — uses getKeybindingForCommand().match(e)
  *   - usePersistence.ts        — uses getKeybindingForCommand().match(e)
  *   - SpotlightRoot.tsx        — uses getKeybindingForCommand().match(e)
- *   - UndoRedoButtons.tsx      — uses getKeybindingForCommand().match(e)
+ *   - useUndoRedoShortcuts.ts  — uses getKeybindingForCommand().match(e)
  *   - useCanvas.ts             — canvas-specific zoom/pan shortcuts (not global)
  *   - Spotlight.tsx            — ⌘ symbol appears only in a JSDoc comment
  */
 
 import { describe, it, expect } from 'bun:test'
 import { readdirSync, readFileSync, statSync, existsSync } from 'fs'
-import { join, extname, relative } from 'path'
+import { join, extname, relative, sep } from 'path'
 
 const SRC_ROOT = join(import.meta.dir, '../../')
 const ADMIN_SRC = join(SRC_ROOT, 'admin')
@@ -41,11 +41,19 @@ const ALLOWLIST = new Set([
   'admin/pages/site/canvas/CanvasRoot.tsx',
   'admin/pages/site/hooks/usePersistence.ts',
   'admin/spotlight/SpotlightRoot.tsx',
-  'admin/pages/site/canvas/UndoRedoButtons.tsx',
+  'admin/pages/site/canvas/useUndoRedoShortcuts.ts',
   // Canvas-specific zoom/pan shortcuts (Ctrl+0, f, 1, 2) — not global commands.
   // These are canvas viewport controls that don't belong in the palette registry.
   'admin/pages/site/hooks/useCanvas.ts',
 ])
+
+/**
+ * Allowlist keys are posix-style, so the relative path has to be too —
+ * `path.relative` emits backslashes on Windows, which would miss every entry.
+ */
+function relativePosix(from: string, to: string): string {
+  return relative(from, to).split(sep).join('/')
+}
 
 function collectTsFiles(dir: string): string[] {
   const results: string[] = []
@@ -109,7 +117,7 @@ describe('Keybindings registry — single source of truth', () => {
     const violations: string[] = []
 
     for (const file of files) {
-      const rel = relative(SRC_ROOT, file)
+      const rel = relativePosix(SRC_ROOT, file)
       if (ALLOWLIST.has(rel)) continue
 
       const rawSource = readFileSync(file, 'utf8')
@@ -159,7 +167,7 @@ describe('Keybindings registry — single source of truth', () => {
     for (const file of files) {
       if (!file.endsWith('.tsx')) continue
 
-      const rel = relative(SRC_ROOT, file)
+      const rel = relativePosix(SRC_ROOT, file)
       if (ALLOWLIST.has(rel)) continue
 
       const lines = readFileSync(file, 'utf8').split('\n')

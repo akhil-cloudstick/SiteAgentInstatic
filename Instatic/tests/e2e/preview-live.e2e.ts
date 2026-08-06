@@ -3,7 +3,7 @@ import {
   ANONYMOUS_STATE,
   canvasFrame,
   createPage,
-  insertNotchModule,
+  insertModule,
   openLayersPanel,
   login,
   openSiteEditor,
@@ -33,7 +33,7 @@ test.describe('preview overlay and live page opening', () => {
     await createPage(page, pageName, slug)
 
     await test.step('publish the first version of the page', async () => {
-      await insertNotchModule(page, 'text')
+      await insertModule(page, 'text')
       await setPropValue(page, 'text', liveText)
       await expect(canvasFrame(page).getByText(liveText)).toBeVisible()
       await saveDraft(page)

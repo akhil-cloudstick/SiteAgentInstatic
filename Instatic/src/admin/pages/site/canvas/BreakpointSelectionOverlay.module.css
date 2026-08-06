@@ -79,46 +79,28 @@
    green selection ring and pink hover ring. Drawn imperatively (one per match)
    into a container under .ringLayer, so it inherits the same scoped/fixed
    positioning rules as .ring above. */
-/* "Editing <Name> component" — the approved screen's `.editing-label`, a green
-   tab tucked into the selection ring's top-left corner. Rendered as a ::before
-   on the ring so it inherits the ring's already-measured position and costs the
-   RAF loop nothing extra; the name arrives via a data attribute. */
-.selection[data-editing-label]::before {
-    position: absolute;
-    z-index: 8;
-    top: -1px;
-    left: -1px;
-    display: inline-flex;
-    min-height: 30px;
-    align-items: center;
-    padding: 0 11px;
-    border-radius: 0 0 5px;
-    background: var(--mms-action);
-    color: var(--on-accent);
-    content: attr(data-editing-label);
-    font-family: var(--font-mms);
-    font-size: 11px;
-    font-weight: 650;
-    white-space: nowrap;
-}
-
-/* Only the anchor node gets the tab — a multi-selection would otherwise stack
-   labels on top of each other. */
-.selection:not([data-selection-anchor="true"])::before {
-    content: none;
-}
+/* The approved screen's `.editing-label` — a green "Editing <Name> component"
+   tab in the selection ring's top-left corner — is deliberately NOT
+   implemented. It was drawn INSIDE the ring, so it covered the first line of
+   whatever you selected: the same problem that moved the selection toolbar
+   outside the ring. The node's name is already in the Layers tree and the
+   inspector header, so the tab was redundant as well as obstructive. */
 
 .selectorHighlight {
     box-shadow: var(--canvas-selector-ring);
 }
 
-/* Transcribed from the approved Site screen's `.selection-toolbar`: a single
-   48px bar of divided actions rather than a padded pill of round buttons. */
+/* Adapted from the approved Site screen's `.selection-toolbar`: a single bar
+   of divided actions rather than a padded pill of round buttons.
+   Deliberate departure from the reference's 48px: the bar is anchored OUTSIDE
+   the selection (the reference floats it inside the section's top-right), so
+   its height is dead space above the element. 30px + 2px border = 32px keeps
+   the labels readable while leaving the selected content visible. */
 .selectionToolbar {
     top: 0;
     left: 0;
     display: inline-flex;
-    min-height: 48px;
+    min-height: 32px;
     align-items: center;
     overflow: hidden;
     padding: 0;
@@ -152,9 +134,12 @@
     position: fixed;
 }
 
+/* 30px children inside the 32px bar (1px border top and bottom). `height` as
+   well as `min-height` so the xs Button's own 22px cannot win. */
 .selectionToolbarButton {
-    min-width: 44px;
-    min-height: 48px;
+    min-width: 28px;
+    height: 30px;
+    min-height: 30px;
     border-radius: 0;
     border-right: 1px solid var(--mms-border);
     aspect-ratio: auto;
@@ -167,6 +152,17 @@
 .selectionToolbarButton svg {
     display: block;
     color: currentColor;
+}
+
+/* The action labels ("Open component", "Insert", "Duplicate"). Referenced by
+   the toolbar JSX but previously undefined here, so they inherited the xs
+   button's 9px. At 32px the bar is tight enough that the labels need their
+   own legible size and must never wrap the row to two lines. */
+.selectionToolbarLabel {
+    font-size: var(--text-xs);
+    font-weight: 650;
+    line-height: 1;
+    white-space: nowrap;
 }
 
 .treeLadder {

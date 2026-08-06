@@ -111,7 +111,7 @@ const CmsLoginResponseSchema = Type.Object({
 
 export async function getCmsSetupStatus(
   fetchImpl: FetchLike = globalThis.fetch.bind(globalThis),
-  basePath = '/admin/api/cms',
+  basePath = '/cms/api/cms',
 ): Promise<CmsSetupStatus> {
   return apiRequest(`${basePath}/setup/status`, {
     schema: CmsSetupStatusSchema,
@@ -128,7 +128,7 @@ export async function getCmsSetupStatus(
  */
 export async function getCmsPublicSite(
   fetchImpl: FetchLike = globalThis.fetch.bind(globalThis),
-  basePath = '/admin/api/cms',
+  basePath = '/cms/api/cms',
 ): Promise<CmsPublicSite> {
   return apiRequest(`${basePath}/public-site`, {
     schema: CmsPublicSiteSchema,
@@ -140,7 +140,7 @@ export async function getCmsPublicSite(
 export async function setupCms(
   input: CmsSetupInput,
   fetchImpl: FetchLike = globalThis.fetch.bind(globalThis),
-  basePath = '/admin/api/cms',
+  basePath = '/cms/api/cms',
 ): Promise<void> {
   await apiRequest(`${basePath}/setup`, {
     method: 'POST',
@@ -153,7 +153,7 @@ export async function setupCms(
 export async function loginCms(
   input: CmsLoginInput,
   fetchImpl: FetchLike = globalThis.fetch.bind(globalThis),
-  basePath = '/admin/api/cms',
+  basePath = '/cms/api/cms',
 ): Promise<{ mfaRequired: boolean }> {
   const body = await apiRequest(`${basePath}/login`, {
     method: 'POST',
@@ -168,7 +168,7 @@ export async function loginCms(
 export async function verifyCmsMfa(
   input: CmsMfaVerifyInput,
   fetchImpl: FetchLike = globalThis.fetch.bind(globalThis),
-  basePath = '/admin/api/cms',
+  basePath = '/cms/api/cms',
 ): Promise<void> {
   await apiRequest(`${basePath}/auth/mfa/verify`, {
     method: 'POST',
@@ -180,7 +180,7 @@ export async function verifyCmsMfa(
 
 export async function logoutCms(
   fetchImpl: FetchLike = globalThis.fetch.bind(globalThis),
-  basePath = '/admin/api/cms',
+  basePath = '/cms/api/cms',
 ): Promise<void> {
   await apiRequest(`${basePath}/logout`, {
     method: 'POST',
@@ -191,7 +191,7 @@ export async function logoutCms(
 
 export async function probeCmsSession(
   fetchImpl: FetchLike = globalThis.fetch.bind(globalThis),
-  basePath = '/admin/api/cms',
+  basePath = '/cms/api/cms',
 ): Promise<boolean> {
   try {
     await apiRequest(`${basePath}/me`, { fetchImpl, fallbackMessage: 'CMS session check failed' })
@@ -204,7 +204,7 @@ export async function probeCmsSession(
 
 export async function getCurrentCmsUser(
   fetchImpl: FetchLike = globalThis.fetch.bind(globalThis),
-  basePath = '/admin/api/cms',
+  basePath = '/cms/api/cms',
 ): Promise<CmsCurrentUser> {
   const body = await apiRequest(`${basePath}/me`, {
     schema: CurrentUserEnvelope,
@@ -262,7 +262,7 @@ interface CmsStepUpSettingsInput {
 export async function uploadCurrentUserAvatar(
   file: File,
   fetchImpl: FetchLike = globalThis.fetch.bind(globalThis),
-  basePath = '/admin/api/cms',
+  basePath = '/cms/api/cms',
 ): Promise<CmsCurrentUser> {
   const form = new FormData()
   form.append('file', file)
@@ -283,7 +283,7 @@ export async function uploadCurrentUserAvatar(
  */
 export async function deleteCurrentUserAvatar(
   fetchImpl: FetchLike = globalThis.fetch.bind(globalThis),
-  basePath = '/admin/api/cms',
+  basePath = '/cms/api/cms',
 ): Promise<CmsCurrentUser> {
   const body = await apiRequest(`${basePath}/me/avatar`, {
     method: 'DELETE',
@@ -297,7 +297,7 @@ export async function deleteCurrentUserAvatar(
 export async function updateCurrentUserProfile(
   input: CmsProfileInput,
   fetchImpl: FetchLike = globalThis.fetch.bind(globalThis),
-  basePath = '/admin/api/cms',
+  basePath = '/cms/api/cms',
 ): Promise<CmsCurrentUser> {
   const body = await apiRequest(`${basePath}/me`, {
     method: 'PATCH',
@@ -312,7 +312,7 @@ export async function updateCurrentUserProfile(
 export async function changeCurrentUserPassword(
   input: { newPassword: string },
   fetchImpl: FetchLike = globalThis.fetch.bind(globalThis),
-  basePath = '/admin/api/cms',
+  basePath = '/cms/api/cms',
 ): Promise<CmsCurrentUser> {
   const body = await apiRequest(`${basePath}/me/password`, {
     method: 'PATCH',
@@ -326,7 +326,7 @@ export async function changeCurrentUserPassword(
 
 export async function startCurrentUserTotpSetup(
   fetchImpl: FetchLike = globalThis.fetch.bind(globalThis),
-  basePath = '/admin/api/cms',
+  basePath = '/cms/api/cms',
 ): Promise<{ secret: string; otpauthUrl: string }> {
   return apiRequest(`${basePath}/me/mfa/totp/start`, {
     method: 'POST',
@@ -339,7 +339,7 @@ export async function startCurrentUserTotpSetup(
 export async function enableCurrentUserTotp(
   input: { secret: string; code: string },
   fetchImpl: FetchLike = globalThis.fetch.bind(globalThis),
-  basePath = '/admin/api/cms',
+  basePath = '/cms/api/cms',
 ): Promise<{ user: CmsCurrentUser; recoveryCodes: string[] }> {
   const body = await apiRequest(`${basePath}/me/mfa/totp/enable`, {
     method: 'POST',
@@ -353,7 +353,7 @@ export async function enableCurrentUserTotp(
 
 export async function disableCurrentUserTotp(
   fetchImpl: FetchLike = globalThis.fetch.bind(globalThis),
-  basePath = '/admin/api/cms',
+  basePath = '/cms/api/cms',
 ): Promise<CmsCurrentUser> {
   const body = await apiRequest(`${basePath}/me/mfa/totp`, {
     method: 'DELETE',
@@ -366,7 +366,7 @@ export async function disableCurrentUserTotp(
 
 export async function regenerateCurrentUserRecoveryCodes(
   fetchImpl: FetchLike = globalThis.fetch.bind(globalThis),
-  basePath = '/admin/api/cms',
+  basePath = '/cms/api/cms',
 ): Promise<{ user: CmsCurrentUser; recoveryCodes: string[] }> {
   const body = await apiRequest(`${basePath}/me/mfa/recovery-codes`, {
     method: 'POST',
@@ -380,7 +380,7 @@ export async function regenerateCurrentUserRecoveryCodes(
 export async function updateCurrentUserStepUpSettings(
   input: CmsStepUpSettingsInput,
   fetchImpl: FetchLike = globalThis.fetch.bind(globalThis),
-  basePath = '/admin/api/cms',
+  basePath = '/cms/api/cms',
 ): Promise<CmsCurrentUser> {
   const body = await apiRequest(`${basePath}/me/security/step-up`, {
     method: 'PATCH',
@@ -425,7 +425,7 @@ export type CmsSession = Static<typeof CmsSessionSchema>
  */
 export async function listCmsSessions(
   fetchImpl: FetchLike = globalThis.fetch.bind(globalThis),
-  basePath = '/admin/api/cms',
+  basePath = '/cms/api/cms',
 ): Promise<CmsSession[]> {
   const body = await apiRequest(`${basePath}/auth/sessions`, {
     schema: CmsSessionsEnvelope,
@@ -442,7 +442,7 @@ export async function listCmsSessions(
 export async function revokeCmsSession(
   sessionId: string,
   fetchImpl: FetchLike = globalThis.fetch.bind(globalThis),
-  basePath = '/admin/api/cms',
+  basePath = '/cms/api/cms',
 ): Promise<void> {
   await apiRequest(`${basePath}/auth/sessions/${encodeURIComponent(sessionId)}`, {
     method: 'DELETE',
@@ -471,7 +471,7 @@ const CmsStepUpResponseSchema = Type.Object({
 export async function stepUpCms(
   input: CmsStepUpInput,
   fetchImpl: FetchLike = globalThis.fetch.bind(globalThis),
-  basePath = '/admin/api/cms',
+  basePath = '/cms/api/cms',
 ): Promise<{ stepUpExpiresAt: string; user?: CmsCurrentUser }> {
   const body = await apiRequest(`${basePath}/auth/step-up`, {
     method: 'POST',
@@ -538,7 +538,7 @@ export type CmsLoginActivityResult = Static<typeof CmsLoginActivityResultSchema>
  */
 export async function listCmsLoginActivity(
   fetchImpl: FetchLike = globalThis.fetch.bind(globalThis),
-  basePath = '/admin/api/cms',
+  basePath = '/cms/api/cms',
 ): Promise<CmsLoginActivityEvent[]> {
   const body = await apiRequest(`${basePath}/auth/activity`, {
     schema: CmsLoginActivityEnvelope,
@@ -555,7 +555,7 @@ export async function listCmsLoginActivity(
  */
 export async function logoutAllOtherCmsSessions(
   fetchImpl: FetchLike = globalThis.fetch.bind(globalThis),
-  basePath = '/admin/api/cms',
+  basePath = '/cms/api/cms',
 ): Promise<number> {
   const body = await apiRequest(`${basePath}/auth/logout-all`, {
     method: 'POST',

@@ -10,7 +10,7 @@
  * variable, or scale group — so re-running patches in place.
  *
  * `set_font_tokens` can install a brand-new Google web font: it POSTs to
- * `/admin/api/cms/fonts/install` (downloads the woff2 files server-side, gated
+ * `/cms/api/cms/fonts/install` (downloads the woff2 files server-side, gated
  * by `site.style.edit` via the session cookie), merges the returned `FontEntry`
  * into the library, then binds the token to it.
  */
@@ -39,7 +39,7 @@ const getStoreState = (): EditorStore => getAgentStoreApi<EditorStore>().getStat
 // `server/ai/tools/site/writeTools.ts`. Imported above; validated with
 // `parseValue` below.
 
-/** Validates the `/admin/api/cms/fonts/install` 201 body. */
+/** Validates the `/cms/api/cms/fonts/install` 201 body. */
 const FontInstallResponseSchema = Type.Object({ font: FontEntrySchema })
 
 // ---------------------------------------------------------------------------
@@ -105,7 +105,7 @@ export async function runSetFontTokens(rawInput: unknown): Promise<AiToolOutput>
     let installed: string | undefined
     if (t.googleFamily) {
       try {
-        const { font } = await apiRequest('/admin/api/cms/fonts/install', {
+        const { font } = await apiRequest('/cms/api/cms/fonts/install', {
           method: 'POST',
           body: {
             family: t.googleFamily,

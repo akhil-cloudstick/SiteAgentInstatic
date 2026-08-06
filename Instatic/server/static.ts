@@ -301,7 +301,7 @@ const LOGIN_SKELETON_HTML = `<div class="login-skeleton" data-initial-login-skel
       <span>Admin</span>
     </div>
     <h1 class="login-skeleton__title">Sign in</h1>
-    <form class="login-skeleton__form" action="/admin/api/cms/login" method="POST">
+    <form class="login-skeleton__form" action="/cms/api/cms/login" method="POST">
       <label class="login-skeleton__field">
         <span>Email</span>
         <input class="login-skeleton__input" type="email" name="email" required autocomplete="email" />
@@ -345,13 +345,13 @@ const BOOT_API_KICKOFF = `
             });
         };
         window.__instaticBootPromises = {
-          setupStatus: json('/admin/api/cms/setup/status'),
+          setupStatus: json('/cms/api/cms/setup/status'),
           // /me is allowed to fail (401 when unauthenticated) — swallow
           // here so the await in useAdminBoot doesn't see a rejected
           // promise it can't handle. The server returns an envelope shape
           // { user: CmsCurrentUser }; mirror what getCurrentCmsUser does
           // and hand the consumer the unwrapped user object.
-          me: json('/admin/api/cms/me').then(
+          me: json('/cms/api/cms/me').then(
             function (body) {
               if (!body || !body.user || typeof body.user !== 'object') {
                 throw new Error('missing user');
@@ -360,7 +360,7 @@ const BOOT_API_KICKOFF = `
             },
             function () { return { ok: false }; }
           ),
-          publicSite: json('/admin/api/cms/public-site').catch(function () { return null; }),
+          publicSite: json('/cms/api/cms/public-site').catch(function () { return null; }),
         };
       })();
     </script>`

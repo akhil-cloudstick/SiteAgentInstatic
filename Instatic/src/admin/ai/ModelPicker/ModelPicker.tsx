@@ -193,13 +193,24 @@ export function ModelPicker({
   const showEmpty = q !== '' && !hasMatches
 
   // ── Trigger label ─────────────────────────────────────────────────────
-  const activeLabel = (() => {
+  const fullLabel = (() => {
     if (!value) return placeholder
     const cred = credentials.find((c) => c.id === value.credentialId)
     const model = (modelsByCred[value.credentialId] ?? []).find((m) => m.id === value.modelId)
     const credLabel = cred?.displayLabel ?? ''
     const modelLabel = model?.label ?? value.modelId
     return credLabel ? `${credLabel} · ${modelLabel}` : modelLabel
+  })()
+
+  // The inline trigger shares one composer row with the attach and send
+  // buttons. "credential · model" outgrew that row and its chevron overlapped
+  // the attach icon, so inline shows the credential alone — the model stays one
+  // hover away in the tooltip, and spelled out in the menu itself.
+  const activeLabel = (() => {
+    if (!value || variant !== 'inline') return fullLabel
+    const cred = credentials.find((c) => c.id === value.credentialId)
+    if (!cred?.displayLabel) return fullLabel
+    return cred.displayLabel
   })()
 
   function openMenu() {
@@ -283,7 +294,7 @@ export function ModelPicker({
         onClick={toggle}
         // Inline trigger takes its accessible name from the 'Model' tooltip;
         // the field trigger has no tooltip, so it carries the aria-label.
-        tooltip={variant === 'inline' ? 'Model' : undefined}
+        tooltip={variant === 'inline' ? (value ? `Model · ${fullLabel}` : 'Model') : undefined}
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label={variant === 'field' ? ariaLabel : undefined}

@@ -3,7 +3,7 @@
  *
  * Modal that asks the current user to re-enter their password, plus an
  * authenticator/recovery code when MFA is enabled. On submit, the parent
- * provider POSTs to `/admin/api/cms/auth/step-up` and (on success) retries
+ * provider POSTs to `/cms/api/cms/auth/step-up` and (on success) retries
  * the original sensitive action; on cancel, the provider rejects the pending
  * promise with `step_up_cancelled`.
  *

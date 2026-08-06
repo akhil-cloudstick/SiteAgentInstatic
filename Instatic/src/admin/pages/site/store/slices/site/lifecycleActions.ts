@@ -58,6 +58,12 @@ export function createLifecycleActions({
         // the prior site and would cause `mutateActiveTree` to silently no-op
         // (early-return) when the VC id is not present in the new site.
         state.activeDocument = null
+        // Session-only canvas state keyed by breakpoint id. The default ids
+        // (`mobile`/`tablet`/`desktop`) repeat across sites, so without this a
+        // collapsed frame or a preview width silently follows the author into
+        // the next site they open.
+        state.collapsedBreakpointIds = []
+        state.breakpointPreviewWidths = {}
         state._historyPast = []
         state._historyFuture = []
         state._historyCoalesceKey = null
@@ -89,6 +95,9 @@ export function createLifecycleActions({
         state.activePageId = (findHomePage(site.pages) ?? site.pages[0])?.id ?? null
         // Reset activeDocument — see createSite for rationale.
         state.activeDocument = null
+        // Breakpoint-keyed session state — see createSite.
+        state.collapsedBreakpointIds = []
+        state.breakpointPreviewWidths = {}
         state._historyPast = []
         state._historyFuture = []
         state._historyCoalesceKey = null
@@ -107,6 +116,9 @@ export function createLifecycleActions({
         state.activePageId = null
         // Reset activeDocument — without a site there can be no active doc.
         state.activeDocument = null
+        // Breakpoint-keyed session state — see createSite.
+        state.collapsedBreakpointIds = []
+        state.breakpointPreviewWidths = {}
         clearCanvasSelectionDraft(state)
         state._historyPast = []
         state._historyFuture = []

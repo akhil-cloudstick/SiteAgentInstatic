@@ -1,6 +1,6 @@
 /**
  * Plugin event stream — a singleton EventSource subscription to the
- * server's `/admin/api/cms/plugins/events` SSE endpoint. Every admin tab
+ * server's `/cms/api/cms/plugins/events` SSE endpoint. Every admin tab
  * subscribes ONCE; multiple consumers (PluginsPage live-refresh, toast
  * dispatcher, nav badge) attach via `subscribePluginEvents`.
  *
@@ -28,7 +28,7 @@ let source: EventSource | null = null
 
 function ensureConnected(): void {
   if (source) return
-  source = new EventSource('/admin/api/cms/plugins/events', { withCredentials: true })
+  source = new EventSource('/cms/api/cms/plugins/events', { withCredentials: true })
   for (const kind of PLUGIN_EVENT_KINDS) {
     source.addEventListener(kind, (event) => {
       try {

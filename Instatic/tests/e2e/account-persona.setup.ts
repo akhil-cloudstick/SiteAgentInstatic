@@ -11,7 +11,7 @@ import { completeStepUp, expectLoggedIn, login, loginAs, logout } from './helper
  */
 setup('create the account-management persona', async ({ page }) => {
   await login(page)
-  await page.goto('/admin/users')
+  await page.goto('/cms/users')
   await expect(page.getByRole('table', { name: 'Users' })).toBeVisible()
 
   const alreadyExists = await page.getByText(ACCOUNT_PERSONA.email).isVisible()

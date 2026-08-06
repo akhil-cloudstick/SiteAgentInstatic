@@ -24,11 +24,11 @@ export function getContentCommands(): Command[] {
       run: (ctx) => {
         if (ctx.workspace !== 'content') {
           queuePendingAction('content.newDocument')
-          ctx.navigate('/admin/content')
+          ctx.navigate('/cms/content')
         } else {
           queuePendingAction('content.newDocument')
           // Trigger a hash change so the Content page's mount-effect re-runs.
-          ctx.navigate('/admin/content')
+          ctx.navigate('/cms/content')
         }
       },
     },
@@ -45,7 +45,7 @@ export function getContentCommands(): Command[] {
       capability: 'content.manage',
       run: (ctx) => {
         queuePendingAction('content.newCollection')
-        ctx.navigate('/admin/content')
+        ctx.navigate('/cms/content')
       },
     },
   ]

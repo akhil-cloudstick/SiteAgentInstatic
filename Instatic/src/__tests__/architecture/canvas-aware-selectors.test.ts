@@ -76,7 +76,7 @@ const SELECT_ACTIVE_PAGE_ALLOWLIST = new Set<string>([
 
   // §A.3 — module inserter toolbar trigger: uses selectActiveCanvasPage for
   //   Component-ref insertion target resolution.
-  'admin/pages/site/toolbar/ModulePickerDropdown.tsx',
+  'admin/pages/site/canvas/CanvasInsertModuleButton.tsx',
 
   // §A.4 — page preview overlay: publishes the active page via publishPage() to
   //   render it in a sandboxed iframe. VCs are not publishable pages and have no

@@ -13,6 +13,7 @@ import {
   openDatabase,
   upsertMessage,
 } from '../src/db.js';
+import { runSseEventToPersistedAgentEvent } from '../src/runtimes/chat-run-messages.js';
 
 describe('message event persistence', () => {
   let tempDir: string;
@@ -48,6 +49,7 @@ describe('message event persistence', () => {
       content: '',
       runId: 'agent-run-1',
       runStatus: 'running',
+      resultDeliveryState: 'delivery_failed',
       events: [{ kind: 'status', label: 'starting', detail: 'Codex' }],
       startedAt: now,
     });
@@ -69,6 +71,23 @@ describe('message event persistence', () => {
         detail: 'Agent stalled without emitting any new output for 1s.',
       },
     ]);
+    expect(listMessages(db, 'conv-1')[0]?.resultDeliveryState).toBe('delivery_failed');
+  });
+
+  it('persists cache-inclusive usage for the next session rollover decision', () => {
+    expect(runSseEventToPersistedAgentEvent('agent', {
+      type: 'usage',
+      usage: {
+        input_tokens: 2_000,
+        cache_read_input_tokens: 168_000,
+        output_tokens: 100,
+      },
+    })).toMatchObject({
+      kind: 'usage',
+      inputTokens: 2_000,
+      inputTokensEffective: 170_000,
+      outputTokens: 100,
+    });
   });
 
   it('persists explicit message createdAt values on insert', () => {

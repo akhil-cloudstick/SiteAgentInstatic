@@ -135,7 +135,7 @@ const ALLOWLIST_FETCH = new Set<string>([
 
   // §3.6  useMcpWorkspaceBridge.ts — holds long-lived, workspace-scoped
   //   NDJSON streams open
-  //   (`/admin/api/ai/editor-bridge`) so MCP browser-tool calls can be relayed
+  //   (`/cms/api/ai/editor-bridge`) so MCP browser-tool calls can be relayed
   //   to the open editor. Same constraint as §3.1: apiRequest returns a parsed
   //   value and cannot stream a response body, so raw fetch + ReadableStream is
   //   required. The tool-result POST still goes through apiRequest (postToolResult).

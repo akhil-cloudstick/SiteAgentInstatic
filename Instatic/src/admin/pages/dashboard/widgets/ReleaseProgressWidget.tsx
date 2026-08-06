@@ -160,7 +160,7 @@ export function ReleaseProgressWidget({ span, editing }: DashboardWidgetRenderer
       <Button
         variant="ghost"
         className={styles.releaseCta}
-        onClick={() => navigate('/admin/site')}
+        onClick={() => navigate('/cms/site')}
       >
         <FaIcon name={hasChanges ? 'eye' : 'pen'} size={15} />
         {hasChanges ? 'Review changes' : 'Open site editor'}

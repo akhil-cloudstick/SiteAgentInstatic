@@ -8,7 +8,8 @@
  * - Delegates the rename modal to useCanvasRenameDialog + CanvasRenameDialog
  * - Delegates the right-click menu to useCanvasLayerContextMenu + CanvasLayerContextMenu
  * - Renders CanvasTransformLayer inside the gesture-capture area
- * - Renders CanvasNotch (position: absolute, not in transform layer)
+ * - Renders the floating canvas chrome (mode dock, view toggle, context
+ *   selector) at position: absolute, outside the transform layer
  * - Handles double-click on base.visual-component-ref → enters VC canvas mode
  *
  * Performance architecture:
@@ -36,8 +37,8 @@ import { CanvasTransformLayer } from './CanvasTransformLayer'
 import { CanvasLiveSurface } from './CanvasLiveSurface'
 import { AgentSnapshotFrame } from './AgentSnapshotFrame'
 import { useRuntimeScriptBuild } from './useRuntimeScriptBuild'
-import { CanvasNotch } from './CanvasNotch'
-import { CanvasModeToggle } from './CanvasModeToggle'
+import { CanvasDocumentModeDock } from './CanvasDocumentModeDock'
+import { useUndoRedoShortcuts } from './useUndoRedoShortcuts'
 import { CanvasContextSelector } from './CanvasContextSelector'
 import { CanvasSelectionContext, CanvasViewportActionsContext } from './CanvasContexts'
 // Class / user-stylesheet injectors are now mounted per breakpoint frame
@@ -82,6 +83,10 @@ export function CanvasRoot({ editable = true }: CanvasRootProps) {
   const transformLayerRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLDivElement>(null)
   const spotlight = useContext(SpotlightContext)
+
+  // History is keyboard-only — the notch has no Undo/Redo buttons, so this
+  // document-level listener is the sole non-palette path to undo/redo.
+  useUndoRedoShortcuts(editable)
 
   // Store subscriptions
   const canvasPage = useEditorStore(selectActiveCanvasPage)
@@ -442,37 +447,33 @@ export function CanvasRoot({ editable = true }: CanvasRootProps) {
             breakpoint iframe now — mounted per-frame by IframeFrameSurface
             so the canvas sees the same cascade the published page sees. */}
 
-          {/* Insert toolbar — shown in both design and live modes. Both are
-            editable surfaces (live reuses the same editable iframe + selection
-            overlay), so the notch's quick-insert and history controls apply
-            equally; only the frame layout differs (all frames vs. one). In live
-            mode the frame is flush with the top edge, so the notch auto-hides
-            (peek) and rolls down on hover instead of overlaying the page. */}
-          {editable && (
-            <CanvasNotch
-              peek={isLive}
-              floatingControl={
-                activeDocument?.kind === 'visualComponent' ? (
-                  <Suspense fallback={null}>
-                    <VisualComponentModeControl />
-                  </Suspense>
-                ) : canvasPage?.template?.enabled ? (
-                  <Suspense fallback={null}>
-                    <TemplateModeControl />
-                  </Suspense>
-                ) : null
-              }
-            />
+          {/* Document mode control — the VC / Template pills. There is no
+            top-center insert notch on this canvas: module insertion lives on
+            the selection toolbar's "Insert module" button, the Layers panel's
+            "+", and the canvas right-click menu, and history is keyboard-only.
+            The dock renders only when the active document actually has a mode
+            to switch, so an ordinary page draws no top-center chrome at all.
+            In live mode the frame is flush with the top edge, so the dock
+            auto-hides (peek) and rolls down on hover instead of overlaying the
+            page's own header. */}
+          {editable && (activeDocument?.kind === 'visualComponent' || canvasPage?.template?.enabled) && (
+            <CanvasDocumentModeDock peek={isLive}>
+              {activeDocument?.kind === 'visualComponent' ? (
+                <Suspense fallback={null}>
+                  <VisualComponentModeControl />
+                </Suspense>
+              ) : (
+                <Suspense fallback={null}>
+                  <TemplateModeControl />
+                </Suspense>
+              )}
+            </CanvasDocumentModeDock>
           )}
 
-          {/* Design / Live view toggle — top-left chrome. In live mode this
-            also hosts inline breakpoint switcher buttons, and the toggle owns
-            the "Run scripts" switch + its build status / Refresh. */}
-          <CanvasModeToggle
-            peek={isLive}
-            scriptStatus={scriptBuild.status}
-            onRefreshScripts={scriptBuild.refresh}
-          />
+          {/* The top-left "Run scripts" / "Refresh scripts" pill was removed —
+            the approved canvas draws no chrome in that corner. The runtime
+            script build still exists behind `runScripts` (default off) for
+            callers that opt in; it simply has no on-canvas trigger. */}
 
           {/* The editing-context switcher targets per-context style overrides
               (viewports + custom conditions), so it's only meaningful for

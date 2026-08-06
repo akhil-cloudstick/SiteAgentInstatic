@@ -1,23 +1,25 @@
 /**
- * ComponentRefView — PropertiesPanel view for a selected base.visual-component-ref instance.
+ * ComponentRefView — the parameter rows for a selected
+ * `base.visual-component-ref` instance.
  *
  * Architecture source: Contribution #619 §8.5
  *
- * When a visualComponentRef node is selected, this view replaces the normal
- * Properties tab. It shows:
- *   - Header: component icon + VC name + "Open in canvas" link
- *   - One row per VCParam, in vc.params declaration order
- *   - Each row: <ParamRow mode='override-edit'> (handles Default / Overridden pill + Reset)
+ * One row per VCParam, in `vc.params` declaration order, each a
+ * `<ParamRow mode='override-edit'>` (Default / Overridden pill + Reset).
+ *
+ * These ARE the "Instance parameters" of the approved Site screen's inspector:
+ * the ref module's own schema is plumbing (`componentId`, `propOverrides`), so
+ * the VC's declared params are what an author actually edits. The three mode
+ * bodies render this in place of `moduleTabContent` whenever the selected node
+ * is a component instance. The screen supplies its own identity block (the
+ * "Visual component" badge and the "Open component in canvas ↗" action), so
+ * this renders parameters only.
  *
  * Achromatic palette (Guideline #376). CSS Modules only (Constraint #402/#403).
- * Icons from pixel-art-icons (Guideline #350).
  */
 
 import { useEditorStore } from '@site/store/store'
 import { WarningDiamondSolidIcon } from 'pixel-art-icons/icons/warning-diamond-solid'
-import { BracesIcon } from 'pixel-art-icons/icons/braces'
-import { ExternalLinkSolidIcon } from 'pixel-art-icons/icons/external-link-solid'
-import { Button } from '@ui/components/Button'
 import { ParamRow } from './ParamRow'
 import styles from './ComponentRefView.module.css'
 
@@ -31,18 +33,11 @@ interface ComponentRefViewProps {
 }
 
 export function ComponentRefView({ nodeId, componentId, propOverrides }: ComponentRefViewProps) {
-  const setActiveDocument = useEditorStore((s) => s.setActiveDocument)
   const updateNodeProps = useEditorStore((s) => s.updateNodeProps)
 
   const vc = useEditorStore(
     (s) => s.site?.visualComponents?.find((v) => v.id === componentId) ?? null,
   )
-
-  function handleOpenInCanvas() {
-    if (componentId) {
-      setActiveDocument({ kind: 'visualComponent', vcId: componentId })
-    }
-  }
 
   function handleParamChange(paramId: string, value: unknown) {
     const next = { ...propOverrides, [paramId]: value }
@@ -66,23 +61,6 @@ export function ComponentRefView({ nodeId, componentId, propOverrides }: Compone
 
   return (
     <>
-      {/* ── Header: VC name + Open in canvas link ──────────────────────── */}
-      <div className={styles.header}>
-        <span className={styles.headerIcon} aria-hidden="true">
-          <BracesIcon size={12} color="currentColor" />
-        </span>
-        <span className={styles.headerName}>{vc.name}</span>
-        <Button
-          variant="ghost"
-          size="xs"
-          onClick={handleOpenInCanvas}
-          tooltip="Open component in canvas"
-        >
-          <ExternalLinkSolidIcon size={10} color="currentColor" aria-hidden="true" />
-          Open in canvas
-        </Button>
-      </div>
-
       {/* ── Param rows ──────────────────────────────────────────────────── */}
       {vc.params.length === 0 ? (
         <div className={styles.noParams}>

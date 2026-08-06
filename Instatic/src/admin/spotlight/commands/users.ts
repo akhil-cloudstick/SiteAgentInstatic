@@ -19,7 +19,7 @@ export function getUsersCommands(): Command[] {
       capability: 'users.manage',
       run: (ctx) => {
         queuePendingAction('users.invite')
-        ctx.navigate('/admin/users')
+        ctx.navigate('/cms/users')
       },
     },
 
@@ -35,7 +35,7 @@ export function getUsersCommands(): Command[] {
       capability: 'roles.manage',
       run: (ctx) => {
         queuePendingAction('users.newRole')
-        ctx.navigate('/admin/users')
+        ctx.navigate('/cms/users')
       },
     },
   ]

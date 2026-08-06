@@ -1,4 +1,5 @@
 import type { Page, SiteDocument } from '@core/page-tree'
+import { treeHasOutlet } from './outlet'
 
 export function normalizeRouteBase(value: string): string {
   const trimmed = value.trim()
@@ -95,4 +96,57 @@ export function resolveTemplateChain(
     if (winner) chain.push(winner.page)
   }
   return chain
+}
+
+/** Breadth rank: lower wraps higher. Non-template pages are the innermost. */
+function levelRank(page: Page): number {
+  const target = page.template?.target
+  if (!target) return 2
+  return target.kind === 'everywhere' ? 0 : 1
+}
+
+/**
+ * The templates that WRAP `doc` at publish time, ordered outermost-first.
+ *
+ * `resolveTemplateChain` answers "what renders this *route*"; this answers
+ * "what chrome surrounds this *document* when I look at it on its own" — the
+ * question every editing/preview surface asks. Both the design canvas
+ * (`CanvasComposedTree`) and the authenticated draft preview
+ * (`buildRuntimePreviewDocument`) resolve wrappers through here, so a page
+ * previews inside the same nav/footer chrome the canvas shows and the
+ * published page carries.
+ *
+ * Breadth levels (outer → inner): `everywhere` (0) → `postTypes` / `notFound`
+ * (1) → a non-template page (2, the innermost terminal). A document is wrapped
+ * by every matching template strictly broader than its own level:
+ *   - a page                → wrapped by the `everywhere` layout;
+ *   - a `postTypes` template → wrapped by the `everywhere` layout;
+ *   - a `notFound` template  → wrapped by the `everywhere` layout (matching how
+ *     the public router composes the 404 render);
+ *   - the `everywhere` layout → nothing wraps it (it is the broadest).
+ *
+ * Empty when nothing wraps `doc`, so `composeTemplateChain(wrappers, …)`
+ * returns the document untouched.
+ */
+export function resolveWrapperTemplates(site: SiteDocument, doc: Page): Page[] {
+  const myRank = levelRank(doc)
+  // An `everywhere` template (rank 0) is the broadest — never wrapped.
+  if (myRank <= 0) return []
+
+  const target = doc.template?.target
+  let ctx: RouteResolutionContext
+  if (target?.kind === 'postTypes') {
+    const tableSlug = target.tableSlugs[0]
+    if (!tableSlug) return []
+    ctx = { kind: 'entry', tableSlug }
+  } else {
+    ctx = { kind: 'page' }
+  }
+
+  // Keep only templates strictly broader than the document (so a sibling
+  // postTypes winner for the same route never wraps another postTypes template)
+  // that actually have an outlet to host the wrapped content.
+  return resolveTemplateChain(site, ctx).filter(
+    (page) => page.id !== doc.id && levelRank(page) < myRank && treeHasOutlet(page),
+  )
 }

@@ -54,6 +54,148 @@ function isOverlayCss(d) {
   return !!bg && !/transparent|rgba\([^)]*,\s*0(?:\.0+)?\s*\)/.test(bg[1] || '');
 }
 
+// ---------------------------------------------------------------------------
+// Editable-text scanning (rules 8 + 16). Kept in parity with
+// OpenDesign/apps/daemon/src/cms-compliance.ts.
+//
+// Mirrors HTML_TO_MODULE_RULES / walkAndMap in Instatic's importer:
+//   - h1-h6, p, span, small, strong, em, label import as ONE editable text block
+//     — but only while they hold no element child. With a child the rule recurses
+//     to a container and the loose runs become bare text again.
+//   - a, button, option capture their text wholesale and never recurse.
+//   - Everything else recurses, so a text node written directly inside it becomes
+//     a no-wrapper base.text (tag: 'none'). It renders, but owns NO DOM element —
+//     so it can never be clicked on the canvas, never gets a selection ring, and
+//     can never carry a class.
+// ---------------------------------------------------------------------------
+
+const TEXT_LEAF_WHEN_CHILDLESS = new Set(['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'span', 'small', 'strong', 'em', 'label']);
+const TEXT_LEAF_ALWAYS = new Set(['a', 'button', 'option']);
+const VOID_TAGS = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'param', 'source', 'track', 'wbr']);
+// Subtrees whose text is not tenant-editable page copy.
+const SKIP_SUBTREES = new Set(['script', 'style', 'svg', 'math', 'pre', 'code', 'textarea', 'noscript', 'template', 'head', 'title', 'iframe', 'canvas']);
+
+const classesOf = (rawTag) => {
+  const m = /\bclass\s*=\s*(?:"([^"]*)"|'([^']*)')/i.exec(rawTag);
+  return (m?.[1] ?? m?.[2] ?? '').split(/\s+/).filter(Boolean);
+};
+
+function closeFrame(frame, scan) {
+  if (frame.texts.length === 0) return;
+  const ownsItsText = TEXT_LEAF_ALWAYS.has(frame.tag) ||
+    (TEXT_LEAF_WHEN_CHILDLESS.has(frame.tag) && !frame.hasElementChild);
+  if (ownsItsText) {
+    scan.owners.push({ tag: frame.tag, text: frame.texts.join(' '), classes: frame.classes });
+    return;
+  }
+  for (const text of frame.texts) scan.bare.push({ tag: frame.tag, text });
+}
+
+// Every significant text run that will import WITHOUT an element of its own.
+function findBareText(html) {
+  return scanText(html).bare;
+}
+
+// Text elements whose every class is shared with another element — editing that
+// class in the CMS restyles all of them, so the tenant cannot customise one.
+function findTextWithoutUniqueClass(html) {
+  const frequency = new Map();
+  for (const m of html.matchAll(/<[A-Za-z][^>]*?\bclass\s*=\s*(?:"([^"]*)"|'([^']*)')/g)) {
+    for (const c of (m[1] ?? m[2] ?? '').split(/\s+/)) {
+      if (c) frequency.set(c, (frequency.get(c) ?? 0) + 1);
+    }
+  }
+  return scanText(html).owners.filter((o) => !o.classes.some((c) => frequency.get(c) === 1));
+}
+
+function scanText(html) {
+  const scan = { bare: [], owners: [] };
+  const hits = scan;
+  const stack = [];
+  let skipDepth = 0;
+  let cursor = 0;
+  const pushText = (raw) => {
+    if (skipDepth > 0) return;
+    const text = raw.replace(/\s+/g, ' ').trim();
+    if (!text) return;
+    if (stack.length) stack[stack.length - 1].texts.push(text);
+  };
+
+  const tokens = /<!--[\s\S]*?-->|<!\[CDATA\[[\s\S]*?\]\]>|<[!/]?[A-Za-z][^>]*>/g;
+  let m;
+  while ((m = tokens.exec(html)) !== null) {
+    pushText(html.slice(cursor, m.index));
+    cursor = tokens.lastIndex;
+    const raw = m[0];
+    if (raw.startsWith('<!')) continue; // comment / doctype / CDATA
+    const name = (/^<\/?\s*([A-Za-z][A-Za-z0-9-]*)/.exec(raw)?.[1] || '').toLowerCase();
+    if (!name) continue;
+
+    if (raw[1] === '/') {
+      if (skipDepth > 0) {
+        if (SKIP_SUBTREES.has(name)) skipDepth--;
+        continue;
+      }
+      for (let i = stack.length - 1; i >= 0; i--) {
+        if (stack[i].tag !== name) continue;
+        for (let j = stack.length - 1; j >= i; j--) closeFrame(stack[j], hits);
+        stack.length = i;
+        break;
+      }
+      continue;
+    }
+
+    const selfClosing = raw.endsWith('/>') || VOID_TAGS.has(name);
+    if (skipDepth > 0) {
+      if (SKIP_SUBTREES.has(name) && !selfClosing) skipDepth++;
+      continue;
+    }
+    // Any open tag makes its parent a container rather than a text leaf.
+    if (stack.length) stack[stack.length - 1].hasElementChild = true;
+    if (selfClosing) continue;
+    if (SKIP_SUBTREES.has(name)) { skipDepth++; continue; }
+    stack.push({ tag: name, texts: [], classes: classesOf(raw), hasElementChild: false });
+  }
+  pushText(html.slice(cursor));
+  for (let i = stack.length - 1; i >= 0; i--) closeFrame(stack[i], hits);
+  return scan;
+}
+
+// Tags that carry tenant-visible copy — the targets rule 16 cares about.
+const TEXT_BEARING_TAG_RE = /^(?:h[1-6]|p|span|small|strong|em|b|i|a|li|blockquote|figcaption|td|th|dt|dd)$/;
+
+// Descendant selectors that style a text tag directly (`.card strong`). Those
+// import as AMBIENT rules: editing one changes every element it matches instead
+// of the single element the tenant selected. Every such selector is reported —
+// deciding "does this reach a class-less element?" needs a real DOM matcher we
+// don't have here, and a document-wide regex approximation flags a selector
+// because of an UNRELATED class-less element, leaving a page that stays red no
+// matter what the author fixes. The fix is always the same: give the matched
+// elements their own class and move the declarations onto it.
+function findDescendantTextSelectors(styleCss, html) {
+  const hits = new Set();
+  const css = styleCss.replace(/\/\*[\s\S]*?\*\//g, '');
+  for (const rule of css.matchAll(/([^{}]+)\{[^{}]*\}/g)) {
+    const selectorList = rule[1] || '';
+    if (selectorList.trim().startsWith('@')) continue;
+    for (const rawSelector of selectorList.split(',')) {
+      const selector = rawSelector.trim().replace(/\s+/g, ' ');
+      // Pseudo-class/element and attribute selectors are ambient by design.
+      if (!selector || /[:[]/.test(selector)) continue;
+      const parts = selector.replace(/\s*[>+~]\s*/g, ' ').split(' ').filter(Boolean);
+      if (parts.length < 2) continue; // a bare element selector is base typography
+      const target = parts[parts.length - 1].toLowerCase();
+      if (!TEXT_BEARING_TAG_RE.test(target)) continue;
+      hits.add(selector);
+    }
+  }
+  return [...hits];
+}
+
+// Severity for rule 16 — keep in parity with DESCENDANT_TEXT_SELECTOR_STATUS in
+// cms-compliance.ts. Flip to 'WARN' if it proves too noisy on real pages.
+const DESCENDANT_TEXT_SELECTOR_STATUS = 'FAIL';
+
 // A page result: [ { rule, status, detail } ]
 function checkPage(html) {
   const results = [];
@@ -115,19 +257,26 @@ function checkPage(html) {
   // becomes an editable block automatically). The old marker rule enforced a
   // no-op convention, so it was removed.
 
-  // 8) Editable text — bare text next to an inline element (best-effort heuristic).
-  const inlineChild = /<(span|strong|em|b|i|a)\b/i;
-  let bareTextHits = 0;
-  for (const m of html.matchAll(/<(h[1-6]|p)\b[^>]*>([\s\S]*?)<\/\1>/gi)) {
-    const inner = m[2];
-    if (!inlineChild.test(inner)) continue; // only lines that mix an inline child
-    const bare = inner.replace(/<[^>]+>/g, '').split('').some((t) => t.trim().length > 0 && /\S/.test(t) && !/^\s*$/.test(t));
-    // crude: does removing inline tags leave loose non-tag text alongside a child?
-    const stripped = inner.replace(/<(span|strong|em|b|i|a)\b[^>]*>[\s\S]*?<\/\1>/gi, '');
-    if (stripped.replace(/<[^>]+>/g, '').trim().length > 0 && bare) bareTextHits++;
+  // 8) No bare text — every text run must own an element. Text written directly
+  // inside a container (a <div>, <li>, <td>, <b>, or a heading that also holds a
+  // child element) imports as a no-wrapper text node: it renders, but owns no DOM
+  // element, so the tenant can never select it on the canvas, never gets a
+  // selection ring, and can never give it a class to style it. Blocking.
+  const bareText = findBareText(html);
+  if (bareText.length) {
+    const unique = [...new Set(bareText.map((h) => `<${h.tag}> "${h.text.slice(0, 40)}${h.text.length > 40 ? '…' : ''}"`))];
+    const shown = unique.slice(0, 12);
+    add('No bare text (every run owns an element)', 'FAIL',
+      `${bareText.length} text run(s) sit directly inside a container, so they import with NO element of their own — ` +
+      `the tenant cannot select, highlight or style them at all. Wrap EVERY one in its own element with its own ` +
+      `class, e.g. <span class="stat-label">Founded in Lisbon</span>. Remember a heading/paragraph that contains ` +
+      `any child element (even a <br> or <span>) stops being one text block, so its loose runs must be wrapped ` +
+      `too. Fix every occurrence on the page, not only the examples listed here` +
+      `${unique.length > shown.length ? ` (showing ${shown.length} of ${unique.length})` : ''}: ` +
+      `${shown.join(', ')} (see templateRule.md)`);
+  } else {
+    add('No bare text (every run owns an element)', 'PASS');
   }
-  add('No bare text beside inline element', bareTextHits ? 'WARN' : 'PASS',
-    bareTextHits ? `${bareTextHits} heading/paragraph(s) mix a wrapped span with loose text — wrap every run` : '');
 
   // 9) No content built by JavaScript at runtime. A <script> without `src`
   // that writes innerHTML/insertAdjacentHTML/outerHTML renders visible
@@ -249,6 +398,43 @@ function checkPage(html) {
       unnamed.length
         ? `${unnamed.length} element(s) have no meaningful name — they import as "Container" and the AI editor can't target them: ${[...new Set(unnamed)].slice(0, 5).join(', ')}. Give each a semantic class (hero, services-grid, service-card) or data-layer="…" (see templateRule.md)`
         : '');
+  }
+
+  // 16) Text styled through its own class, not a descendant selector. Only a
+  // single bare class imports as an editable rule the tenant can change on ONE
+  // element; `.stat-item strong` imports as an ambient rule, so editing it
+  // restyles every match at once and per-element customisation is impossible.
+  const ambientTextSelectors = findDescendantTextSelectors(styleBlocks, html);
+  add('Text styled by its own class (not a descendant selector)',
+    ambientTextSelectors.length ? DESCENDANT_TEXT_SELECTOR_STATUS : 'PASS',
+    ambientTextSelectors.length
+      ? `${ambientTextSelectors.length} rule(s) style a text element through a descendant selector — these import ` +
+        `as AMBIENT rules, so editing one changes every element it matches instead of the one the tenant selected. ` +
+        `Give each of those text elements its own class and move the declarations onto that class ` +
+        `(.stat-value { … }, not .stat-item strong { … }). Fix every one, not only the examples listed here` +
+        `${ambientTextSelectors.length > 10 ? ` (showing 10 of ${ambientTextSelectors.length})` : ''}: ` +
+        `${ambientTextSelectors.slice(0, 10).join(', ')} (see templateRule.md)`
+      : '');
+
+  // 17) Every text element owns a unique class. A shared role class
+  // (`.stat-label` on all four stats) is correct for the shared design, but on
+  // its own it means editing that text in the CMS restyles all four — the tenant
+  // cannot customise the one they clicked. So each text element also carries a
+  // class used exactly once, giving it a per-element style rule that survives a
+  // re-share (a CMS-side inline style does not — a re-share overwrites the page).
+  const sharedOnlyText = findTextWithoutUniqueClass(html);
+  if (sharedOnlyText.length) {
+    const uniqueList = [...new Set(sharedOnlyText.map((h) => `<${h.tag}> "${h.text.slice(0, 40)}${h.text.length > 40 ? '…' : ''}"`))];
+    const shown = uniqueList.slice(0, 12);
+    add('Every text element has its own unique class', 'FAIL',
+      `${sharedOnlyText.length} text element(s) have no class of their own — every class they carry is also used ` +
+      `elsewhere, so restyling one in the CMS restyles them all. Give each its OWN class in addition to any ` +
+      `shared role class, unique one first: class="stat-label-4 stat-label", and declare it (.stat-label-4 {}). ` +
+      `Fix every occurrence, not only the examples listed here` +
+      `${uniqueList.length > shown.length ? ` (showing ${shown.length} of ${uniqueList.length})` : ''}: ` +
+      `${shown.join(', ')} (see templateRule.md)`);
+  } else {
+    add('Every text element has its own unique class', 'PASS');
   }
 
   return results;

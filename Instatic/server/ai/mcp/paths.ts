@@ -5,5 +5,5 @@ export const MCP_PATH_PROTECTED_RESOURCE_METADATA_PATH =
 export const MCP_AUTHORIZATION_SERVER_METADATA_PATH = '/.well-known/oauth-authorization-server'
 export const MCP_OAUTH_REGISTER_PATH = '/_instatic/oauth/register'
 export const MCP_OAUTH_TOKEN_PATH = '/_instatic/oauth/token'
-export const MCP_OAUTH_AUTHORIZE_PATH = '/admin/ai/oauth/authorize'
-export const MCP_OAUTH_AUTHORIZATION_API_PATH = '/admin/api/ai/mcp/oauth/authorization'
+export const MCP_OAUTH_AUTHORIZE_PATH = '/cms/ai/oauth/authorize'
+export const MCP_OAUTH_AUTHORIZATION_API_PATH = '/cms/api/ai/mcp/oauth/authorization'

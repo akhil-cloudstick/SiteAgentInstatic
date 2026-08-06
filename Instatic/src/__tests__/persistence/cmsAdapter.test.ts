@@ -98,7 +98,7 @@ describe('CmsAdapter', () => {
 
     expect(loaded?.id).toBe('project_1')
     expect(calls[0]).toMatchObject({
-      input: '/admin/api/cms/site',
+      input: '/cms/api/cms/site',
       init: { method: 'GET', credentials: 'include' },
     })
   })
@@ -113,7 +113,7 @@ describe('CmsAdapter', () => {
     await adapter.saveSite(site())
 
     expect(calls).toHaveLength(1)
-    expect(calls[0].input).toBe('/admin/api/cms/site-document')
+    expect(calls[0].input).toBe('/cms/api/cms/site-document')
     expect(calls[0].init).toMatchObject({
       method: 'PUT',
       credentials: 'include',
@@ -194,7 +194,7 @@ describe('CmsAdapter save wire shapes', () => {
 
   function savedBody(calls: RecordedCall[]): Record<string, unknown> {
     expect(calls).toHaveLength(1)
-    expect(calls[0].input).toBe('/admin/api/cms/site-document')
+    expect(calls[0].input).toBe('/cms/api/cms/site-document')
     return JSON.parse(String(calls[0].init?.body)) as Record<string, unknown>
   }
 

@@ -16,7 +16,7 @@ const booksPage: PluginAdminPageRoute = {
   id: 'books',
   title: 'Books',
   navLabel: 'Books',
-  route: '/admin/plugins/acme.books/books',
+  route: '/cms/plugins/acme.books/books',
   content: {
     kind: 'resource',
     heading: 'Books',
@@ -43,7 +43,7 @@ describe('PluginPageRenderer resource pages', () => {
       calls.push({ input, init })
       const url = String(input)
 
-      if (url === '/admin/api/cms/plugins/acme.books/resources/books/records' && init?.method === 'GET') {
+      if (url === '/cms/api/cms/plugins/acme.books/resources/books/records' && init?.method === 'GET') {
         return json({
           resource: {
             id: 'books',
@@ -66,7 +66,7 @@ describe('PluginPageRenderer resource pages', () => {
         })
       }
 
-      if (url === '/admin/api/cms/plugins/acme.books/resources/books/records' && init?.method === 'POST') {
+      if (url === '/cms/api/cms/plugins/acme.books/resources/books/records' && init?.method === 'POST') {
         return json({
           record: {
             id: 'record_2',
@@ -92,7 +92,7 @@ describe('PluginPageRenderer resource pages', () => {
 
     await waitFor(() => {
       expect(calls.some((call) =>
-        String(call.input) === '/admin/api/cms/plugins/acme.books/resources/books/records' &&
+        String(call.input) === '/cms/api/cms/plugins/acme.books/resources/books/records' &&
         call.init?.method === 'POST' &&
         call.init.body === JSON.stringify({
           data: {
@@ -147,7 +147,7 @@ describe('PluginPageRenderer resource pages', () => {
     const originalFetchScoped = globalThis.fetch
     globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input)
-      if (url === '/admin/api/cms/plugins/acme.demo/runtime/approvals') {
+      if (url === '/cms/api/cms/plugins/acme.demo/runtime/approvals') {
         return json({ count: 1 })
       }
       return originalFetchScoped(input, init)
@@ -160,7 +160,7 @@ describe('PluginPageRenderer resource pages', () => {
           pluginName: 'Demo Plugin',
           id: 'dashboard',
           title: 'Dashboard',
-          route: '/admin/plugins/acme.demo/dashboard',
+          route: '/cms/plugins/acme.demo/dashboard',
           content: {
             kind: 'app',
             heading: 'Demo Dashboard',
@@ -191,7 +191,7 @@ describe('PluginPageRenderer resource pages', () => {
       pluginName: 'Demo Plugin',
       id: 'dashboard',
       title: 'Dashboard',
-      route: '/admin/plugins/acme.demo/dashboard',
+      route: '/cms/plugins/acme.demo/dashboard',
       content: {
         kind: 'app',
         heading: 'Demo Dashboard',
@@ -238,7 +238,7 @@ describe('PluginPageRenderer resource pages', () => {
       pluginName: 'Demo Plugin',
       id: 'dashboard',
       title: 'Dashboard',
-      route: '/admin/plugins/acme.demo/dashboard',
+      route: '/cms/plugins/acme.demo/dashboard',
       content: {
         kind: 'app',
         heading: 'Demo Dashboard',

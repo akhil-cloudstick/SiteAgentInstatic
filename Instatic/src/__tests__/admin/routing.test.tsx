@@ -21,20 +21,20 @@ afterEach(cleanup)
 describe('matchPath — wildcard patterns', () => {
   it("matches '*' against any pathname", () => {
     expect(matchPath('*', '/')).not.toBeNull()
-    expect(matchPath('*', '/admin/login')).not.toBeNull()
+    expect(matchPath('*', '/cms/login')).not.toBeNull()
     expect(matchPath('*', '/totally/unknown/path')).not.toBeNull()
   })
 
   it("matches a trailing '/*' segment against any subpath", () => {
-    expect(matchPath('/admin/*', '/admin/login')).not.toBeNull()
-    expect(matchPath('/admin/*', '/admin/a/b/c')).not.toBeNull()
-    expect(matchPath('/admin/*', '/other')).toBeNull()
+    expect(matchPath('/cms/*', '/cms/login')).not.toBeNull()
+    expect(matchPath('/cms/*', '/cms/a/b/c')).not.toBeNull()
+    expect(matchPath('/cms/*', '/other')).toBeNull()
   })
 
   it('still treats non-wildcard patterns literally', () => {
-    expect(matchPath('/admin/site', '/admin/site')).not.toBeNull()
-    expect(matchPath('/admin/site', '/admin/site2')).toBeNull()
-    expect(matchPath('/admin/plugins/:pluginId/:pageId', '/admin/plugins/a/b')).not.toBeNull()
+    expect(matchPath('/cms/site', '/cms/site')).not.toBeNull()
+    expect(matchPath('/cms/site', '/cms/site2')).toBeNull()
+    expect(matchPath('/cms/plugins/:pluginId/:pageId', '/cms/plugins/a/b')).not.toBeNull()
   })
 })
 
@@ -46,22 +46,22 @@ function LocationProbe() {
 describe('Routes — catch-all route', () => {
   it('renders the * route when nothing else matches, and Navigate redirects', async () => {
     render(
-      <MemoryRouter initialEntries={['/admin/login']}>
+      <MemoryRouter initialEntries={['/cms/login']}>
         <Routes>
-          <Route path="/admin/dashboard" element={<LocationProbe />} />
-          <Route path="*" element={<Navigate to="/admin/dashboard" replace />} />
+          <Route path="/cms/dashboard" element={<LocationProbe />} />
+          <Route path="*" element={<Navigate to="/cms/dashboard" replace />} />
         </Routes>
       </MemoryRouter>,
     )
     const probe = await screen.findByTestId('probe')
-    expect(probe.textContent).toBe('/admin/dashboard')
+    expect(probe.textContent).toBe('/cms/dashboard')
   })
 
   it('prefers an earlier explicit match over the catch-all', () => {
     render(
-      <MemoryRouter initialEntries={['/admin/site']}>
+      <MemoryRouter initialEntries={['/cms/site']}>
         <Routes>
-          <Route path="/admin/site" element={<div data-testid="site" />} />
+          <Route path="/cms/site" element={<div data-testid="site" />} />
           <Route path="*" element={<div data-testid="fallback" />} />
         </Routes>
       </MemoryRouter>,
@@ -79,11 +79,11 @@ describe('AdminRoutes — unknown admin URLs never render an empty tree', () => 
       React.ReactElement<{ path: string; element: React.ReactElement }>
     >
     const last = routeElements[routeElements.length - 1]
-    expect(last.props.path).toBe('/admin/*')
+    expect(last.props.path).toBe('/cms/*')
     expect(last.props.element.type).toBe(Navigate)
     expect(
       (last.props.element as React.ReactElement<{ to: string; replace?: boolean }>).props.to,
-    ).toBe('/admin/dashboard')
+    ).toBe('/cms/dashboard')
   })
 
   it('does not claim non-admin paths (public 404s keep their own treatment)', () => {

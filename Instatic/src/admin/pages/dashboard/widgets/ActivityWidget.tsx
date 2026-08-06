@@ -172,7 +172,7 @@ export function ActivityWidget({ span, editing }: DashboardWidgetRendererProps) 
     // Deep-link to the Audit tab via the cross-workspace pending-action bus —
     // the Users page reads this on mount and selects the Audit tab.
     queuePendingAction('users.viewAudit')
-    navigate('/admin/users')
+    navigate('/cms/users')
   }
 
   return (

@@ -3,8 +3,9 @@
  *
  *   [Zoom -] [%] [Zoom +]
  *
- * Zooming +/− anchors around the canvas viewport center so the visible content
- * scales around the middle of the screen instead of the document's top-left.
+ * Zooming +/− only changes the zoom level — it never writes pan. The canvas is
+ * a fixed grid with `transform-origin: 50% 50%`, so scaling alone keeps the
+ * board concentric; rewriting pan is what used to fling it into a corner.
  *
  * Live mode: the single real-size frame always renders at 100%, so the
  * controls show 100% and are disabled with the reason in their tooltip —
@@ -28,22 +29,6 @@ import { Button } from '@ui/components/Button'
 import { cn } from '@ui/cn'
 import styles from './Toolbar.module.css'
 
-/**
- * Resolve the canvas viewport center in canvas-local coordinates.
- * Returns `null` if the canvas root isn't mounted (e.g. before first render).
- *
- * The canvas root is queried by data-testid because ZoomControls lives in the
- * toolbar (a sibling of the canvas), not inside CanvasRoot — passing a ref
- * would require threading it through several layers of layout components for
- * a one-off geometry lookup at click time.
- */
-function getCanvasCenter(): { x: number; y: number } | null {
-  const el = document.querySelector('[data-testid="canvas-root"]')
-  if (!(el instanceof HTMLElement)) return null
-  const rect = el.getBoundingClientRect()
-  return { x: rect.width / 2, y: rect.height / 2 }
-}
-
 const LIVE_ZOOM_REASON = 'Live mode always shows 100% zoom.'
 
 interface ZoomControlsProps {
@@ -62,17 +47,13 @@ export function ZoomControls({ className }: ZoomControlsProps = {}) {
   const zoomOut = useEditorStore((s) => s.zoomOut)
   const resetView = useEditorStore((s) => s.resetView)
 
-  const handleZoomIn = () => {
-    const center = getCanvasCenter()
-    if (center) zoomIn(center.x, center.y)
-    else zoomIn()
-  }
-
-  const handleZoomOut = () => {
-    const center = getCanvasCenter()
-    if (center) zoomOut(center.x, center.y)
-    else zoomOut()
-  }
+  // No origin argument: passing one makes the store rewrite pan with
+  // "keep this screen point fixed" maths, which assumes a pannable plane
+  // anchored at 0,0. The Responsive Review board is a fixed grid scaled about
+  // its own centre (transform-origin: 50% 50%), so any pan write drags it into
+  // a corner. Leaving pan alone keeps every step concentric.
+  const handleZoomIn = () => zoomIn()
+  const handleZoomOut = () => zoomOut()
 
   // The live frame renders real-size regardless of the stored design-canvas
   // zoom, which is preserved for the return to design view.

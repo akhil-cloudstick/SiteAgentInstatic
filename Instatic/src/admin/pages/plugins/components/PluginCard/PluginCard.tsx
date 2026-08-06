@@ -315,7 +315,7 @@ export function PluginCard(props: PluginCardProps) {
                 <Link
                   key={page.id}
                   className={styles.pluginPageLink}
-                  to={page.route ?? `/admin/plugins/${plugin.id}/${page.id}`}
+                  to={page.route ?? `/cms/plugins/${plugin.id}/${page.id}`}
                 >
                   {page.navLabel ?? page.title}
                 </Link>

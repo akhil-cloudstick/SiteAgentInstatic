@@ -99,3 +99,6 @@ growth/**
 .task/
 deploy/agent-bins/
 apps/web/tsconfig.build.json
+
+# Looper harness attachments (bug screenshots etc.) — agent scratch, not repo content
+.looper-attachments/

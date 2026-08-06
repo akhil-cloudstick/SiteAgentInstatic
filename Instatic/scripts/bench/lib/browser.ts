@@ -160,11 +160,11 @@ export async function loginAdmin(
 ): Promise<void> {
   // Need to be on a same-origin page first so the cookie is settable.
   if (!page.url().startsWith(baseUrl)) {
-    await page.goto(`${baseUrl}/admin`, { waitUntil: 'domcontentloaded' })
+    await page.goto(`${baseUrl}/cms`, { waitUntil: 'domcontentloaded' })
   }
   const res = await page.evaluate(
     async (args: { baseUrl: string; email: string; password: string }) => {
-      const r = await fetch(`${args.baseUrl}/admin/api/cms/login`, {
+      const r = await fetch(`${args.baseUrl}/cms/api/cms/login`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },

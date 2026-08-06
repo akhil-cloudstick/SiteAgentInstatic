@@ -28,6 +28,7 @@ import { applyAssetRewrites } from './applyAssetRewrites'
 import { rewriteInternalLinks, rewriteFragmentInternalLinks } from './linkRewrite'
 import type {
   GlobalSectionCandidate,
+  SharedBlockCandidate,
   ImportColorToken,
   ImportFontToken,
   ImportPlan,
@@ -127,6 +128,10 @@ export async function commitImportPlan(
     // every page commits only its body content and inherits the shared chrome
     // through the template's outlet (new CMS pages inherit it too).
     commitGlobalSections(tx, globalSections, linkedPages, activeScriptPageSources, pageIdBySource)
+    // Author-marked shared blocks: one Visual Component each, referenced IN PLACE
+    // so the block stays where the designer put it. Also before commitPages, so
+    // pages commit with the reference already spliced in.
+    commitSharedBlocks(tx, rewrittenPlan.sharedBlocks ?? [], linkedPages, pageIdBySource)
     commitPages(tx, linkedPages, pageConflictsBySource, pageIdBySource, results)
     commitPageScopedFiles(tx, rewrittenPlan, pageIdBySource, results)
     // Active-state script: injected once per page that had a shared nav with
@@ -593,6 +598,76 @@ function buildEverywhereTemplateFragment(
  * place. `rewriteInternalLinks` already produced a detached copy, so this is
  * safe to mutate.
  */
+/**
+ * Promote every author-marked `data-shared` group to ONE Visual Component and
+ * point each occurrence at it.
+ *
+ * Deliberately different from `commitGlobalSections`: shared chrome is hoisted
+ * into the everywhere layout (so new CMS pages inherit it), but an ordinary
+ * shared block must stay where the designer put it. Replacing the node in place
+ * keeps it visible at the right position in the canvas, and because every
+ * occurrence references the same component, editing it once updates every page.
+ */
+function commitSharedBlocks(
+  tx: SiteImportTransaction,
+  sharedBlocks: SharedBlockCandidate[],
+  linkedPages: ImportPlan['pages'],
+  pageIdBySource: ReadonlyMap<string, string>,
+): void {
+  if (sharedBlocks.length === 0) return
+
+  const pageBySource = new Map<string, ImportPlan['pages'][number]>()
+  for (const page of linkedPages) pageBySource.set(page.source, page)
+
+  for (const block of sharedBlocks) {
+    // Rewrite internal links relative to the page the component was lifted from,
+    // so a shared block's links resolve to CMS routes on every page it appears on.
+    const source = block.occurrences[0]?.pageSource
+    const nodeFragment = source
+      ? rewriteFragmentInternalLinks(block.representativeFragment, source, pageIdBySource)
+      : block.representativeFragment
+
+    const vcId = tx.createVisualComponent({ name: humanizeSharedName(block.name), nodeFragment })
+
+    for (const { pageSource, nodeId } of block.occurrences) {
+      const page = pageBySource.get(pageSource)
+      if (page) replaceWithComponentRef(page.nodeFragment, nodeId, vcId)
+    }
+  }
+}
+
+/** `contact-strip` → `Contact Strip`, so the components list reads like a name. */
+function humanizeSharedName(raw: string): string {
+  const words = raw
+    .replace(/[_-]+/g, ' ')
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+  if (words.length === 0) return 'Shared Block'
+  return words.map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ').slice(0, 40)
+}
+
+/**
+ * Turn a node into a reference to `vcId`, dropping the subtree it used to own.
+ * The node KEEPS its id, so the parent's `children` array and the fragment's
+ * `rootIds` stay valid without having to find and patch the parent.
+ */
+function replaceWithComponentRef(fragment: ImportFragment, nodeId: string, vcId: string): void {
+  const node = fragment.nodes[nodeId]
+  if (!node) return
+  for (const childId of node.children ?? []) removeSubtree(fragment.nodes, childId)
+  fragment.nodes[nodeId] = {
+    ...node,
+    moduleId: 'base.visual-component-ref',
+    props: { componentId: vcId },
+    children: [],
+    // The block's own classes live on the component's root node, so leaving them
+    // here too would apply them twice.
+    classIds: [],
+  } as unknown as PageNode
+}
+
 function stripSection(nodeFragment: ImportFragment, sectionRootId: string): void {
   const idx = nodeFragment.rootIds.indexOf(sectionRootId)
   if (idx !== -1) nodeFragment.rootIds.splice(idx, 1)

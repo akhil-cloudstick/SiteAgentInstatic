@@ -34,7 +34,10 @@ function sessionCookieAttributes(secure: boolean): string {
   // HttpOnly  — JS in the browser cannot read the cookie (XSS mitigation)
   // SameSite=Lax — cross-origin POST/PUT/DELETE don't carry the cookie (CSRF)
   // Secure    — browser only sends the cookie over HTTPS (set when applicable)
-  const base = 'Path=/admin; HttpOnly; SameSite=Lax'
+  // Path MUST match the admin mount point (/cms). If it drifts, the browser
+  // silently withholds the cookie on every admin request and the SPA falls back
+  // to its own login screen even though SSO succeeded.
+  const base = 'Path=/cms; HttpOnly; SameSite=Lax'
   return secure ? `${base}; Secure` : base
 }
 

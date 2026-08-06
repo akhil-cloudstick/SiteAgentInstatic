@@ -15,7 +15,7 @@ export const dataProvider = makeServerProvider({
   id: 'data',
   label: 'Data',
   debounceMs: 150,
-  endpoint: '/admin/api/cms/data/tables',
+  endpoint: '/cms/api/cms/data/tables',
   schema: DataTablesListResponseSchema,
   select: (body) => body.tables,
   toCommand: (table): Command => ({
@@ -27,7 +27,7 @@ export const dataProvider = makeServerProvider({
     keywords: ['data', 'table', 'database', table.slug],
     run: (ctx) => {
       ctx.closeSpotlight()
-      ctx.navigate(`/admin/data?table=${encodeURIComponent(table.id)}`)
+      ctx.navigate(`/cms/data?table=${encodeURIComponent(table.id)}`)
     },
   }),
 })

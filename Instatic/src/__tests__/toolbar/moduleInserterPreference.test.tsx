@@ -75,7 +75,7 @@ describe('useModuleInserterPreference', () => {
 
     await waitFor(() => expect(calls.some((call) => call.init?.method === 'PUT')).toBe(true))
     const save = calls.find((call) => call.init?.method === 'PUT')
-    expect(save?.input.toString()).toBe('/admin/api/cms/me/preferences/module-inserter')
+    expect(save?.input.toString()).toBe('/cms/api/cms/me/preferences/module-inserter')
     expect(JSON.parse(String(save?.init?.body))).toEqual({
       value: {
         favorites: [

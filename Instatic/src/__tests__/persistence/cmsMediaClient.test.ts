@@ -28,7 +28,7 @@ describe('CMS media client', () => {
     expect(assets).toHaveLength(1)
     expect(assets[0].publicPath).toBe('/uploads/asset_1-hero.png')
     expect(calls[0]).toMatchObject({
-      input: '/admin/api/cms/media',
+      input: '/cms/api/cms/media',
       init: { method: 'GET', credentials: 'include' },
     })
   })
@@ -54,7 +54,7 @@ describe('CMS media client', () => {
 
     expect(asset.filename).toBe('hero.png')
     expect(calls[0]).toMatchObject({
-      input: '/admin/api/cms/media',
+      input: '/cms/api/cms/media',
       init: { method: 'POST', credentials: 'include' },
     })
     expect(calls[0].init?.body).toBeInstanceOf(FormData)
@@ -80,7 +80,7 @@ describe('CMS media client', () => {
 
     expect(asset.filename).toBe('Hero renamed.png')
     expect(calls[0]).toMatchObject({
-      input: '/admin/api/cms/media/media-1',
+      input: '/cms/api/cms/media/media-1',
       init: {
         method: 'PATCH',
         credentials: 'include',
@@ -99,7 +99,7 @@ describe('CMS media client', () => {
     } })
 
     expect(calls[0]).toMatchObject({
-      input: '/admin/api/cms/media/media-1',
+      input: '/cms/api/cms/media/media-1',
       init: {
         method: 'DELETE',
         credentials: 'include',

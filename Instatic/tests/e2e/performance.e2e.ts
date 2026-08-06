@@ -5,7 +5,7 @@ import {
   createPage,
   expectEditorReady,
   insertModuleViaPicker,
-  insertNotchModule,
+  insertModule,
   login,
   openSiteEditor,
   publishDraft,
@@ -38,7 +38,7 @@ test.describe('performance and reliability', () => {
     })
 
     const startedAt = Date.now()
-    await page.goto('/admin/site')
+    await page.goto('/cms/site')
     await expect(page).toHaveURL(/\/admin\/site$/)
     await expectEditorReady(page)
     await expect(page.getByTestId('toolbar')).toBeVisible()
@@ -72,12 +72,12 @@ test.describe('performance and reliability', () => {
       const filename = `perf-publish-${suffix}.png`
 
       await createPage(page, `Performance Publish ${suffix}`, slug)
-      await insertNotchModule(page, 'text')
+      await insertModule(page, 'text')
       await setPropValue(page, 'text', headline)
       await insertModuleViaPicker(page, 'base.button')
       await setPropValue(page, 'label', ctaLabel)
       await setPropValue(page, 'href', 'https://example.com/performance')
-      await insertNotchModule(page, 'image')
+      await insertModule(page, 'image')
       await uploadAndSelectImage(page, filename)
 
       const frame = canvasFrame(page)

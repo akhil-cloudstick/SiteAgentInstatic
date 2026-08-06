@@ -35,7 +35,7 @@ export function tryHandleAiToolResult(
   db: DbClient,
   pathname: string,
 ): Promise<Response> | null {
-  if (pathname !== '/admin/api/ai/tool-result') return null
+  if (pathname !== '/cms/api/ai/tool-result') return null
   return handleAiToolResult(req, db)
 }
 

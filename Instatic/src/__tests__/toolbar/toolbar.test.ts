@@ -2,13 +2,14 @@
  * Toolbar Component Tests — J13
  *
  * Tests focus on:
- *   1. UndoRedoButtons — WCAG aria-disabled pattern (Guideline #224),
- *      keyboard shortcut handler registration. The component lives in the
- *      canvas notch (src/editor/components/Canvas/UndoRedoButtons.tsx) so
- *      Undo/Redo only appears on the visual editor, not on Content / Plugins
- *      admin pages.
+ *   1. useUndoRedoShortcuts — keyboard-only editor history. There are no
+ *      Undo/Redo buttons any more; the hook
+ *      (src/admin/pages/site/canvas/useUndoRedoShortcuts.ts) owns the
+ *      Ctrl/Cmd+Z and Ctrl/Cmd+Shift+Z listener and is mounted by CanvasRoot,
+ *      so history stays scoped to the visual editor and never reaches the
+ *      Content / Plugins admin pages.
  *   2. ZoomControls — zoom percentage rendering, correct store subscriptions.
- *   3. ModulePickerDropdown — search filter pure logic.
+ *   3. module inserter — search filter pure logic.
  *   4. PublishButton — state machine (idle → publishing → published / error).
  *   5. Toolbar — overall structure (role, testid, always-rendered sub-components).
  *
@@ -105,43 +106,39 @@ describe('ZoomControls — live mode', () => {
 })
 
 // ---------------------------------------------------------------------------
-// 2 — UndoRedoButtons — WCAG aria-disabled pattern (Guideline #224)
+// 2 — useUndoRedoShortcuts — keyboard-only editor history
 // ---------------------------------------------------------------------------
 
-describe('UndoRedoButtons — WCAG aria-disabled pattern (Guideline #224)', () => {
-  it('aria-disabled buttons must still be in the DOM (no conditional removal)', () => {
-    // Structural assertion: both buttons are always rendered regardless of state.
-    // We assert this by checking the toolbar source uses aria-disabled, not disabled.
-    const { readFileSync } = require('fs')
-    const src = readFileSync(
-      new URL('../../admin/pages/site/canvas/UndoRedoButtons.tsx', import.meta.url),
+const UNDO_REDO_HOOK = new URL(
+  '../../admin/pages/site/canvas/useUndoRedoShortcuts.ts',
+  import.meta.url,
+)
+
+describe('useUndoRedoShortcuts — keyboard-only editor history', () => {
+  it('no Undo/Redo buttons survive anywhere in the editor chrome', () => {
+    // The buttons were removed from the canvas notch; the shortcuts are the
+    // only non-palette affordance. Nothing may re-introduce the component.
+    const { existsSync, readFileSync } = require('fs')
+    expect(
+      existsSync(
+        new URL('../../admin/pages/site/canvas/UndoRedoButtons.tsx', import.meta.url),
+      ),
+    ).toBe(false)
+
+    const notchSrc = readFileSync(
+      new URL('../../admin/pages/site/canvas/CanvasNotch.tsx', import.meta.url),
       'utf-8',
     )
-    // Must use aria-disabled for the disabled state (Guideline #224)
-    expect(src).toContain('aria-disabled={!canUndo}')
-    expect(src).toContain('aria-disabled={!canRedo}')
-    // Must NOT use the `disabled` HTML attribute on the <button> directly.
-    // Note: `aria-disabled={!canUndo}` contains "disabled={!canUndo}" as a substring,
-    // so we check for the exact standalone HTML attribute pattern: `disabled={` NOT
-    // preceded by "aria-". Using a negative lookahead-style check via regex.
-    expect(/(?<!aria-)disabled=\{!can/.test(src)).toBe(false)
+    expect(notchSrc).not.toContain('UndoRedoButtons')
+    expect(notchSrc).not.toContain('canvas-notch-undo-btn')
+    expect(notchSrc).not.toContain('canvas-notch-redo-btn')
   })
 
-  it('aria-keyshortcuts attributes are present for screen readers', () => {
-    // Post-spotlight refactor: shortcut values come from the keybindings
-    // registry (keybindings.ts) rather than being hardcoded in JSX. We assert
-    // the JSX wires aria-keyshortcuts to the registry-resolved binding, AND
-    // that the registry itself declares the canonical ⌘Z / ⌘⇧Z labels so
-    // screen readers still receive "Meta+Z" / "Meta+Shift+Z" on macOS.
+  it('the registry still declares the canonical undo/redo bindings', () => {
+    // Shortcut values come from the keybindings registry (keybindings.ts)
+    // rather than being hardcoded, so screen readers and the help screen keep
+    // receiving "Meta+Z" / "Meta+Shift+Z" on macOS.
     const { readFileSync } = require('fs')
-    const src = readFileSync(
-      new URL('../../admin/pages/site/canvas/UndoRedoButtons.tsx', import.meta.url),
-      'utf-8',
-    )
-    expect(src).toContain('aria-keyshortcuts={kbUndo?.ariaKeyshortcuts}')
-    expect(src).toContain('aria-keyshortcuts={kbRedo?.ariaKeyshortcuts}')
-
-    // Confirm the registry resolves the canonical shortcuts the buttons rely on.
     const registrySrc = readFileSync(
       new URL('../../admin/spotlight/keybindings.ts', import.meta.url),
       'utf-8',
@@ -154,10 +151,7 @@ describe('UndoRedoButtons — WCAG aria-disabled pattern (Guideline #224)', () =
 
   it('keyboard shortcut handler guards against text input targets', () => {
     const { readFileSync } = require('fs')
-    const src = readFileSync(
-      new URL('../../admin/pages/site/canvas/UndoRedoButtons.tsx', import.meta.url),
-      'utf-8',
-    )
+    const src = readFileSync(UNDO_REDO_HOOK, 'utf-8')
     // Shortcuts must not fire inside inputs (would break text editing)
     expect(src).toContain("tagName === 'INPUT'")
     expect(src).toContain("tagName === 'TEXTAREA'")
@@ -166,37 +160,41 @@ describe('UndoRedoButtons — WCAG aria-disabled pattern (Guideline #224)', () =
 
   it('keyboard handler registers on document (global scope, not canvas-local)', () => {
     const { readFileSync } = require('fs')
-    const src = readFileSync(
-      new URL('../../admin/pages/site/canvas/UndoRedoButtons.tsx', import.meta.url),
-      'utf-8',
-    )
+    const src = readFileSync(UNDO_REDO_HOOK, 'utf-8')
     expect(src).toContain('document.addEventListener')
     expect(src).toContain('document.removeEventListener')
   })
 
   it('handler supports both Cmd+Z (undo) and Cmd+Shift+Z / Cmd+Y (redo)', () => {
-    // Post-spotlight refactor: the keydown handler delegates undo/redo matching
-    // to the keybindings registry via `kb.match(e)`. The Ctrl+Y Windows alias
-    // stays inline because the canonical Redo binding is ⌘⇧Z — Ctrl+Y is just
-    // a convenience escape hatch.
+    // The keydown handler delegates undo/redo matching to the keybindings
+    // registry via `kb.match(e)`. The Ctrl+Y Windows alias stays inline
+    // because the canonical Redo binding is ⌘⇧Z — Ctrl+Y is just a
+    // convenience escape hatch.
     const { readFileSync } = require('fs')
-    const src = readFileSync(
-      new URL('../../admin/pages/site/canvas/UndoRedoButtons.tsx', import.meta.url),
-      'utf-8',
-    )
+    const src = readFileSync(UNDO_REDO_HOOK, 'utf-8')
     expect(src).toContain('kbUndo?.match(e)')
     expect(src).toContain('kbRedo?.match(e)')
     // Also support Ctrl+Y (Windows redo) — handled inline as an alias.
     expect(src).toContain("e.key === 'y'")
   })
+
+  it('is mounted by CanvasRoot so the shortcuts live as long as the canvas', () => {
+    const { readFileSync } = require('fs')
+    const src = readFileSync(
+      new URL('../../admin/pages/site/canvas/CanvasRoot.tsx', import.meta.url),
+      'utf-8',
+    )
+    expect(src).toContain("from './useUndoRedoShortcuts'")
+    expect(src).toContain('useUndoRedoShortcuts(editable)')
+  })
 })
 
 // ---------------------------------------------------------------------------
-// 3 — ModulePickerDropdown — search filter logic
+// 3 — module inserter — search filter logic
 // ---------------------------------------------------------------------------
 
 // The filtering logic is extracted here for pure-function testing.
-// It mirrors what the useMemo in ModulePickerDropdown computes.
+// It mirrors what ModuleInserterDialog computes.
 function filterModules(
   grouped: Record<string, Array<{ id: string; name: string }>>,
   query: string,
@@ -229,7 +227,7 @@ const MOCK_REGISTRY: Record<string, Array<{ id: string; name: string }>> = {
   ],
 }
 
-describe('ModulePickerDropdown — search filter', () => {
+describe('module inserter — search filter', () => {
   it('returns all modules when query is empty', () => {
     const result = filterModules(MOCK_REGISTRY, '')
     expect(Object.keys(result)).toHaveLength(3)
@@ -447,13 +445,15 @@ describe('Toolbar — structural requirements', () => {
     expect(layoutSrc).toContain('saveStatus={persistence.saveStatus}')
   })
 
-  it('module picker trigger has data-testid for Playwright', () => {
+  it('module inserter trigger has data-testid for Playwright', () => {
+    // The site canvas has no top-center insert notch, so the Layers panel's
+    // "+" is the durable inserter entry point the browser suite drives.
     const { readFileSync } = require('fs')
     const src = readFileSync(
-      new URL('../../admin/pages/site/toolbar/ModulePickerDropdown.tsx', import.meta.url),
+      new URL('../../admin/pages/site/panels/DomPanel/DomPanel.tsx', import.meta.url),
       'utf-8',
     )
-    expect(src).toContain('triggerTestId')
+    expect(src).toContain('data-testid="dom-tree-insert-module"')
   })
 
   it('Toolbar no longer renders panel toggles or create-page/component quick actions', () => {
@@ -470,12 +470,12 @@ describe('Toolbar — structural requirements', () => {
     expect(src).not.toContain('NewComponentButton')
   })
 
-  it('Add inserter is module-only — no in-toolbar page/component create actions', () => {
+  it('Add inserter is module-only — no page/component create actions', () => {
     // Page / Component creation lives in the Site Explorer panel (the dedicated
-    // place for site structure). The toolbar "+ Add" inserter is module-only.
+    // place for site structure). The module inserter is module-only.
     const { readFileSync } = require('fs')
     const src = readFileSync(
-      new URL('../../admin/pages/site/toolbar/ModulePickerDropdown.tsx', import.meta.url),
+      new URL('../../admin/pages/site/module-picker/ModuleInserterDialog.tsx', import.meta.url),
       'utf-8',
     )
     expect(src).not.toContain('toolbar-add-page-action')
@@ -488,13 +488,6 @@ describe('Toolbar — structural requirements', () => {
 
   it('all required data-testid attributes are present (Guideline #221)', () => {
     const { readFileSync } = require('fs')
-    // UndoRedo testids
-    const undoSrc = readFileSync(
-      new URL('../../admin/pages/site/canvas/UndoRedoButtons.tsx', import.meta.url), 'utf-8',
-    )
-    expect(undoSrc).toContain('data-testid="canvas-notch-undo-btn"')
-    expect(undoSrc).toContain('data-testid="canvas-notch-redo-btn"')
-
     // ZoomControls testid
     const zoomSrc = readFileSync(
       new URL('../../admin/pages/site/toolbar/ZoomControls.tsx', import.meta.url), 'utf-8',
@@ -616,8 +609,6 @@ describe('Toolbar — structural requirements', () => {
     // Guideline #357 (user directive #1532): WCAG 2.5.5 44px touch target requirement
     // is explicitly waived for editor chrome. Toolbar controls target 28px.
     // Pattern asserts a 24–29px height value declared in the shared Toolbar.module.css.
-    // UndoRedoButtons lives in the canvas notch and uses the notch chrome
-    // styling, not the toolbar shared CSS — covered by canvasNotch.test.ts.
     const files = [
       'ZoomControls.tsx',
       'PublishButton.tsx',
@@ -642,7 +633,7 @@ describe('Toolbar — structural requirements', () => {
 })
 
 // ---------------------------------------------------------------------------
-// 7 — ModulePickerDropdown keyboard navigation: ArrowDown from search input
+// 7 — ModulePicker keyboard navigation: ArrowDown from search input
 //     Regression test for the WCAG 2.1.1 gap found in UX Review #343.
 //
 //     Bug: handleMenuKeyDown was attached to the menu container div, NOT the

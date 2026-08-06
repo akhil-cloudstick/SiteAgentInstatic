@@ -59,6 +59,11 @@ function resetStore() {
     selectedNodeIds: [],
     hoveredNodeId: null,
     activeBreakpointId: 'desktop',
+    // The inspector is per-mode since the approved Site re-skin; these tests
+    // exercise the Live-edit body, so pin the mode rather than inheriting the
+    // store's 'design' default (which resolves to Responsive review).
+    canvasView: 'live',
+    sectionFocusNodeId: null,
     activeClassId: null,
     propertiesPanel: { collapsed: false, x: 0, y: 0, width: 360 },
     _historyPast: [],

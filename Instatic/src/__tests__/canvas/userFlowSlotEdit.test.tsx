@@ -37,6 +37,11 @@ beforeEach(() => {
     selectedNodeId: null,
     selectedNodeIds: [],
     hoveredNodeId: null,
+    // The inspector is per-mode since the approved Site re-skin; these tests
+    // exercise the Live-edit body, so pin the mode rather than inheriting the
+    // store's 'design' default (which resolves to Responsive review).
+    canvasView: 'live',
+    sectionFocusNodeId: null,
     propertiesPanel: { collapsed: false, x: 0, y: 0, width: 360 },
     propertiesPanelMode: 'docked',
     packageJson: {},

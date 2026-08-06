@@ -108,17 +108,17 @@ describe('workspaceLayoutStorage — per-workspace layouts', () => {
 
 describe('workspaceLayoutStorage — workspaceFromPathname', () => {
   it('maps admin canvas routes onto workspace ids', () => {
-    expect(workspaceFromPathname('/admin/site')).toBe('site')
-    expect(workspaceFromPathname('/admin/site/pages/abc')).toBe('site')
-    expect(workspaceFromPathname('/admin/content')).toBe('content')
-    expect(workspaceFromPathname('/admin/data')).toBe('data')
-    expect(workspaceFromPathname('/admin/media')).toBe('media')
+    expect(workspaceFromPathname('/cms/site')).toBe('site')
+    expect(workspaceFromPathname('/cms/site/pages/abc')).toBe('site')
+    expect(workspaceFromPathname('/cms/content')).toBe('content')
+    expect(workspaceFromPathname('/cms/data')).toBe('data')
+    expect(workspaceFromPathname('/cms/media')).toBe('media')
   })
 
   it('returns null for non-canvas admin routes', () => {
-    expect(workspaceFromPathname('/admin/account')).toBeNull()
-    expect(workspaceFromPathname('/admin/users')).toBeNull()
-    expect(workspaceFromPathname('/admin/plugins')).toBeNull()
+    expect(workspaceFromPathname('/cms/account')).toBeNull()
+    expect(workspaceFromPathname('/cms/users')).toBeNull()
+    expect(workspaceFromPathname('/cms/plugins')).toBeNull()
     expect(workspaceFromPathname('/')).toBeNull()
   })
 })

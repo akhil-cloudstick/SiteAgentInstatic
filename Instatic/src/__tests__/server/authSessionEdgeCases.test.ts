@@ -14,7 +14,7 @@ async function listSessions(
   harness: CapabilityTestHarness,
   cookie: string,
 ): Promise<ListedSession[]> {
-  const res = await harness.cms('/admin/api/cms/auth/sessions', { cookie })
+  const res = await harness.cms('/cms/api/cms/auth/sessions', { cookie })
   expect(res.status).toBe(200)
   const body = await readJson<{ sessions: ListedSession[] }>(res)
   return body.sessions
@@ -38,7 +38,7 @@ describe('account session edge cases', () => {
     const before = await listSessions(harness, steppedCookie)
     expect(before).toHaveLength(1)
 
-    const res = await harness.cms('/admin/api/cms/auth/sessions/not-a-live-session', {
+    const res = await harness.cms('/cms/api/cms/auth/sessions/not-a-live-session', {
       method: 'DELETE',
       cookie: steppedCookie,
     })
@@ -62,7 +62,7 @@ describe('account session edge cases', () => {
     expect(before).toHaveLength(1)
     expect(before[0]?.isCurrent).toBe(true)
 
-    const res = await harness.cms('/admin/api/cms/auth/logout-all', {
+    const res = await harness.cms('/cms/api/cms/auth/logout-all', {
       method: 'POST',
       cookie: steppedCookie,
     })
@@ -82,7 +82,7 @@ describe('account session edge cases', () => {
     const harness = await createCapabilityTestHarness()
     const account = await createAccount(harness)
 
-    const firstLogout = await harness.cms('/admin/api/cms/logout', {
+    const firstLogout = await harness.cms('/cms/api/cms/logout', {
       method: 'POST',
       cookie: account.cookie,
     })
@@ -90,7 +90,7 @@ describe('account session edge cases', () => {
     await expect(readJson<{ ok: boolean }>(firstLogout)).resolves.toEqual({ ok: true })
     expect(firstLogout.headers.get('set-cookie') ?? '').toContain('Max-Age=0')
 
-    const repeatedLogout = await harness.cms('/admin/api/cms/logout', {
+    const repeatedLogout = await harness.cms('/cms/api/cms/logout', {
       method: 'POST',
       cookie: account.cookie,
     })
@@ -98,7 +98,7 @@ describe('account session edge cases', () => {
     await expect(readJson<{ ok: boolean }>(repeatedLogout)).resolves.toEqual({ ok: true })
     expect(repeatedLogout.headers.get('set-cookie') ?? '').toContain('Max-Age=0')
 
-    const me = await harness.cms('/admin/api/cms/me', { cookie: account.cookie })
+    const me = await harness.cms('/cms/api/cms/me', { cookie: account.cookie })
     expect(me.status).toBe(401)
   })
 })

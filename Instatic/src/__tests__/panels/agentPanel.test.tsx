@@ -31,10 +31,10 @@ function installModelFetch(
 ): void {
   globalThis.fetch = mock(async (input: RequestInfo | URL) => {
     const url = typeof input === 'string' ? input : input.toString()
-    if (url.endsWith('/admin/api/ai/credentials')) {
+    if (url.endsWith('/cms/api/ai/credentials')) {
       return jsonResponse({ credentials: [credential] })
     }
-    if (url.includes('/admin/api/ai/providers/')) {
+    if (url.includes('/cms/api/ai/providers/')) {
       return jsonResponse({
         models: [{
           id: 'model-1',
@@ -195,7 +195,7 @@ function renderAgentPanel(
   const store = createAgentStore(overrides)
   const view = render(
     <AdminSessionProvider user={user}>
-      <MemoryRouter initialEntries={['/admin/site']}>
+      <MemoryRouter initialEntries={['/cms/site']}>
         <AgentStoreProvider store={store}>
           <AgentPanel variant="docked" />
           <RouteProbe />
@@ -280,7 +280,7 @@ describe('AgentPanel', () => {
   it('surfaces a large setup empty state and header shortcut when no credentials exist', async () => {
     globalThis.fetch = mock(async (input: RequestInfo | URL) => {
       const url = typeof input === 'string' ? input : input.toString()
-      if (url.endsWith('/admin/api/ai/credentials')) {
+      if (url.endsWith('/cms/api/ai/credentials')) {
         return jsonResponse({ credentials: [] })
       }
       throw new Error(`Unexpected fetch: ${url}`)
@@ -298,7 +298,7 @@ describe('AgentPanel', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Open AI settings' }))
     await waitFor(() => {
-      expect(screen.getByLabelText('current route').textContent).toBe('/admin/ai')
+      expect(screen.getByLabelText('current route').textContent).toBe('/cms/ai')
     })
 
     expect(screen.getByText('No credentials yet')).toBeTruthy()
@@ -308,7 +308,7 @@ describe('AgentPanel', () => {
   it('shows the build prompt when a provider is active (default preloaded)', async () => {
     globalThis.fetch = mock(async (input: RequestInfo | URL) => {
       const url = typeof input === 'string' ? input : input.toString()
-      if (url.endsWith('/admin/api/ai/credentials')) {
+      if (url.endsWith('/cms/api/ai/credentials')) {
         return jsonResponse({
           credentials: [{
             id: 'cred_1',
@@ -322,7 +322,7 @@ describe('AgentPanel', () => {
           }],
         })
       }
-      if (url.includes('/admin/api/ai/providers/')) {
+      if (url.includes('/cms/api/ai/providers/')) {
         return jsonResponse({ models: [] })
       }
       throw new Error(`Unexpected fetch: ${url}`)
@@ -443,7 +443,7 @@ describe('AgentPanel', () => {
   it('prompts to choose a model when credentials exist but no default is set', async () => {
     globalThis.fetch = mock(async (input: RequestInfo | URL) => {
       const url = typeof input === 'string' ? input : input.toString()
-      if (url.endsWith('/admin/api/ai/credentials')) {
+      if (url.endsWith('/cms/api/ai/credentials')) {
         return jsonResponse({
           credentials: [{
             id: 'cred_1',
@@ -457,7 +457,7 @@ describe('AgentPanel', () => {
           }],
         })
       }
-      if (url.includes('/admin/api/ai/providers/')) {
+      if (url.includes('/cms/api/ai/providers/')) {
         return jsonResponse({ models: [] })
       }
       throw new Error(`Unexpected fetch: ${url}`)
@@ -482,7 +482,7 @@ describe('AgentPanel', () => {
   it('preloads the scope default on open', async () => {
     globalThis.fetch = mock(async (input: RequestInfo | URL) => {
       const url = typeof input === 'string' ? input : input.toString()
-      if (url.endsWith('/admin/api/ai/credentials')) {
+      if (url.endsWith('/cms/api/ai/credentials')) {
         return jsonResponse({ credentials: [] })
       }
       throw new Error(`Unexpected fetch: ${url}`)
@@ -500,7 +500,7 @@ describe('AgentPanel', () => {
     // model staged). The setup lockout must NOT show — the composer is usable.
     globalThis.fetch = mock(async (input: RequestInfo | URL) => {
       const url = typeof input === 'string' ? input : input.toString()
-      if (url.endsWith('/admin/api/ai/credentials')) {
+      if (url.endsWith('/cms/api/ai/credentials')) {
         return jsonResponse({
           credentials: [{
             id: 'cred_1',
@@ -514,7 +514,7 @@ describe('AgentPanel', () => {
           }],
         })
       }
-      if (url.includes('/admin/api/ai/providers/')) {
+      if (url.includes('/cms/api/ai/providers/')) {
         return jsonResponse({ models: [] })
       }
       throw new Error(`Unexpected fetch: ${url}`)
@@ -786,7 +786,7 @@ describe('AgentPanel', () => {
   it('renders a rehydrated user image block in conversation history', async () => {
     globalThis.fetch = mock(async (input: RequestInfo | URL) => {
       const url = typeof input === 'string' ? input : input.toString()
-      if (url.endsWith('/admin/api/ai/credentials')) return jsonResponse({ credentials: [] })
+      if (url.endsWith('/cms/api/ai/credentials')) return jsonResponse({ credentials: [] })
       throw new Error(`Unexpected fetch: ${url}`)
     }) as typeof fetch
 
@@ -806,7 +806,7 @@ describe('AgentPanel', () => {
   it('coalesces images into compact galleries and opens a focus-restoring preview', async () => {
     globalThis.fetch = mock(async (input: RequestInfo | URL) => {
       const url = typeof input === 'string' ? input : input.toString()
-      if (url.endsWith('/admin/api/ai/credentials')) return jsonResponse({ credentials: [] })
+      if (url.endsWith('/cms/api/ai/credentials')) return jsonResponse({ credentials: [] })
       throw new Error(`Unexpected fetch: ${url}`)
     }) as typeof fetch
     const { store } = renderAgentPanel({
@@ -858,7 +858,7 @@ describe('AgentPanel', () => {
   it('opens the same image action menu from chat, keyboard, and the preview', async () => {
     globalThis.fetch = mock(async (input: RequestInfo | URL) => {
       const url = typeof input === 'string' ? input : input.toString()
-      if (url.endsWith('/admin/api/ai/credentials')) return jsonResponse({ credentials: [] })
+      if (url.endsWith('/cms/api/ai/credentials')) return jsonResponse({ credentials: [] })
       throw new Error(`Unexpected fetch: ${url}`)
     }) as typeof fetch
     renderAgentPanel({
@@ -905,13 +905,13 @@ describe('AgentPanel', () => {
     let uploadedFile: File | null = null
     globalThis.fetch = mock(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input.toString()
-      if (url.endsWith('/admin/api/ai/credentials')) return jsonResponse({ credentials: [] })
+      if (url.endsWith('/cms/api/ai/credentials')) return jsonResponse({ credentials: [] })
       if (url === '/conversation-image/0') {
         return new Response(new Uint8Array([0xff, 0xd8, 0xff, 0xd9]), {
           headers: { 'content-type': 'image/jpeg' },
         })
       }
-      if (url === '/admin/api/cms/media' && init?.method === 'POST') {
+      if (url === '/cms/api/cms/media' && init?.method === 'POST') {
         uploadedFile = (init.body as FormData).get('file') as File
         return jsonResponse({
           asset: {
@@ -952,7 +952,7 @@ describe('AgentPanel', () => {
   it('uses the same gallery for assistant and plural tool-result images', async () => {
     globalThis.fetch = mock(async (input: RequestInfo | URL) => {
       const url = typeof input === 'string' ? input : input.toString()
-      if (url.endsWith('/admin/api/ai/credentials')) return jsonResponse({ credentials: [] })
+      if (url.endsWith('/cms/api/ai/credentials')) return jsonResponse({ credentials: [] })
       throw new Error(`Unexpected fetch: ${url}`)
     }) as typeof fetch
     renderAgentPanel({

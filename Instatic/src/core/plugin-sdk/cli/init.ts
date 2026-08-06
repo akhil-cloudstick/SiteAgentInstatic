@@ -220,7 +220,7 @@ auto-detects the host's \`uploads/\` folder by walking up from the plugin
 directory; pass \`--uploads <path>\` (or set \`INSTATIC_UPLOADS_DIR\`) when running
 outside the instatic monorepo.
 
-You'll need to install the plugin once via the admin UI (\`/admin/plugins\` →
+You'll need to install the plugin once via the admin UI (\`/cms/plugins\` →
 Upload Plugin) so the host registers it and approves permissions. After
 that, every \`instatic-plugin dev\` rebuild flows in without another upload.
 

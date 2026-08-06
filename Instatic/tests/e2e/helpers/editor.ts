@@ -3,19 +3,19 @@ import { OWNER } from './constants'
 
 /**
  * Site editor / visual builder helpers. Each one is a small wrapper around the
- * durable controls a user actually clicks: the toolbar, the canvas notch, the
+ * durable controls a user actually clicks: the toolbar, the canvas chrome, the
  * layers tree, and the properties panel.
  *
  * Editor/canvas controls are addressed by `data-testid` where an accessible
- * name is not practical (canvas notch buttons, toolbar publish actions, the
+ * name is not practical (canvas chrome buttons, toolbar publish actions, the
  * step-up dialog). User-facing surfaces (login, dialogs, the layers tree) are
  * addressed by role/label.
  */
 
-/** The editor is ready once the canvas surface and its insert notch are shown. */
+/** The editor is ready once the canvas surface and the admin toolbar are shown. */
 export async function expectEditorReady(page: Page): Promise<void> {
   await expect(page.getByTestId('canvas-root')).toBeVisible({ timeout: 20_000 })
-  await expect(page.getByTestId('canvas-notch')).toBeVisible()
+  await expect(page.getByTestId('toolbar')).toBeVisible()
 }
 
 /** Open the Site workspace (visual editor) and wait for it to be ready. */
@@ -25,7 +25,7 @@ export async function openSiteEditor(page: Page): Promise<void> {
     .isVisible({ timeout: 1_000 })
     .catch(() => false)
   if (!alreadyOpen) {
-    await page.goto('/admin/site')
+    await page.goto('/cms/site')
   }
   await expectEditorReady(page)
 }
@@ -45,31 +45,49 @@ export function canvasFrameForBreakpoint(
     .frameLocator('iframe[title^="Canvas frame"]')
 }
 
+/** Module ids behind the shorthand names `insertModule` accepts. */
+const COMMON_MODULE_IDS = {
+  container: 'base.container',
+  text: 'base.text',
+  image: 'base.image',
+} as const
+
 /**
- * Insert one of the favourite modules exposed directly on the canvas notch
- * (container, text, image). Returns once the module is on the canvas and
- * selected (its property controls are visible).
+ * Open the module inserter dialog. The site canvas has no top-center insert
+ * notch, so the durable trigger is the Layers panel's "+" — the same
+ * `ModuleInserterDialog` the selection toolbar's "Insert module" button and the
+ * canvas right-click menu open. Opens the Layers panel first (idempotent), so
+ * callers that had the Site Explorer tab showing end up on Layers.
  */
-export async function insertNotchModule(
-  page: Page,
-  module: 'container' | 'text' | 'image',
-): Promise<void> {
-  await page.getByTestId(`canvas-notch-${module}-btn`).click()
+export async function openModuleInserter(page: Page): Promise<void> {
+  await openLayersPanel(page)
+  await page.getByTestId('dom-tree-insert-module').click()
+  await expect(page.getByRole('dialog', { name: 'Add to canvas' })).toBeVisible()
 }
 
 /**
- * Insert any registered module through the full module picker dialog. Modules
- * that are not notch favourites (button, link, …) go through here. The dialog
- * items carry a stable `data-module-id`, so we pick by module id rather than by
- * the localized item label.
+ * Insert one of the common structural modules (container, text, image).
+ * Returns once the module is on the canvas and selected (its property controls
+ * are visible).
+ */
+export async function insertModule(
+  page: Page,
+  module: keyof typeof COMMON_MODULE_IDS,
+): Promise<void> {
+  await insertModuleViaPicker(page, COMMON_MODULE_IDS[module])
+}
+
+/**
+ * Insert any registered module through the full module picker dialog. The
+ * dialog items carry a stable `data-module-id`, so we pick by module id rather
+ * than by the localized item label.
  */
 export async function insertModuleViaPicker(
   page: Page,
   moduleId: string,
 ): Promise<void> {
-  await page.getByTestId('canvas-notch-add-btn').click()
+  await openModuleInserter(page)
   const dialog = page.getByRole('dialog', { name: 'Add to canvas' })
-  await expect(dialog).toBeVisible()
   await dialog.locator(`[data-module-id="${moduleId}"]`).first().click()
   await expect(dialog).toBeHidden()
 }
@@ -178,7 +196,7 @@ export async function saveDraft(page: Page): Promise<void> {
   }
   await expect(saveAction).toBeVisible()
   const saveResponse = page.waitForResponse((response) =>
-    new URL(response.url()).pathname === '/admin/api/cms/site-document' &&
+    new URL(response.url()).pathname === '/cms/api/cms/site-document' &&
     response.request().method() === 'PUT',
   )
   await saveAction.click()

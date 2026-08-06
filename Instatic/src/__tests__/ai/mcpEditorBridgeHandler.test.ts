@@ -4,7 +4,7 @@ import {
   type CapabilityTestHarness,
 } from '../helpers/capabilityHarness'
 
-const BASE = '/admin/api/ai/editor-bridge'
+const BASE = '/cms/api/ai/editor-bridge'
 
 describe('MCP editor bridge handler', () => {
   let harness: CapabilityTestHarness

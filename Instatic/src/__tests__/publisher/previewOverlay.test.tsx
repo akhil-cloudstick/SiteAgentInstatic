@@ -16,6 +16,8 @@ import React from 'react'
 import { render, screen, cleanup, fireEvent, act } from '@testing-library/react'
 import { readFileSync } from 'fs'
 import { PreviewOverlay } from '@site/preview/PreviewOverlay'
+import { resolvePreviewLink } from '@site/preview/previewLinks'
+import type { Page } from '@core/page-tree'
 import { useEditorStore } from '@site/store/store'
 import { publishPage } from '@core/publisher'
 import { makeModule, makeRegistry, makePage, makeSite } from './helpers'
@@ -81,12 +83,23 @@ function openPreviewWithSite() {
 const originalFetch = globalThis.fetch
 const runtimePreviewCalls: Array<{ input: RequestInfo | URL; init?: RequestInit }> = []
 let runtimePreviewHtml = '<!DOCTYPE html><html><head><title>Test Site</title></head><body><h1>Welcome</h1></body></html>'
+/** Drives the "Open live" affordance — the overlay only offers it once live. */
+let hasPublishedVersion = true
 
 beforeEach(() => {
   resetStore()
   runtimePreviewCalls.length = 0
   runtimePreviewHtml = '<!DOCTYPE html><html><head><title>Test Site</title></head><body><h1>Welcome</h1></body></html>'
+  hasPublishedVersion = true
   globalThis.fetch = async (input, init) => {
+    if (String(input).includes('/publish/status')) {
+      return new Response(JSON.stringify({
+        hasPublishedVersion,
+        draftMatchesPublished: hasPublishedVersion,
+        draftPages: 1,
+        publishedPages: hasPublishedVersion ? 1 : 0,
+      }), { status: 200 })
+    }
     runtimePreviewCalls.push({ input, init })
     return new Response(JSON.stringify({
       html: runtimePreviewHtml,
@@ -100,6 +113,90 @@ beforeEach(() => {
 afterEach(() => {
   cleanup()
   globalThis.fetch = originalFetch
+})
+
+// ---------------------------------------------------------------------------
+// 0 — resolvePreviewLink: clicking the site's own nav browses the DRAFT
+// ---------------------------------------------------------------------------
+
+describe('resolvePreviewLink — preview-internal routing', () => {
+  const pageStub = (id: string, slug: string, template?: Page['template']): Page => ({
+    id,
+    slug,
+    title: id,
+    rootNodeId: 'root',
+    nodes: {},
+    ...(template ? { template } : {}),
+  })
+
+  const pages: Page[] = [
+    pageStub('p_home', 'index'),
+    pageStub('p_about', 'about'),
+    pageStub('t_layout', 'site-layout', {
+      enabled: true,
+      target: { kind: 'everywhere' },
+      priority: 0,
+    }),
+  ]
+
+  it('routes an internal path to the matching draft page', () => {
+    expect(resolvePreviewLink('/about', pages, false)).toEqual({
+      kind: 'page', pageId: 'p_about', hash: '',
+    })
+  })
+
+  it('routes "/" to the home page (slug index)', () => {
+    expect(resolvePreviewLink('/', pages, false)).toEqual({
+      kind: 'page', pageId: 'p_home', hash: '',
+    })
+  })
+
+  it('ignores a trailing slash so /about/ still resolves', () => {
+    expect(resolvePreviewLink('/about/', pages, false)).toMatchObject({ pageId: 'p_about' })
+  })
+
+  it('carries a cross-page hash so /about#team lands on the section', () => {
+    expect(resolvePreviewLink('/about#team', pages, false)).toEqual({
+      kind: 'page', pageId: 'p_about', hash: 'team',
+    })
+  })
+
+  it('treats a bare #hash as an in-page anchor, NOT a link to the home page', () => {
+    // The <base href> would resolve "#team" to "<origin>/#team", whose pathname
+    // is "/" — indistinguishable from the home page unless the raw attribute is
+    // inspected first. Getting this wrong makes every on-page jump navigate.
+    expect(resolvePreviewLink('#team', pages, false)).toEqual({ kind: 'anchor', hash: 'team' })
+  })
+
+  it('never routes to a template — its slug has no public route', () => {
+    expect(resolvePreviewLink('/site-layout', pages, false)).toEqual({ kind: 'dead' })
+  })
+
+  it('marks an internal path with no draft page as dead rather than navigating', () => {
+    expect(resolvePreviewLink('/pricing', pages, false)).toEqual({ kind: 'dead' })
+  })
+
+  it('sends a cross-origin link to a real new tab', () => {
+    expect(resolvePreviewLink('https://example.com/x', pages, false)).toEqual({
+      kind: 'external', url: 'https://example.com/x',
+    })
+  })
+
+  it('hands mailto:/tel: to the OS untouched', () => {
+    expect(resolvePreviewLink('mailto:a@b.com', pages, false)).toEqual({
+      kind: 'external', url: 'mailto:a@b.com',
+    })
+  })
+
+  it('respects target="_blank" on an internal link', () => {
+    expect(resolvePreviewLink('/about', pages, true).kind).toBe('external')
+  })
+
+  it('treats empty and placeholder hrefs as dead', () => {
+    expect(resolvePreviewLink('', pages, false)).toEqual({ kind: 'dead' })
+    expect(resolvePreviewLink('#', pages, false)).toEqual({ kind: 'dead' })
+    expect(resolvePreviewLink(null, pages, false)).toEqual({ kind: 'dead' })
+  })
 })
 
 // ---------------------------------------------------------------------------
@@ -198,7 +295,7 @@ describe('PreviewOverlay — DOM rendering', () => {
     const iframe = await screen.findByTestId('preview-iframe')
     expect(iframe.getAttribute('srcdoc')).toContain('ISS-234 LOOP ROW')
     expect(runtimePreviewCalls).toHaveLength(1)
-    expect(runtimePreviewCalls[0]?.input).toBe('/admin/api/cms/runtime/preview')
+    expect(runtimePreviewCalls[0]?.input).toBe('/cms/api/cms/runtime/preview')
     expect(JSON.parse(String(runtimePreviewCalls[0]?.init?.body))).toMatchObject({
       site: currentSite,
       pageId: 'page-1',
@@ -213,10 +310,20 @@ describe('PreviewOverlay — DOM rendering', () => {
     await screen.findByTestId('preview-iframe')
   })
 
-  it('renders an "Open live" button (escape hatch to the interactive served page)', () => {
+  it('renders an "Open live" button once the site has a published version', async () => {
     openPreviewWithSite()
     render(<PreviewOverlay />)
-    expect(screen.getByLabelText('Open live page in a new tab')).toBeDefined()
+    expect(await screen.findByLabelText('Open live page in a new tab')).toBeDefined()
+  })
+
+  it('hides the "Open live" button until the site has been published', async () => {
+    hasPublishedVersion = false
+    openPreviewWithSite()
+    render(<PreviewOverlay />)
+    // The iframe settling proves the overlay finished its async work, so the
+    // absent button is a decision — not a not-yet-resolved fetch.
+    await screen.findByTestId('preview-iframe')
+    expect(screen.queryByLabelText('Open live page in a new tab')).toBeNull()
   })
 
   it('clicking the close button closes the overlay (sets previewOpen=false)', async () => {
@@ -330,6 +437,23 @@ describe('PreviewOverlay — source enforcement', () => {
     expect(overlaySrc).toContain('loading="eager"')
   })
 
+  it('routes link activation itself — the frame is never allowed to navigate', () => {
+    // The page renders inside its template chrome, so the real site nav is
+    // present and clickable. The frame following a link would land on the
+    // PUBLIC route (a 404 for anything unpublished) and destroy the draft
+    // snapshot, so activation is cancelled in the capture phase and
+    // re-interpreted against the draft. Mirrors IframeFrameSurface.
+    expect(overlaySrc).toContain('NAVIGABLE_SELECTOR')
+    expect(overlaySrc).toContain("addEventListener('click', onActivate, true)")
+    expect(overlaySrc).toContain("addEventListener('auxclick', onActivate, true)")
+    expect(overlaySrc).toContain("addEventListener('submit', blockSubmit, true)")
+    expect(overlaySrc).toContain('event.preventDefault()')
+    // Capture phase cancels the default only. Propagation must NOT be stopped —
+    // that would silently break any other listener on the way down. Asserted on
+    // the call syntax so the rationale can still be spelled out in a comment.
+    expect(overlaySrc).not.toContain('.stopPropagation()')
+  })
+
   it('injects a <base href> so root-relative /uploads/ assets resolve', () => {
     expect(overlaySrc).toContain('<base href=')
     expect(overlaySrc).toContain('window.location.origin')
@@ -341,6 +465,9 @@ describe('PreviewOverlay — source enforcement', () => {
     expect(overlaySrc).toContain('Open live')
     expect(overlaySrc).toContain("window.open(liveTarget, '_blank', 'noopener,noreferrer')")
     expect(overlaySrc).toContain('activeLivePath')
+    // …but only once there IS a live page: before the first publish the public
+    // URL 404s, so the action must stay hidden.
+    expect(overlaySrc).toContain('hasPublishedVersion')
   })
 })
 

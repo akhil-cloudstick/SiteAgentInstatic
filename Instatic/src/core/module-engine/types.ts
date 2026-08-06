@@ -244,6 +244,24 @@ type SyntheticFocusEvent = SyntheticMouseEvent
 // Source of truth: Contribution #309
 // ---------------------------------------------------------------------------
 
+/**
+ * One node in a module's declarative starter subtree (`defaultChildren`).
+ *
+ * `props` is shallow-merged OVER the child module's own registry defaults, so
+ * a declaration only names what it changes. `children` nests to any depth;
+ * materialisation caps recursion defensively.
+ */
+export interface ModuleDefaultChild {
+  /** Registered module id to mint, e.g. `'base.text'`. Unknown ids are skipped. */
+  moduleId: string
+  /** Props merged over the child module's `defaults`. */
+  props?: Record<string, unknown>
+  /** Optional user-facing layer label. Falls back to the module name. */
+  label?: string
+  /** Nested starter children. */
+  children?: readonly ModuleDefaultChild[]
+}
+
 export interface ModuleDefinition<
   TProps extends Record<string, unknown> = Record<string, unknown>,
 > {
@@ -292,6 +310,21 @@ export interface ModuleDefinition<
    * All children go into a single default slot.
    */
   canHaveChildren: boolean
+
+  /**
+   * Starter subtree minted when the author inserts this module from a picker.
+   * Without it a container arrives as an empty shell — inserting a Form or a
+   * List gave you one childless row and no hint of what goes inside.
+   *
+   * Applies ONLY to fresh author inserts (the editor store's `insertNode`
+   * action). It is deliberately NOT consulted by the HTML importer, by
+   * drag-and-drop, or by wrap/duplicate/paste: those either carry their own
+   * children or move existing nodes, and seeding there would corrupt content.
+   * Existing documents are never rewritten.
+   *
+   * Ignored when `canHaveChildren` is false.
+   */
+  defaultChildren?: readonly ModuleDefaultChild[]
 
   /**
    * Opt-in canvas inline text editing (double-click a node on the canvas).

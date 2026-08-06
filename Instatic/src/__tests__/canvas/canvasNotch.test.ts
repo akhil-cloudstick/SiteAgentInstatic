@@ -1,19 +1,24 @@
 import { describe, it, expect } from 'bun:test'
-import { readFileSync } from 'fs'
+import { existsSync, readFileSync } from 'fs'
 
 const CANVAS_ROOT = new URL('../../admin/pages/site/canvas/CanvasRoot.tsx', import.meta.url)
 const CANVAS_NOTCH = new URL('../../admin/pages/site/canvas/CanvasNotch.tsx', import.meta.url)
 const CANVAS_NOTCH_CSS = new URL('../../admin/pages/site/canvas/CanvasNotch.module.css', import.meta.url)
-const CANVAS_MODE_TOGGLE_CSS = new URL(
-  '../../admin/pages/site/canvas/CanvasModeToggle.module.css',
+const MODE_DOCK = new URL('../../admin/pages/site/canvas/CanvasDocumentModeDock.tsx', import.meta.url)
+const MODE_DOCK_CSS = new URL(
+  '../../admin/pages/site/canvas/CanvasDocumentModeDock.module.css',
   import.meta.url,
 )
 const SELECTION_OVERLAY_CSS = new URL(
   '../../admin/pages/site/canvas/BreakpointSelectionOverlay.module.css',
   import.meta.url,
 )
+const CONTENT_CANVAS = new URL(
+  '../../admin/pages/content/components/ContentDocumentCanvas/ContentDocumentCanvas.tsx',
+  import.meta.url,
+)
 const TOOLBAR = new URL('../../admin/pages/site/toolbar/Toolbar.tsx', import.meta.url)
-const MODULE_PICKER = new URL('../../admin/pages/site/toolbar/ModulePickerDropdown.tsx', import.meta.url)
+const DOM_PANEL = new URL('../../admin/pages/site/panels/DomPanel/DomPanel.tsx', import.meta.url)
 
 function cssRule(css: string, selector: string): string {
   return css.match(new RegExp(`${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\{[\\s\\S]*?\\}`))?.[0] ?? ''
@@ -25,31 +30,87 @@ function zIndexForRule(rule: string): number {
   return Number(value)
 }
 
-describe('CanvasNotch', () => {
-  it('is rendered by CanvasRoot as fixed canvas chrome', () => {
+describe('site canvas — no insert notch', () => {
+  it('CanvasRoot mounts no notch at all', () => {
     const src = readFileSync(CANVAS_ROOT, 'utf-8')
 
-    expect(src).toContain('CanvasNotch')
-    expect(src).toContain('<CanvasNotch')
-    expect(src).toContain('floatingControl=')
+    // The top-center insert chrome is gone from the site canvas. Nothing may
+    // re-introduce it here — insertion lives on the selection toolbar, the
+    // Layers panel, and the canvas right-click menu.
+    expect(src).not.toContain('CanvasNotch')
+    expect(src).not.toContain('canvas-notch')
   })
 
-  it('resolves quick insert actions from module inserter favorites', () => {
+  it('keeps the document mode control (VC / Template) in its own dock', () => {
+    const src = readFileSync(CANVAS_ROOT, 'utf-8')
+
+    // The VC / Template pills used to ride under the notch as `floatingControl`.
+    // They are not insert chrome, so they survive in a dedicated dock that only
+    // renders when the active document actually has a mode to switch.
+    expect(src).toContain('<CanvasDocumentModeDock')
+    expect(src).toContain('VisualComponentModeControl')
+    expect(src).toContain('TemplateModeControl')
+    expect(src).not.toContain('floatingControl=')
+
+    const dock = readFileSync(MODE_DOCK, 'utf-8')
+    expect(dock).toContain('peek')
+    expect(dock).toContain('data-testid="canvas-document-mode-dock"')
+  })
+
+  it('leaves module insertion reachable from the Layers panel', () => {
+    const src = readFileSync(DOM_PANEL, 'utf-8')
+
+    // The durable inserter entry point the browser suite drives now that the
+    // notch's "+ Add" trigger is gone.
+    expect(src).toContain('data-testid="dom-tree-insert-module"')
+    expect(src).toContain('ModuleInserterDialog')
+  })
+
+  it('deletes the notch-only module picker trigger', () => {
+    // ModulePickerDropdown existed solely to sit in the notch and open
+    // ModuleInserterDialog — CanvasInsertModuleButton already does exactly
+    // that from the selection toolbar, so the duplicate is gone.
+    expect(
+      existsSync(
+        new URL('../../admin/pages/site/toolbar/ModulePickerDropdown.tsx', import.meta.url),
+      ),
+    ).toBe(false)
+
+    const toolbar = readFileSync(TOOLBAR, 'utf-8')
+    expect(toolbar).not.toContain('ModulePickerDropdown')
+    expect(toolbar).not.toContain('toolbar-add-module-btn')
+  })
+
+  it('carries no Undo/Redo buttons — history is keyboard-only', () => {
+    const notch = readFileSync(CANVAS_NOTCH, 'utf-8')
+    const toolbar = readFileSync(TOOLBAR, 'utf-8')
+
+    // Ctrl/Cmd+Z and Ctrl/Cmd+Shift+Z are the affordance now, owned by
+    // useUndoRedoShortcuts.
+    expect(notch).not.toContain('UndoRedoButtons')
+    expect(notch).not.toContain('showHistoryControls')
+
+    // The shared admin toolbar must NOT render undo/redo either — those
+    // controls make no sense on Content / Plugins admin pages where there is
+    // no editor page tree to mutate.
+    expect(toolbar).not.toContain('UndoRedoButtons')
+  })
+})
+
+describe('CanvasNotch — Content document canvas only', () => {
+  it('is mounted by the content canvas and driven entirely by caller actions', () => {
+    const content = readFileSync(CONTENT_CANVAS, 'utf-8')
+    expect(content).toContain('<CanvasNotch actions={notchActions} />')
+
     const src = readFileSync(CANVAS_NOTCH, 'utf-8')
-
-    // Icons come from each module's own declaration via the shared ModuleIcon
-    // resolver — the notch must not duplicate the icon mapping locally.
-    expect(src).toContain('ModuleIcon')
-    expect(src).not.toContain('pixel-art-icons/icons/checkbox-sharp')
-    expect(src).not.toContain('pixel-art-icons/icons/text-start-t')
-    expect(src).not.toContain('pixel-art-icons/icons/image-solid')
-
-    expect(src).not.toContain('QUICK_ACTION_MODULE_IDS')
-    expect(src).toContain('useModuleInserterPreference')
-    expect(src).toContain('DEFAULT_MODULE_INSERTER_FAVORITES')
-    expect(src).toContain('resolveInserterRefs')
-
-    expect(src).toContain('canvas-notch-add-btn')
+    // No site-editor machinery left: no favourites, no module registry lookup,
+    // no "+ Add" trigger, no peek/floating-control plumbing.
+    expect(src).not.toContain('useModuleInserterPreference')
+    expect(src).not.toContain('DEFAULT_MODULE_INSERTER_FAVORITES')
+    expect(src).not.toContain('ModuleIcon')
+    expect(src).not.toContain('canvas-notch-add-btn')
+    expect(src).not.toContain('peek')
+    expect(src).not.toContain('floatingControl')
   })
 
   it('does not draw real side borders through the inverted-corner seam', () => {
@@ -61,57 +122,31 @@ describe('CanvasNotch', () => {
     expect(css).toContain('left: calc(2px - var(--notch-corner))')
     expect(css).toContain('right: calc(2px - var(--notch-corner))')
   })
+})
 
-  it('stacks above selection overlay chrome', () => {
-    const notchCss = readFileSync(CANVAS_NOTCH_CSS, 'utf-8')
-    const modeToggleCss = readFileSync(CANVAS_MODE_TOGGLE_CSS, 'utf-8')
+describe('canvas chrome stacking', () => {
+  it('stacks the mode dock above selection overlay chrome', () => {
+    const dockCss = readFileSync(MODE_DOCK_CSS, 'utf-8')
     const overlayCss = readFileSync(SELECTION_OVERLAY_CSS, 'utf-8')
 
-    const notchZIndex = zIndexForRule(cssRule(notchCss, '.shell'))
-    const modeToggleZIndex = zIndexForRule(cssRule(modeToggleCss, '.shell'))
+    const dockZIndex = zIndexForRule(cssRule(dockCss, '.shell'))
     const selectionToolbarZIndex = zIndexForRule(cssRule(overlayCss, '.selectionToolbar'))
     const treeLadderZIndex = zIndexForRule(cssRule(overlayCss, '.treeLadder'))
 
-    expect(notchZIndex).toBeGreaterThan(selectionToolbarZIndex)
-    expect(notchZIndex).toBeGreaterThan(treeLadderZIndex)
-    expect(modeToggleZIndex).toBe(notchZIndex)
-    expect(modeToggleZIndex).toBeGreaterThan(selectionToolbarZIndex)
-    expect(modeToggleZIndex).toBeGreaterThan(treeLadderZIndex)
+    expect(dockZIndex).toBeGreaterThan(selectionToolbarZIndex)
+    expect(dockZIndex).toBeGreaterThan(treeLadderZIndex)
   })
 
-  it('moves the Add picker out of the top toolbar', () => {
-    const src = readFileSync(TOOLBAR, 'utf-8')
+  it('leaves the canvas top-left corner empty', () => {
+    // The "Run scripts" / "Refresh scripts" pill was removed from that corner.
+    expect(
+      existsSync(
+        new URL('../../admin/pages/site/canvas/CanvasModeToggle.tsx', import.meta.url),
+      ),
+    ).toBe(false)
 
-    expect(src).not.toContain('ModulePickerDropdown')
-    expect(src).not.toContain('toolbar-add-module-btn')
-  })
-
-  it('hosts the Undo/Redo controls so they only appear on the visual editor canvas', () => {
-    const src = readFileSync(CANVAS_NOTCH, 'utf-8')
-    const toolbar = readFileSync(TOOLBAR, 'utf-8')
-
-    // Undo/Redo lives next to the quick-insert icons, separated by a divider.
-    expect(src).toContain('UndoRedoButtons')
-    expect(src).toContain('styles.divider')
-    expect(src).toContain('showHistoryControls')
-
-    // The shared admin toolbar must NOT render undo/redo — those controls
-    // make no sense on Content / Plugins admin pages where there is no
-    // editor page tree to mutate.
-    expect(toolbar).not.toContain('UndoRedoButtons')
-  })
-
-  it('moves the Add picker trigger to an icon-only chip (no "Add" label text)', () => {
-    const picker = readFileSync(MODULE_PICKER, 'utf-8')
-
-    // The trigger is icon-only — only the AppGridPlusGlyphIcon is rendered
-    // (the same icon used by the "Insert module here" right-click submenu, so
-    // the two affordances read as the same action).
-    expect(picker).toContain('iconOnly')
-    expect(picker).toContain('<AppGridPlusGlyphIcon size={13} />')
-    // The literal "Add" text inside the trigger button is gone. The aria-label
-    // and tooltip describe the dialog action for screen readers.
-    expect(picker).toContain('aria-label="Add to canvas"')
-    expect(picker).not.toMatch(/<AppGridPlusGlyphIcon[^>]*\/>\s*Add\s*<\/Button>/)
+    const root = readFileSync(CANVAS_ROOT, 'utf-8')
+    expect(root).not.toContain('<CanvasModeToggle')
+    expect(root).not.toContain('canvas-run-scripts-toggle')
   })
 })

@@ -88,3 +88,31 @@
 .checkbox .check {
     pointer-events: none;
 }
+
+/* ── Site screen ─────────────────────────────────────────────────────────
+ * `.field input[type="checkbox"]` in the approved Site screen is a 44x44
+ * target tinted with the MMS green (`accent-color: var(--mms-action)`), not
+ * the admin's 12/16px achromatic box. The wrapper grows to the touch target
+ * and the box is filled with the action colour when checked.
+ */
+:global([data-editor-screen='site']) .checkbox[data-size="md"],
+:global([data-editor-screen='site']) .checkbox[data-size="sm"] {
+    width: 44px;
+    height: 44px;
+    padding: 12px;
+}
+
+:global([data-editor-screen='site']) .checkbox .box {
+    border-color: var(--mms-border-strong);
+    border-radius: 4px;
+}
+
+:global([data-editor-screen='site']) .checkbox:hover .box {
+    border-color: var(--mms-action);
+}
+
+:global([data-editor-screen='site']) .checkbox .input:checked + .box {
+    border-color: var(--mms-action);
+    background: var(--mms-action);
+    color: var(--mms-surface-raised);
+}

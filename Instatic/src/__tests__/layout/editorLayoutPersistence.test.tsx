@@ -24,8 +24,8 @@ const LAYOUT_STORAGE_KEY = 'instatic-editor-layout-v2'
 const originalFetch = globalThis.fetch
 
 /**
- * AdminCanvasLayout's mount fires `/admin/api/cms/plugins` and
- * `/admin/api/cms/site` through usePluginEventBridge / usePersistence. Most
+ * AdminCanvasLayout's mount fires `/cms/api/cms/plugins` and
+ * `/cms/api/cms/site` through usePluginEventBridge / usePersistence. Most
  * tests in this file don't care about the result — they only care about
  * layout/panel behaviour — so provide a default fetch that answers those
  * endpoints with safe empty values. Tests that need bespoke responses still
@@ -34,28 +34,28 @@ const originalFetch = globalThis.fetch
 function installAmbientFetch() {
   globalThis.fetch = (async (input: RequestInfo | URL) => {
     const url = String(input)
-    if (url.endsWith('/admin/api/cms/plugins')) {
+    if (url.endsWith('/cms/api/cms/plugins')) {
       return new Response(JSON.stringify({ plugins: [], adminPages: [] }), {
         status: 200,
         headers: { 'content-type': 'application/json' },
       })
     }
-    if (url.endsWith('/admin/api/cms/site')) {
+    if (url.endsWith('/cms/api/cms/site')) {
       return new Response(JSON.stringify({ error: 'no draft site' }), { status: 404 })
     }
-    if (url.endsWith('/admin/api/cms/pages')) {
+    if (url.endsWith('/cms/api/cms/pages')) {
       return new Response(JSON.stringify({ rows: [] }), {
         status: 200,
         headers: { 'content-type': 'application/json' },
       })
     }
-    if (url.endsWith('/admin/api/cms/layouts')) {
+    if (url.endsWith('/cms/api/cms/layouts')) {
       return new Response(JSON.stringify({ rows: [] }), {
         status: 200,
         headers: { 'content-type': 'application/json' },
       })
     }
-    if (url.endsWith('/admin/api/cms/publish/status')) {
+    if (url.endsWith('/cms/api/cms/publish/status')) {
       return new Response(JSON.stringify({
         hasPublishedVersion: false,
         draftMatchesPublished: false,
@@ -66,13 +66,13 @@ function installAmbientFetch() {
         headers: { 'content-type': 'application/json' },
       })
     }
-    if (url.endsWith('/admin/api/cms/me/preferences/module-inserter')) {
+    if (url.endsWith('/cms/api/cms/me/preferences/module-inserter')) {
       return new Response(JSON.stringify({ value: null }), {
         status: 200,
         headers: { 'content-type': 'application/json' },
       })
     }
-    if (url.endsWith('/admin/api/ai/defaults')) {
+    if (url.endsWith('/cms/api/ai/defaults')) {
       return new Response(JSON.stringify({ defaults: {} }), {
         status: 200,
         headers: { 'content-type': 'application/json' },
@@ -234,7 +234,7 @@ describe('AdminCanvasLayout — CMS site hydration gate', () => {
     globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input)
       const { pages, ...shell } = loaded
-      if (url.includes('/admin/api/cms/pages')) {
+      if (url.includes('/cms/api/cms/pages')) {
         const rows = pages.map((page) => ({
           id: page.id,
           tableId: 'pages',
@@ -257,13 +257,13 @@ describe('AdminCanvasLayout — CMS site hydration gate', () => {
         }))
         return new Response(JSON.stringify({ rows }), { status: 200 })
       }
-      if (url.includes('/admin/api/cms/components')) {
+      if (url.includes('/cms/api/cms/components')) {
         return new Response(JSON.stringify({ rows: [] }), { status: 200 })
       }
-      if (url.includes('/admin/api/cms/layouts')) {
+      if (url.includes('/cms/api/cms/layouts')) {
         return new Response(JSON.stringify({ rows: [] }), { status: 200 })
       }
-      if (url.includes('/admin/api/cms/site')) {
+      if (url.includes('/cms/api/cms/site')) {
         return new Response(JSON.stringify({ site: shell }), { status: 200 })
       }
       return originalFetch(input, init)
@@ -303,7 +303,7 @@ describe('AdminCanvasLayout — CMS site hydration gate', () => {
     let siteFetchCalls = 0
     const originalFetch = globalThis.fetch
     globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
-      if (String(input).includes('/admin/api/cms/site')) {
+      if (String(input).includes('/cms/api/cms/site')) {
         siteFetchCalls += 1
         return new Response(JSON.stringify({ error: 'draft site not found' }), { status: 404 })
       }

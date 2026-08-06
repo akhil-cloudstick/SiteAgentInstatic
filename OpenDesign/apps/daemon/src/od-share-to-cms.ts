@@ -46,12 +46,12 @@ export async function collectSiteFiles(projectRoot: string): Promise<Record<stri
   const out: Record<string, SiteFileEntry> = {};
 
   async function walk(dir: string, rel: string): Promise<void> {
-    let entries: Awaited<ReturnType<typeof fsp.readdir>>;
-    try {
-      entries = await fsp.readdir(dir, { withFileTypes: true });
-    } catch {
-      return;
-    }
+    // Let TS infer the Dirent element type from the call. Annotating this with
+    // `Awaited<ReturnType<typeof fsp.readdir>>` resolves to the Buffer overload
+    // (`Dirent<NonSharedBuffer>[]`) under the @types/node that upstream v0.16.1
+    // pulls in, which breaks every `entry.name` string use below.
+    const entries = await fsp.readdir(dir, { withFileTypes: true }).catch(() => null);
+    if (!entries) return;
     for (const entry of entries) {
       if (entry.name.startsWith('.')) continue; // skip .file-versions, .od-skills, etc.
       const abs = nodePath.join(dir, entry.name);

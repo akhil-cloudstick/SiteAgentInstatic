@@ -5,15 +5,22 @@ import '@excalidraw/excalidraw/index.css';
 import '../src/index.css';
 import '../src/styles/home/index.css';
 
+// Next prefixes its OWN assets (`/_next/*`) and `<Link>` hrefs with basePath, but
+// NOT plain-string metadata icon URLs — those ship verbatim. Behind the gateway
+// that means the browser asks for `<origin>/favicon.ico`, which the gateway hands
+// to the CMS catch-all instead of us, so the tab shows no icon. Prefix them here.
+const BASE_PATH = (process.env.OD_WEB_BASE_PATH ?? '').replace(/\/$/, '');
+const asset = (p: string) => `${BASE_PATH}${p}`;
+
 export const metadata: Metadata = {
   title: 'MMS Design — Map My Shops',
   icons: {
     icon: [
-      { url: '/favicon.ico' },
-      { url: '/favicon-32x32.png', sizes: '32x32', type: 'image/png' },
-      { url: '/favicon-16x16.png', sizes: '16x16', type: 'image/png' },
+      { url: asset('/favicon.ico') },
+      { url: asset('/favicon-32x32.png'), sizes: '32x32', type: 'image/png' },
+      { url: asset('/favicon-16x16.png'), sizes: '16x16', type: 'image/png' },
     ],
-    apple: '/apple-touch-icon.png',
+    apple: asset('/apple-touch-icon.png'),
   },
 };
 

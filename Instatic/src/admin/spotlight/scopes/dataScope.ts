@@ -20,7 +20,7 @@ function getDataScopeCommands(): Command[] {
       workspaces: ['data'],
       run: (ctx) => {
         ctx.closeSpotlight()
-        ctx.navigate('/admin/data?action=newTable')
+        ctx.navigate('/cms/data?action=newTable')
       },
     },
     {
@@ -33,7 +33,7 @@ function getDataScopeCommands(): Command[] {
       workspaces: ['data'],
       run: (ctx) => {
         ctx.closeSpotlight()
-        ctx.navigate('/admin/data?action=newField')
+        ctx.navigate('/cms/data?action=newField')
       },
     },
   ]

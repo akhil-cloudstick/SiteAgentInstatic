@@ -72,8 +72,7 @@
 import { use, useEffect, useEffectEvent, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useEditorStore, selectActiveCanvasPage } from '@site/store/store'
-import { registry } from '@core/module-engine'
-import { getNodeDisplayName, styleRuleSelector } from '@core/page-tree'
+import { styleRuleSelector } from '@core/page-tree'
 import { useEditorPermissions } from '@site/editorPermissionsContext'
 import { useShallow } from 'zustand/react/shallow'
 import { Button } from '@ui/components/Button'
@@ -149,16 +148,11 @@ export function BreakpointSelectionOverlay({
   // are equal (matters because selectedNodeIds is a new array every set call).
   const selectedNodeIds = useEditorStore(useShallow((s) => s.selectedNodeIds))
   const selectedNodeId = useEditorStore((s) => s.selectedNodeId)
-  // "Editing <Name> component" — the approved screen's ring tab. Reads the
-  // same display name the Layers tree and the inspector header show, so the
-  // three never disagree about what a node is called.
-  const editingLabel = useEditorStore((s) => {
-    if (!s.selectedNodeId) return null
-    const node = selectActiveCanvasPage(s)?.nodes[s.selectedNodeId]
-    if (!node) return null
-    const name = getNodeDisplayName(node, registry.get(node.moduleId), s.site?.visualComponents)
-    return `Editing ${name} component`
-  })
+  // The approved screen's "Editing <Name> component" ring tab is deliberately
+  // NOT rendered: it sat inside the selection's top-left corner and covered
+  // the first line of the selected element — the same complaint that moved the
+  // selection toolbar outside the ring. The node's name is already shown in
+  // the Layers tree and the inspector header.
   /**
    * "Open component" is only meaningful for a Visual Component instance —
    * that is the only selection that HAS a component to open. The button stays
@@ -532,12 +526,10 @@ export function BreakpointSelectionOverlay({
           className={cn(styles.ring, styles.selection)}
           data-canvas-selection-ring="true"
           data-node-id={id}
-          // The approved screen tags the selected element with
-          // "Editing <Name> component". Only the anchor carries it, so a
-          // multi-selection doesn't stack labels; the CSS renders it as a
-          // ::before so the RAF measure loop stays untouched.
+          // Marks which ring in a multi-selection is the anchor. Kept as a
+          // hook for styling/queries even though the "Editing <Name>" tab it
+          // used to drive has been removed.
           data-selection-anchor={id === selectedNodeId ? 'true' : undefined}
-          data-editing-label={id === selectedNodeId && editingLabel ? editingLabel : undefined}
         />
       ))}
       {showHover && hoverRingNodeId && (

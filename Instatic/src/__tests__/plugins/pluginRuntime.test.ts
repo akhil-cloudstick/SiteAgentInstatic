@@ -99,7 +99,7 @@ describe('editor plugin runtime SDK', () => {
     await Promise.resolve()
 
     expect(calls[0]).toMatchObject({
-      input: '/admin/api/cms/plugins/acme.workflow/resources/approvals/records',
+      input: '/cms/api/cms/plugins/acme.workflow/resources/approvals/records',
       init: {
         method: 'POST',
         credentials: 'include',

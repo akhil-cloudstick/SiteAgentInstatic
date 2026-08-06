@@ -7,7 +7,7 @@
  *
  * Endpoints exercised:
  *   - `/health`         — liveness ping, no DB, no auth
- *   - `/admin`          — HTML shell (static, no DB but more parsing)
+ *   - `/cms`          — HTML shell (static, no DB but more parsing)
  *   - `/assets/*.js`    — biggest first-paint JS chunk
  *   - `/assets/*.css`   — eager CSS
  *
@@ -118,8 +118,8 @@ export const httpBench: BenchModule = {
     try {
       const baseEndpoints: Endpoint[] = [
         { label: '/health', path: '/health' },
-        { label: '/admin', path: '/admin' },
-        { label: '/admin/site', path: '/admin/site' },
+        { label: '/cms', path: '/cms' },
+        { label: '/cms/site', path: '/cms/site' },
       ]
       const eager = readEagerEndpoints()
       const endpoints = [...baseEndpoints, ...eager]
@@ -149,7 +149,7 @@ export const httpBench: BenchModule = {
       const concurrencyLevels = ctx.quick ? [4, 32] : [1, 4, 16, 64]
       const concEndpoints: Endpoint[] = [
         { label: '/health', path: '/health' },
-        { label: '/admin', path: '/admin' },
+        { label: '/cms', path: '/cms' },
         ...(eager[0] ? [eager[0]] : []),
       ]
       const total = ctx.quick ? 1000 : 3000
@@ -188,11 +188,11 @@ export const httpBench: BenchModule = {
 
       const healthRow = seqRows.find((r) => r.label === '/health')
       // Pick the highest concurrency we actually tested for /admin
-      const adminConcRows = concRows.filter((r) => r.label.startsWith('/admin  c='))
+      const adminConcRows = concRows.filter((r) => r.label.startsWith('/cms  c='))
       const adminConc = adminConcRows[adminConcRows.length - 1] ?? null
       const adminConcLabel = adminConc
-        ? `/admin rps (${adminConc.label.split('  ')[1]})`
-        : '/admin rps'
+        ? `/cms rps (${adminConc.label.split('  ')[1]})`
+        : '/cms rps'
 
       return {
         name: this.name,

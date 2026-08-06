@@ -33,7 +33,7 @@ export function getBuiltInPluginCommands(): Command[] {
       capability: 'plugins.install',
       run: (ctx) => {
         queuePendingAction('plugins.install')
-        ctx.navigate('/admin/plugins')
+        ctx.navigate('/cms/plugins')
       },
     },
   ]

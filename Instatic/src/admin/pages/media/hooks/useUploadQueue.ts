@@ -130,7 +130,7 @@ export function useUploadQueue({
     const xhr = new XMLHttpRequest()
     transfersRef.current.set(item.id, { xhr })
 
-    xhr.open('POST', '/admin/api/cms/media', true)
+    xhr.open('POST', '/cms/api/cms/media', true)
     xhr.withCredentials = true
     xhr.responseType = 'json'
 

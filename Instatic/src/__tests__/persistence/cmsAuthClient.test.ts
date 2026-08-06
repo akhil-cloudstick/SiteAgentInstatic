@@ -18,7 +18,7 @@ describe('CMS auth client', () => {
 
     expect(status).toEqual({ hasSite: false, hasAdmin: false, needsSetup: true })
     expect(calls[0]).toMatchObject({
-      input: '/admin/api/cms/setup/status',
+      input: '/cms/api/cms/setup/status',
       init: { method: 'GET', credentials: 'include' },
     })
   })
@@ -35,7 +35,7 @@ describe('CMS auth client', () => {
       return new Response(JSON.stringify({ ok: true }), { status: 201 })
     })
 
-    expect(calls[0].input).toBe('/admin/api/cms/setup')
+    expect(calls[0].input).toBe('/cms/api/cms/setup')
     expect(calls[0].init).toMatchObject({
       method: 'POST',
       credentials: 'include',
@@ -65,11 +65,11 @@ describe('CMS auth client', () => {
     })
 
     expect(calls[0]).toMatchObject({
-      input: '/admin/api/cms/login',
+      input: '/cms/api/cms/login',
       init: { method: 'POST', credentials: 'include' },
     })
     expect(calls[1]).toMatchObject({
-      input: '/admin/api/cms/logout',
+      input: '/cms/api/cms/logout',
       init: { method: 'POST', credentials: 'include' },
     })
   })
@@ -90,7 +90,7 @@ describe('CMS auth client', () => {
       return new Response(JSON.stringify({ user: { id: 'user_1' } }), { status: 200 })
     })
     expect(calls[0]).toMatchObject({
-      input: '/admin/api/cms/me',
+      input: '/cms/api/cms/me',
       init: { method: 'GET', credentials: 'include' },
     })
   })

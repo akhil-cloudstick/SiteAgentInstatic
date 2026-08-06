@@ -6,9 +6,10 @@ import {
   completeStepUp,
   createPage,
   insertModuleViaPicker,
-  insertNotchModule,
+  insertModule,
   login,
   openLayersPanel,
+  openModuleInserter,
   openSitePanel,
   openSiteEditor,
   publishDraft,
@@ -31,9 +32,9 @@ test.describe('visual builder', () => {
   }) => {
     await openBlankPage(page, 'Builder insert')
 
-    await insertNotchModule(page, 'container')
-    await insertNotchModule(page, 'text')
-    await insertNotchModule(page, 'image')
+    await insertModule(page, 'container')
+    await insertModule(page, 'text')
+    await insertModule(page, 'image')
 
     await openLayersPanel(page)
     const tree = page.getByRole('tree', { name: 'Page element tree' })
@@ -47,7 +48,7 @@ test.describe('visual builder', () => {
   }) => {
     await openBlankPage(page, 'Module picker')
 
-    await page.getByTestId('canvas-notch-add-btn').click()
+    await openModuleInserter(page)
     let dialog = page.getByRole('dialog', { name: 'Add to canvas' })
     await expect(dialog).toBeVisible()
     await expect(dialog.getByRole('button', { name: 'Grid view' })).toHaveAttribute(
@@ -68,7 +69,7 @@ test.describe('visual builder', () => {
       }),
     ).toBeVisible()
 
-    await page.getByTestId('canvas-notch-add-btn').click()
+    await openModuleInserter(page)
     dialog = page.getByRole('dialog', { name: 'Add to canvas' })
     await expect(dialog).toBeVisible()
     await dialog.getByRole('button', { name: 'Recent' }).click()
@@ -86,7 +87,7 @@ test.describe('visual builder', () => {
     await page.keyboard.press('Escape')
     await expect(dialog).toBeHidden()
 
-    await page.getByTestId('canvas-notch-add-btn').click()
+    await openModuleInserter(page)
     dialog = page.getByRole('dialog', { name: 'Add to canvas' })
     await expect(dialog).toBeVisible()
     await expect(dialog.getByRole('button', { name: 'List view' })).toHaveAttribute(
@@ -103,7 +104,7 @@ test.describe('visual builder', () => {
     const nestedText = `Dropped into container ${Date.now().toString(36)}`
 
     await openBlankPage(page, 'Module picker drag')
-    await insertNotchModule(page, 'container')
+    await insertModule(page, 'container')
     await openLayersPanel(page)
 
     const containerRow = page
@@ -119,7 +120,7 @@ test.describe('visual builder', () => {
     const containerBox = await containerCanvas.boundingBox()
     expect(containerBox, 'Canvas Container needs a measurable drop target').not.toBeNull()
 
-    await page.getByTestId('canvas-notch-add-btn').click()
+    await openModuleInserter(page)
     const dialog = page.getByRole('dialog', { name: 'Add to canvas' })
     await expect(dialog).toBeVisible()
     await dialog.getByRole('searchbox', { name: 'Search modules' }).fill('text')
@@ -151,12 +152,12 @@ test.describe('visual builder', () => {
 
     await openBlankPage(page, 'Builder select')
 
-    await insertNotchModule(page, 'text')
+    await insertModule(page, 'text')
     await setPropValue(page, 'text', headline)
     await expect(canvasFrame(page).getByText(headline)).toBeVisible()
 
     // Insert a second module so selection moves away from the text node.
-    await insertNotchModule(page, 'image')
+    await insertModule(page, 'image')
     await expect(page.getByTestId('property-control-src')).toBeVisible()
 
     // Re-select the text node from the layers tree, then edit it again.
@@ -167,7 +168,7 @@ test.describe('visual builder', () => {
     await expect(canvasFrame(page).getByText(headline)).toHaveCount(0)
   })
 
-  test('undoes and redoes edits with buttons and shortcuts (BUILDER-005 / SITE-009)', async ({
+  test('undoes and redoes edits with keyboard shortcuts (BUILDER-005 / SITE-009)', async ({
     page,
   }) => {
     const { name } = await openBlankPage(page, 'Builder history')
@@ -183,36 +184,26 @@ test.describe('visual builder', () => {
     const tree = page.getByRole('tree', { name: 'Page element tree' })
     const textNode = tree.getByRole('treeitem', { name: 'Text' })
     const containerNode = tree.getByRole('treeitem', { name: 'Container' })
-    const undoButton = page.getByTestId('canvas-notch-undo-btn')
-    const redoButton = page.getByTestId('canvas-notch-redo-btn')
     const shortcutModifier = process.platform === 'darwin' ? 'Meta' : 'Control'
 
-    await expect(undoButton).toHaveAttribute('aria-disabled', 'true')
-    await expect(redoButton).toHaveAttribute('aria-disabled', 'true')
-    await insertNotchModule(page, 'text')
+    // History has no buttons — Ctrl/Cmd+Z and Ctrl/Cmd+Shift+Z are the whole
+    // affordance, so this exercise is keyboard-driven end to end.
+    await insertModule(page, 'text')
     await expect(textNode).toBeVisible()
-    await expect(undoButton).not.toHaveAttribute('aria-disabled', 'true')
-    await expect(redoButton).toHaveAttribute('aria-disabled', 'true')
 
     await page.getByTestId('canvas-root').focus()
     await page.keyboard.press(`${shortcutModifier}+Z`)
     await expect(textNode).toHaveCount(0)
-    await expect(undoButton).toHaveAttribute('aria-disabled', 'true')
-    await expect(redoButton).not.toHaveAttribute('aria-disabled', 'true')
 
     await page.keyboard.press(`${shortcutModifier}+Shift+Z`)
     await expect(textNode).toBeVisible()
-    await expect(undoButton).not.toHaveAttribute('aria-disabled', 'true')
-    await expect(redoButton).toHaveAttribute('aria-disabled', 'true')
 
-    await undoButton.click()
+    await page.keyboard.press(`${shortcutModifier}+Z`)
     await expect(textNode).toHaveCount(0)
-    await expect(redoButton).not.toHaveAttribute('aria-disabled', 'true')
 
-    await insertNotchModule(page, 'container')
+    await insertModule(page, 'container')
     await expect(containerNode).toBeVisible()
     await expect(textNode).toHaveCount(0)
-    await expect(redoButton).toHaveAttribute('aria-disabled', 'true')
 
     await saveDraft(page)
     await page.reload()
@@ -222,8 +213,13 @@ test.describe('visual builder', () => {
     await openLayersPanel(page)
     await expect(containerNode).toBeVisible()
     await expect(textNode).toHaveCount(0)
-    await expect(undoButton).toHaveAttribute('aria-disabled', 'true')
-    await expect(redoButton).toHaveAttribute('aria-disabled', 'true')
+
+    // History does not survive a reload — Ctrl/Cmd+Z on a freshly loaded page
+    // is a no-op rather than replaying the pre-save tree.
+    await page.getByTestId('canvas-root').focus()
+    await page.keyboard.press(`${shortcutModifier}+Z`)
+    await expect(containerNode).toBeVisible()
+    await expect(textNode).toHaveCount(0)
   })
 
   test('runs direct panel and canvas clipboard shortcuts (BUILDER-005)', async ({
@@ -242,7 +238,7 @@ test.describe('visual builder', () => {
     await expect(assistantPanel).toBeHidden()
 
     const canvasShortcutText = `Canvas shortcut text ${Date.now().toString(36)}`
-    await insertNotchModule(page, 'text')
+    await insertModule(page, 'text')
     await setPropValue(page, 'text', canvasShortcutText)
     await openLayersPanel(page)
 
@@ -293,7 +289,7 @@ test.describe('visual builder', () => {
     const slotText = `Slot fill ${suffix}`
 
     await openBlankPage(page, 'Builder slot guard')
-    await insertNotchModule(page, 'text')
+    await insertModule(page, 'text')
     await setPropValue(page, 'text', 'Reusable component copy')
 
     await page.getByRole('button', { name: 'Componentize' }).click()
@@ -342,11 +338,11 @@ test.describe('visual builder', () => {
     const gamma = `Layer Gamma ${suffix}`
 
     const { name } = await openBlankPage(page, 'Builder layer reorder')
-    await insertNotchModule(page, 'text')
+    await insertModule(page, 'text')
     await setPropValue(page, 'text', alpha)
-    await insertNotchModule(page, 'text')
+    await insertModule(page, 'text')
     await setPropValue(page, 'text', beta)
-    await insertNotchModule(page, 'text')
+    await insertModule(page, 'text')
     await setPropValue(page, 'text', gamma)
 
     await openLayersPanel(page)
@@ -377,11 +373,11 @@ test.describe('visual builder', () => {
     const gamma = `Canvas Gamma ${suffix}`
 
     await openBlankPage(page, 'Builder canvas drag')
-    await insertNotchModule(page, 'text')
+    await insertModule(page, 'text')
     await setPropValue(page, 'text', alpha)
-    await insertNotchModule(page, 'text')
+    await insertModule(page, 'text')
     await setPropValue(page, 'text', beta)
-    await insertNotchModule(page, 'text')
+    await insertModule(page, 'text')
     await setPropValue(page, 'text', gamma)
 
     await expectCanvasTextOrder(page, [alpha, beta, gamma])
@@ -450,7 +446,7 @@ test.describe('visual builder', () => {
       const slotText = `Published slot fill ${suffix}`
       const { slug } = await openBlankPage(page, 'Builder visual component')
 
-      await insertNotchModule(page, 'text')
+      await insertModule(page, 'text')
       await setPropValue(page, 'text', componentText)
       await expect(canvasFrame(page).getByText(componentText, { exact: true })).toBeVisible()
 
@@ -541,7 +537,7 @@ test.describe('visual builder', () => {
         await page.getByRole('option', { name: postTitle, exact: true }).click()
         await expect(previewSource).toHaveValue(postTitle)
 
-        await insertNotchModule(page, 'text')
+        await insertModule(page, 'text')
         await setPropValue(page, 'text', 'Template headline:')
         await page.getByRole('button', { name: 'Insert binding for Text' }).click()
 
@@ -585,7 +581,7 @@ test.describe('visual builder', () => {
       const target = await openBlankPage(page, 'Builder layout source')
 
       await test.step('capture a styled container subtree as a saved layout', async () => {
-        await insertNotchModule(page, 'container')
+        await insertModule(page, 'container')
         await page.getByTestId('class-picker-input').fill(className)
         await page.getByTestId('class-picker-submit').click()
         await expect(page.getByTestId(`class-chip-${className}`)).toBeVisible()
@@ -606,7 +602,7 @@ test.describe('visual builder', () => {
           .getByRole('tree', { name: 'Page element tree' })
           .getByRole('treeitem', { name: 'Container' })
         await containerRow.click()
-        await insertNotchModule(page, 'text')
+        await insertModule(page, 'text')
         await setPropValue(page, 'text', layoutText)
         await expect(canvasFrame(page).getByText(layoutText, { exact: true })).toBeVisible()
 
@@ -724,7 +720,7 @@ test.describe('visual builder', () => {
       const headline = `Class styled headline ${suffix}`
       const { name, slug } = await openBlankPage(page, 'Builder class style')
 
-      await insertNotchModule(page, 'text')
+      await insertModule(page, 'text')
       await setPropValue(page, 'text', headline)
       const frame = canvasFrame(page)
       const canvasHeadline = frame.getByText(headline, { exact: true })
@@ -782,7 +778,7 @@ test.describe('visual builder', () => {
       const ambientSelector = 'p:not(.nope)'
       const { name, slug } = await openBlankPage(page, 'Builder ambient style')
 
-      await insertNotchModule(page, 'text')
+      await insertModule(page, 'text')
       await setPropValue(page, 'text', headline)
       const frame = canvasFrame(page)
       const canvasHeadline = frame.getByText(headline, { exact: true })
@@ -844,7 +840,7 @@ test.describe('visual builder', () => {
       const trackValue = `headline-${suffix}`
       const { name, slug } = await openBlankPage(page, 'Builder attributes')
 
-      await insertNotchModule(page, 'text')
+      await insertModule(page, 'text')
       await setPropValue(page, 'text', headline)
       const frame = canvasFrame(page)
       const canvasHeadline = frame.getByText(headline, { exact: true })
@@ -1016,7 +1012,7 @@ test.describe('visual builder', () => {
       const classBCopy = `${classB}-copy`
       const { name, slug } = await openBlankPage(page, 'Builder bulk selectors')
 
-      await insertNotchModule(page, 'text')
+      await insertModule(page, 'text')
       await setPropValue(page, 'text', sourceText)
       for (const className of [classA, classB]) {
         await page.getByTestId('class-picker-input').fill(className)
@@ -1236,7 +1232,7 @@ test.describe('visual builder', () => {
       await openBlankPage(page, 'Module picker mobile')
       await page.setViewportSize({ width: 390, height: 844 })
 
-      await page.getByTestId('canvas-notch-add-btn').click()
+      await openModuleInserter(page)
       const dialog = page.getByRole('dialog', { name: 'Add to canvas' })
       await expect(dialog).toBeVisible()
       await expectMobileDialogContained(page, dialog)
@@ -1271,9 +1267,9 @@ test.describe('visual builder', () => {
       await login(page)
       await openBlankPage(page, 'Builder tablet insert')
 
-      await insertNotchModule(page, 'text')
+      await insertModule(page, 'text')
       await setPropValue(page, 'text', 'Tablet-width insert')
-      await insertNotchModule(page, 'text')
+      await insertModule(page, 'text')
       await setPropValue(page, 'text', 'Second tablet-width insert')
 
       await openLayersPanel(page)
@@ -1307,7 +1303,7 @@ async function createPostDraft(
   slug: string,
   body: string,
 ): Promise<void> {
-  await page.goto('/admin/content')
+  await page.goto('/cms/content')
 
   const previousRow = new URL(page.url()).searchParams.get('row')
   const newPost = page.getByRole('button', { name: 'New post', exact: true })
@@ -1470,7 +1466,7 @@ async function expectMobileLocatorContained(
 }
 
 async function openSavedLayoutSection(page: Page): Promise<void> {
-  await page.getByTestId('canvas-notch-add-btn').click()
+  await openModuleInserter(page)
   const dialog = page.getByRole('dialog', { name: 'Add to canvas' })
   await expect(dialog).toBeVisible()
   await dialog.getByRole('button', { name: /^Layouts/ }).click()

@@ -8,7 +8,7 @@ import {
 
 export async function publishCmsDraft(
   fetchImpl: FetchLike = globalThis.fetch.bind(globalThis),
-  basePath = '/admin/api/cms',
+  basePath = '/cms/api/cms',
 ): Promise<CmsPublishResult> {
   return apiRequest(`${basePath}/publish`, {
     method: 'POST',
@@ -20,7 +20,7 @@ export async function publishCmsDraft(
 
 export async function getCmsPublishStatus(
   fetchImpl: FetchLike = globalThis.fetch.bind(globalThis),
-  basePath = '/admin/api/cms',
+  basePath = '/cms/api/cms',
 ): Promise<CmsPublishStatus> {
   return apiRequest(`${basePath}/publish/status`, {
     schema: CmsPublishStatusSchema,

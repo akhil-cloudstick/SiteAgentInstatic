@@ -531,6 +531,21 @@ export interface TokenConflict {
  * During commit, each candidate is promoted to a VisualComponent and every
  * affected page's section node is replaced with a `base.visual-component-ref`.
  */
+/**
+ * A block the author marked with `data-shared="name"` that occurs at least twice
+ * with identical structure. Unlike a `GlobalSectionCandidate` (nav/header/footer,
+ * which move into the everywhere layout), each occurrence is replaced in place by
+ * a `base.visual-component-ref`, so it keeps its position on the page.
+ */
+export interface SharedBlockCandidate {
+  /** The authored `data-shared` value; becomes the component's name. */
+  name: string
+  /** Every place the block appears, across all imported pages. */
+  occurrences: { pageSource: string; nodeId: string }[]
+  /** The subtree promoted to the Visual Component. */
+  representativeFragment: ImportFragment
+}
+
 export interface GlobalSectionCandidate {
   /** HTML tag that identified the section: 'nav', 'header', or 'footer'. */
   tag: string
@@ -645,6 +660,9 @@ export interface ImportPlan {
    * Omitted (or empty) when no cross-page sections were found.
    */
   globalSections?: GlobalSectionCandidate[]
+  /** Blocks marked `data-shared="…"` that repeat identically — one VC each,
+   *  referenced in place on every page (see `detectSharedBlocks`). */
+  sharedBlocks?: SharedBlockCandidate[]
 }
 
 /**

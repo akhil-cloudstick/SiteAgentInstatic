@@ -145,6 +145,88 @@ describe('LayerNodeContextMenu — Insert module here', () => {
     expect(inserted?.moduleId).toBe('base.text')
   })
 
+  /**
+   * The real user gesture is mousedown-then-click, and it used to lose the
+   * insert entirely: `ContextMenu` dismisses from a capture-phase `mousedown`
+   * listener on `document` that only forgave clicks inside its own element,
+   * while `ContextMenuSubmenu` portals its panel to `document.body` as a
+   * SIBLING. Every press inside the submenu therefore read as an outside
+   * click and tore the menu down before `mouseup`, so `onClick` never fired.
+   *
+   * Every pre-existing test here fired a bare `click`, which is exactly why
+   * the bug shipped — `fireEvent.click` does not dispatch `mousedown`.
+   */
+  it('inserts on a real mousedown-then-click gesture (not just a synthetic click)', () => {
+    renderMenu('container-node')
+    openInsertSubmenu()
+
+    const submenu = screen.getByRole('menu', { name: 'Insert module here' })
+    const textOption = within(submenu).getAllByRole('menuitem').find(
+      (el) => el.getAttribute('data-module-id') === 'base.text',
+    )
+    expect(textOption).toBeDefined()
+
+    fireEvent.mouseDown(textOption!)
+    fireEvent.click(textOption!)
+
+    const page = useEditorStore.getState().site?.pages.find((p) => p.id === 'page-home')
+    const container = page?.nodes['container-node']
+    expect(container?.children.length).toBe(1)
+    expect(page?.nodes[container!.children[0]]?.moduleId).toBe('base.text')
+  })
+
+  it('mousedown inside the submenu does not dismiss the parent menu', () => {
+    renderMenu('container-node')
+    openInsertSubmenu()
+
+    const submenu = screen.getByRole('menu', { name: 'Insert module here' })
+    fireEvent.mouseDown(within(submenu).getByRole('searchbox', { name: 'Search modules' }))
+
+    // The parent menu must still be mounted and not mid-exit — clicking the
+    // search box is a normal part of finding a module.
+    const parent = screen.getByRole('menu', { name: 'Node options' })
+    expect(parent.hasAttribute('data-closing')).toBe(false)
+  })
+
+  it('inserts a List with its three starter Text items, in one undo entry', () => {
+    renderMenu('container-node')
+    openInsertSubmenu()
+
+    const submenu = screen.getByRole('menu', { name: 'Insert module here' })
+    const listOption = within(submenu).getAllByRole('menuitem').find(
+      (el) => el.getAttribute('data-module-id') === 'base.list',
+    )
+    expect(listOption).toBeDefined()
+    fireEvent.mouseDown(listOption!)
+    fireEvent.click(listOption!)
+
+    const page = useEditorStore.getState().site?.pages.find((p) => p.id === 'page-home')
+    const container = page?.nodes['container-node']
+    const listId = container?.children[0]
+    const list = listId ? page?.nodes[listId] : null
+    expect(list?.moduleId).toBe('base.list')
+    expect(list?.children.length).toBe(3)
+    for (const childId of list!.children) {
+      const child = page?.nodes[childId]
+      expect(child?.moduleId).toBe('base.text')
+      expect(child?.props.tag).toBe('li')
+      expect(child?.parentId).toBe(listId)
+    }
+
+    // One Cmd+Z must remove the List AND its children. Splitting the writes
+    // across two recipes would revert only the parent and leave the three
+    // Text nodes orphaned in the persisted node map forever.
+    act(() => {
+      useEditorStore.getState().undo()
+    })
+    const afterUndo = useEditorStore.getState().site?.pages.find((p) => p.id === 'page-home')
+    expect(afterUndo?.nodes['container-node']?.children.length).toBe(0)
+    expect(Object.keys(afterUndo!.nodes)).not.toContain(listId!)
+    for (const childId of list!.children) {
+      expect(Object.keys(afterUndo!.nodes)).not.toContain(childId)
+    }
+  })
+
   it('inserts a Visual Component into the right-clicked node when picked', () => {
     const vc = makeVC('vc-abc', 'MyCard')
     renderMenu('container-node', [vc])

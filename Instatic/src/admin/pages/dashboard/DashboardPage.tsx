@@ -1,5 +1,5 @@
 /**
- * DashboardPage — `/admin/dashboard`.
+ * DashboardPage — `/cms/dashboard`.
  *
  * The admin home. Renders:
  *   • A page header with a personal greeting + Publish / Customize / New
@@ -592,7 +592,7 @@ export function DashboardPage() {
           <Button
             variant="ghost"
             className={styles.newPageButton}
-            onClick={() => navigate('/admin/site')}
+            onClick={() => navigate('/cms/site')}
           >
             <FaIcon name="plus" size={14} /> New page
           </Button>

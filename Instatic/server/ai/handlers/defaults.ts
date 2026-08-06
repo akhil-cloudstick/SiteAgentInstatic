@@ -38,7 +38,7 @@ export function tryHandleAiDefaults(
   db: DbClient,
   pathname: string,
 ): Promise<Response> | null {
-  if (pathname === '/admin/api/ai/defaults') {
+  if (pathname === '/cms/api/ai/defaults') {
     return handleList(req, db)
   }
   const match = pathname.match(/^\/admin\/api\/ai\/defaults\/([^/]+)$/)

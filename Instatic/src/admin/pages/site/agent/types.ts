@@ -20,7 +20,7 @@ import type { AiContentBlock, AiToolOutput } from '@core/ai'
 
 /**
  * Conversation scope shared by every agent surface. Used in URL paths
- * (`/admin/api/ai/chat/${scope}`, `?scope=${scope}`), the conversation-create
+ * (`/cms/api/ai/chat/${scope}`, `?scope=${scope}`), the conversation-create
  * body, and the per-scope default lookup. Keep it aligned with
  * `server/ai/runtime/types.ts → ToolScope`.
  */
@@ -55,7 +55,7 @@ interface TextEvent {
 /**
  * Bridge handshake: the server has accepted the request and assigned a bridge
  * id. The browser uses this id when POSTing tool-result responses to
- * `/admin/api/ai/tool-result` so the server can correlate the response with the
+ * `/cms/api/ai/tool-result` so the server can correlate the response with the
  * pending tool waiter inside the driver.
  */
 interface BridgeReadyEvent {
@@ -66,7 +66,7 @@ interface BridgeReadyEvent {
 /**
  * The server-side driver needs the browser to apply a write tool against
  * the editor store. The browser executes it, then POSTs the result to
- * `/admin/api/ai/tool-result` with `{ bridgeId, requestId, result }`.
+ * `/cms/api/ai/tool-result` with `{ bridgeId, requestId, result }`.
  */
 interface ToolRequestEvent {
   type: 'toolRequest'

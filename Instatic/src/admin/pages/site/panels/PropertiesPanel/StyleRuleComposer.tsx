@@ -21,6 +21,14 @@ interface StyleRuleComposerProps {
   /** Search query — filters visible properties across all categories. */
   styleQuery: string
   mode?: 'contextual' | 'global'
+  /** Restrict to these section ids — the Site screen's per-tab slices. */
+  sectionIds?: ReadonlyArray<string>
+  /** Hide the catch-all custom-properties section. */
+  hideCustomProperties?: boolean
+  /** Individual properties owned by a guided control elsewhere on screen. */
+  excludeProperties?: ReadonlyArray<keyof CSSPropertyBag>
+  /** Force every section closed on mount (the Site inspector does). */
+  collapsedByDefault?: boolean
 }
 
 // ---------------------------------------------------------------------------
@@ -32,6 +40,10 @@ export function StyleRuleComposer({
   cls,
   styleQuery,
   mode: _mode = 'contextual',
+  sectionIds,
+  hideCustomProperties,
+  excludeProperties,
+  collapsedByDefault,
 }: StyleRuleComposerProps) {
   const activeBreakpointId = useEditorStore((s) => s.activeBreakpointId)
   // The editing context is owned by the canvas toolbar's context switcher:
@@ -147,6 +159,10 @@ export function StyleRuleComposer({
       onClearProperties={handleClearProperties}
       onPreview={handlePreview}
       onClearPreview={handleClearPreview}
+      sectionIds={sectionIds}
+      hideCustomProperties={hideCustomProperties}
+      excludeProperties={excludeProperties}
+      collapsedByDefault={collapsedByDefault}
     />
   )
 }

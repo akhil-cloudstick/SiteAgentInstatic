@@ -32,7 +32,7 @@ async function request(
 }
 
 async function setupOwner(db: DbClient): Promise<string> {
-  const res = await request(db, '/admin/api/cms/setup', {
+  const res = await request(db, '/cms/api/cms/setup', {
     method: 'POST',
     body: JSON.stringify({
       siteName: 'Authorization Matrix',
@@ -59,7 +59,7 @@ async function sessionCookieForUser(db: DbClient, email: string): Promise<string
 }
 
 async function stepUp(db: DbClient, cookie: string): Promise<string> {
-  const res = await request(db, '/admin/api/cms/auth/step-up', {
+  const res = await request(db, '/cms/api/cms/auth/step-up', {
     method: 'POST',
     cookie,
     body: JSON.stringify({ password }),
@@ -75,7 +75,7 @@ async function createRole(
   ownerCookie: string,
   input: { name: string; slug: string; capabilities: CoreCapability[] },
 ): Promise<string> {
-  const res = await request(db, '/admin/api/cms/roles', {
+  const res = await request(db, '/cms/api/cms/roles', {
     method: 'POST',
     cookie: ownerCookie,
     body: JSON.stringify(input),
@@ -90,7 +90,7 @@ async function createUser(
   ownerCookie: string,
   input: { email: string; displayName: string; roleId: string },
 ): Promise<void> {
-  const res = await request(db, '/admin/api/cms/users', {
+  const res = await request(db, '/cms/api/cms/users', {
     method: 'POST',
     cookie: ownerCookie,
     body: JSON.stringify({ ...input, password }),
@@ -99,10 +99,10 @@ async function createUser(
 }
 
 async function currentSiteDocument(db: DbClient, cookie: string): Promise<SiteDocument> {
-  const shellRes = await request(db, '/admin/api/cms/site', { method: 'GET', cookie })
+  const shellRes = await request(db, '/cms/api/cms/site', { method: 'GET', cookie })
   expect(shellRes.status).toBe(200)
   const shellPayload = await readBody<{ site: SiteShell }>(shellRes)
-  const pagesRes = await request(db, '/admin/api/cms/pages', { method: 'GET', cookie })
+  const pagesRes = await request(db, '/cms/api/cms/pages', { method: 'GET', cookie })
   expect(pagesRes.status).toBe(200)
   const pagesPayload = await readBody<{ rows: DataRow[] }>(pagesRes)
   const pages = (pagesPayload.rows ?? []).map(pageFromRow)
@@ -141,13 +141,13 @@ describe('CMS route authorization', () => {
       })
       const userManagerCookie = await sessionCookieForUser(db, 'user-manager@example.com')
 
-      const listRoles = await request(db, '/admin/api/cms/roles', {
+      const listRoles = await request(db, '/cms/api/cms/roles', {
         method: 'GET',
         cookie: userManagerCookie,
       })
       expect(listRoles.status).toBe(200)
 
-      const createRoleAttempt = await request(db, '/admin/api/cms/roles', {
+      const createRoleAttempt = await request(db, '/cms/api/cms/roles', {
         method: 'POST',
         cookie: userManagerCookie,
         body: JSON.stringify({
@@ -192,7 +192,7 @@ describe('CMS route authorization', () => {
 
       const site = await currentSiteDocument(db, ownerCookie)
       // site.read alone is not enough — write is forbidden.
-      const readOnlyWrite = await request(db, '/admin/api/cms/site-document', {
+      const readOnlyWrite = await request(db, '/cms/api/cms/site-document', {
         method: 'PUT',
         cookie: readerCookie,
         body: shellPutBody(site),
@@ -202,7 +202,7 @@ describe('CMS route authorization', () => {
       // A no-op save (the document is byte-identical) is allowed for any
       // caller that holds at least one site-write capability — the diff
       // walk finds no changes at all.
-      const stylistNoop = await request(db, '/admin/api/cms/site-document', {
+      const stylistNoop = await request(db, '/cms/api/cms/site-document', {
         method: 'PUT',
         cookie: stylistCookie,
         body: shellPutBody(site),
@@ -233,7 +233,7 @@ describe('CMS route authorization', () => {
       // content-only client is allowed.
       const contentEdit = structuredClone(site)
       contentEdit.settings.metaTitle = 'Edited by the copy editor'
-      const allowed = await request(db, '/admin/api/cms/site-document', {
+      const allowed = await request(db, '/cms/api/cms/site-document', {
         method: 'PUT',
         cookie: clientCookie,
         body: shellPutBody(contentEdit),
@@ -255,7 +255,7 @@ describe('CMS route authorization', () => {
         createdAt: Date.now(),
         updatedAt: Date.now(),
       }
-      const denied = await request(db, '/admin/api/cms/site-document', {
+      const denied = await request(db, '/cms/api/cms/site-document', {
         method: 'PUT',
         cookie: clientCookie,
         body: shellPutBody(styleEdit),
@@ -283,7 +283,7 @@ describe('CMS route authorization', () => {
       const pageEditorCookie = await sessionCookieForUser(db, 'page-preview@example.com')
 
       const site = await currentSiteDocument(db, ownerCookie)
-      const preview = await request(db, '/admin/api/cms/runtime/preview', {
+      const preview = await request(db, '/cms/api/cms/runtime/preview', {
         method: 'POST',
         cookie: pageEditorCookie,
         body: JSON.stringify({ site, pageId: site.pages[0].id }),

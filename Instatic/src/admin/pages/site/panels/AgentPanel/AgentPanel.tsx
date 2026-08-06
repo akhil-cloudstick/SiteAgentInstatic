@@ -7,7 +7,7 @@
  * Zustand conversation state across open/close cycles.
  *
  * Runtime model:
- * - Agent calls stream through `/admin/api/ai/chat/site`.
+ * - Agent calls stream through `/cms/api/ai/chat/site`.
  * - The Bun server selects the configured provider credential and model.
  * - Drivers call provider REST/SSE endpoints directly; no provider SDK runs.
  *
@@ -60,7 +60,7 @@ import styles from './AgentPanel.module.css'
 
 const PANEL_WIDTH = 320
 const PANEL_HEIGHT = 480
-const AI_SETTINGS_ROUTE = '/admin/ai'
+const AI_SETTINGS_ROUTE = '/cms/ai'
 type PanelVariant = 'floating' | 'docked'
 
 interface AgentPanelProps {
@@ -76,7 +76,7 @@ interface AgentPanelProps {
  *
  * Always-mounted by EditorLayout — visibility is controlled via CSS display:none
  * (`.floatPanelClosed`) to preserve Zustand conversation state across open/close cycles.
- * Agent routes via Vite proxy `/admin/api/agent` → local Bun server → Claude SDK.
+ * Agent routes via Vite proxy `/cms/api/agent` → local Bun server → Claude SDK.
  */
 export function AgentPanel({ variant = 'floating' }: AgentPanelProps) {
   const agentStore = useAgentStoreApi()

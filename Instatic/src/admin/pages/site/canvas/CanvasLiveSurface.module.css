@@ -16,6 +16,10 @@
     justify-content: center;
     overflow: hidden;
     background: var(--bg-surface-2);
+    /* Same inset the Responsive Review board gives its frames, so Live edit /
+       Focus section read as the same card-on-a-surface layout instead of a
+       frame welded to the chrome. */
+    padding: var(--canvas-frame-inset);
 }
 
 .frame {
@@ -29,13 +33,40 @@
 
 /* The iframe's visible viewport. The frame surrounds it with handles on both
    sides; the viewport fills whatever's left. The live iframe scrolls
-   internally, so this box is a fixed-height window onto the page. */
+   internally, so this box is a fixed-height window onto the page.
+ *
+ * Drawn as the same bordered, rounded, lifted card the Responsive Review
+ * frames use (`BreakpointFrame.module.css` → `.viewport`): one frame or three,
+ * a viewport is a viewport, and the two modes looked like different products
+ * when only Review had the chrome. Same tokens on purpose — if the frame card
+ * changes there, change it here too. */
 .iframeViewport {
     position: relative;
     flex: 1 1 auto;
     min-width: 0;
-    background: var(--bg-surface);
     overflow: hidden;
+    border: 1px solid var(--mms-border-strong);
+    border-radius: var(--site-control-radius);
+    background: var(--mms-surface-raised);
+    box-shadow: var(--mms-shadow-frame);
+    /* `border-radius` + `overflow: hidden` is NOT enough to round the iframe
+       here. The live iframe owns its own scroller, so the browser promotes it
+       to its own compositing layer, and a composited descendant escapes an
+       ancestor's rounded overflow clip — the page's white background kept
+       painting a square top-left corner through the card. (Responsive Review
+       dodges this by accident: `.scaler`'s `zoom` forces containment, so the
+       clip lands there.) `clip-path` is applied at paint time to the whole
+       subtree, composited layers included, so it holds. `inset(0 …)` clips at
+       the border box, which keeps the 1px border fully visible.
+
+       `contain: paint` is the belt to that braces: it makes this box a paint
+       containment root, so the clip is resolved as containment rather than as
+       an overflow clip a promoted layer can be hoisted out of. Responsive
+       Review gets the same guarantee for free — `.scaler`'s `zoom` forces
+       containment there, which is the only reason its corners were already
+       right. Same tool `BreakpointFrame`'s `.frameWrapper` uses. */
+    clip-path: inset(0 round var(--site-control-radius));
+    contain: paint;
 }
 
 /* Side resize handle — slim vertical strip flush with the frame edge. */
@@ -75,27 +106,6 @@
 }
 
 /* Width readout — small unobtrusive badge at the bottom-centre of the frame. */
-/* Transcribed from the approved Site screen's `.zoom-badge`. */
-.zoomBadge {
-    position: absolute;
-    right: 14px;
-    bottom: 12px;
-    z-index: 10;
-    display: inline-flex;
-    min-height: 32px;
-    align-items: center;
-    padding: 0 10px;
-    border: 1px solid var(--mms-border-strong);
-    border-radius: 6px;
-    background: var(--mms-surface-raised);
-    color: var(--mms-text-muted);
-    font-family: var(--font-mms);
-    font-size: 11px;
-    gap: 7px;
-    pointer-events: none;
-    user-select: none;
-}
-
 .widthBadge {
     position: absolute;
     bottom: 8px;

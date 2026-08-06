@@ -495,7 +495,10 @@ describe('CMS handlers', () => {
     expect(res.status).toBe(200)
     const cookie = res.headers.get('set-cookie') ?? ''
     expect(cookie).toContain(`${SESSION_COOKIE_NAME}=`)
-    expect(cookie).toContain('Path=/admin')
+    // Must match the admin mount point. A drift here means the browser withholds
+    // the session cookie on every /cms request and the SPA shows its own login
+    // even after a successful SSO hand-off.
+    expect(cookie).toContain('Path=/cms')
     expect(cookie).toContain('HttpOnly')
     expect(cookie).toContain('SameSite=Lax')
     // Plain HTTP request → cookie must NOT carry the Secure flag, otherwise

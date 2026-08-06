@@ -4,7 +4,7 @@ import {
   PUBLIC_BASE_URL,
   canvasFrame,
   createPage,
-  insertNotchModule,
+  insertModule,
   login,
   openSiteEditor,
   publishDraft,
@@ -39,7 +39,7 @@ test.describe('public dynamic fragments', () => {
     await createPage(page, pageName, slug)
     await page.getByRole('treeitem', { name: `Open page ${pageName}` }).click()
 
-    await insertNotchModule(page, 'text')
+    await insertModule(page, 'text')
     await setPropValue(page, 'text', authoredText)
     await expect(canvasFrame(page).getByText(/Dynamic result:/)).toBeVisible()
 

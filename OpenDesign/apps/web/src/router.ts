@@ -6,14 +6,19 @@
 import { useSyncExternalStore } from 'react';
 import { LIBRARY_UI_VISIBLE } from './features/libraryUi';
 
-// Behind the SiteAgent public gateway the app is served under /od/<slug>
+// Behind the SiteAgent public gateway the app is served under a FIXED `/design`
 // (Next.js basePath). `window.location` carries that prefix but our routes are
 // authored base-less (`/projects`, `/design-systems`), so strip it when READING
 // the location and add it back when WRITING history. Served at the root (local
 // dev, no gateway) BASE_PATH is '' and both helpers are no-ops.
+//
+// The prefix is tenant-AGNOSTIC on purpose: it used to be `/od/<slug>`, which
+// forced one Next build per tenant because basePath is a build-time constant.
+// The tenant is now resolved by the gateway from the hub session cookie, so a
+// single shared build serves every tenant. Do not put the slug back in here.
 const BASE_PATH: string = (() => {
   if (typeof window === 'undefined') return '';
-  const m = window.location.pathname.match(/^\/od\/[a-z0-9-]+/);
+  const m = window.location.pathname.match(/^\/design(?=\/|$)/);
   return m ? m[0] : '';
 })();
 

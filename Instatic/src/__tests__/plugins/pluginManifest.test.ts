@@ -35,8 +35,8 @@ describe('plugin manifest validation', () => {
     })
 
     expect(manifest.id).toBe('local.map')
-    expect(manifest.adminPages[0].route).toBe('/admin/plugins/local.map/overview')
-    expect(pluginAdminPageRoute('local.map', 'overview')).toBe('/admin/plugins/local.map/overview')
+    expect(manifest.adminPages[0].route).toBe('/cms/plugins/local.map/overview')
+    expect(pluginAdminPageRoute('local.map', 'overview')).toBe('/cms/plugins/local.map/overview')
   })
 
   it('accepts backend resources and resource-backed admin pages', () => {

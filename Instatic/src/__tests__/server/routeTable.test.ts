@@ -27,7 +27,7 @@ describe('runRouteTable', () => {
     const routes: Route<[]>[] = [
       {
         method: 'GET',
-        pattern: '/admin/api/cms/things',
+        pattern: '/cms/api/cms/things',
         handler: async (_req, _db, params) => {
           seen = params
           return ok({ hit: 'list' })
@@ -35,7 +35,7 @@ describe('runRouteTable', () => {
       },
     ]
 
-    const res = await runRouteTable(req('GET', '/admin/api/cms/things'), FAKE_DB, routes)
+    const res = await runRouteTable(req('GET', '/cms/api/cms/things'), FAKE_DB, routes)
     expect(res).not.toBeNull()
     expect(res!.status).toBe(200)
     expect(await res!.json()).toEqual({ hit: 'list' })
@@ -59,7 +59,7 @@ describe('runRouteTable', () => {
     // %20 → space, %2F is NOT present (a slash would break the [^/]+ segment),
     // so an encoded slug round-trips to its decoded form exactly once.
     const res = await runRouteTable(
-      req('PATCH', '/admin/api/cms/things/my%20slug'),
+      req('PATCH', '/cms/api/cms/things/my%20slug'),
       FAKE_DB,
       routes,
     )
@@ -70,11 +70,11 @@ describe('runRouteTable', () => {
 
   it('returns 405 when a path matches but no route has that method', async () => {
     const routes: Route<[]>[] = [
-      { method: 'GET', pattern: '/admin/api/cms/things', handler: async () => ok({}) },
-      { method: 'POST', pattern: '/admin/api/cms/things', handler: async () => ok({}) },
+      { method: 'GET', pattern: '/cms/api/cms/things', handler: async () => ok({}) },
+      { method: 'POST', pattern: '/cms/api/cms/things', handler: async () => ok({}) },
     ]
 
-    const res = await runRouteTable(req('DELETE', '/admin/api/cms/things'), FAKE_DB, routes)
+    const res = await runRouteTable(req('DELETE', '/cms/api/cms/things'), FAKE_DB, routes)
     expect(res).not.toBeNull()
     expect(res!.status).toBe(405)
     expect(await res!.json()).toEqual({ error: 'Method not allowed' })
@@ -89,16 +89,16 @@ describe('runRouteTable', () => {
       },
     ]
 
-    const res = await runRouteTable(req('GET', '/admin/api/cms/things/abc'), FAKE_DB, routes)
+    const res = await runRouteTable(req('GET', '/cms/api/cms/things/abc'), FAKE_DB, routes)
     expect(res!.status).toBe(405)
   })
 
   it('returns null when no route pattern matches (caller falls through to 404)', async () => {
     const routes: Route<[]>[] = [
-      { method: 'GET', pattern: '/admin/api/cms/things', handler: async () => ok({}) },
+      { method: 'GET', pattern: '/cms/api/cms/things', handler: async () => ok({}) },
     ]
 
-    const res = await runRouteTable(req('GET', '/admin/api/cms/other'), FAKE_DB, routes)
+    const res = await runRouteTable(req('GET', '/cms/api/cms/other'), FAKE_DB, routes)
     expect(res).toBeNull()
   })
 
@@ -107,7 +107,7 @@ describe('runRouteTable', () => {
     const routes: Route<[{ marker: string }]>[] = [
       {
         method: 'GET',
-        pattern: '/admin/api/cms/ctx',
+        pattern: '/cms/api/cms/ctx',
         handler: async (_req, _db, _params, extra) => {
           seenExtra = extra.marker
           return ok({})
@@ -115,7 +115,7 @@ describe('runRouteTable', () => {
       },
     ]
 
-    await runRouteTable(req('GET', '/admin/api/cms/ctx'), FAKE_DB, routes, { marker: 'xyz' })
+    await runRouteTable(req('GET', '/cms/api/cms/ctx'), FAKE_DB, routes, { marker: 'xyz' })
     expect(seenExtra).toBe('xyz')
   })
 
@@ -124,7 +124,7 @@ describe('runRouteTable', () => {
     // (GET/PATCH). The `(?<id>[^/]+)` segment cannot span `/` and every pattern
     // is `$`-anchored, so the sub-route and the item route are disjoint.
     const calls: string[] = []
-    const ITEM = '/admin/api/cms/data/rows/(?<id>[^/]+)'
+    const ITEM = '/cms/api/cms/data/rows/(?<id>[^/]+)'
     const routes: Route<[]>[] = [
       {
         method: 'POST',
@@ -143,14 +143,14 @@ describe('runRouteTable', () => {
       },
     ]
 
-    await runRouteTable(req('POST', '/admin/api/cms/data/rows/abc/publish'), FAKE_DB, routes)
-    await runRouteTable(req('GET', '/admin/api/cms/data/rows/abc'), FAKE_DB, routes)
+    await runRouteTable(req('POST', '/cms/api/cms/data/rows/abc/publish'), FAKE_DB, routes)
+    await runRouteTable(req('GET', '/cms/api/cms/data/rows/abc'), FAKE_DB, routes)
     expect(calls).toEqual(['publish:abc', 'get:abc'])
 
     // GET on the publish sub-route: the POST entry path-matches but method
     // doesn't, and the item route's `$` excludes the longer path → 405.
     const wrong = await runRouteTable(
-      req('GET', '/admin/api/cms/data/rows/abc/publish'),
+      req('GET', '/cms/api/cms/data/rows/abc/publish'),
       FAKE_DB,
       routes,
     )
@@ -165,7 +165,7 @@ describe('runRouteTable', () => {
     const routes: Route<[]>[] = [
       {
         method: 'GET',
-        pattern: '/admin/api/cms/plugins/events',
+        pattern: '/cms/api/cms/plugins/events',
         handler: async () => { calls.push('events'); return ok({}) },
       },
       {
@@ -176,16 +176,16 @@ describe('runRouteTable', () => {
     ]
 
     // GET the reserved literal → its own handler.
-    await runRouteTable(req('GET', '/admin/api/cms/plugins/events'), FAKE_DB, routes)
+    await runRouteTable(req('GET', '/cms/api/cms/plugins/events'), FAKE_DB, routes)
     // PATCH a real plugin id → the item route.
-    await runRouteTable(req('PATCH', '/admin/api/cms/plugins/acme.workflow'), FAKE_DB, routes)
+    await runRouteTable(req('PATCH', '/cms/api/cms/plugins/acme.workflow'), FAKE_DB, routes)
     expect(calls).toEqual(['events', 'item:acme.workflow'])
 
     // PATCH the reserved literal: the exact GET route path-matches but method
     // doesn't, and the lookahead keeps the item route from claiming it → 405,
     // NOT a stray dispatch to the item handler with id="events".
     const reserved = await runRouteTable(
-      req('PATCH', '/admin/api/cms/plugins/events'),
+      req('PATCH', '/cms/api/cms/plugins/events'),
       FAKE_DB,
       routes,
     )
@@ -214,7 +214,7 @@ describe('runRouteTable', () => {
       },
     ]
 
-    const res = await runRouteTable(req('GET', '/admin/api/cms/things/abc/sub'), FAKE_DB, routes)
+    const res = await runRouteTable(req('GET', '/cms/api/cms/things/abc/sub'), FAKE_DB, routes)
     expect(await res!.json()).toEqual({ which: 'sub' })
     expect(calls).toEqual(['sub'])
   })

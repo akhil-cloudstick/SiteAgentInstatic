@@ -262,16 +262,16 @@ function mockDraftSiteLoad(site: SiteDocument): string[] {
   globalThis.fetch = async (input: RequestInfo | URL) => {
     const url = String(input)
     requested.push(url)
-    if (url === '/admin/api/cms/site') {
+    if (url === '/cms/api/cms/site') {
       return jsonResponse({ site: siteShell(site) })
     }
-    if (url === '/admin/api/cms/pages') {
+    if (url === '/cms/api/cms/pages') {
       return jsonResponse({ rows: site.pages.map(pageRow) })
     }
-    if (url === '/admin/api/cms/components') {
+    if (url === '/cms/api/cms/components') {
       return jsonResponse({ rows: [] })
     }
-    if (url === '/admin/api/cms/layouts') {
+    if (url === '/cms/api/cms/layouts') {
       return jsonResponse({ rows: [] })
     }
     return jsonResponse({ error: `Unexpected request: ${url}` }, 500)
@@ -403,7 +403,7 @@ describe('SiteImportModal — CMS bundle import', () => {
   it('reviews a CMS-exported zip bundle in the shared category navigator', async () => {
     globalThis.fetch = async (input: RequestInfo | URL) => {
       const url = String(input)
-      if (url === '/admin/api/cms/import/preview') {
+      if (url === '/cms/api/cms/import/preview') {
         return jsonResponse({
           meta: {
             exportedAt: CMS_BUNDLE.exportedAt,
@@ -452,7 +452,7 @@ describe('SiteImportModal — CMS bundle import', () => {
     let previewRequestBody: unknown = null
     globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input)
-      if (url === '/admin/api/cms/import/preview') {
+      if (url === '/cms/api/cms/import/preview') {
         previewRequestBody = JSON.parse(String(init?.body ?? '{}'))
         return jsonResponse({
           meta: {
@@ -502,7 +502,7 @@ describe('SiteImportModal — CMS bundle import', () => {
     let previewRequestBody: unknown = null
     globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input)
-      if (url === '/admin/api/cms/import/preview') {
+      if (url === '/cms/api/cms/import/preview') {
         previewRequestBody = JSON.parse(String(init?.body ?? '{}'))
         return jsonResponse({
           meta: {
@@ -553,7 +553,7 @@ describe('SiteImportModal — CMS bundle import', () => {
     let importBody: BodyInit | null | undefined = null
     globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input)
-      if (url === '/admin/api/cms/import/preview') {
+      if (url === '/cms/api/cms/import/preview') {
         return jsonResponse({
           meta: {
             exportedAt: CMS_BUNDLE.exportedAt,
@@ -580,7 +580,7 @@ describe('SiteImportModal — CMS bundle import', () => {
           },
         })
       }
-      if (url.startsWith('/admin/api/cms/import/archive')) {
+      if (url.startsWith('/cms/api/cms/import/archive')) {
         importUrl = url
         importBody = init?.body
         return jsonResponse({
@@ -610,7 +610,7 @@ describe('SiteImportModal — CMS bundle import', () => {
     fireEvent.click(screen.getByRole('button', { name: /add rows/i }))
 
     await waitFor(() => {
-      expect(importUrl).toContain('/admin/api/cms/import/archive')
+      expect(importUrl).toContain('/cms/api/cms/import/archive')
     })
     expect(importUrl).toContain('strategy=merge-add')
     expect(importBody).toBe(zipFile)
@@ -621,7 +621,7 @@ describe('SiteImportModal — CMS bundle import', () => {
     let importBody: BodyInit | null | undefined = null
     globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input)
-      if (url === '/admin/api/cms/import/preview') {
+      if (url === '/cms/api/cms/import/preview') {
         return jsonResponse({
           meta: {
             exportedAt: CMS_BUNDLE.exportedAt,
@@ -648,7 +648,7 @@ describe('SiteImportModal — CMS bundle import', () => {
           },
         })
       }
-      if (url.startsWith('/admin/api/cms/import/archive')) {
+      if (url.startsWith('/cms/api/cms/import/archive')) {
         importUrl = url
         importBody = init?.body
         return jsonResponse({
@@ -680,7 +680,7 @@ describe('SiteImportModal — CMS bundle import', () => {
     fireEvent.click(screen.getByRole('button', { name: /add rows/i }))
 
     await waitFor(() => {
-      expect(importUrl).toContain('/admin/api/cms/import/archive')
+      expect(importUrl).toContain('/cms/api/cms/import/archive')
     })
     const url = new URL(importUrl!, 'http://localhost')
     const selection = JSON.parse(url.searchParams.get('selection') ?? '{}') as Record<string, unknown>
@@ -693,7 +693,7 @@ describe('SiteImportModal — CMS bundle import', () => {
     let importUrl: string | null = null
     globalThis.fetch = async (input: RequestInfo | URL) => {
       const url = String(input)
-      if (url === '/admin/api/cms/import/preview') {
+      if (url === '/cms/api/cms/import/preview') {
         return jsonResponse({
           meta: {
             exportedAt: CMS_BUNDLE.exportedAt,
@@ -731,7 +731,7 @@ describe('SiteImportModal — CMS bundle import', () => {
           },
         })
       }
-      if (url.startsWith('/admin/api/cms/import/archive')) {
+      if (url.startsWith('/cms/api/cms/import/archive')) {
         importUrl = url
         return jsonResponse({
           ok: true,
@@ -767,7 +767,7 @@ describe('SiteImportModal — CMS bundle import', () => {
     fireEvent.click(screen.getByRole('button', { name: /^import$/i }))
 
     await waitFor(() => {
-      expect(importUrl).toContain('/admin/api/cms/import/archive')
+      expect(importUrl).toContain('/cms/api/cms/import/archive')
     })
     const url = new URL(importUrl!, 'http://localhost')
     const selection = JSON.parse(url.searchParams.get('selection') ?? '{}') as {
@@ -783,7 +783,7 @@ describe('SiteImportModal — CMS bundle import', () => {
     const stepUpRequests: Array<Record<string, unknown>> = []
     globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input)
-      if (url === '/admin/api/cms/import/preview') {
+      if (url === '/cms/api/cms/import/preview') {
         return jsonResponse({
           meta: {
             exportedAt: CMS_BUNDLE.exportedAt,
@@ -810,7 +810,7 @@ describe('SiteImportModal — CMS bundle import', () => {
           },
         })
       }
-      if (url.startsWith('/admin/api/cms/import/archive')) {
+      if (url.startsWith('/cms/api/cms/import/archive')) {
         importAttempts += 1
         if (importAttempts === 1) return jsonResponse({ error: 'step_up_required' }, 401)
         return jsonResponse({
@@ -825,7 +825,7 @@ describe('SiteImportModal — CMS bundle import', () => {
           redirectsImported: 0,
         })
       }
-      if (url === '/admin/api/cms/auth/step-up' && init?.method === 'POST') {
+      if (url === '/cms/api/cms/auth/step-up' && init?.method === 'POST') {
         stepUpRequests.push(JSON.parse(String(init.body)) as Record<string, unknown>)
         return jsonResponse({ ok: true, stepUpExpiresAt: '2026-01-01T00:15:00.000Z' })
       }
@@ -868,7 +868,7 @@ describe('SiteImportModal — CMS bundle import', () => {
     let callbackCalled = false
     globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input)
-      if (url === '/admin/api/cms/import/preview') {
+      if (url === '/cms/api/cms/import/preview') {
         return jsonResponse({
           meta: {
             exportedAt: CMS_BUNDLE.exportedAt,
@@ -895,7 +895,7 @@ describe('SiteImportModal — CMS bundle import', () => {
           },
         })
       }
-      if (url.startsWith('/admin/api/cms/import')) {
+      if (url.startsWith('/cms/api/cms/import')) {
         importUrl = url
         importBody = JSON.parse(String(init?.body ?? '{}'))
         return jsonResponse({
@@ -954,7 +954,7 @@ describe('SiteImportModal — CMS bundle import', () => {
     }
     globalThis.fetch = async (input: RequestInfo | URL) => {
       const url = String(input)
-      if (url === '/admin/api/cms/import/preview') {
+      if (url === '/cms/api/cms/import/preview') {
         return jsonResponse({
           meta: {
             exportedAt: emptyBundle.exportedAt,
@@ -1021,10 +1021,10 @@ describe('SiteImportModal — global static import', () => {
     expect(screen.queryByText(/editor has no site loaded/i)).toBeNull()
     expect(useEditorStore.getState().site?.name).toBe('Global Draft Site')
     expect(requested).toEqual([
-      '/admin/api/cms/site',
-      '/admin/api/cms/pages',
-      '/admin/api/cms/components',
-      '/admin/api/cms/layouts',
+      '/cms/api/cms/site',
+      '/cms/api/cms/pages',
+      '/cms/api/cms/components',
+      '/cms/api/cms/layouts',
     ])
   })
 })

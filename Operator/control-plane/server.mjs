@@ -54,8 +54,11 @@ function decorate(row) {
     running: rt.isRunning(row.slug),
     od_running: odrt.isRunning(row.slug),
     published: hasBakedOutput(row.slug),
-    admin_url: row.port ? `http://127.0.0.1:${row.port}/admin` : null,
-    od_url: row.od_web_port ? `http://127.0.0.1:${row.od_web_port}` : null,
+    admin_url: row.port ? `http://127.0.0.1:${row.port}/cms` : null,
+    // One shared OD web serves every tenant; the tenant is resolved from the hub
+    // session, so the reachable URL is the gateway's /od mount, not a per-tenant
+    // localhost port. (The od_web_port column is legacy and no longer used.)
+    od_url: row.od_port ? `${config.gatewayOrigin}/design` : null,
     ai_base_url: `${config.publicBaseUrl}/ai/${signTenantToken(row.slug)}`,
   };
 }

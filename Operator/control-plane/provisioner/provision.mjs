@@ -156,7 +156,7 @@ async function seedInstaticOwner(slug, port) {
   const siteName = (row?.display_name || '').trim() || slug;
   const password = genPassword(16); // base64url(16 bytes) — comfortably >= 12 chars
   try {
-    const r = await fetch(`http://127.0.0.1:${port}/admin/api/cms/setup`, {
+    const r = await fetch(`http://127.0.0.1:${port}/cms/api/cms/setup`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ siteName, email, password }),
@@ -184,15 +184,17 @@ async function runProvisionSaga({ slug, schema, role, dbPassword, secretKey, por
     // on local disk + port. Non-fatal: an OD hiccup records od_status='failed' but
     // doesn't fail the whole provision.
     try {
-      // Pre-build the web so it serves FAST via `next start` from the first visit
-      // (otherwise the first load falls back to the slow on-demand `next dev`).
-      // Non-fatal: on a build failure start() still runs the dev fallback.
+      // The OD web is built ONCE and shared by every tenant, so there is nothing
+      // tenant-specific to build here — only make sure the shared build exists at
+      // all (first tenant ever provisioned). Non-fatal: without it the shared web
+      // falls back to the slow on-demand `next dev`.
       try {
-        if (!odrt.isWebBuilt(slug)) await odrt.buildWeb(slug, odPort);
+        if (!odrt.isWebBuilt()) await odrt.buildWeb();
       } catch (e) {
-        console.error(`[provisioner] OpenDesign web build for ${slug} failed (dev fallback):`, e.message);
+        console.error('[provisioner] shared OpenDesign web build failed (dev fallback):', e.message);
       }
-      odrt.start({ slug, odPort, webPort: odWebPort, instaticUrl: advanced ? `http://127.0.0.1:${port}` : undefined });
+      odrt.startSharedWeb();
+      odrt.start({ slug, odPort, instaticUrl: advanced ? `http://127.0.0.1:${port}` : undefined });
       const odHealthy = await odrt.waitHealthy(odPort, 90000);
       await tenants.updateTenant(slug, { od_status: odHealthy ? 'running' : 'failed' });
     } catch (e) {
@@ -404,7 +406,7 @@ export async function pointTestFunnel(slug) {
   if (!row) throw new Error(`Unknown tenant: ${slug}`);
   if (!rt.isRunning(slug)) await startTenant(slug); // must be up to receive traffic
   await runTailscale(['funnel', '--bg', `--https=${config.testFunnelPort}`, `http://127.0.0.1:${row.port}`]);
-  return { ok: true, slug, url: `${config.testFunnelOrigin}/admin` };
+  return { ok: true, slug, url: `${config.testFunnelOrigin}/cms` };
 }
 
 // On control-plane boot, bring active tenants back up.
@@ -419,8 +421,12 @@ export async function resumeAll() {
     }
     if (r.od_port) {
       const instaticUrl = r.tier !== 'lite' ? `http://127.0.0.1:${r.port}` : undefined;
-      try { odrt.start({ slug: r.slug, odPort: r.od_port, webPort: r.od_web_port, instaticUrl }); } catch (e) { console.error(`[provisioner] OD resume ${r.slug} failed:`, e.message); }
+      try { odrt.start({ slug: r.slug, odPort: r.od_port, instaticUrl }); } catch (e) { console.error(`[provisioner] OD resume ${r.slug} failed:`, e.message); }
     }
+  }
+  // ONE shared OD web for every tenant resumed above (no-op if already running).
+  if (active.some((r) => r.od_port)) {
+    try { odrt.startSharedWeb(); } catch (e) { console.error('[provisioner] shared OD web start failed:', e.message); }
   }
   return active.map((r) => r.slug);
 }

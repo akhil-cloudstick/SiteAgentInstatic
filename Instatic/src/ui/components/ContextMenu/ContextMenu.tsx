@@ -1,5 +1,7 @@
 import {
+  useCallback,
   useEffect,
+  useMemo,
   useRef,
   type CSSProperties,
   type HTMLAttributes,
@@ -10,6 +12,10 @@ import {
 } from 'react'
 import { createPortal } from 'react-dom'
 import { cn } from '@ui/cn'
+import {
+  ContextMenuPanelContext,
+  type ContextMenuPanelRegistry,
+} from './contextMenuPanels'
 import {
   type FloatingAlign,
   type FloatingSide,
@@ -230,6 +236,27 @@ export function ContextMenu({
     ...(measuring ? { visibility: 'hidden' as const } : null),
   } as CSSProperties
 
+  // Portaled submenu panels register here so the dismiss handler below can
+  // treat the whole menu tree as "inside". See `contextMenuPanels.ts` for why
+  // this is required rather than a nicety.
+  const panelsRef = useRef<Set<HTMLElement>>(new Set())
+  const registerPanel = useCallback((node: HTMLElement) => {
+    panelsRef.current.add(node)
+    return () => {
+      panelsRef.current.delete(node)
+    }
+  }, [])
+  const containsPanelTarget = useCallback((target: Node) => {
+    for (const panel of panelsRef.current) {
+      if (panel.contains(target)) return true
+    }
+    return false
+  }, [])
+  const panelRegistry = useMemo<ContextMenuPanelRegistry>(
+    () => ({ registerPanel, containsPanelTarget }),
+    [registerPanel, containsPanelTarget],
+  )
+
   // Non-modal dismiss: any mouse down / contextmenu outside the menu,
   // explicit triggerRef (if set), and anchor element (if set) closes the
   // menu. The event is not cancelled, so the same click still reaches the
@@ -246,6 +273,10 @@ export function ContextMenu({
       if (menuRef.current?.contains(target)) return
       if (triggerRef?.current?.contains(target)) return
       if (anchorRef?.current?.contains(target)) return
+      // Submenu panels are portaled siblings of `menuRef`, so `contains` above
+      // misses them. Without this the menu closes on the `mousedown` that
+      // begins a submenu item click and the click never lands.
+      if (containsPanelTarget(target)) return
       beginClose()
     }
     // Attach to the editor document AND every same-origin iframe document
@@ -264,7 +295,7 @@ export function ContextMenu({
         doc.removeEventListener('contextmenu', handlePointerDown, true)
       }
     }
-  }, [beginClose, triggerRef, anchorRef])
+  }, [beginClose, triggerRef, anchorRef, containsPanelTarget])
 
   function handleKeyDown(event: KeyboardEvent<HTMLDivElement>) {
     if (event.key === 'Escape') {
@@ -294,19 +325,21 @@ export function ContextMenu({
       onKeyDown={handleKeyDown}
       onClick={(event) => { event.stopPropagation(); domProps.onClick?.(event) }}
     >
-      {header != null ? (
-        <>
-          <div className={styles.menuHeader}>{header}</div>
-          <div
-            className={styles.menuScroll}
-            data-scrollable={maxHeight != null ? '' : undefined}
-          >
-            {children}
-          </div>
-        </>
-      ) : (
-        children
-      )}
+      <ContextMenuPanelContext.Provider value={panelRegistry}>
+        {header != null ? (
+          <>
+            <div className={styles.menuHeader}>{header}</div>
+            <div
+              className={styles.menuScroll}
+              data-scrollable={maxHeight != null ? '' : undefined}
+            >
+              {children}
+            </div>
+          </>
+        ) : (
+          children
+        )}
+      </ContextMenuPanelContext.Provider>
     </div>,
     document.body,
   )

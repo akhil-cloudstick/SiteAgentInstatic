@@ -46,7 +46,7 @@ describe('AI chat user-image boundary', () => {
   })
 
   it('returns 413 when the complete request envelope exceeds its limit', async () => {
-    const response = await harness.ai('/admin/api/ai/chat/site', {
+    const response = await harness.ai('/cms/api/ai/chat/site', {
       method: 'POST',
       cookie,
       json: {
@@ -60,7 +60,7 @@ describe('AI chat user-image boundary', () => {
   })
 
   it('rejects malformed JPEG bytes before persistence', async () => {
-    const response = await harness.ai('/admin/api/ai/chat/site', {
+    const response = await harness.ai('/cms/api/ai/chat/site', {
       method: 'POST',
       cookie,
       json: {
@@ -86,7 +86,7 @@ describe('AI chat user-image boundary', () => {
       throw new Error(`Unexpected fetch: ${url}`)
     }
 
-    const response = await harness.ai('/admin/api/ai/chat/site', {
+    const response = await harness.ai('/cms/api/ai/chat/site', {
       method: 'POST',
       cookie,
       json: { conversationId, content: [image] },
@@ -105,7 +105,7 @@ describe('AI chat user-image boundary', () => {
       throw new Error(`Unexpected fetch: ${url}`)
     }
 
-    const response = await harness.ai('/admin/api/ai/chat/site', {
+    const response = await harness.ai('/cms/api/ai/chat/site', {
       method: 'POST',
       cookie,
       json: {
@@ -143,7 +143,7 @@ describe('AI chat user-image boundary', () => {
       throw new Error(`Unexpected fetch: ${url}`)
     }
 
-    const response = await harness.ai('/admin/api/ai/chat/site', {
+    const response = await harness.ai('/cms/api/ai/chat/site', {
       method: 'POST',
       cookie,
       json: { conversationId, content: [image, image] },
@@ -182,13 +182,13 @@ describe('AI chat user-image boundary', () => {
       throw new Error(`Unexpected fetch: ${url}`)
     }
 
-    const firstRequest = harness.ai('/admin/api/ai/chat/site', {
+    const firstRequest = harness.ai('/cms/api/ai/chat/site', {
       method: 'POST',
       cookie,
       json: { conversationId, content: [image] },
     })
     await capabilityStarted.promise
-    const secondRequest = harness.ai('/admin/api/ai/chat/site', {
+    const secondRequest = harness.ai('/cms/api/ai/chat/site', {
       method: 'POST',
       cookie,
       json: { conversationId, content: [image] },
@@ -246,7 +246,7 @@ describe('AI chat user-image boundary', () => {
       ].join(''), { headers: { 'content-type': 'text/event-stream' } })
     }
 
-    const response = await harness.ai('/admin/api/ai/chat/site', {
+    const response = await harness.ai('/cms/api/ai/chat/site', {
       method: 'POST',
       cookie,
       json: {
@@ -265,7 +265,7 @@ describe('AI chat user-image boundary', () => {
     // new turn instead of remaining stuck behind the abandoned request.
     let retry: Response | null = null
     for (let attempt = 0; attempt < 20; attempt += 1) {
-      retry = await harness.ai('/admin/api/ai/chat/site', {
+      retry = await harness.ai('/cms/api/ai/chat/site', {
         method: 'POST',
         cookie,
         json: {
@@ -296,7 +296,7 @@ describe('AI chat user-image boundary', () => {
     }
     const controller = new AbortController()
 
-    const request = harness.ai('/admin/api/ai/chat/site', {
+    const request = harness.ai('/cms/api/ai/chat/site', {
       method: 'POST',
       cookie,
       signal: controller.signal,
@@ -334,7 +334,7 @@ describe('AI chat user-image boundary', () => {
       throw new Error(`Unexpected fetch: ${url}`)
     }
 
-    const response = await harness.ai('/admin/api/ai/chat/site', {
+    const response = await harness.ai('/cms/api/ai/chat/site', {
       method: 'POST',
       cookie,
       json: { conversationId, content: [image, image] },

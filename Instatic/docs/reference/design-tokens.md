@@ -429,7 +429,7 @@ The visual editor uses additional raw z-index values that are **not** tokenised.
 |-------------|-----------------|
 | 50          | PluginCanvasOverlayLayer |
 | 51          | Selection ring, hover ring, selection toolbar |
-| 53          | CanvasModeToggle, CanvasNotch |
+| 53          | CanvasDocumentModeDock, CanvasNotch |
 | 60          | CanvasContextSelector |
 | 2147483647  | Drop-indicator layer inside iframe (must beat arbitrary module stacking contexts) |
 

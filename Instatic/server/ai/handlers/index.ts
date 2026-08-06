@@ -1,5 +1,5 @@
 /**
- * AI handlers dispatcher — routes `/admin/api/ai/*` requests to the right
+ * AI handlers dispatcher — routes `/cms/api/ai/*` requests to the right
  * handler module. The server router calls `tryHandleAi(req, db, url)` and
  * either returns the dispatched Response or null (not an AI route).
  *
@@ -27,7 +27,7 @@ export function tryHandleAi(
   url: URL,
 ): Promise<Response> | null {
   const pathname = url.pathname
-  if (!pathname.startsWith('/admin/api/ai/')) return null
+  if (!pathname.startsWith('/cms/api/ai/')) return null
 
   // Centralised CSRF gate — mirrors handleCmsRequest in server/handlers/cms/index.ts.
   // GETs pass through; state-changing methods (POST/PUT/PATCH/DELETE) require

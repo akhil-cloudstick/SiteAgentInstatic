@@ -83,7 +83,7 @@ const PLUGIN_SCHEDULES_PATTERN = /^\/admin\/api\/cms\/plugins\/(?<id>[^/]+)\/sch
 const PLUGIN_SCHEDULE_RUN_NOW_PATTERN = /^\/admin\/api\/cms\/plugins\/(?<id>[^/]+)\/schedules\/(?<sid>[^/]+)\/run-now$/
 const PLUGIN_SCHEDULE_PAUSE_PATTERN = /^\/admin\/api\/cms\/plugins\/(?<id>[^/]+)\/schedules\/(?<sid>[^/]+)\/pause$/
 const PLUGIN_SCHEDULE_RESUME_PATTERN = /^\/admin\/api\/cms\/plugins\/(?<id>[^/]+)\/schedules\/(?<sid>[^/]+)\/resume$/
-const PLUGIN_EVENTS_PATH = '/admin/api/cms/plugins/events'
+const PLUGIN_EVENTS_PATH = '/cms/api/cms/plugins/events'
 
 // The bare `/plugins/:id` route must NOT claim the reserved single-segment
 // children of `/plugins` (`events`, `package`, `inspect-package`) — those are
@@ -115,13 +115,13 @@ interface PluginRoutePolicy {
 
 function resolvePluginRoutePolicy(method: string, pathname: string): PluginRoutePolicy {
   // Fresh install / upgrade — uploads + executes arbitrary plugin code. RCE.
-  if (method === 'POST' && pathname === '/admin/api/cms/plugins') {
+  if (method === 'POST' && pathname === '/cms/api/cms/plugins') {
     return { capability: 'plugins.install', stepUp: true }
   }
-  if (method === 'POST' && pathname === '/admin/api/cms/plugins/package') {
+  if (method === 'POST' && pathname === '/cms/api/cms/plugins/package') {
     return { capability: 'plugins.install', stepUp: true }
   }
-  if (method === 'POST' && pathname === '/admin/api/cms/plugins/inspect-package') {
+  if (method === 'POST' && pathname === '/cms/api/cms/plugins/inspect-package') {
     // Read-only — inspect a .zip before deciding to install. Same audience
     // as the install endpoint (someone deciding whether to run untrusted
     // code), but the operation itself never touches the host.
@@ -194,7 +194,7 @@ function resolvePluginRoutePolicy(method: string, pathname: string): PluginRoute
 // route table simply 405s any method none of the entries claim.
 // ---------------------------------------------------------------------------
 
-const PLUGIN_ADMIN_PATH = '/admin/api/cms/plugins'
+const PLUGIN_ADMIN_PATH = '/cms/api/cms/plugins'
 
 const PLUGIN_ROUTES: readonly Route<[CmsHandlerOptions, AuthUser]>[] = [
   { method: 'GET', pattern: PLUGIN_ADMIN_PATH, handler: (req, db, _p, _o, user) => handlePluginsCollection(req, db, user) },
@@ -271,8 +271,8 @@ export async function handlePluginsRoutes(
  * the dispatcher's auth gate from running on unrelated CMS paths.
  */
 function isPluginAdminPath(pathname: string): boolean {
-  if (pathname === '/admin/api/cms/plugins') return true
-  if (pathname === '/admin/api/cms/plugins/inspect-package') return true
-  if (pathname === '/admin/api/cms/plugins/package') return true
-  return pathname.startsWith('/admin/api/cms/plugins/')
+  if (pathname === '/cms/api/cms/plugins') return true
+  if (pathname === '/cms/api/cms/plugins/inspect-package') return true
+  if (pathname === '/cms/api/cms/plugins/package') return true
+  return pathname.startsWith('/cms/api/cms/plugins/')
 }

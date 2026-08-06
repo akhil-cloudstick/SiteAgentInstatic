@@ -63,7 +63,7 @@ const DeletedRowEnvelope = Type.Object(
 
 export async function listCmsDataTables(
   fetchImpl: FetchLike = globalThis.fetch.bind(globalThis),
-  basePath = '/admin/api/cms',
+  basePath = '/cms/api/cms',
 ): Promise<DataTableListItem[]> {
   const body = await apiRequest(`${basePath}/data/tables`, {
     schema: TablesListEnvelope,
@@ -76,7 +76,7 @@ export async function listCmsDataTables(
 export async function getCmsDataTable(
   tableId: string,
   fetchImpl: FetchLike = globalThis.fetch.bind(globalThis),
-  basePath = '/admin/api/cms',
+  basePath = '/cms/api/cms',
 ): Promise<DataTable | null> {
   try {
     const body = await apiRequest(`${basePath}/data/tables/${encodeURIComponent(tableId)}`, {
@@ -94,7 +94,7 @@ export async function getCmsDataTable(
 export async function getCmsDataTableBySlug(
   slug: string,
   fetchImpl: FetchLike = globalThis.fetch.bind(globalThis),
-  basePath = '/admin/api/cms',
+  basePath = '/cms/api/cms',
 ): Promise<DataTable | null> {
   const tables = await listCmsDataTables(fetchImpl, basePath)
   return tables.find((t) => t.slug === slug) ?? null
@@ -103,7 +103,7 @@ export async function getCmsDataTableBySlug(
 export async function createCmsDataTable(
   input: CreateDataTableInput,
   fetchImpl: FetchLike = globalThis.fetch.bind(globalThis),
-  basePath = '/admin/api/cms',
+  basePath = '/cms/api/cms',
 ): Promise<DataTable> {
   const body = await apiRequest(`${basePath}/data/tables`, {
     method: 'POST',
@@ -120,7 +120,7 @@ export async function updateCmsDataTable(
   tableId: string,
   input: UpdateDataTableInput,
   fetchImpl: FetchLike = globalThis.fetch.bind(globalThis),
-  basePath = '/admin/api/cms',
+  basePath = '/cms/api/cms',
 ): Promise<DataTable> {
   const body = await apiRequest(`${basePath}/data/tables/${encodeURIComponent(tableId)}`, {
     method: 'PATCH',
@@ -136,7 +136,7 @@ export async function updateCmsDataTable(
 export async function deleteCmsDataTable(
   tableId: string,
   fetchImpl: FetchLike = globalThis.fetch.bind(globalThis),
-  basePath = '/admin/api/cms',
+  basePath = '/cms/api/cms',
 ): Promise<DataTable> {
   const body = await apiRequest(`${basePath}/data/tables/${encodeURIComponent(tableId)}`, {
     method: 'DELETE',
@@ -155,7 +155,7 @@ export async function deleteCmsDataTable(
 export async function listCmsDataRows(
   tableId: string,
   fetchImpl: FetchLike = globalThis.fetch.bind(globalThis),
-  basePath = '/admin/api/cms',
+  basePath = '/cms/api/cms',
 ): Promise<DataRow[]> {
   const body = await apiRequest(
     `${basePath}/data/tables/${encodeURIComponent(tableId)}/rows`,
@@ -167,7 +167,7 @@ export async function listCmsDataRows(
 export async function getCmsDataRow(
   rowId: string,
   fetchImpl: FetchLike = globalThis.fetch.bind(globalThis),
-  basePath = '/admin/api/cms',
+  basePath = '/cms/api/cms',
 ): Promise<DataRow | null> {
   try {
     const body = await apiRequest(`${basePath}/data/rows/${encodeURIComponent(rowId)}`, {
@@ -186,7 +186,7 @@ export async function createCmsDataRow(
   tableId: string,
   input: CreateDataRowInput,
   fetchImpl: FetchLike = globalThis.fetch.bind(globalThis),
-  basePath = '/admin/api/cms',
+  basePath = '/cms/api/cms',
 ): Promise<DataRow> {
   const body = await apiRequest(
     `${basePath}/data/tables/${encodeURIComponent(tableId)}/rows`,
@@ -200,7 +200,7 @@ export async function saveCmsDataRowDraft(
   rowId: string,
   input: SaveDataRowDraftInput,
   fetchImpl: FetchLike = globalThis.fetch.bind(globalThis),
-  basePath = '/admin/api/cms',
+  basePath = '/cms/api/cms',
 ): Promise<DataRow> {
   const body = await apiRequest(`${basePath}/data/rows/${encodeURIComponent(rowId)}`, {
     method: 'PATCH',
@@ -216,7 +216,7 @@ export async function saveCmsDataRowDraft(
 export async function deleteCmsDataRow(
   rowId: string,
   fetchImpl: FetchLike = globalThis.fetch.bind(globalThis),
-  basePath = '/admin/api/cms',
+  basePath = '/cms/api/cms',
 ): Promise<DeletedRowSummary> {
   const body = await apiRequest(`${basePath}/data/rows/${encodeURIComponent(rowId)}`, {
     method: 'DELETE',
@@ -231,7 +231,7 @@ export async function deleteCmsDataRow(
 export async function publishCmsDataRow(
   rowId: string,
   fetchImpl: FetchLike = globalThis.fetch.bind(globalThis),
-  basePath = '/admin/api/cms',
+  basePath = '/cms/api/cms',
 ): Promise<DataRow> {
   const body = await apiRequest(`${basePath}/data/rows/${encodeURIComponent(rowId)}/publish`, {
     method: 'POST',
@@ -254,7 +254,7 @@ export async function scheduleCmsDataRowPublish(
   rowId: string,
   atIso: string,
   fetchImpl: FetchLike = globalThis.fetch.bind(globalThis),
-  basePath = '/admin/api/cms',
+  basePath = '/cms/api/cms',
 ): Promise<DataRow> {
   const body = await apiRequest(`${basePath}/data/rows/${encodeURIComponent(rowId)}/schedule`, {
     method: 'POST',
@@ -275,7 +275,7 @@ export async function scheduleCmsDataRowPublish(
 export async function cancelCmsDataRowSchedule(
   rowId: string,
   fetchImpl: FetchLike = globalThis.fetch.bind(globalThis),
-  basePath = '/admin/api/cms',
+  basePath = '/cms/api/cms',
 ): Promise<DataRow> {
   const body = await apiRequest(`${basePath}/data/rows/${encodeURIComponent(rowId)}/schedule`, {
     method: 'DELETE',
@@ -297,7 +297,7 @@ export async function updateCmsDataRowStatus(
   // type system enforces "use the right endpoint" at the call site.
   status: 'draft' | 'unpublished',
   fetchImpl: FetchLike = globalThis.fetch.bind(globalThis),
-  basePath = '/admin/api/cms',
+  basePath = '/cms/api/cms',
 ): Promise<DataRow> {
   const body = await apiRequest(`${basePath}/data/rows/${encodeURIComponent(rowId)}/status`, {
     method: 'PATCH',
@@ -314,7 +314,7 @@ export async function updateCmsDataRowAuthor(
   rowId: string,
   authorUserId: string,
   fetchImpl: FetchLike = globalThis.fetch.bind(globalThis),
-  basePath = '/admin/api/cms',
+  basePath = '/cms/api/cms',
 ): Promise<DataRow> {
   const body = await apiRequest(`${basePath}/data/rows/${encodeURIComponent(rowId)}/author`, {
     method: 'PATCH',
@@ -331,7 +331,7 @@ export async function updateCmsDataRowTable(
   rowId: string,
   tableId: string,
   fetchImpl: FetchLike = globalThis.fetch.bind(globalThis),
-  basePath = '/admin/api/cms',
+  basePath = '/cms/api/cms',
 ): Promise<DataRow> {
   const body = await apiRequest(`${basePath}/data/rows/${encodeURIComponent(rowId)}/table`, {
     method: 'PATCH',
@@ -376,7 +376,7 @@ export async function previewCmsDataLoopItems(
   tableId: string,
   options: DataLoopPreviewOptions = {},
   fetchImpl: FetchLike = globalThis.fetch.bind(globalThis),
-  basePath = '/admin/api/cms',
+  basePath = '/cms/api/cms',
 ): Promise<DataLoopPreviewResult> {
   const body = await apiRequest(
     `${basePath}/data/tables/${encodeURIComponent(tableId)}/loop-preview`,
@@ -420,7 +420,7 @@ export async function previewCmsDataRow(
   options: PreviewCmsDataRowOptions = {},
 ): Promise<string> {
   const fetchImpl = options.fetchImpl ?? globalThis.fetch.bind(globalThis)
-  const basePath = options.basePath ?? '/admin/api/cms'
+  const basePath = options.basePath ?? '/cms/api/cms'
   const res = await fetchImpl(`${basePath}/data/rows/${encodeURIComponent(rowId)}/preview`, {
     method: 'POST',
     credentials: 'include',
@@ -440,7 +440,7 @@ export async function previewCmsDataRow(
 
 export async function listCmsDataAuthors(
   fetchImpl: FetchLike = globalThis.fetch.bind(globalThis),
-  basePath = '/admin/api/cms',
+  basePath = '/cms/api/cms',
 ): Promise<DataUserReference[]> {
   const body = await apiRequest(`${basePath}/data/authors`, {
     schema: AuthorsListEnvelope,
@@ -463,7 +463,7 @@ export async function getDataMeta(
   options?: { fetchImpl?: FetchLike; basePath?: string },
 ): Promise<DataMeta> {
   const fetchImpl = options?.fetchImpl ?? globalThis.fetch.bind(globalThis)
-  const basePath = options?.basePath ?? '/admin/api/cms'
+  const basePath = options?.basePath ?? '/cms/api/cms'
   const body = await apiRequest(`${basePath}/data/_meta`, {
     schema: DataMetaEnvelope,
     fetchImpl,

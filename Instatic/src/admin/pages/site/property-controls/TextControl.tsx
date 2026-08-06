@@ -3,10 +3,13 @@ import type { TextControlNormalize } from '@core/module-engine'
 import { normalizeIdentifierInput, normalizeIdentifierValue } from '@core/utils/identifier'
 import { Input } from '@ui/components/Input'
 import { ControlRow } from '@ui/components/ControlRow'
+import { charCounter } from '@site/panels/PropertiesPanel/inspector/charCounter'
 
 interface TextControlProps extends ControlProps<string> {
   placeholder?: string
   normalize?: TextControlNormalize
+  /** Hard character limit; also prints the reference's `used/max` counter. */
+  maxLength?: number
   onInputFocus?: () => void
   onInputBlur?: (value: string) => void
 }
@@ -18,6 +21,7 @@ export function TextControl({
   label,
   placeholder,
   normalize,
+  maxLength,
   isOverride,
   disabled,
   layout,
@@ -43,6 +47,7 @@ export function TextControl({
       layout={layout}
       isOverride={isOverride}
       disabled={disabled}
+      description={charCounter(value, maxLength)}
     >
       <Input
         id={`ctrl-${propKey}`}
@@ -50,6 +55,7 @@ export function TextControl({
         value={value ?? ''}
         placeholder={placeholder}
         disabled={disabled}
+        maxLength={maxLength}
         fieldSize="sm"
         autoCapitalize={normalize === 'identifier' ? 'none' : undefined}
         spellCheck={normalize === 'identifier' ? false : undefined}

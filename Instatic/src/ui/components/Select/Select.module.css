@@ -142,3 +142,39 @@
 .placeholderOption .optionLabel {
     color: var(--text-subtle);
 }
+
+/* ── Site screen ─────────────────────────────────────────────────────────
+ * Transcribed from `.field select` in the approved Site screen
+ * (screens/site/src/styles.css): the inspector draws selects on exactly the
+ * same 44px / 6px / `--mms-border-strong` chassis as its text inputs, so the
+ * size ramp above is overridden wholesale inside the Site scope.
+ */
+:global([data-editor-screen='site']) .select {
+    min-height: 44px;
+    padding: 10px;
+    border: 1px solid var(--mms-border-strong);
+    border-radius: 6px;
+    background: var(--mms-surface-raised);
+    color: var(--mms-text);
+    font-family: var(--font-mms);
+    font-size: 13px;
+    font-weight: 430;
+}
+
+:global([data-editor-screen='site']) .select.size-xs,
+:global([data-editor-screen='site']) .select.size-sm,
+:global([data-editor-screen='site']) .select.size-md {
+    min-height: 44px;
+    padding: 10px;
+    font-size: 13px;
+}
+
+:global([data-editor-screen='site']) .select:hover {
+    border-color: var(--mms-border-strong);
+}
+
+:global([data-editor-screen='site']) .select:focus-within,
+:global([data-editor-screen='site']) .select[data-open="true"] {
+    border-color: var(--mms-action);
+    background: var(--mms-surface-raised);
+}

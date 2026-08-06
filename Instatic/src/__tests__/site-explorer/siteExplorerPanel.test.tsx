@@ -1167,7 +1167,7 @@ describe('SiteExplorerPanel', () => {
       fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }))
 
       expect(await screen.findByRole('button', { name: /open media hero renamed\.png/i })).toBeDefined()
-      expect(calls.some((call) => call.input === '/admin/api/cms/media/media-1' && call.init?.method === 'PATCH')).toBe(true)
+      expect(calls.some((call) => call.input === '/cms/api/cms/media/media-1' && call.init?.method === 'PATCH')).toBe(true)
 
       fireEvent.contextMenu(screen.getByRole('button', { name: /open media hero renamed\.png/i }), {
         clientX: 120,
@@ -1178,7 +1178,7 @@ describe('SiteExplorerPanel', () => {
       await waitFor(() => {
         expect(screen.queryByRole('button', { name: /open media hero renamed\.png/i })).toBeNull()
       })
-      expect(calls.some((call) => call.input === '/admin/api/cms/media/media-1' && call.init?.method === 'DELETE')).toBe(true)
+      expect(calls.some((call) => call.input === '/cms/api/cms/media/media-1' && call.init?.method === 'DELETE')).toBe(true)
     } finally {
       globalThis.fetch = originalFetch
     }

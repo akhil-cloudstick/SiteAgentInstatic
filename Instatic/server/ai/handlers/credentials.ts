@@ -86,7 +86,7 @@ export function tryHandleAiCredentials(
   db: DbClient,
   pathname: string,
 ): Promise<Response> | null {
-  if (pathname === '/admin/api/ai/credentials') {
+  if (pathname === '/cms/api/ai/credentials') {
     return dispatchCollection(req, db)
   }
   const idMatch = pathname.match(/^\/admin\/api\/ai\/credentials\/([^/]+)$/)

@@ -42,7 +42,7 @@ function pluginAdminAssetUrl(assetPath: string, entrypoint: string): string {
 
 function runtimePath(pluginId: string, path: string): string {
   const normalized = path.trim().replace(/^\/+/g, '')
-  return `/admin/api/cms/plugins/${encodeURIComponent(pluginId)}/runtime/${normalized}`
+  return `/cms/api/cms/plugins/${encodeURIComponent(pluginId)}/runtime/${normalized}`
 }
 
 interface PluginRoutesHelper {

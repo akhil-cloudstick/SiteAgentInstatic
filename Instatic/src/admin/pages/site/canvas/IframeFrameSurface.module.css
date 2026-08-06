@@ -32,6 +32,15 @@
   position: relative;
   border: 0;
   display: block;
+  /* Round the iframe to its wrapper's radius. An <iframe> is a replaced
+   * element that paints its own square box on top of an ancestor's rounded
+   * `overflow: hidden` clip — which is why the frame card showed sharp corners
+   * wherever the page's own background met the border (most visibly top-left,
+   * under the site header), while the hover/selection ring above it drew
+   * rounded. Inheriting means the review frames pick up `.scaler`'s
+   * scale-compensated radius and the live frame picks up `.iframeViewport`'s,
+   * with no second source of truth for the value. */
+  border-radius: inherit;
 }
 
 :global(html[data-instatic-canvas-parent-space-pan='1']) .iframe:not(.iframeLive),
@@ -42,11 +51,18 @@
 /* Live frame: a single real-size viewport that scrolls internally instead of
  * growing to content. The live surface controls the wrapper's width; the
  * iframe fills it and owns its own scrollbar (published height behaviour).
- * Chrome — shadow / radius / min-height — is dropped so it reads as the page
- * itself, not a framed artboard. */
+ * Chrome — shadow / min-height — is dropped so it reads as the page itself,
+ * not a framed artboard. The radius is NOT dropped: Live edit and Focus
+ * section draw the same bordered, rounded frame card as Responsive Review, so
+ * squaring the iframe here punched sharp corners through it. */
 .iframeLive {
   min-height: 0;
   box-shadow: none;
-  border-radius: 0;
   overflow: auto;
+  /* Concrete radius, not the `inherit` the base rule uses. The live iframe is
+   * the one frame that owns its own scroller, so it is the one most likely to
+   * be promoted to its own layer and paint a square box over the card behind
+   * it — rounding the element itself means it is correct even before any
+   * ancestor clip gets a say. Same token the wrapper's border uses. */
+  border-radius: var(--site-control-radius);
 }

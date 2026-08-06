@@ -147,7 +147,7 @@ async function createRole(
   name: string,
   capabilityLabels: readonly string[],
 ): Promise<void> {
-  await page.goto('/admin/users')
+  await page.goto('/cms/users')
   await page.getByRole('button', { name: 'Roles', exact: true }).click()
   await page.getByRole('button', { name: 'Create Role', exact: true }).click()
 
@@ -167,7 +167,7 @@ async function setRoleCapabilities(
   roleName: string,
   capabilityLabels: readonly string[],
 ): Promise<void> {
-  await page.goto('/admin/users')
+  await page.goto('/cms/users')
   await page.getByRole('button', { name: 'Roles', exact: true }).click()
   await openRoleAction(page, roleName, 'Edit')
 
@@ -187,7 +187,7 @@ async function createUser(
   page: Page,
   user: { email: string; displayName: string; password: string; role: string },
 ): Promise<void> {
-  await page.goto('/admin/users')
+  await page.goto('/cms/users')
   await page.getByRole('button', { name: 'Create User', exact: true }).click()
   await page.locator('input[name="new-user-email-address"]').fill(user.email)
   await page.locator('input[name="new-user-display-name"]').fill(user.displayName)
@@ -199,7 +199,7 @@ async function createUser(
 
 async function openReadableSiteEditor(page: Page): Promise<void> {
   if (!(await page.getByTestId('canvas-root').isVisible({ timeout: 1_000 }).catch(() => false))) {
-    await page.goto('/admin/site')
+    await page.goto('/cms/site')
   }
   await expect(page.getByTestId('canvas-root')).toBeVisible({ timeout: 20_000 })
 }
@@ -254,7 +254,7 @@ test.describe('AI settings', () => {
     const suffix = Date.now().toString(36)
     const label = `E2E Ollama ${suffix}`
 
-    await page.goto('/admin/ai')
+    await page.goto('/cms/ai')
     await expect(page.getByRole('heading', { name: 'AI' })).toBeVisible()
     await expect(page.getByRole('tab', { name: 'Providers' })).toHaveAttribute(
       'aria-selected',
@@ -284,7 +284,7 @@ test.describe('AI settings', () => {
     const suffix = Date.now().toString(36)
     const label = `E2E Defaults Ollama ${suffix}`
 
-    await page.goto('/admin/ai')
+    await page.goto('/cms/ai')
     await expect(page.getByRole('heading', { name: 'AI' })).toBeVisible()
 
     await test.step('create a credential for the defaults picker', async () => {
@@ -350,7 +350,7 @@ test.describe('AI settings', () => {
 
     try {
       await test.step('create a live local credential for chat', async () => {
-        await page.goto('/admin/ai')
+        await page.goto('/cms/ai')
         await expect(page.getByRole('heading', { name: 'AI' })).toBeVisible()
         await addOllamaCredential(page, label, fakeOllama.baseUrl)
         await expect(page.getByText(label)).toBeVisible({ timeout: 20_000 })
@@ -375,7 +375,7 @@ test.describe('AI settings', () => {
       })
 
       await test.step('verify the Audit tab shows the persisted usage', async () => {
-        await page.goto('/admin/ai')
+        await page.goto('/cms/ai')
         await page.getByRole('tab', { name: 'Audit' }).click()
         await expect(page.getByRole('heading', { name: 'Usage audit' })).toBeVisible()
         await expect(page.getByText('e2e-model')).toBeVisible({ timeout: 20_000 })
@@ -388,7 +388,7 @@ test.describe('AI settings', () => {
 
       await test.step('clear seeded defaults and delete the credential', async () => {
         await page.evaluate(async () => {
-          const conversationsRes = await fetch('/admin/api/ai/conversations?scope=site')
+          const conversationsRes = await fetch('/cms/api/ai/conversations?scope=site')
           if (!conversationsRes.ok) {
             throw new Error(`Failed to list site conversations: ${conversationsRes.status}`)
           }
@@ -400,13 +400,13 @@ test.describe('AI settings', () => {
             if (typeof conversation?.id !== 'string') {
               throw new Error('Conversation list response included an invalid id.')
             }
-            const res = await fetch(`/admin/api/ai/conversations/${conversation.id}`, {
+            const res = await fetch(`/cms/api/ai/conversations/${conversation.id}`, {
               method: 'DELETE',
             })
             if (!res.ok) throw new Error(`Failed to delete conversation ${conversation.id}: ${res.status}`)
           }
           for (const scope of ['site', 'content', 'data', 'plugin']) {
-            const res = await fetch(`/admin/api/ai/defaults/${scope}`, { method: 'DELETE' })
+            const res = await fetch(`/cms/api/ai/defaults/${scope}`, { method: 'DELETE' })
             if (!res.ok) throw new Error(`Failed to clear ${scope} default: ${res.status}`)
           }
         })
@@ -434,7 +434,7 @@ test.describe('AI settings', () => {
 
     try {
       await test.step('create a live local credential for the tool loop', async () => {
-        await page.goto('/admin/ai')
+        await page.goto('/cms/ai')
         await expect(page.getByRole('heading', { name: 'AI' })).toBeVisible()
         await addOllamaCredential(page, label, fakeOllama.baseUrl)
         await expect(page.getByText(label)).toBeVisible({ timeout: 20_000 })
@@ -472,7 +472,7 @@ test.describe('AI settings', () => {
 
       await test.step('clear seeded conversations/defaults and delete the credential', async () => {
         await page.evaluate(async () => {
-          const conversationsRes = await fetch('/admin/api/ai/conversations?scope=site')
+          const conversationsRes = await fetch('/cms/api/ai/conversations?scope=site')
           if (!conversationsRes.ok) {
             throw new Error(`Failed to list site conversations: ${conversationsRes.status}`)
           }
@@ -484,17 +484,17 @@ test.describe('AI settings', () => {
             if (typeof conversation?.id !== 'string') {
               throw new Error('Conversation list response included an invalid id.')
             }
-            const res = await fetch(`/admin/api/ai/conversations/${conversation.id}`, {
+            const res = await fetch(`/cms/api/ai/conversations/${conversation.id}`, {
               method: 'DELETE',
             })
             if (!res.ok) throw new Error(`Failed to delete conversation ${conversation.id}: ${res.status}`)
           }
           for (const scope of ['site', 'content', 'data', 'plugin']) {
-            const res = await fetch(`/admin/api/ai/defaults/${scope}`, { method: 'DELETE' })
+            const res = await fetch(`/cms/api/ai/defaults/${scope}`, { method: 'DELETE' })
             if (!res.ok) throw new Error(`Failed to clear ${scope} default: ${res.status}`)
           }
         })
-        await page.goto('/admin/ai')
+        await page.goto('/cms/ai')
         const credentialCard = page.locator('div').filter({ hasText: label }).first()
         await expect(credentialCard).toBeVisible()
         await credentialCard.getByRole('button', { name: 'Delete' }).click()
@@ -515,7 +515,7 @@ test.describe('AI settings', () => {
 
     try {
       await test.step('create a live local credential for the conversation', async () => {
-        await page.goto('/admin/ai')
+        await page.goto('/cms/ai')
         await expect(page.getByRole('heading', { name: 'AI' })).toBeVisible()
         await addOllamaCredential(page, label, fakeOllama.baseUrl)
         await expect(page.getByText(label)).toBeVisible({ timeout: 20_000 })
@@ -570,11 +570,11 @@ test.describe('AI settings', () => {
       await test.step('clear seeded defaults and delete the credential', async () => {
         await page.evaluate(async () => {
           for (const scope of ['site', 'content', 'data', 'plugin']) {
-            const res = await fetch(`/admin/api/ai/defaults/${scope}`, { method: 'DELETE' })
+            const res = await fetch(`/cms/api/ai/defaults/${scope}`, { method: 'DELETE' })
             if (!res.ok) throw new Error(`Failed to clear ${scope} default: ${res.status}`)
           }
         })
-        await page.goto('/admin/ai')
+        await page.goto('/cms/ai')
         const credentialCard = page.locator('div').filter({ hasText: label }).first()
         await expect(credentialCard).toBeVisible()
         await credentialCard.getByRole('button', { name: 'Delete' }).click()
@@ -627,7 +627,7 @@ test.describe.serial('AI write-tool capability filtering', () => {
       try {
         await test.step('persona creates its own disposable fake-provider credential', async () => {
           await loginAs(personaPage, email, password)
-          await personaPage.goto('/admin/ai')
+          await personaPage.goto('/cms/ai')
           await expect(personaPage.getByRole('heading', { name: 'AI' })).toBeVisible()
           await addOllamaCredential(personaPage, label, fakeOllama.baseUrl)
           credentialCreated = true
@@ -683,7 +683,7 @@ test.describe.serial('AI write-tool capability filtering', () => {
           ])
           await personaPage.evaluate(async () => {
             for (const scope of ['site', 'content', 'data', 'plugin']) {
-              const response = await fetch(`/admin/api/ai/defaults/${scope}`, {
+              const response = await fetch(`/cms/api/ai/defaults/${scope}`, {
                 method: 'DELETE',
               })
               if (!response.ok) {
@@ -691,7 +691,7 @@ test.describe.serial('AI write-tool capability filtering', () => {
               }
             }
           })
-          await personaPage.goto('/admin/ai')
+          await personaPage.goto('/cms/ai')
           const credentialCard = personaPage.locator('div').filter({ hasText: label }).first()
           await expect(credentialCard).toBeVisible()
           await credentialCard.getByRole('button', { name: 'Delete' }).click()

@@ -216,7 +216,10 @@ export function AgentComposer({
   else if (imageStatus === 'error') sendTooltip = 'Remove the failed image'
 
   return (
-    <div className={styles.inputBar}>
+    // `data-agent-composer` is the stable hook a host column uses to align the
+    // composer with its own gutters (the Site column supplies the padding, so
+    // the bar's own would double it).
+    <div className={styles.inputBar} data-agent-composer="">
       {hasAttachments && (
         <PendingImageAttachmentGrid
           entries={attachments.pending}

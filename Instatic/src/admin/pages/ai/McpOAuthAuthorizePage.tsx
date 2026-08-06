@@ -73,7 +73,7 @@ export function McpOAuthAuthorizePage() {
           <div className={styles.stateCard} role="alert">
             <h2>Connection request unavailable</h2>
             <p>{error}</p>
-            <Button type="button" variant="secondary" size="sm" onClick={() => navigate('/admin/ai')}>
+            <Button type="button" variant="secondary" size="sm" onClick={() => navigate('/cms/ai')}>
               <span>Back to AI settings</span>
             </Button>
           </div>

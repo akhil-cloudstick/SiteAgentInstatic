@@ -22,7 +22,7 @@
  * flag lives in the `adminUi` store, which the editor's settings slice
  * mirrors via a registered bridge.
  *
- * Concretely: visiting `/admin/users` should download only `react-vendor`,
+ * Concretely: visiting `/cms/users` should download only `react-vendor`,
  * `validation-vendor`, the page-specific chunk, and the shared `layouts-*`
  * chunk — NOT `store-*` (editor) or any panel/canvas/modules code.
  */

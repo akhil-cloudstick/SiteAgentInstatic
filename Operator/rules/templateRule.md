@@ -135,7 +135,7 @@ The importer strips your `<script>`s from the **editing canvas**, so any content
 - `@media` (site breakpoints become responsive overrides; other queries become reusable conditions), `@supports`, `@container`, `@keyframes`.
 - `transition`, `animation`, `transform`, `position: sticky`, `display:grid`/`flex`, gradients, `url()` backgrounds, pseudo-classes/elements, `:has()`.
 
-**Selectors — style each component with a single semantic class.** Only a **single bare class** (`.hero`) becomes an editable/bindable rule the tenant can tweak per element. Compound/descendant/pseudo/element selectors (`.hero .title`, `h1`, `a:hover`) still apply visually but import as **ambient** (global) rules — not per-node editable. Prefer one meaningful class per component.
+**Selectors — style each component with a single semantic class.** Only a **single bare class** (`.hero`) becomes an editable/bindable rule the tenant can tweak per element. Compound/descendant/pseudo/element selectors (`.hero .title`, `h1`, `a:hover`) still apply visually but import as **ambient** (global) rules — not per-node editable. **Give every text element its own class and style it through that class** — never reach it with a descendant selector (see "Editability is automatic" below; this is checked and blocks the share).
 
 **HTML content** — real semantic elements each become an editable block: `h1`–`h6`, `p`, `a`, `img`, `button`, `ul/ol/li`, `section/div/article/main/header/footer/nav/aside`, inline `svg` (icons), forms & inputs, tables. `id`, `data-*`, `aria-*`, and `role` are preserved (so behavioral scripts keep working).
 
@@ -238,7 +238,26 @@ This costs nothing (you already write one semantic class per component for styli
 ### Editability is automatic — no marker attribute needed
 Instatic makes an element editable **by its type** — write a real `<h1>`, `<p>`, `<img>`, `<button>`, and it becomes an editable block automatically. **You do NOT need a `data-sa` (or any) marker attribute** — the importer doesn't use one; clean semantic HTML is enough.
 
-**But wrap every text run.** If part of a heading/sentence is wrapped in an inline element (for color/bold/a link), wrap **every** part in its own element too — otherwise the loose text next to it isn't selectable in the editor.
+**The goal: every single piece of text on the page must be individually selectable in the canvas and individually restyleable (its own colour, size, font, spacing).** Three hard rules get you there. All three are checked, and a page that breaks any of them is rejected at Share to CMS.
+
+#### 1. Never leave bare text — every text run gets its own element
+
+Text written **directly inside a container** has no element of its own. The importer keeps it as a no-wrapper text node, which means it **cannot be clicked in the canvas, cannot be highlighted, and can never be styled** — a dead end for the tenant. This applies to **every** container, not just headings: `<div>`, `<li>`, `<td>`, `<blockquote>`, `<figcaption>`, `<b>`, `<i>` — all of them.
+
+```html
+<!-- ❌ "Founded in Lisbon" has no element — un-selectable, un-styleable -->
+<div class="stat-item">
+  <strong>2011</strong>
+  Founded in Lisbon
+</div>
+<!-- ✅ every run wrapped AND named -->
+<div class="stat-item">
+  <span class="stat-value">2011</span>
+  <span class="stat-label">Founded in Lisbon</span>
+</div>
+```
+
+The same trap closes on a heading the moment it contains **any** child element — the heading stops being a single text block and its loose runs become bare text:
 
 ```html
 <!-- ❌ the plain white text isn't editable -->
@@ -246,7 +265,74 @@ Instatic makes an element editable **by its type** — write a real `<h1>`, `<p>
 <!-- ✅ every run wrapped (keep the spaces) -->
 <h1><span>Powering the AI era with </span><span class="accent">high-density compute</span><span> built to last.</span></h1>
 ```
-If the whole line uses one accent color, put the color on the heading itself (no inner span) so it stays a single editable node.
+If the whole line uses one accent colour, put the colour on the heading itself (no inner span) so it stays a single editable node.
+
+Also bare: `<li>Buy milk</li>` → `<li><span class="list-item-text">Buy milk</span></li>`.
+
+**Safe parents** (their text becomes one editable block): `<h1>`–`<h6>`, `<p>`, `<span>`, `<small>`, `<strong>`, `<em>`, `<label>` — *only while they contain no child element* — plus `<a>` and `<button>`, which always keep their text.
+
+#### 2. Every text element carries its own single, meaningful class
+
+A class is what makes an element **individually** styleable. Without one, the tenant selects the text and the editor can only offer "add a class first" — colour, font and size stay locked.
+
+```html
+<!-- ❌ styleable only as a group -->
+<h2>Our services</h2><p>Full colour and gloss.</p>
+<!-- ✅ each one addressable on its own -->
+<h2 class="services-title">Our services</h2>
+<p class="services-copy">Full colour and gloss.</p>
+```
+
+#### 3. Give every text element its OWN unique class as well — unique first
+
+A shared role class is right for the shared design, but on its own it means the tenant selects one label, changes its colour, and **all four change**. So every text element carries **two** classes: its own unique one **first**, then the shared role class. The CMS edits the first class by default, so a click-and-restyle affects exactly that element; switching to the shared pill restyles the whole set on purpose.
+
+Declare the unique class even when it is empty — that is what makes it an editable style rule in the CMS.
+
+```html
+<!-- ❌ all four labels move together, and only together -->
+<span class="stat-label">Founded in Lisbon</span>
+<span class="stat-label">Max departures per year</span>
+<!-- ✅ unique first, shared second -->
+<span class="stat-label-1 stat-label">Founded in Lisbon</span>
+<span class="stat-label-4 stat-label">Max departures per year</span>
+```
+```css
+.stat-label   { font-size: 12px; letter-spacing: 0.14em; }  /* the whole set */
+.stat-label-1 {}                                            /* just this one */
+.stat-label-4 {}
+```
+
+Prefer a meaningful unique name where one exists (`.stat-label-departures`); a numeric suffix is fine otherwise. A CMS-side inline style is **not** a substitute — a re-share overwrites the page and wipes it.
+
+> **Inside the shared `<header>`/`<nav>`/`<footer>`, the unique class must be the SAME on every page.** Those blocks are promoted to one shared component only while they are byte-identical across pages, so a per-page name (`nav-link-2` on one page, nothing on another) silently splits them into a separate copy per page — and editing the nav stops updating the other pages. Give chrome text elements reserved, page-independent names (`site-chrome-h1`, `site-chrome-f3`) and copy the block verbatim into every page. Only the active-state class (`is-active`) may differ per page; the importer strips it before comparing.
+
+#### 4. Style through that single class — never a descendant selector
+
+Only a **single bare class** (`.stat-value`) imports as an editable rule the tenant can change on one element. A descendant selector (`.stat-item strong`) imports as an **ambient** rule: it still renders correctly, but editing it changes **every** element it matches, so the tenant can't restyle just the one they clicked.
+
+```css
+/* ❌ edits hit all four stat blocks at once */
+.stat-item strong { font-size: 22px; color: var(--fg); }
+/* ✅ edits hit exactly the element the tenant selected */
+.stat-value { font-size: 22px; color: var(--fg); }
+```
+
+### Shared blocks — mark anything that repeats: `data-shared="name"`
+
+If the same block appears on more than one page (or twice on one page) — a CTA band, a contact strip, a newsletter box, a repeated card — put **`data-shared="a-name"`** on its outer element. The CMS turns each marked group into **one shared component**: it stays exactly where you put it on every page, and the tenant edits it **once** to update all of them. Without the marker each copy imports separately and the tenant has to repeat the same edit on every page.
+
+```html
+<!-- ✅ same block on 3 pages → ONE component named "Cta Band" -->
+<section class="cta-band" data-shared="cta-band">
+  <h2 class="cta-band-title">Ready when you are.</h2>
+  <a class="cta-band-action" href="contact.html">Plan a trip</a>
+</section>
+```
+
+**The copies must be byte-identical** — same markup, same classes, in the same order. The CMS groups by `(name + exact structure)`, so one different class splits the group and you silently get separate copies again. In particular, a shared block's **per-element unique classes must be the same on every page** (rule 3 above): name them from the block (`cta-band-title`), never from a per-page counter. Only the active-state class (`is-active`) may differ — the importer strips it before comparing.
+
+Use one `data-shared` name per distinct block; don't reuse a name for blocks that differ.
 
 ### Shared nav / footer + active state
 Keep `<nav>`/`<header>`/`<footer>` structurally identical across pages (they get promoted to one shared component). Set the nav active state at **runtime** with a small script (read `location.pathname`, toggle a class + `aria-current`), and scope component scripts to a **wrapper class**, not `getElementById` (so a shared component works on every page).
@@ -287,6 +373,11 @@ Don't block their workflow and don't lecture them. Figure out the compliant way 
 - [ ] **Every section is visible with CSS alone** — no JS-dismissed loading overlay, no `opacity:0`/`visibility:hidden` content revealed only by a JS-added class.
 - [ ] No hashed/`_astro` imports, no SPA hydration root.
 - [ ] JavaScript is **behavior only** on existing markup (menus, tabs, swaps); no `on*=` inline handlers; no asset paths hardcoded in script text.
-- [ ] No bare text beside an inline element — every run wrapped so all parts are editable.
+- [ ] **No bare text anywhere** — never text sitting directly inside a `<div>`/`<li>`/`<td>`/`<b>`/etc., and never a loose run beside a child element inside a heading. Every run is wrapped in its own `<span>`/`<p>`/heading so all of it is selectable.
+- [ ] **Every text element carries its own single, meaningful class** — so the tenant can restyle that one piece of text (colour, size, font) on its own.
+- [ ] **Every text element also has a UNIQUE class, listed first** (`class="stat-label-4 stat-label"`), declared in the CSS even if empty — otherwise editing one label restyles every label sharing that class.
+- [ ] **Every repeated block carries `data-shared="a-name"`** (CTA band, contact strip, repeated card) and its copies are byte-identical — so the tenant edits it once instead of on every page.
+- [ ] **`<header>`/`<nav>`/`<footer>` are byte-identical on every page** — same markup AND same classes (including the unique ones; use reserved `site-chrome-*` names). Only `is-active` may differ. Otherwise they stop being one shared component and each page keeps its own copy.
+- [ ] **Style text through that single class, never a descendant selector** — `.stat-label { }`, not `.stat-item strong { }` (a descendant rule edits every match at once).
 - [ ] **Every structural element carries a meaningful class** (`hero`, `services-grid`, `service-card-title`) — outer sections *and* nested blocks — so the Layers panel never reads "Container". Never rely on `container`/`wrapper`/`row`/`grid` alone.
 - [ ] Effects (animation/3D/filters/carousels) built with CSS + behavioral JS, never content-generating JS.

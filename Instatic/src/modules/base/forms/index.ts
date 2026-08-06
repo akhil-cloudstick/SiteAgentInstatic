@@ -165,6 +165,19 @@ export const FormModule: ModuleDefinition<FormProps> = {
   icon: FileTextSolidIcon,
   trusted: true,
   canHaveChildren: true,
+  // An empty <form> publishes only the honeypot, so a fresh insert arrives as
+  // the smallest form that actually works: one labelled field and a submit.
+  // The field carries a concrete `fieldId` rather than the schema's empty
+  // default because `formSettingsAnalysis` infers the target data table from
+  // field ids — two forms both carrying '' would collide.
+  defaultChildren: [
+    { moduleId: 'base.label', props: { text: 'Email' } },
+    {
+      moduleId: 'base.input',
+      props: { fieldId: 'email', name: 'email', id: 'email', inputType: 'email' },
+    },
+    { moduleId: 'base.submit', props: { label: 'Send' } },
+  ],
   schema: {
     mode: { type: 'select', label: 'Mode', options: [
       { label: 'CMS-native', value: 'cms' },
@@ -321,6 +334,11 @@ export const SelectModule: ModuleDefinition<SelectProps> = {
   icon: CheckboxSolidIcon,
   trusted: true,
   canHaveChildren: true,
+  // A <select> with no <option> renders as an unusable empty control.
+  defaultChildren: [
+    { moduleId: 'base.option', props: { value: 'option-1', label: 'Option 1' } },
+    { moduleId: 'base.option', props: { value: 'option-2', label: 'Option 2' } },
+  ],
   schema: {
     fieldId: { type: 'text', label: 'Field ID' },
     name: { type: 'text', label: 'Name' },
@@ -374,6 +392,11 @@ export const OptionGroupModule: ModuleDefinition<OptionGroupProps> = {
   icon: CheckboxSolidIcon,
   trusted: true,
   canHaveChildren: true,
+  // Same reasoning as base.select — an <optgroup> exists to hold options.
+  defaultChildren: [
+    { moduleId: 'base.option', props: { value: 'option-1', label: 'Option 1' } },
+    { moduleId: 'base.option', props: { value: 'option-2', label: 'Option 2' } },
+  ],
   schema: {
     label: { type: 'text', label: 'Label' },
     disabled: { type: 'toggle', label: 'Disabled' },

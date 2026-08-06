@@ -77,7 +77,7 @@ describe('CMS data client', () => {
     expect(tables[0].slug).toBe('posts')
     expect(tables[0].routeBase).toBe('/posts')
     expect(calls[0]).toMatchObject({
-      input: '/admin/api/cms/data/tables',
+      input: '/cms/api/cms/data/tables',
       init: { method: 'GET', credentials: 'include' },
     })
   })
@@ -103,7 +103,7 @@ describe('CMS data client', () => {
     expect(table.name).toBe('Articles')
     expect(table.slug).toBe('articles')
     expect(calls[0]).toMatchObject({
-      input: '/admin/api/cms/data/tables/posts',
+      input: '/cms/api/cms/data/tables/posts',
       init: {
         method: 'PATCH',
         credentials: 'include',
@@ -143,7 +143,7 @@ describe('CMS data client', () => {
     expect(table.id).toBe('products')
     expect(table.fields).toHaveLength(2)
     expect(calls[0]).toMatchObject({
-      input: '/admin/api/cms/data/tables',
+      input: '/cms/api/cms/data/tables',
       init: {
         method: 'POST',
         credentials: 'include',
@@ -172,11 +172,11 @@ describe('CMS data client', () => {
     })
 
     expect(calls[0]).toMatchObject({
-      input: '/admin/api/cms/data/tables/posts/rows',
+      input: '/cms/api/cms/data/tables/posts/rows',
       init: { method: 'GET', credentials: 'include' },
     })
     expect(calls[1]).toMatchObject({
-      input: '/admin/api/cms/data/tables/posts/rows',
+      input: '/cms/api/cms/data/tables/posts/rows',
       init: {
         method: 'POST',
         credentials: 'include',
@@ -200,7 +200,7 @@ describe('CMS data client', () => {
     expect(row?.id).toBe('row/1')
     expect(missing).toBeNull()
     expect(calls[0]).toMatchObject({
-      input: '/admin/api/cms/data/rows/row%2F1',
+      input: '/cms/api/cms/data/rows/row%2F1',
       init: { method: 'GET', credentials: 'include' },
     })
   })
@@ -229,7 +229,7 @@ describe('CMS data client', () => {
       roleName: 'Editor',
     }])
     expect(calls[0]).toMatchObject({
-      input: '/admin/api/cms/data/authors',
+      input: '/cms/api/cms/data/authors',
       init: { method: 'GET', credentials: 'include' },
     })
   })
@@ -270,7 +270,7 @@ describe('CMS data client', () => {
     })
 
     expect(calls[0]).toMatchObject({
-      input: '/admin/api/cms/data/rows/row_1',
+      input: '/cms/api/cms/data/rows/row_1',
       init: {
         method: 'PATCH',
         credentials: 'include',
@@ -279,7 +279,7 @@ describe('CMS data client', () => {
     })
     expect(calls[0].init?.body).toBe(JSON.stringify(draft))
     expect(calls[1]).toMatchObject({
-      input: '/admin/api/cms/data/rows/row_1/publish',
+      input: '/cms/api/cms/data/rows/row_1/publish',
       init: { method: 'POST', credentials: 'include' },
     })
   })
@@ -299,7 +299,7 @@ describe('CMS data client', () => {
 
     expect(row.status).toBe('unpublished')
     expect(calls[0]).toMatchObject({
-      input: '/admin/api/cms/data/rows/row_1/status',
+      input: '/cms/api/cms/data/rows/row_1/status',
       init: {
         method: 'PATCH',
         credentials: 'include',
@@ -324,7 +324,7 @@ describe('CMS data client', () => {
 
     expect(row.tableId).toBe('products')
     expect(calls[0]).toMatchObject({
-      input: '/admin/api/cms/data/rows/row_1/table',
+      input: '/cms/api/cms/data/rows/row_1/table',
       init: {
         method: 'PATCH',
         credentials: 'include',
@@ -349,7 +349,7 @@ describe('CMS data client', () => {
 
     expect(row.authorUserId).toBe('user_author_2')
     expect(calls[0]).toMatchObject({
-      input: '/admin/api/cms/data/rows/row_1/author',
+      input: '/cms/api/cms/data/rows/row_1/author',
       init: {
         method: 'PATCH',
         credentials: 'include',
@@ -389,11 +389,11 @@ describe('CMS data client', () => {
     })
 
     expect(calls[0]).toMatchObject({
-      input: '/admin/api/cms/data/rows/row_1',
+      input: '/cms/api/cms/data/rows/row_1',
       init: { method: 'DELETE', credentials: 'include' },
     })
     expect(calls[1]).toMatchObject({
-      input: '/admin/api/cms/data/tables/products',
+      input: '/cms/api/cms/data/tables/products',
       init: { method: 'DELETE', credentials: 'include' },
     })
   })

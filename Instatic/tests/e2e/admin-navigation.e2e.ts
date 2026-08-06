@@ -19,13 +19,13 @@ test.describe('admin navigation', () => {
   test('moves between Site, Content, Plugins, Users, and Account', async ({
     page,
   }) => {
-    await page.goto('/admin/site')
+    await page.goto('/cms/site')
     await expectEditorReady(page)
     await expectActiveSection(page, 'Site')
 
-    await navigateSection(page, 'Content', '/admin/content')
-    await navigateSection(page, 'Plugins', '/admin/plugins')
-    await navigateSection(page, 'Users', '/admin/users')
+    await navigateSection(page, 'Content', '/cms/content')
+    await navigateSection(page, 'Plugins', '/cms/plugins')
+    await navigateSection(page, 'Users', '/cms/users')
 
     await test.step('reach Account from the account menu', async () => {
       await page.getByTestId('account-menu-trigger').click()
@@ -38,7 +38,7 @@ test.describe('admin navigation', () => {
   test('keeps global toolbar actions available and updates open-live targets (ADMIN-003)', async ({
     page,
   }) => {
-    await page.goto('/admin/dashboard')
+    await page.goto('/cms/dashboard')
     await expect(page.getByRole('heading', { name: 'Overview' })).toBeVisible()
 
     await test.step('dashboard toolbar exposes global actions and opens the live site root', async () => {
@@ -64,7 +64,7 @@ test.describe('admin navigation', () => {
       const title = `ADMIN-003 Toolbar ${suffix}`
       const slug = `admin-003-toolbar-${suffix}`
 
-      await page.goto('/admin/content')
+      await page.goto('/cms/content')
       await expect(page.getByTestId('content-explorer-panel')).toBeVisible({ timeout: 20_000 })
       await page.getByRole('button', { name: 'New post', exact: true }).click()
       await page.getByRole('textbox', { name: 'Title', exact: true }).fill(title)
@@ -126,7 +126,7 @@ test.describe('admin navigation', () => {
     let previousLayout: string | null = null
 
     try {
-      await page.goto('/admin/content')
+      await page.goto('/cms/content')
       previousLayout = await page.evaluate((key) => localStorage.getItem(key), EDITOR_LAYOUT_STORAGE_KEY)
       await page.evaluate((key) => localStorage.removeItem(key), EDITOR_LAYOUT_STORAGE_KEY)
       await page.reload()
@@ -246,7 +246,7 @@ test.describe('admin settings', () => {
   test('opens global settings, persists preferences, and stays contained at mobile width (ADMIN-004)', async ({
     page,
   }) => {
-    await page.goto('/admin/dashboard')
+    await page.goto('/cms/dashboard')
     await expect(page.getByRole('heading', { name: 'Overview' })).toBeVisible()
 
     const previousPrefs = await page.evaluate((key) => localStorage.getItem(key), EDITOR_PREFS_KEY)
@@ -272,7 +272,7 @@ test.describe('admin settings', () => {
         await switchSettingsSection(dialog, 'Publishing')
         const publishing = dialog.getByRole('region', { name: 'Publishing' })
         await expect(publishing.getByText('Runtime', { exact: true })).toBeVisible()
-        await expect(publishing.getByText('/admin', { exact: true })).toBeVisible()
+        await expect(publishing.getByText('/cms', { exact: true })).toBeVisible()
         await expect(
           publishing.getByRole('switch', {
             name: 'Tree-shake generated framework utilities',

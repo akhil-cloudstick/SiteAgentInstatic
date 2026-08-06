@@ -16,7 +16,7 @@ import { jsonResponse, methodNotAllowed } from '../../http'
 
 export async function handleSiteRoutes(req: Request, db: DbClient): Promise<Response | null> {
   const url = new URL(req.url)
-  if (url.pathname !== '/admin/api/cms/site') return null
+  if (url.pathname !== '/cms/api/cms/site') return null
   if (req.method !== 'GET') return methodNotAllowed()
 
   const user = await requireCapability(req, db, 'site.read')

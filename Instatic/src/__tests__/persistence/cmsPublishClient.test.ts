@@ -12,7 +12,7 @@ describe('publishCmsDraft', () => {
 
     expect(result).toEqual({ publishedPages: 2 })
     expect(calls[0]).toMatchObject({
-      input: '/admin/api/cms/publish',
+      input: '/cms/api/cms/publish',
       init: { method: 'POST', credentials: 'include' },
     })
   })
@@ -40,7 +40,7 @@ describe('publishCmsDraft', () => {
 
     expect(result.draftMatchesPublished).toBe(true)
     expect(calls[0]).toMatchObject({
-      input: '/admin/api/cms/publish/status',
+      input: '/cms/api/cms/publish/status',
       init: { method: 'GET', credentials: 'include' },
     })
   })

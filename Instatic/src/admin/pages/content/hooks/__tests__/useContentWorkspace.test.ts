@@ -68,14 +68,14 @@ function row(id: string, tableId: string, title: string): DataRow {
 describe('useContentWorkspace document navigation', () => {
   it('finishes loading when a deep link targets the fallback collection', async () => {
     const post = row('post-1', 'posts', 'Post')
-    window.history.replaceState({}, '', '/admin/content?table=posts&row=post-1')
+    window.history.replaceState({}, '', '/cms/content?table=posts&row=post-1')
     globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input)
       const method = init?.method ?? 'GET'
-      if (url === '/admin/api/cms/data/tables' && method === 'GET') {
+      if (url === '/cms/api/cms/data/tables' && method === 'GET') {
         return json({ tables: [table('posts', 'Posts')] })
       }
-      if (url === '/admin/api/cms/data/tables/posts/rows' && method === 'GET') {
+      if (url === '/cms/api/cms/data/tables/posts/rows' && method === 'GET') {
         return json({ rows: [post] })
       }
       return json({ error: `Unhandled ${method} ${url}` }, 500)
@@ -99,13 +99,13 @@ describe('useContentWorkspace document navigation', () => {
     globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input)
       const method = init?.method ?? 'GET'
-      if (url === '/admin/api/cms/data/tables' && method === 'GET') {
+      if (url === '/cms/api/cms/data/tables' && method === 'GET') {
         return json({ tables: [table('posts', 'Posts'), table('articles', 'Articles')] })
       }
-      if (url === '/admin/api/cms/data/tables/posts/rows' && method === 'GET') {
+      if (url === '/cms/api/cms/data/tables/posts/rows' && method === 'GET') {
         return json({ rows: [post] })
       }
-      if (url === '/admin/api/cms/data/tables/articles/rows' && method === 'GET') {
+      if (url === '/cms/api/cms/data/tables/articles/rows' && method === 'GET') {
         return articleList
       }
       return json({ error: `Unhandled ${method} ${url}` }, 500)

@@ -34,7 +34,7 @@ export async function handlePublishRoutes(
 ): Promise<Response | null> {
   const url = new URL(req.url)
 
-  if (url.pathname === '/admin/api/cms/publish') {
+  if (url.pathname === '/cms/api/cms/publish') {
     const user = await requireCapability(req, db, 'pages.publish')
     if (user instanceof Response) return user
     if (req.method !== 'POST') return methodNotAllowed()
@@ -66,7 +66,7 @@ export async function handlePublishRoutes(
     return jsonResponse(result)
   }
 
-  if (url.pathname === '/admin/api/cms/publish/status') {
+  if (url.pathname === '/cms/api/cms/publish/status') {
     const user = await requireCapability(req, db, 'site.read')
     if (user instanceof Response) return user
     if (req.method !== 'GET') return methodNotAllowed()

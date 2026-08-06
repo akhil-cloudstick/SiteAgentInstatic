@@ -65,12 +65,12 @@ const LazySpotlight = lazy(() =>
 // ─── Workspace detection ──────────────────────────────────────────────────────
 
 function workspaceFromPathname(pathname: string): AdminWorkspace {
-  if (pathname.startsWith('/admin/content')) return 'content'
-  if (pathname.startsWith('/admin/data')) return 'data'
-  if (pathname.startsWith('/admin/media')) return 'media'
-  if (pathname.startsWith('/admin/plugins')) return 'plugins'
-  if (pathname.startsWith('/admin/users')) return 'users'
-  if (pathname.startsWith('/admin/account')) return 'account'
+  if (pathname.startsWith('/cms/content')) return 'content'
+  if (pathname.startsWith('/cms/data')) return 'data'
+  if (pathname.startsWith('/cms/media')) return 'media'
+  if (pathname.startsWith('/cms/plugins')) return 'plugins'
+  if (pathname.startsWith('/cms/users')) return 'users'
+  if (pathname.startsWith('/cms/account')) return 'account'
   return 'site'
 }
 

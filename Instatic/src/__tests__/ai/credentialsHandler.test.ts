@@ -69,7 +69,7 @@ describe('AI credential handler', () => {
     `)
 
     console.warn = () => {}
-    const res = await harness.ai('/admin/api/ai/credentials', {
+    const res = await harness.ai('/cms/api/ai/credentials', {
       method: 'POST',
       cookie,
       json: {
@@ -115,7 +115,7 @@ describe('AI credential handler', () => {
       return originalFetch(input)
     }
 
-    const res = await harness.ai('/admin/api/ai/credentials', {
+    const res = await harness.ai('/cms/api/ai/credentials', {
       method: 'POST',
       cookie,
       json: {
@@ -146,7 +146,7 @@ describe('AI credential handler', () => {
       throw new Error(`model lookup failed with ${apiKey}`)
     }
 
-    const res = await harness.ai('/admin/api/ai/credentials', {
+    const res = await harness.ai('/cms/api/ai/credentials', {
       method: 'POST',
       cookie,
       json: {
@@ -169,7 +169,7 @@ describe('AI credential handler', () => {
 
     const cookie = await harness.setupOwner()
 
-    const res = await harness.ai('/admin/api/ai/credentials', {
+    const res = await harness.ai('/cms/api/ai/credentials', {
       method: 'POST',
       cookie,
       json: {
@@ -189,7 +189,7 @@ describe('AI credential handler', () => {
   it('redacts API keys from credential test failures', async () => {
     const cookie = await harness.setupOwner()
     const apiKey = 'sk-proj-test-endpoint-redaction'
-    const createRes = await harness.ai('/admin/api/ai/credentials', {
+    const createRes = await harness.ai('/cms/api/ai/credentials', {
       method: 'POST',
       cookie,
       json: {
@@ -204,7 +204,7 @@ describe('AI credential handler', () => {
       throw new Error(`provider echoed ${apiKey}`)
     }
 
-    const testRes = await harness.ai(`/admin/api/ai/credentials/${createBody.credential.id}/test`, {
+    const testRes = await harness.ai(`/cms/api/ai/credentials/${createBody.credential.id}/test`, {
       method: 'POST',
       cookie,
     })
@@ -231,7 +231,7 @@ describe('AI credential handler', () => {
       return originalFetch(input)
     }
 
-    const createRes = await harness.ai('/admin/api/ai/credentials', {
+    const createRes = await harness.ai('/cms/api/ai/credentials', {
       method: 'POST',
       cookie,
       json: {
@@ -245,7 +245,7 @@ describe('AI credential handler', () => {
     expect(createRes.status).toBe(201)
     const createBody = await readJson<{ credential: { id: string } }>(createRes)
 
-    const testRes = await harness.ai(`/admin/api/ai/credentials/${createBody.credential.id}/test`, {
+    const testRes = await harness.ai(`/cms/api/ai/credentials/${createBody.credential.id}/test`, {
       method: 'POST',
       cookie,
     })

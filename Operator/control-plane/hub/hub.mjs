@@ -4,6 +4,8 @@
 //   /hub            advanced -> two cards (OpenDesign + Instatic); lite -> straight to OpenDesign
 //   /logout
 // SSO into each tool is a short-lived signed token the tool validates (Phase 3/4).
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import config from '../lib/env.mjs';
 import { getTenant } from '../registry/tenants.mjs';
 import { validateLogin, acceptInvite, findByInviteToken } from '../registry/tenantUsers.mjs';
@@ -12,6 +14,29 @@ import { signValue, verifyValue } from '../lib/crypto.mjs';
 const SESSION_COOKIE = 'sa_hub';
 const SESSION_TTL_SEC = 7 * 24 * 3600;
 const SSO_TTL_SEC = 120;
+
+// The hub pages (/login, /hub, /invite) must show the SAME MMS mark as the CMS and
+// the design studio — three different icons across one product reads as three
+// different products. OpenDesign and Instatic ship byte-identical favicons, so we
+// reuse that exact file rather than drawing our own.
+//
+// It is inlined as a data URI (read once at startup) instead of served from a
+// route: a bare `/favicon.ico` request would fall through the gateway to the CMS
+// catch-all rather than reaching the control plane.
+const FAVICON_TAG = (() => {
+  const candidates = [
+    resolve(config.openDesignDir, 'apps', 'web', 'public', 'favicon-32x32.png'),
+    resolve(config.instaticDir ?? '', 'public', 'favicon-32x32.png'),
+  ];
+  for (const file of candidates) {
+    try {
+      const b64 = readFileSync(file).toString('base64');
+      return `<link rel="icon" type="image/png" sizes="32x32" href="data:image/png;base64,${b64}">`;
+    } catch { /* try the next candidate */ }
+  }
+  console.warn('[hub] MMS favicon not found; hub pages will show the browser default');
+  return '';
+})();
 
 // ---- low-level helpers ---------------------------------------------------
 function html(res, code, body) {
@@ -44,12 +69,29 @@ function parseCookies(req) {
   });
   return out;
 }
+// SameSite=None (not Lax) because this cookie now decides WHICH TENANT a request
+// is routed to, and some of those requests come from OpenDesign's preview iframes.
+// Those are sandboxed WITHOUT allow-same-origin, so the browser treats their
+// requests as cross-site and withholds a Lax cookie — the gateway would then see
+// no session and answer "not signed in" for every raw file in a preview.
+// Requires Secure, which we have (the funnel is HTTPS). CSRF is still covered:
+// the OD daemon validates Origin against OD_ALLOWED_ORIGINS, and state-changing
+// hub routes are POST-only.
 function sessionCookie(slug) {
   const val = signValue({ sub: slug, kind: 'hub' }, SESSION_TTL_SEC);
-  return `${SESSION_COOKIE}=${val}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${SESSION_TTL_SEC}`;
+  return `${SESSION_COOKIE}=${val}; HttpOnly; Path=/; SameSite=None; Secure; Max-Age=${SESSION_TTL_SEC}`;
 }
 function clearCookie() {
-  return `${SESSION_COOKIE}=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0`;
+  return `${SESSION_COOKIE}=; HttpOnly; Path=/; SameSite=None; Secure; Max-Age=0`;
+}
+
+// Where to send the user after a successful login. `next` comes from
+// /login?next=… (set by the gateway when it bounces an unauthenticated page
+// request). Only same-origin ABSOLUTE PATHS are accepted — never a full URL, and
+// never `//host` — so this cannot be turned into an open redirect.
+function safeNext(raw) {
+  if (typeof raw !== 'string' || !raw.startsWith('/') || raw.startsWith('//')) return null;
+  return raw;
 }
 function currentSlug(req) {
   const p = verifyValue(parseCookies(req)[SESSION_COOKIE]);
@@ -67,18 +109,21 @@ export function ssoUrl(tenant, target) {
   if (target === 'instatic') {
     // Root path -> the gateway's session-routed catch-all forwards it to THIS
     // tenant's Instatic (the request carries the sa_hub cookie set at login).
-    return `${config.gatewayOrigin}/admin/api/cms/sso?token=${encodeURIComponent(token)}`;
+    return `${config.gatewayOrigin}/cms/api/cms/sso?token=${encodeURIComponent(token)}`;
   }
-  // OpenDesign: /od/<slug>/* -> the tenant's Next.js web (basePath=/od/<slug>),
-  // which proxies /sso (and /api,/artifacts,/frames) to the daemon.
-  return `${config.gatewayOrigin}/od/${tenant.slug}/sso?token=${encodeURIComponent(token)}`;
+  // OpenDesign: the tenant-agnostic /od mount. The gateway splits /od/sso off to
+  // THIS tenant's daemon using the sa_hub cookie set at login — exactly like the
+  // Instatic hand-off above. No slug in the URL: one shared Next build serves
+  // every tenant (see docs/opendesign-shared-web-build.md).
+  return `${config.gatewayOrigin}/design/sso?token=${encodeURIComponent(token)}`;
 }
 
 // ---- page templates ------------------------------------------------------
 function shell(title, inner) {
   return `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>${esc(title)}</title>
+<title>${esc(title)} · MMS Design</title>
+${FAVICON_TAG}
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&family=Nunito+Sans:wght@400;500;600;700;800&display=swap">
@@ -109,12 +154,14 @@ function shell(title, inner) {
 </style></head><body><div class="wrap">${inner}</div></body></html>`;
 }
 
-function loginPage(err) {
+function loginPage(err, next) {
   return shell('Sign in', `
     <h1>Sign in</h1>
     <p class="muted">One login for your design studio and CMS.</p>
     ${err ? `<div class="err">${esc(err)}</div>` : ''}
+    ${next ? '<p class="muted">Your session expired — sign in to pick up where you left off.</p>' : ''}
     <form method="POST" action="/login">
+      ${next ? `<input type="hidden" name="next" value="${esc(next)}" />` : ''}
       <label>Email or account</label>
       <input name="identifier" autocomplete="username" autofocus required />
       <label>Password</label>
@@ -159,15 +206,61 @@ function hubPage(tenant) {
 // ---- router --------------------------------------------------------------
 // Returns true if it handled the request.
 export async function handleHub(req, res, method, path) {
-  // GET /login
-  if (path === '/login' && method === 'GET') { html(res, 200, loginPage()); return true; }
+  // GET /sso/<tool>?next=<path> — SILENT RE-SSO. This is what makes "one login"
+  // hold in production. A tool session (Instatic's admin cookie, OD's od_session)
+  // is shorter-lived than the hub session and is missing entirely when a user
+  // arrives by bookmark or in a fresh browser profile. Without this route each
+  // tool falls back to ITS OWN login form — which is the second login we never
+  // want to see. Instead both tools redirect here, and:
+  //   • hub session valid  -> mint a fresh SSO token, hand off, land on `next`.
+  //     The user sees a redirect, never a form.
+  //   • hub session absent -> /login once, then straight back through here.
+  // Tools only fall back to their own login when they are NOT hub-managed
+  // (standalone installs), which is exactly the right behaviour.
+  const ssoRoute = path.match(/^\/sso\/(design|cms)$/);
+  if (ssoRoute && method === 'GET') {
+    const tool = ssoRoute[1];
+    const next = safeNext(new URL(req.url, 'http://x').searchParams.get('next'));
+    const slug = currentSlug(req);
+    if (!slug) {
+      // Come back here after signing in, so the hand-off still happens.
+      const back = `/sso/${tool}${next ? `?next=${encodeURIComponent(next)}` : ''}`;
+      redirect(res, `/login?next=${encodeURIComponent(back)}`);
+      return true;
+    }
+    const tenant = await getTenant(slug);
+    if (!tenant) { redirect(res, '/login'); return true; }
+    const target = tool === 'cms' ? 'instatic' : 'od';
+    let url = ssoUrl(tenant, target);
+    if (next) url += `&redirect=${encodeURIComponent(next)}`;
+    redirect(res, url);
+    return true;
+  }
+
+
+  // GET /login[?next=/design/...] — carry `next` through the form so a session
+  // that expired mid-edit returns the user to the page they were on.
+  if (path === '/login' && method === 'GET') {
+    const next = safeNext(new URL(req.url, 'http://x').searchParams.get('next'));
+    html(res, 200, loginPage(null, next));
+    return true;
+  }
 
   // POST /login
   if (path === '/login' && method === 'POST') {
     const f = await readForm(req);
+    const next = safeNext(f.next);
     const slug = await validateLogin(f.identifier, f.password);
-    if (!slug) { html(res, 401, loginPage('Wrong email/account or password.')); return true; }
-    redirect(res, '/hub', sessionCookie(slug));
+    if (!slug) { html(res, 401, loginPage('Wrong email/account or password.', next)); return true; }
+    // Back to where they were. If they signed in as a DIFFERENT tenant the deep
+    // link is not theirs to open, so drop them at that tool's home instead of a
+    // 404: /design/... -> /design, anything else -> /hub.
+    let target = '/hub';
+    if (next) {
+      const sameTenant = currentSlug(req) === null || currentSlug(req) === slug;
+      target = sameTenant ? next : (next.startsWith('/design') ? '/design' : '/hub');
+    }
+    redirect(res, target, sessionCookie(slug));
     return true;
   }
 

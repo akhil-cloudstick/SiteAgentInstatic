@@ -19,7 +19,7 @@ export function getMediaCommands(): Command[] {
       capability: 'media.write',
       run: (ctx) => {
         queuePendingAction('media.upload')
-        ctx.navigate('/admin/media')
+        ctx.navigate('/cms/media')
       },
     },
 
@@ -35,7 +35,7 @@ export function getMediaCommands(): Command[] {
       capability: 'media.write',
       run: (ctx) => {
         queuePendingAction('media.newFolder')
-        ctx.navigate('/admin/media')
+        ctx.navigate('/cms/media')
       },
     },
   ]

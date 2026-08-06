@@ -1,7 +1,7 @@
 /**
  * Dashboard widget types.
  *
- * The admin dashboard (`/admin/dashboard`) renders a configurable grid of
+ * The admin dashboard (`/cms/dashboard`) renders a configurable grid of
  * widgets. First-party widgets (Pages, Storage, AI usage, …) are registered
  * during admin bootstrap; plugins register their own widgets via
  * `api.dashboard.widgets.register(...)` exposed through the plugin SDK.

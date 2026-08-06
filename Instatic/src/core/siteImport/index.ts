@@ -60,6 +60,8 @@ export type { SiteImportAdapter, SiteImportTransaction } from './adapter'
 
 // ── Phase 2 — top-level orchestration ────────────────────────────────────────
 
+export { detectGlobalSections, detectSharedBlocks } from './globalSections'
+
 export { buildImportPlan } from './buildPlan'
 export { commitImportPlan } from './commitPlan'
 
@@ -88,6 +90,9 @@ export type {
   ImportFontToken,
   ImportScriptDependency,
   ImportScript,
+  // shared components
+  GlobalSectionCandidate,
+  SharedBlockCandidate,
 } from './types'
 
 // ── Error classes (callers need instanceof checks) ────────────────────────────

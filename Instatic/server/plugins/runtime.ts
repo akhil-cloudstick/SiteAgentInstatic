@@ -13,7 +13,7 @@
  * This module is the thin orchestration layer between the rest of the
  * CMS server and the worker host. It owns:
  *   - Path-containment safety (`assertPathWithin`)
- *   - The HTTP entrypoint for `/admin/api/cms/plugins/:id/runtime/...`
+ *   - The HTTP entrypoint for `/cms/api/cms/plugins/:id/runtime/...`
  *   - The boot-time activation loop
  *
  * The plugin settings cache (seeded into each worker's local `settings.get`
@@ -203,7 +203,7 @@ export async function loadPluginModulePack(
 }
 
 // ---------------------------------------------------------------------------
-// HTTP runtime forwarder — `/admin/api/cms/plugins/:id/runtime/...`
+// HTTP runtime forwarder — `/cms/api/cms/plugins/:id/runtime/...`
 // ---------------------------------------------------------------------------
 
 export async function handleServerPluginRuntimeRequest(

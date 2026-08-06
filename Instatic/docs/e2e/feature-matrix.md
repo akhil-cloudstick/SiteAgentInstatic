@@ -140,7 +140,7 @@ Page management note: `page-management.e2e.ts` creates disposable pages from the
 | BUILDER-002 | P1 | ✅ | Selection | Select canvas nodes and edit properties | Page with modules | Canvas and properties panel | Selection is obvious and property edits apply | lost selection, wrong node edited |
 | BUILDER-003 | P1 | ✅ | DOM Panel | Reorder nodes in the tree | Page with nested modules | DOM panel drag/drop | Canvas order matches tree order | impossible drop targets, bad affordance |
 | BUILDER-004 | P1 | partial | Canvas Drag | Reorder nodes directly on canvas | Page with modules | Canvas drag/drop | Drop target and final order are clear | jumpy drag, scroll/zoom conflict |
-| BUILDER-005 | P1 | ✅ | Undo/Redo | Undo and redo edits | Edited page | Toolbar/shortcuts | State moves predictably backward/forward | partial undo, UI desync |
+| BUILDER-005 | P1 | ✅ | Undo/Redo | Undo and redo edits | Edited page | Keyboard shortcuts (Ctrl/Cmd+Z, Ctrl/Cmd+Shift+Z) | State moves predictably backward/forward | partial undo, UI desync |
 | BUILDER-006 | P2 | ✅ | Styling | Apply spacing, color, and typography | Selected node | Properties and class controls | Visual result matches settings | token label confusion, no preview |
 | BUILDER-007 | P2 | ✅ | Breakpoints | Edit mobile/tablet/desktop variants | Page with content | Breakpoint selector | Variant changes are scoped and understandable | accidental global change, clipped UI |
 | BUILDER-008 | P2 | partial | Formatted content | Render formatted post content | Content entry with rich body | Content outlet or text bindings | Formatting persists and publishes cleanly | binding confusion, sanitization surprises |

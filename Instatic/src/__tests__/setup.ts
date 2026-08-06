@@ -128,7 +128,7 @@ for (const key of GLOBALS_TO_COPY) {
 //
 // Admin surfaces load user preferences on mount (e.g. the module-inserter
 // favourites via `useModuleInserterPreference` → `getUserPreference`), which
-// fires a real `fetch` to `/admin/api/cms/me/preferences/<key>`. In tests that
+// fires a real `fetch` to `/cms/api/cms/me/preferences/<key>`. In tests that
 // hits `http://localhost` and rejects with ECONNREFUSED. Because the
 // preference store is a module-level singleton whose load promise can outlive
 // the component that triggered it, that rejection surfaces during a LATER
@@ -143,7 +143,7 @@ for (const key of GLOBALS_TO_COPY) {
 // bypass this entirely.
 {
   const realFetch = globalThis.fetch
-  const PREFERENCES_PATH = '/admin/api/cms/me/preferences/'
+  const PREFERENCES_PATH = '/cms/api/cms/me/preferences/'
   ;(globalThis as Record<string, unknown>).fetch = (async (
     input: RequestInfo | URL,
     init?: RequestInit,

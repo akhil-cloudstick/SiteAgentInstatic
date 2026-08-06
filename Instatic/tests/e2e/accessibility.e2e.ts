@@ -6,7 +6,7 @@ import {
   createPage,
   expectEditorReady,
   expectLoggedIn,
-  insertNotchModule,
+  insertModule,
   login,
   openSiteEditor,
   publishDraft,
@@ -27,7 +27,7 @@ test.describe('keyboard access', () => {
   test.use({ storageState: ANONYMOUS_STATE })
 
   test('logs in with the keyboard only (A11Y-001)', async ({ page }) => {
-    await page.goto('/admin')
+    await page.goto('/cms')
     await expect(page.getByRole('heading', { name: 'Admin Login' })).toBeVisible()
 
     const email = page.getByLabel('Email')
@@ -49,7 +49,7 @@ test.describe('keyboard shell navigation', () => {
   test('navigates the admin shell with keyboard controls (A11Y-002)', async ({
     page,
   }) => {
-    await page.goto('/admin/site')
+    await page.goto('/cms/site')
     await expectEditorReady(page)
 
     await activateToolbarLink(page, 'Content', /\/admin\/content$/)
@@ -77,7 +77,7 @@ test.describe('keyboard shell navigation', () => {
 test.describe('responsive', () => {
   test('admin editor is usable at tablet width (RESP-001)', async ({ page }) => {
     await page.setViewportSize({ width: 768, height: 1024 })
-    await page.goto('/admin/site')
+    await page.goto('/cms/site')
 
     // Core editor chrome renders without the canvas collapsing at tablet width.
     await expect(page.getByTestId('toolbar')).toBeVisible()
@@ -103,7 +103,7 @@ test.describe('public responsive', () => {
     await login(page)
     await openSiteEditor(page)
     await createPage(page, title, slug)
-    await insertNotchModule(page, 'text')
+    await insertModule(page, 'text')
     await setPropValue(page, 'text', text)
     await expect(canvasFrame(page).getByText(text)).toBeVisible()
     await saveDraft(page)

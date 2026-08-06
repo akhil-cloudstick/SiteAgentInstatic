@@ -11,7 +11,7 @@
  *   2. We synthesise a `mediaUploadPlaceholder` node at the drop position (or
  *      at the caret for paste) with a stable `uploadId` and a local object-URL
  *      preview.
- *   3. We kick off `uploadMediaInline` against `/admin/api/cms/media` with an
+ *   3. We kick off `uploadMediaInline` against `/cms/api/cms/media` with an
  *      AbortController, updating the placeholder's `progress` attr as bytes
  *      stream.
  *   4. On success: walk the doc to find the placeholder by `uploadId` and
