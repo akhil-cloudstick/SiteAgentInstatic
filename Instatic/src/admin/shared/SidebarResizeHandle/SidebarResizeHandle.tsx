@@ -5,6 +5,7 @@ import {
   SIDEBAR_MIN_WIDTH,
   clampSidebarWidth,
 } from '@admin/state/workspaceLayout'
+import { cn } from '@ui/cn'
 import styles from './SidebarResizeHandle.module.css'
 
 const KEYBOARD_STEP = 10
@@ -19,6 +20,13 @@ interface SidebarResizeHandleProps {
   layoutCssVariable?: string
   ariaLabel: string
   onResize: (width: number) => void
+  /**
+   * Optional per-workspace appearance override, composed after the shared
+   * `.handle` class. The Content workspace uses it to apply its reference's
+   * 44px hit area and 2px accent bar without forking the drag / keyboard
+   * behaviour. Callers that omit it are byte-identical to before.
+   */
+  className?: string
 }
 
 interface ResizeDragState {
@@ -47,6 +55,7 @@ export function SidebarResizeHandle({
   layoutCssVariable,
   ariaLabel,
   onResize,
+  className,
 }: SidebarResizeHandleProps) {
   const handleRef = useRef<HTMLDivElement>(null)
   const widthRef = useRef(clampSidebarWidth(width))
@@ -126,7 +135,7 @@ export function SidebarResizeHandle({
       aria-label={ariaLabel}
       tabIndex={0}
       data-side={side}
-      className={styles.handle}
+      className={cn(styles.handle, className)}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}

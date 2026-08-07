@@ -6,48 +6,51 @@
 
 /* The editable ProseMirror surface. The class is applied directly to the
  * `contenteditable` root by Tiptap (via `editorProps.attributes.class`). */
+/* Body type scale transcribed from the MMSBUILD Content reference
+ * (`screens/content/src/styles.css` → `.tiptap-prose`). */
 .proseSurface {
-    min-height: 220px;
-    color: var(--text);
-    font-size: var(--text-xl);
-    line-height: 1.65;
+    min-height: var(--content-prose-min-h);
+    color: var(--mms-text);
+    font-size: var(--content-text-15);
+    font-weight: 430;
+    line-height: 1.7;
     outline: none;
 }
 
 .proseSurface:focus,
 .proseSurface:focus-visible {
     outline: none;
-    box-shadow: none;
+    box-shadow: -2px 0 0 var(--content-accent-soft);
 }
 
 /* Headings */
 
-.proseSurface :global(h2),
-.proseSurface :global(h3),
-.proseSurface :global(h4) {
-    margin: 1em 0 0.35em;
-    color: var(--text);
-    font-weight: 720;
-    line-height: 1.2;
-    letter-spacing: -0.005em;
-}
-
 .proseSurface :global(h2) {
-    font-size: var(--text-5xl);
+    margin: var(--content-sp-30) var(--content-sp-0) var(--content-sp-12);
+    color: var(--mms-text);
+    font-size: var(--content-text-23);
+    line-height: 1.2;
+    letter-spacing: -0.02em;
 }
 
 .proseSurface :global(h3) {
-    font-size: var(--text-4xl);
+    margin: var(--content-sp-24) var(--content-sp-0) var(--content-sp-10);
+    color: var(--mms-text);
+    font-size: var(--content-text-18);
+    line-height: 1.25;
 }
 
 .proseSurface :global(h4) {
-    font-size: var(--text-2xl);
+    margin: var(--content-sp-24) var(--content-sp-0) var(--content-sp-10);
+    color: var(--mms-text);
+    font-size: var(--content-text-15);
+    line-height: 1.25;
 }
 
 /* Paragraphs */
 
 .proseSurface :global(p) {
-    margin: 0 0 0.7em;
+    margin: var(--content-sp-0) var(--content-sp-0) var(--content-sp-21);
 }
 
 .proseSurface :global(p:last-child) {
@@ -75,20 +78,20 @@
 }
 
 .proseSurface :global(code) {
-    padding: var(--space-px) var(--space-2xs);
-    border-radius: var(--radius-sm);
-    background: var(--bg-surface-3);
-    color: var(--text);
+    padding: var(--content-sp-2) var(--content-sp-4);
+    border-radius: var(--content-radius-2);
+    background: var(--content-surface-hover);
+    color: var(--mms-text);
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: 0.92em;
+    font-size: 0.9em;
 }
 
 /* Lists */
 
 .proseSurface :global(ul),
 .proseSurface :global(ol) {
-    margin: 0 0 0.7em;
-    padding-left: 1.4em;
+    margin: var(--content-sp-0) var(--content-sp-0) var(--content-sp-21);
+    padding-left: var(--content-sp-24);
 }
 
 .proseSurface :global(li) {
@@ -102,11 +105,11 @@
 /* Blockquote */
 
 .proseSurface :global(blockquote) {
-    margin: 0.5em 0 0.9em;
-    padding: 0.2em 0 0.2em var(--space-xl);
-    border-left: 3px solid var(--border);
-    color: var(--text-muted);
-    font-style: italic;
+    margin: var(--content-sp-24) var(--content-sp-0);
+    padding: var(--content-sp-0) var(--content-sp-0) var(--content-sp-0)
+        var(--content-sp-14);
+    border-left: 3px solid var(--mms-border-strong);
+    color: var(--mms-text-muted);
 }
 
 /* Code block */
@@ -142,7 +145,7 @@
 
 .proseSurface :global(table) {
     width: 100%;
-    margin: 0.9em 0;
+    margin: var(--content-sp-24) var(--content-sp-0);
     border-collapse: collapse;
     table-layout: fixed;
     overflow: hidden;
@@ -150,14 +153,14 @@
 
 .proseSurface :global(th),
 .proseSurface :global(td) {
-    padding: var(--space-s) var(--space-m);
-    border: 1px solid var(--border);
+    padding: var(--content-sp-8);
+    border: 1px solid var(--mms-border-strong);
     vertical-align: top;
     text-align: left;
 }
 
 .proseSurface :global(th) {
-    background: var(--bg-surface-3);
+    background: var(--content-surface-hover);
     font-weight: 700;
 }
 

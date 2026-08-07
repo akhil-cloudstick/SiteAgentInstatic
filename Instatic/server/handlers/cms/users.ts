@@ -1,10 +1,10 @@
 /**
  * User management endpoints (gated by `users.manage`).
  *
- *   GET    /admin/api/cms/users      — list every user with their role
- *   POST   /admin/api/cms/users      — create a user (rejects role=owner)
- *   PATCH  /admin/api/cms/users/:id  — update fields, change password, change role
- *   DELETE /admin/api/cms/users/:id  — soft delete a user
+ *   GET    /cms/api/cms/users      — list every user with their role
+ *   POST   /cms/api/cms/users      — create a user (rejects role=owner)
+ *   PATCH  /cms/api/cms/users/:id  — update fields, change password, change role
+ *   DELETE /cms/api/cms/users/:id  — soft delete a user
  *
  * Owner-account guards live here too: this is where we refuse to let an
  * actor strip the last active owner of the role, suspend them, or delete
@@ -292,7 +292,9 @@ async function handleUserDelete(
 // runs it ONCE up front and threads the resolved actor to each handler as the
 // route table's extra context.
 const USERS_PATH = `${CMS_API_PREFIX}/users`
-const USER_ITEM_PATTERN = /^\/admin\/api\/cms\/users\/([^/]+)$/
+// Left behind at the pre-rename `/admin/api/cms` spelling; the admin now calls
+// `/cms/api/cms` (see CMS_API_PREFIX), so this never matched.
+const USER_ITEM_PATTERN = /^\/cms\/api\/cms\/users\/([^/]+)$/
 
 const USERS_ROUTES: readonly Route<[AuthUser]>[] = [
   { method: 'GET', pattern: USERS_PATH, handler: handleListUsers },

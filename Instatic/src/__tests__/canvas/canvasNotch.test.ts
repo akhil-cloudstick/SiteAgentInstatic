@@ -113,14 +113,19 @@ describe('CanvasNotch — Content document canvas only', () => {
     expect(src).not.toContain('floatingControl')
   })
 
-  it('does not draw real side borders through the inverted-corner seam', () => {
+  it('draws the reference bar shape with no real side borders', () => {
     const css = readFileSync(CANVAS_NOTCH_CSS, 'utf-8')
 
     expect(css).toContain('border: 0')
     expect(css).not.toContain('border: 1px solid')
     expect(css).not.toContain('border-top: 0')
-    expect(css).toContain('left: calc(2px - var(--notch-corner))')
-    expect(css).toContain('right: calc(2px - var(--notch-corner))')
+    // The MMSBUILD Content reference draws a plain rounded-bottom bar rather
+    // than the outward-curling seam the earlier notch masked with a ::before
+    // radial-gradient pair, so those corner-mask offsets are gone with it.
+    expect(css).toContain(
+      'border-radius: 0 0 var(--content-radius-16) var(--content-radius-16)',
+    )
+    expect(css).not.toContain('--notch-corner')
   })
 })
 

@@ -38,6 +38,9 @@ import { isAbortError, classifyHttpFailure } from './errors'
 export const PROVIDER_RETRY_IMAGE_OMITTED =
   '[Earlier attached images omitted after the provider rejected the full conversation context.]'
 
+export const PROVIDER_TEXT_ONLY_IMAGE_OMITTED =
+  '[Image omitted — the model handling this request reads text only.]'
+
 /** A resolved tool call the model issued this turn. */
 export interface TurnToolCall {
   readonly id: string
@@ -115,6 +118,16 @@ export async function* runToolLoop<TMessage>(
   const headers = adapter.buildHeaders(req)
   let initialProviderRound = true
   let replayOverflowRetried = false
+  // How many entries at the head of `messages` came from `mapHistory`. The
+  // text-only retry rebuilds that prefix and keeps the loop's own appended
+  // assistant/tool turns, so it has to know where the seam is.
+  let historyLength = messages.length
+  /**
+   * Set once the provider has told us this model reads text only. From then on
+   * `render_snapshot` stops capturing screenshots for the rest of the loop —
+   * otherwise every subsequent round would re-attach an image and fail again.
+   */
+  let modelReadsTextOnly = false
 
   // Track tool-result messages that carry heavy evidence (screenshots,
   // full-page HTML/CSS). Once superseded they describe stale page state and are
@@ -173,8 +186,34 @@ export async function* runToolLoop<TMessage>(
         if (projected) {
           replayOverflowRetried = true
           messages = adapter.mapHistory({ ...req, messages: projected })
+          historyLength = messages.length
           continue
         }
+      }
+      // The model reads text only. Unlike an overflow this can strike on ANY
+      // round — a tool-result screenshot from round 2 trips it just as a user's
+      // attachment trips round 1 — so the retry is not gated on the initial
+      // round. Every image in the request goes, on both sides of the seam.
+      if (!modelReadsTextOnly && failure.kind === 'imageUnsupported') {
+        modelReadsTextOnly = true
+        const tail = messages.slice(historyLength)
+        const rebuiltHistory = adapter.mapHistory({
+          ...req,
+          messages: elideAllUserImages(req.messages),
+        })
+        // `mapHistory` is free to merge or split turns, so re-anchor the tracked
+        // tool-result indices on the new prefix length instead of assuming it
+        // matched the old one.
+        const delta = rebuiltHistory.length - historyLength
+        for (const m of heavyMessages) m.index += delta
+        messages = [...rebuiltHistory, ...tail]
+        historyLength = rebuiltHistory.length
+        // Tool-result images only ever live on results `isHeavyResult` tracks
+        // (any result carrying an image is heavy by definition), so stripping
+        // them there and rebuilding through the adapter covers the tail.
+        for (const m of heavyMessages) m.results = m.results.map(dropResultImages)
+        applyHeavyElision(messages, heavyMessages, adapter)
+        continue
       }
       yield { type: 'error', message: failure.message }
       return
@@ -231,7 +270,7 @@ export async function* runToolLoop<TMessage>(
     const results: TurnToolResult[] = []
     for (const call of turn.toolCalls) {
       const tool = resolveRequestedTool(call.name, toolsByName)
-      const input = prepareToolInput(call, req)
+      const input = prepareToolInput(call, req, !modelReadsTextOnly)
       let output: AiToolOutput
       try {
         output = tool
@@ -318,6 +357,57 @@ function elideHistoricalUserImages(messages: readonly AiMessage[]): AiMessage[] 
   return changed ? projected : null
 }
 
+/**
+ * Text-only projection: drop images from EVERY user turn, newest included.
+ *
+ * `elideHistoricalUserImages` deliberately keeps the current turn intact — an
+ * overflow is about total size, and the user's newest attachment is the one
+ * thing worth spending the budget on. Here the model simply cannot decode an
+ * image at all, so keeping it would just reproduce the same refusal.
+ */
+function elideAllUserImages(messages: readonly AiMessage[]): AiMessage[] {
+  return messages.map((message): AiMessage => {
+    if (message.role !== 'user') return message
+    if (!message.content.some((block) => block.kind === 'image')) return message
+
+    let breadcrumbAdded = false
+    const content: AiContentBlock[] = []
+    for (const block of message.content) {
+      if (block.kind !== 'image') {
+        content.push(block)
+      } else if (!breadcrumbAdded) {
+        content.push({ kind: 'text', text: PROVIDER_TEXT_ONLY_IMAGE_OMITTED })
+        breadcrumbAdded = true
+      }
+    }
+    return { role: 'user', content }
+  })
+}
+
+/**
+ * Strip a tool result's image attachments, leaving a note in their place so the
+ * model knows evidence existed rather than silently seeing a thinner result.
+ *
+ * Only matters for providers whose tool-result channel carries native images
+ * (Anthropic). The Responses adapter already degrades them to a text note, so
+ * for OpenAI/OpenRouter this is a no-op on the wire.
+ */
+function dropResultImages(result: TurnToolResult): TurnToolResult {
+  if (!result.output.images?.length) return result
+  const output: AiToolOutput = { ...result.output }
+  delete output.images
+  output.data = noteImagesOmitted(output.data)
+  return { ...result, output }
+}
+
+/** Fold the omission note into a tool payload without discarding its data. */
+function noteImagesOmitted(data: unknown): unknown {
+  if (typeof data !== 'object' || data === null || Array.isArray(data)) {
+    return data ?? PROVIDER_TEXT_ONLY_IMAGE_OMITTED
+  }
+  return { ...data, imagesOmitted: PROVIDER_TEXT_ONLY_IMAGE_OMITTED }
+}
+
 // ---------------------------------------------------------------------------
 // Per-tool input preparation
 // ---------------------------------------------------------------------------
@@ -327,14 +417,25 @@ function elideHistoricalUserImages(messages: readonly AiMessage[]): AiMessage[] 
  * just `site_render_snapshot`: the server injects `captureScreenshot` from the
  * active model's vision capability so a non-vision model never pays the
  * html-to-image cost for a screenshot it can't consume.
+ *
+ * `allowImages` is the loop's live override: declared capabilities can be wrong
+ * (managed mode advertises a fixed permissive set for a per-request gateway
+ * model), so once the provider has actually refused an image the loop clamps
+ * this off for every remaining round.
  */
-function prepareToolInput(call: TurnToolCall, req: AiStreamRequest): unknown {
+function prepareToolInput(
+  call: TurnToolCall,
+  req: AiStreamRequest,
+  allowImages: boolean,
+): unknown {
   if (call.name === 'site_render_snapshot') {
     const base = call.input && typeof call.input === 'object' ? call.input : {}
     return {
       ...base,
       captureScreenshot:
-        req.modelCapabilities.visionInput && req.modelCapabilities.toolResultImages,
+        allowImages &&
+        req.modelCapabilities.visionInput &&
+        req.modelCapabilities.toolResultImages,
     }
   }
   return call.input

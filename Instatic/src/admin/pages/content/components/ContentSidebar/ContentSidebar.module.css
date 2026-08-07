@@ -1,0 +1,259 @@
+/* Content workspace sidebar chrome — rail + docked panel slot.
+ *
+ * PHASE 2: transcribed from the MMSBUILD Content reference
+ * (`screens/content/src/styles.css` → `.content-sidebar`, `.panel-rail`,
+ * `.rail-primary`, `.rail-button`, `.active-indicator`, `.sidebar-panel-slot`,
+ * `.workspace-panel`, `.panel-header`, `.panel-scroll`, `.left-resize-handle`).
+ * Every metric is the reference's, delivered through the fixed `--content-*`
+ * tokens in globals.css because literal px is gated in admin CSS modules.
+ *
+ * Content owns this file outright — the Site editor's LeftSidebar / PanelRail
+ * modules are no longer imported here, so restyling Content cannot repaint Site.
+ */
+
+.sidebar {
+    position: relative;
+    z-index: 50;
+    display: flex;
+    height: 100%;
+    flex: 0 0 auto;
+    min-height: 0;
+    background: var(--mms-surface);
+    border-right: 1px solid var(--mms-border);
+}
+
+/* ── Rail ─────────────────────────────────────────────────────────────── */
+
+.rail {
+    display: flex;
+    flex: 0 0 var(--content-rail-w);
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    width: var(--content-rail-w);
+    height: 100%;
+    min-height: 0;
+    padding: var(--content-sp-3) var(--content-sp-0);
+    background: var(--mms-surface);
+    border-right: 1px solid var(--mms-border);
+}
+
+/* The reference stacks the rail buttons edge-to-edge in a full-width grid —
+   no gaps, no insets. `.itemGroup` is a nested grid rather than the
+   reference's bare children because `contentAdmin.test.tsx` asserts the
+   `panel-rail-primary` / `panel-rail-global` grouping; it adds no box of its
+   own. */
+.primaryStack,
+.itemGroup,
+.globalGroup {
+    display: grid;
+    width: 100%;
+}
+
+/* ── Rail buttons ─────────────────────────────────────────────────────── */
+
+.railButton {
+    position: relative;
+    /* The reference assigns each dock a fixed identity colour rather than the
+       hash-derived tint the Site rail uses. */
+    --content-rail-color: var(--mms-text);
+    width: var(--content-tap);
+    min-width: var(--content-tap);
+    height: var(--content-tap);
+    min-height: var(--content-tap);
+    border-radius: 0;
+}
+
+.railButton[data-panel-id="content"] {
+    --content-rail-color: var(--mms-action-strong);
+}
+
+.railButton[data-panel-id="media"] {
+    --content-rail-color: var(--mms-text);
+}
+
+.railButton[data-panel-id="agent"] {
+    --content-rail-color: var(--mms-yellow);
+}
+
+/* Doubled class beats the shared Button primitive's own ghost hover. */
+.railButton.railButton:hover {
+    background: color-mix(in srgb, var(--content-rail-color) 10%, transparent);
+}
+
+.railButton.railButton[aria-pressed="true"] {
+    color: var(--mms-text);
+    background: color-mix(in srgb, var(--content-rail-color) 16%, transparent);
+}
+
+/* The vendored icon components render a Remix webfont `<i>`, not an `<svg>`,
+   so the reference's `.rail-button svg` rule is applied to the icon element
+   through its own class instead. */
+.railIcon {
+    color: var(--content-rail-color);
+    filter: drop-shadow(
+        0 0 5px color-mix(in srgb, var(--content-rail-color) 28%, transparent)
+    );
+}
+
+.activeIndicator {
+    position: absolute;
+    top: var(--content-sp-9);
+    bottom: var(--content-sp-9);
+    left: 0;
+    width: 2px;
+    background: transparent;
+}
+
+.railButton[aria-pressed="true"] .activeIndicator {
+    background: var(--content-rail-color);
+}
+
+/* ── Panel slot ───────────────────────────────────────────────────────── */
+
+.panelSlot {
+    /* Default matches the reference's `--panel-w`; the live value is written
+       inline by ContentSidebar and by the resize handle. Declared as a rule
+       default rather than a var() fallback (fallbacks are gated). */
+    --content-panel-width: var(--content-panel-w);
+    width: var(--content-panel-width);
+    min-width: var(--content-panel-width);
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+    background: var(--mms-surface);
+    transition:
+        width 150ms ease,
+        min-width 150ms ease;
+}
+
+.sidebar[data-expanded="false"] .panelSlot {
+    width: 0;
+    min-width: 0;
+}
+
+.panelMount {
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+}
+
+.panelMount[hidden] {
+    display: none;
+}
+
+/* ── Panel shell inside the slot ──────────────────────────────────────── */
+
+/* The reference gives every docked panel (Content, Media, AI) the same shell,
+   header bar and scroll surface. Targeted through the shared Panel's DOM
+   contract (`role="toolbar"` header) rather than its hashed class names, so
+   the shared primitive stays untouched and the Site editor is unaffected. */
+.panelMount > [data-panel] {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    background: var(--mms-surface);
+}
+
+.panelMount [role="toolbar"] {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: var(--content-tap);
+    padding: var(--content-sp-0) var(--content-sp-0) var(--content-sp-0)
+        var(--content-sp-12);
+    border-bottom: 1px solid var(--mms-border);
+}
+
+.panelMount [role="toolbar"] > :first-child {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    gap: var(--content-sp-7);
+    font-size: var(--content-text-12);
+    font-weight: 750;
+    letter-spacing: -0.01em;
+}
+
+/* PHASE 7 — the Media and AI panels mounted in this rail are the real shared
+   workspace components (also used by the Site editor), so they are NOT edited.
+   Instead the reference's panel metrics are applied to whatever mounts in the
+   slot, through the DOM contract rather than their hashed class names. Site is
+   untouched because these selectors are anchored to the content panel mount. */
+
+.panelMount :global(input[type="search"]),
+.panelMount :global(input[type="text"]) {
+    min-height: var(--content-tap);
+    border-radius: var(--content-radius-7);
+    font-size: var(--content-text-11);
+}
+
+.panelMount :global(h3) {
+    color: var(--mms-text-muted);
+    font-size: var(--content-text-10);
+    font-weight: 750;
+}
+
+/* ── Resize handle ────────────────────────────────────────────────────── */
+
+/* The shared handle positions itself with `.handle[data-side="left"]`, so the
+   overrides carry one extra class to win the cascade deterministically rather
+   than relying on CSS-module emission order. */
+.resizeHandle.resizeHandle[data-side="left"] {
+    top: 0;
+    right: calc(-1 * var(--content-sp-22));
+    bottom: 0;
+    z-index: 5;
+    width: var(--content-tap);
+    cursor: col-resize;
+}
+
+.resizeHandle.resizeHandle::after {
+    top: 0;
+    bottom: 0;
+    left: var(--content-sp-21);
+    width: 2px;
+    background: transparent;
+}
+
+.resizeHandle.resizeHandle:hover::after,
+.resizeHandle.resizeHandle:focus-visible::after {
+    background: var(--mms-action);
+}
+
+/* ── Responsive (reference breakpoints) ───────────────────────────────── */
+
+/* At 1000px and below the reference lifts the panel out of the flow into a
+   drawer beside the rail, and hides the resize handle. */
+@media (max-width: 1000px) {
+    .sidebar {
+        z-index: 70;
+    }
+
+    .panelSlot {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: var(--content-rail-w);
+        width: min(320px, calc(100vw - var(--content-rail-w)));
+        min-width: min(320px, calc(100vw - var(--content-rail-w)));
+        border-right: 1px solid var(--mms-border-strong);
+        box-shadow: var(--content-shadow-drawer-left);
+    }
+
+    .sidebar[data-expanded="false"] .panelSlot {
+        display: none;
+    }
+
+    .resizeHandle.resizeHandle[data-side="left"] {
+        display: none;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .panelSlot {
+        transition: none;
+    }
+}

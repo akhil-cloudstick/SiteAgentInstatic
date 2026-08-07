@@ -11,7 +11,7 @@ import {
   POST_TYPE_FIELD_SEO_DESCRIPTION,
   type CreateDataTableInput,
 } from '@core/data/schemas'
-import dialogStyles from '../../../../shared/dialogs/SiteCreateDialog/SiteCreateDialog.module.css'
+import dialogStyles from '../contentDialog.module.css'
 import styles from '../../ContentPage.module.css'
 import { slugFromTitle } from '@core/utils/slug'
 import { getErrorMessage } from '@core/utils/errorMessage'

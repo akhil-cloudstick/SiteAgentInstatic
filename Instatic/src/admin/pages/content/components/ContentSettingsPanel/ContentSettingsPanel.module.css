@@ -1,0 +1,244 @@
+/* Content settings panel — flat schema-driven field list.
+ *
+ * PHASE 6: transcribed from the MMSBUILD Content reference
+ * (`screens/content/src/styles.css` → `.settings-panel`, `.settings-body`,
+ * `.settings-field`, `.settings-meta`, `.featured-field`, `.author-readonly`,
+ * `.featured-preview`, `.media-empty-button`). The reference has no cards and
+ * nothing collapses — one 16px-gap grid of label/control pairs.
+ *
+ * Content owns this file outright; the Site editor's PropertiesPanel module is
+ * no longer imported here.
+ */
+
+.panel {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    background: var(--mms-surface);
+}
+
+.header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: var(--content-tap);
+    padding: var(--content-sp-0) var(--content-sp-0) var(--content-sp-0)
+        var(--content-sp-12);
+    border-bottom: 1px solid var(--mms-border);
+}
+
+.headerTitle {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    gap: var(--content-sp-7);
+    font-size: var(--content-text-12);
+    font-weight: 750;
+    letter-spacing: -0.01em;
+}
+
+.headerLabel {
+    min-width: 0;
+    margin: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font: inherit;
+    white-space: nowrap;
+}
+
+/* ── Body ─────────────────────────────────────────────────────────────── */
+
+.settingsBody {
+    display: grid;
+    align-content: start;
+    gap: var(--content-sp-16);
+    padding: var(--content-sp-14) var(--content-sp-16) var(--content-sp-28);
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-color: var(--mms-border-strong) transparent;
+    scrollbar-width: thin;
+}
+
+.field,
+.metaBlock,
+.featuredField {
+    display: grid;
+    gap: var(--content-sp-6);
+    padding: 0;
+}
+
+.field > span,
+.metaBlock > span,
+.featuredField > span {
+    color: var(--mms-text-muted);
+    font-size: var(--content-text-10);
+    font-weight: 680;
+}
+
+/* The reference styles the raw controls. Note the Select primitive paints its
+   box on a wrapper and keeps the real `<select>` as an invisible overlay, so
+   its radius comes from the `--input-radius` override in the content scope,
+   not from the `select` selector below. */
+.field input,
+.field select,
+.field textarea {
+    width: 100%;
+    min-height: var(--content-tap);
+    padding: var(--content-sp-8) var(--content-sp-9);
+    border: 1px solid var(--mms-border-strong);
+    border-radius: var(--content-radius-3);
+    color: var(--mms-text);
+    background: var(--mms-surface-raised);
+    font-size: var(--content-text-11);
+}
+
+.field textarea {
+    min-height: var(--content-textarea-min-h);
+    resize: vertical;
+}
+
+.metaBlock strong {
+    overflow: hidden;
+    color: var(--mms-text);
+    font-size: var(--content-text-10);
+    font-weight: 550;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Public URL keeps its copy affordance beside the value. */
+.urlValueRow {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    gap: var(--content-sp-4);
+}
+
+.urlValueRow strong {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--mms-text);
+    font-size: var(--content-text-10);
+    font-weight: 550;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.authorReadonly {
+    display: grid;
+    gap: var(--content-sp-3);
+}
+
+.authorReadonly strong {
+    font-size: var(--content-text-11);
+}
+
+.authorReadonly small {
+    color: var(--content-text-faint);
+    font-size: var(--content-text-9);
+}
+
+.authorRoleBadge {
+    justify-self: start;
+    padding: var(--content-sp-2) var(--content-sp-6);
+    border-radius: var(--content-radius-3);
+    background: var(--content-surface-hover);
+    color: var(--mms-text-muted);
+    font-size: var(--content-text-9);
+    text-transform: capitalize;
+}
+
+/* ── Featured media ───────────────────────────────────────────────────── */
+
+.featuredPreview {
+    position: relative;
+    overflow: hidden;
+    min-height: var(--content-featured-h);
+    border: 1px solid var(--mms-border);
+    border-radius: var(--content-radius-4);
+}
+
+.featuredPreview img {
+    display: block;
+    width: 100%;
+    height: var(--content-featured-h);
+    object-fit: cover;
+}
+
+.featuredBrowse.featuredBrowse,
+.featuredClear.featuredClear {
+    position: absolute;
+    bottom: var(--content-sp-4);
+    min-width: var(--content-tap);
+    min-height: var(--content-tap);
+    border: 1px solid var(--content-media-overlay-border);
+    border-radius: var(--content-radius-3);
+    color: var(--content-on-accent);
+    background: var(--content-media-overlay-bg);
+    font-size: var(--content-text-10);
+    font-weight: 700;
+}
+
+.featuredBrowse.featuredBrowse {
+    right: var(--content-sp-4);
+    padding: var(--content-sp-0) var(--content-sp-10);
+}
+
+/* The reference stacks the clear action to the left of Browse. */
+.featuredClear.featuredClear {
+    right: var(--content-sp-66);
+    padding: 0;
+}
+
+.mediaEmptyButton.mediaEmptyButton {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    min-height: var(--content-media-empty-h);
+    gap: var(--content-sp-8);
+    border: 1px dashed var(--mms-border-strong);
+    border-radius: var(--content-radius-4);
+    color: var(--mms-text-muted);
+    background: transparent;
+    font-size: var(--content-text-10);
+}
+
+/* ── SEO completeness (kept from the current CMS, D3) ─────────────────── */
+
+.seoBadge {
+    justify-self: start;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--content-sp-4);
+    padding: var(--content-sp-2) var(--content-sp-8);
+    border-radius: var(--content-radius-3);
+    font-size: var(--content-text-9);
+    font-weight: 700;
+}
+
+.seoBadgeOk {
+    color: var(--content-success);
+    background: var(--content-accent-soft);
+}
+
+.seoBadgeWarn {
+    color: var(--mms-warning);
+    background: var(--content-surface-hover);
+}
+
+.error {
+    margin: 0;
+    color: var(--mms-danger);
+    font-size: var(--content-text-10);
+    line-height: 1.4;
+}
+
+.settingsSkeleton {
+    display: grid;
+    gap: var(--content-sp-16);
+}

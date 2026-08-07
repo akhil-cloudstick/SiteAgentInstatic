@@ -1,0 +1,144 @@
+/* Content document canvas surface.
+ *
+ * PHASE 4: transcribed from the MMSBUILD Content reference
+ * (`screens/content/src/styles.css` → `.content-canvas`, `.document-scroll`,
+ * `.write-document`, `.title-input`, `.canvas-empty`). Content owns this file;
+ * the Site editor's CanvasRoot module is no longer imported here.
+ */
+
+.canvas {
+    position: relative;
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 0;
+    /* Keeps the canvas subtree below the sidebars and any floating overlay
+       panel, exactly as the Site canvas does. */
+    z-index: 0;
+    overflow: hidden;
+    background: var(--mms-workspace);
+    cursor: default;
+    outline: none;
+}
+
+.documentScroll {
+    position: absolute;
+    inset: 0;
+    overflow: auto;
+    padding: var(--content-sp-0) var(--content-sp-64) var(--content-sp-80);
+    scrollbar-color: var(--mms-border-strong) transparent;
+    scrollbar-width: thin;
+}
+
+.document {
+    width: min(var(--content-doc-w), 100%);
+    min-height: calc(100vh - 180px);
+    margin: var(--content-sp-92) auto;
+    padding: var(--content-sp-0) var(--content-sp-48) var(--content-sp-92);
+    color: var(--mms-text);
+    background: transparent;
+}
+
+.titleInput.titleInput {
+    display: block;
+    width: 100%;
+    min-height: var(--content-sp-72);
+    margin: var(--content-sp-0) var(--content-sp-0) var(--content-sp-22);
+    padding: 0;
+    overflow: hidden;
+    resize: none;
+    border: 0;
+    border-radius: 0;
+    outline: 0;
+    color: var(--mms-text);
+    background: transparent;
+    font-size: var(--content-text-title);
+    font-weight: 780;
+    line-height: 0.98;
+    letter-spacing: -0.045em;
+    /* A long unbroken title must wrap inside the column rather than widen it
+       and push the document into horizontal overflow. */
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.titleInput.titleInput::placeholder {
+    color: var(--content-text-faint);
+}
+
+.titleInput.titleInput:focus-visible {
+    box-shadow: 0 2px 0 var(--content-accent);
+}
+
+/* ── Empty state ──────────────────────────────────────────────────────── */
+
+.emptyState {
+    display: grid;
+    place-items: center;
+    align-content: center;
+    width: 100%;
+    height: 100%;
+    padding: var(--content-sp-28);
+    color: var(--mms-text-muted);
+    text-align: center;
+}
+
+.emptyState h2 {
+    margin: var(--content-sp-15) var(--content-sp-0) var(--content-sp-6);
+    color: var(--mms-text);
+    font-size: var(--content-text-21);
+    letter-spacing: -0.025em;
+}
+
+.emptyState p {
+    max-width: var(--content-empty-copy-w);
+    margin: var(--content-sp-0) var(--content-sp-0) var(--content-sp-20);
+    font-size: var(--content-text-12);
+    line-height: 1.55;
+}
+
+.canvasLoading {
+    width: min(var(--content-doc-w), 100%);
+    margin: var(--content-sp-92) auto;
+    padding: var(--content-sp-0) var(--content-sp-48);
+}
+
+/* ── Responsive (reference breakpoints) ───────────────────────────────── */
+
+@media (max-width: 1000px) {
+    .documentScroll {
+        padding-right: var(--content-sp-20);
+        padding-left: var(--content-sp-20);
+    }
+}
+
+@media (max-width: 760px) {
+    .documentScroll {
+        padding: var(--content-sp-0) var(--content-sp-20) var(--content-sp-40);
+    }
+
+    .document {
+        min-height: calc(100vh - 120px);
+        margin: var(--content-sp-92) auto var(--content-sp-0);
+        padding: var(--content-sp-0) var(--content-sp-24) var(--content-sp-72);
+    }
+
+    .titleInput.titleInput {
+        min-height: var(--content-sp-52);
+        font-size: var(--content-text-38);
+    }
+}
+
+@media (max-width: 460px) {
+    .documentScroll {
+        padding: var(--content-sp-0) var(--content-sp-10) var(--content-sp-32);
+    }
+
+    .document {
+        margin-top: var(--content-sp-120);
+        padding: var(--content-sp-0) var(--content-sp-14) var(--content-sp-60);
+    }
+
+    .titleInput.titleInput {
+        font-size: var(--content-text-34);
+    }
+}

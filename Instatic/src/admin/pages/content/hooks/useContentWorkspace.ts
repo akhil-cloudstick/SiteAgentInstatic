@@ -17,6 +17,7 @@ import {
 import { useWorkspaceLayout } from '@admin/state/workspaceLayout'
 import type {
   DataTable,
+  DataTableListItem,
   DataRow,
   DataUserReference,
   CreateDataTableInput,
@@ -44,7 +45,10 @@ export function useContentWorkspace({
   // Every data table (all kinds) — relation custom fields can target any
   // table, so the settings panel needs the full list to resolve targets.
   const [tables, setTables] = useState<DataTable[]>([])
-  const [collections, setCollections] = useState<DataTable[]>([])
+  // Post-type tables keep the list shape `listCmsDataTables` returns — it
+  // carries the server-computed `rowCount` the explorer shows on every
+  // collection row, so no extra request is needed for those counts.
+  const [collections, setCollections] = useState<DataTableListItem[]>([])
   const [entries, setEntries] = useState<DataRow[]>([])
   const [authors, setAuthors] = useState<DataUserReference[]>([])
   const [authorsLoading, setAuthorsLoading] = useState(true)
@@ -336,7 +340,9 @@ export function useContentWorkspace({
     // Always create post-type tables from the Content page.
     const collection = await createCmsDataTable({ ...input, kind: 'postType' })
     setTables((current) => [...current, collection])
-    setCollections((current) => [...current, collection])
+    // A freshly created collection has no rows yet; the create endpoint returns
+    // the bare table, so the count is seeded here rather than re-listing.
+    setCollections((current) => [...current, { ...collection, rowCount: 0 }])
     setEntries([])
     entriesLoadEpochRef.current += 1
     selectedCollectionIdRef.current = collection.id
@@ -354,8 +360,12 @@ export function useContentWorkspace({
     setTables((current) => current.map((candidate) =>
       candidate.id === collection.id ? collection : candidate
     ))
+    // The update endpoint returns the bare table; carry the existing count
+    // forward so the explorer row doesn't blank out after a rename.
     setCollections((current) => current.map((candidate) =>
-      candidate.id === collection.id ? collection : candidate
+      candidate.id === collection.id
+        ? { ...collection, rowCount: candidate.rowCount }
+        : candidate
     ))
     return collection
   }

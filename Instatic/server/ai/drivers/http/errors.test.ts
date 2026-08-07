@@ -18,6 +18,22 @@ describe('classifyHttpError', () => {
     ).kind).toBe('replayOverflow')
   })
 
+  it('classifies a provider image refusal as retryable-without-images', () => {
+    expect(classifyHttpFailure(
+      'OpenRouter',
+      404,
+      JSON.stringify({ error: { message: 'No endpoints found that support image input.' } }),
+    ).kind).toBe('imageUnsupported')
+    expect(classifyHttpFailure(
+      'OpenAI',
+      400,
+      JSON.stringify({ error: { message: 'This model does not support image input' } }),
+    ).kind).toBe('imageUnsupported')
+    // A plain 404 with no image signal stays generic — no pointless resend.
+    expect(classifyHttpFailure('OpenRouter', 404, JSON.stringify({ error: { message: 'No such model' } })).kind)
+      .toBe('generic')
+  })
+
   it('does not relabel unrelated bad requests as context exhaustion', () => {
     expect(classifyHttpError(
       'OpenAI',

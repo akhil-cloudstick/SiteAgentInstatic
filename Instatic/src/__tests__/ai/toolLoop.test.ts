@@ -1,7 +1,10 @@
 import { describe, test, expect, afterEach } from 'bun:test'
 import { Type } from '@core/utils/typeboxHelpers'
 import { anthropicDriver } from '../../../server/ai/drivers/anthropic'
-import { PROVIDER_RETRY_IMAGE_OMITTED } from '../../../server/ai/drivers/http/toolLoop'
+import {
+  PROVIDER_RETRY_IMAGE_OMITTED,
+  PROVIDER_TEXT_ONLY_IMAGE_OMITTED,
+} from '../../../server/ai/drivers/http/toolLoop'
 import type { AiStreamRequest } from '../../../server/ai/drivers/types'
 import type { AiBrowserBridge, AiStreamEvent, AiTool, AiToolOutput } from '../../../server/ai/runtime/types'
 
@@ -301,5 +304,90 @@ describe('runToolLoop via anthropicDriver', () => {
     expect(events).toHaveLength(1)
     expect(events[0]).toMatchObject({ type: 'error' })
     expect((events[0] as { message: string }).message).toContain('Your history is still saved')
+  })
+
+  test('retries without ANY image when the model turns out to read text only', async () => {
+    // The declared capabilities say vision (managed mode advertises a fixed
+    // permissive set for a gateway-routed model), but the provider refuses the
+    // image at request time. The current turn's image must go too — keeping it,
+    // as the overflow retry does, would just reproduce the same refusal.
+    const requestBodies: Array<Record<string, unknown>> = []
+    globalThis.fetch = (async (_url: string, init: RequestInit) => {
+      requestBodies.push(JSON.parse(init.body as string))
+      if (requestBodies.length === 1) {
+        return new Response(JSON.stringify({
+          error: { message: 'No endpoints found that support image input.' },
+        }), { status: 404 })
+      }
+      return sseResponse(TURN2)
+    }) as typeof fetch
+
+    const req = makeRequest({ async callBrowser() { return { ok: true } } }, [])
+    const image = { kind: 'image' as const, mimeType: 'image/jpeg', data: '/9j/' }
+    req.messages.splice(0, req.messages.length,
+      { role: 'user', content: [{ kind: 'text', text: 'Earlier turn' }, image] },
+      { role: 'assistant', content: [{ kind: 'text', text: 'Earlier reply' }] },
+      { role: 'user', content: [{ kind: 'text', text: 'Current turn' }, image] },
+    )
+
+    const events: AiStreamEvent[] = []
+    for await (const event of anthropicDriver.stream(req)) events.push(event)
+
+    expect(requestBodies).toHaveLength(2)
+    expect(JSON.stringify(requestBodies[0]).match(/"type":"image"/g)).toHaveLength(2)
+    expect(JSON.stringify(requestBodies[1])).not.toContain('"type":"image"')
+    expect(JSON.stringify(requestBodies[1])).toContain(PROVIDER_TEXT_ONLY_IMAGE_OMITTED)
+    // The caller's history is a projection target, never mutated.
+    expect(req.messages[2]?.content.some((block) => block.kind === 'image')).toBe(true)
+    expect(events.some((event) => event.type === 'error')).toBe(false)
+  })
+
+  test('stops asking render_snapshot for screenshots once images are refused', async () => {
+    // Turn 1 calls the snapshot tool, so the retry has to survive past the
+    // initial round AND clamp `captureScreenshot` for every round after it.
+    const snapshotTurn = sse(
+      { type: 'message_start', message: { usage: { input_tokens: 10 } } },
+      { type: 'content_block_start', index: 0, content_block: { type: 'tool_use', id: 't_snap', name: 'site_render_snapshot', input: {} } },
+      { type: 'content_block_delta', index: 0, delta: { type: 'input_json_delta', partial_json: '{}' } },
+      { type: 'content_block_stop', index: 0 },
+      { type: 'message_delta', delta: { stop_reason: 'tool_use' }, usage: { output_tokens: 5 } },
+      { type: 'message_stop' },
+    )
+    const requestBodies: Array<Record<string, unknown>> = []
+    globalThis.fetch = (async (_url: string, init: RequestInit) => {
+      requestBodies.push(JSON.parse(init.body as string))
+      if (requestBodies.length === 1) return sseResponse(snapshotTurn)
+      if (requestBodies.length === 2) {
+        return new Response(JSON.stringify({
+          error: { message: 'No endpoints found that support image input.' },
+        }), { status: 404 })
+      }
+      return sseResponse(TURN2)
+    }) as typeof fetch
+
+    const snapshotInputs: unknown[] = []
+    const req = makeRequest({
+      async callBrowser(_name, input) {
+        snapshotInputs.push(input)
+        return { ok: true, data: { html: '<p>hi</p>' }, images: [{ mimeType: 'image/png', data: 'iVBOR' }] }
+      },
+    }, [])
+    req.tools = [{
+      name: 'site_render_snapshot',
+      description: 'renders the page',
+      scope: 'site',
+      execution: 'browser',
+      inputSchema: Type.Object({ captureScreenshot: Type.Optional(Type.Boolean()) }),
+    }]
+
+    const events: AiStreamEvent[] = []
+    for await (const event of anthropicDriver.stream(req)) events.push(event)
+
+    // Round 2 carried the screenshot and was refused; round 3 is the retry.
+    expect(requestBodies).toHaveLength(3)
+    expect(JSON.stringify(requestBodies[1])).toContain('"type":"image"')
+    expect(JSON.stringify(requestBodies[2])).not.toContain('"type":"image"')
+    expect(snapshotInputs[0]).toMatchObject({ captureScreenshot: true })
+    expect(events.some((event) => event.type === 'error')).toBe(false)
   })
 })

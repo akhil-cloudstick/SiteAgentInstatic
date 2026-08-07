@@ -1074,7 +1074,15 @@ describe('ContentPage', () => {
 
     expect(title.value).toBe(longTitle)
 
-    const contentCss = readFileSync(join(process.cwd(), 'src/admin/pages/content/ContentPage.module.css'), 'utf8')
+    // The title field moved into the canvas's own module when Content stopped
+    // borrowing the Site editor's CSS; the wrapping contract is unchanged.
+    const contentCss = readFileSync(
+      join(
+        process.cwd(),
+        'src/admin/pages/content/components/ContentDocumentCanvas/ContentDocumentCanvas.module.css',
+      ),
+      'utf8',
+    )
     expect(contentCss).toMatch(/\.titleInput\s*\{[^}]*white-space:\s*pre-wrap/s)
     expect(contentCss).toMatch(/\.titleInput\s*\{[^}]*overflow-wrap:\s*anywhere/s)
   })
@@ -1436,8 +1444,11 @@ describe('ContentPage', () => {
       })
     )).toBe(true)
 
+    // The reference entry row reads "<title> <author> <status>" — the date that
+    // used to sit after the status is gone and an author line took its place.
+    // Anchored so it matches the row itself and not its "Options for …" ⋮ trigger.
     const renamedEntryButton = within(screen.getByRole('region', { name: 'Posts' }))
-      .getByRole('button', { name: /winter sale draft/i })
+      .getByRole('button', { name: /^winter sale\b/i })
     fireEvent.contextMenu(renamedEntryButton as HTMLButtonElement, { clientX: 240, clientY: 320 })
     menu = screen.getByRole('menu', { name: 'Content item options' })
     fireEvent.click(within(menu).getByRole('menuitem', { name: /^delete$/i }))
@@ -1660,8 +1671,10 @@ describe('ContentPage', () => {
     // The shared MediaPickerField tile renders filename + a metadata line
     // (mime · size · dimensions) instead of the saved publicPath — same
     // shape used by the property panel's media controls.
-    expect(await screen.findByText(imageAsset.filename)).toBeDefined()
-    expect(screen.getByText(new RegExp(imageAsset.mimeType.replace('/', '\\/')))).toBeDefined()
+    // The reference's featured-media preview is image-only — no filename or
+    // MIME caption beneath it — so the asset's name is carried by the preview's
+    // alt text. The raw asset id must still never surface.
+    expect(await screen.findByRole('img', { name: imageAsset.filename })).toBeDefined()
     expect(screen.queryByText(imageAsset.id)).toBeNull()
   })
 
@@ -1688,7 +1701,12 @@ describe('ContentPage', () => {
 
     expect(src).toContain("'Retry publish'")
     expect(src).toContain("'Published'")
-    expect(src).toContain('statusLabel={isCleanPublished ? null : statusText}')
+    // The chip moved out of PublishActionGroup so it can sit before the
+    // Save-draft button, as the reference orders it. The contract is unchanged:
+    // nothing is drawn once the entry is cleanly published, leaving the publish
+    // button as the single published-state indicator.
+    expect(src).toContain('statusLabel={null}')
+    expect(src).toContain('{!isCleanPublished && (')
     expect(src).toContain('publishDisabled={!selectedEntry || !canPublish || isPublishing || isCleanPublished}')
     expect(src).not.toContain("'Live'")
     expect(src).toContain('isCleanPublished ? CheckIcon')

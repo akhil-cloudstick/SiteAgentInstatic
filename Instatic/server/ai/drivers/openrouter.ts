@@ -73,6 +73,9 @@ function adapterFor(creds: AiResolvedCredential) {
       // gateway uses the default (see ai-gateway/gateway.mjs).
       const slug = req.managedRouting?.categorySlug
       if (slug) headers['x-instatic-ai-category'] = slug
+      // This request carries an image. The gateway must route it to a model
+      // that can actually read one, whatever category the text classified as.
+      if (req.managedRouting?.requiresVision) headers['x-instatic-ai-vision'] = '1'
       return headers
     },
   })

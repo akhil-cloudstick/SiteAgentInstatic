@@ -4,11 +4,9 @@ import { BookOpenSolidIcon } from 'pixel-art-icons/icons/book-open-solid'
 import { ImagesSolidIcon } from 'pixel-art-icons/icons/images-solid'
 import { AiSettingsSolidIcon } from 'pixel-art-icons/icons/ai-settings-solid'
 import type { IconComponent } from 'pixel-art-icons/types'
-import { railAccent, railTintVar } from '@ui/railAccent'
 import { useWorkspaceLayout } from '@admin/state/workspaceLayout'
-import leftSidebarStyles from '../../../site/sidebars/LeftSidebar/LeftSidebar.module.css'
-import panelRailStyles from '../../../site/sidebars/PanelRail/PanelRail.module.css'
 import { SidebarResizeHandle } from '@admin/shared/SidebarResizeHandle'
+import styles from './ContentSidebar.module.css'
 
 export type ContentPanelId = 'content' | 'media' | 'agent'
 
@@ -37,16 +35,17 @@ export function ContentSidebar({
   const sidebarRef = useRef<HTMLElement | null>(null)
   const leftSidebarWidth = useWorkspaceLayout((s) => s.leftSidebarWidth)
   const setLeftSidebarWidth = useWorkspaceLayout((s) => s.setLeftSidebarWidth)
-  const panelWidth = activePanel ? leftSidebarWidth : 0
+  // The reference collapses the slot with `[data-expanded="false"]` rather than
+  // by zeroing the width variable, so the stored width survives a close/reopen
+  // and the 150ms width transition has something to animate back to.
   const style = {
-    '--left-sidebar-panel-width': `${panelWidth}px`,
-    '--left-sidebar-panel-layout-width': `${leftSidebarWidth}px`,
+    '--content-panel-width': `${leftSidebarWidth}px`,
   } as CSSProperties
 
   return (
     <aside
       ref={sidebarRef}
-      className={leftSidebarStyles.sidebar}
+      className={styles.sidebar}
       data-testid="left-sidebar"
       data-expanded={activePanel ? 'true' : 'false'}
       data-active-panel={activePanel ?? 'none'}
@@ -54,11 +53,11 @@ export function ContentSidebar({
     >
       <nav
         aria-label="Content panel dock"
-        className={panelRailStyles.rail}
+        className={styles.rail}
         data-testid="content-panel-rail"
       >
-        <div className={panelRailStyles.primaryStack}>
-          <div className={panelRailStyles.itemGroup} data-testid="panel-rail-primary">
+        <div className={styles.primaryStack}>
+          <div className={styles.itemGroup} data-testid="panel-rail-primary">
             <ContentRailButton
               id="content"
               label="Content"
@@ -78,7 +77,7 @@ export function ContentSidebar({
           </div>
         </div>
         {canUseAiChat && (
-          <div className={panelRailStyles.globalGroup} data-testid="panel-rail-global">
+          <div className={styles.globalGroup} data-testid="panel-rail-global">
             <ContentRailButton
               id="agent"
               label="AI assistant"
@@ -92,11 +91,11 @@ export function ContentSidebar({
       </nav>
 
       <div
-        className={leftSidebarStyles.panelSlot}
+        className={styles.panelSlot}
         data-testid="left-sidebar-panel-slot"
         inert={activePanel ? undefined : true}
       >
-        <div className={leftSidebarStyles.panelMount}>
+        <div className={styles.panelMount}>
           {activePanel === 'content'
             ? contentPanel
             : activePanel === 'media'
@@ -112,10 +111,10 @@ export function ContentSidebar({
           side="left"
           width={leftSidebarWidth}
           targetRef={sidebarRef}
-          cssVariable="--left-sidebar-panel-width"
-          layoutCssVariable="--left-sidebar-panel-layout-width"
+          cssVariable="--content-panel-width"
           ariaLabel="Resize content sidebar"
           onResize={setLeftSidebarWidth}
+          className={styles.resizeHandle}
         />
       )}
     </aside>
@@ -141,10 +140,6 @@ function ContentRailButton({
 }: ContentRailButtonProps) {
   const RailIcon = icon
   const action = active ? 'Close' : 'Open'
-  const accent = railAccent(`content:${id}:${label}`)
-  const style = {
-    '--rail-icon-tint': railTintVar(accent),
-  } as CSSProperties
 
   return (
     <Button
@@ -156,13 +151,15 @@ function ContentRailButton({
       tooltip={`${label} panel`}
       data-testid={`panel-rail-${id}`}
       data-icon={iconName}
-      data-accent={accent}
-      style={style}
+      // The reference assigns each dock a fixed identity colour keyed off this
+      // attribute (content = deep green, media = navy ink, AI = MMS yellow)
+      // instead of the hash-derived tint the Site rail uses.
+      data-panel-id={id}
       onClick={onToggle}
-      className={panelRailStyles.railButton}
+      className={styles.railButton}
     >
-      <span className={panelRailStyles.activeIndicator} aria-hidden="true" />
-      <RailIcon size={16} className={panelRailStyles.railIcon} />
+      <span className={styles.activeIndicator} aria-hidden="true" />
+      <RailIcon size={16} className={styles.railIcon} />
     </Button>
   )
 }

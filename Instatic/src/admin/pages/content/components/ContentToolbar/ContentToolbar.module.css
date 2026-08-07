@@ -1,0 +1,170 @@
+/* Content toolbar right-slot chrome.
+ *
+ * Transcribed from the MMSBUILD Content reference
+ * (`screens/content/src/styles.css` → `.shell-button`, `.save-draft-button`,
+ * `.split-button`, `.publish-primary`, `.publish-trigger`).
+ *
+ * SCOPE: only the Save-draft button and the two halves of the publish split
+ * are restyled. Everything else in the toolbar — brand, navigation, status
+ * chip, theme toggle, open-live link, avatar — is deliberately untouched.
+ *
+ * `.scope` carries `data-editor-screen="content"` so the `--content-*` tokens
+ * resolve here: the attribute on the workspace body deliberately stops short of
+ * the toolbar, and these controls live inside it. `display: contents` means the
+ * wrapper inherits the variables without adding a box to the toolbar's flex row.
+ */
+
+.scope {
+    display: contents;
+}
+
+/* ── Status chip ──────────────────────────────────────────────────────── */
+
+/* `.publish-status` in the reference: muted label, tone carried by the dot
+   alone — the text itself never takes the state colour. */
+.status {
+    display: flex;
+    align-items: center;
+    min-height: var(--content-tap);
+    gap: var(--content-sp-6);
+    padding: var(--content-sp-0) var(--content-sp-9);
+    color: var(--mms-text-muted);
+    font-size: var(--content-text-13);
+    white-space: nowrap;
+}
+
+.statusDot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--content-text-faint);
+}
+
+.status[data-tone="warning"] .statusDot {
+    background: var(--content-warning);
+}
+
+.status[data-tone="success"] .statusDot {
+    background: var(--content-success);
+}
+
+.status[data-tone="danger"] .statusDot {
+    background: var(--mms-danger);
+}
+
+/* The reference hides the status label below 1100px, where the actions
+   collapse to icons. */
+@media (max-width: 1100px) {
+    .status {
+        display: none;
+    }
+}
+
+/* ── Save draft ───────────────────────────────────────────────────────── */
+
+.saveDraftButton.saveDraftButton {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 108px;
+    min-height: var(--content-tap);
+    padding: var(--content-sp-0) var(--content-sp-17);
+    gap: var(--content-sp-8);
+    border: 1px solid var(--mms-border-strong);
+    border-radius: var(--content-radius-6);
+    background: var(--mms-surface-raised);
+    color: var(--mms-text);
+    font-size: var(--content-text-13);
+    font-weight: 650;
+}
+
+.saveDraftButton.saveDraftButton:hover:not(:disabled) {
+    background: var(--mms-surface-tint);
+    color: var(--mms-text);
+}
+
+/* ── Publish split ────────────────────────────────────────────────────── */
+
+/* Reached through the shared PublishActionGroup's DOM contract rather than its
+   hashed class names, so the Site editor's own toolbar keeps its styling. */
+.scope [data-testid="toolbar-publish-btn"],
+.scope [data-testid="toolbar-publish-actions-trigger"] {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: var(--content-tap);
+    gap: var(--content-sp-7);
+    border: 1px solid transparent;
+    color: var(--content-on-accent);
+    /* The reference keeps the publish face green in every state, including
+       the retry-after-failure one — only the label and icon change. */
+    background: var(--mms-action);
+    font-size: var(--content-text-13);
+    font-weight: 650;
+}
+
+.scope [data-testid="toolbar-publish-btn"] {
+    min-width: 79px;
+    padding: var(--content-sp-0) var(--content-sp-17);
+    border-radius: var(--content-radius-6) 0 0 var(--content-radius-6);
+    border-right-color: var(--content-split-divider);
+}
+
+.scope [data-testid="toolbar-publish-actions-trigger"] {
+    width: var(--content-tap);
+    padding: 0;
+    border-radius: 0 var(--content-radius-6) var(--content-radius-6) 0;
+    border-left-color: var(--content-split-divider);
+}
+
+.scope [data-testid="toolbar-publish-btn"]:hover:not(:disabled),
+.scope [data-testid="toolbar-publish-actions-trigger"]:hover:not(:disabled) {
+    background: var(--mms-action-strong);
+    color: var(--content-on-accent);
+}
+
+/* Published — the reference settles on the deeper green rather than a
+   separate success palette. */
+.scope [data-testid="toolbar-publish-btn"][data-state="success"] {
+    background: var(--mms-action-strong);
+}
+
+/* ── Responsive (reference breakpoints) ───────────────────────────────── */
+
+@media (max-width: 1399px) and (min-width: 1101px) {
+    .saveDraftButton.saveDraftButton {
+        min-width: 92px;
+        padding: var(--content-sp-0) var(--content-sp-12);
+    }
+}
+
+@media (max-width: 1100px) {
+    .saveDraftButton.saveDraftButton {
+        width: var(--content-tap);
+        min-width: var(--content-tap);
+        padding: 0;
+    }
+
+    .saveDraftLabel {
+        display: none;
+    }
+
+    .scope [data-testid="toolbar-publish-btn"] {
+        min-width: 72px;
+        padding: var(--content-sp-0) var(--content-sp-12);
+    }
+}
+
+@media (max-width: 620px) {
+    .scope [data-testid="toolbar-publish-actions-trigger"] {
+        display: none;
+    }
+
+    .scope [data-testid="toolbar-publish-btn"] {
+        width: var(--content-tap);
+        min-width: var(--content-tap);
+        padding: 0;
+        border-radius: var(--content-radius-6);
+        border-right-color: transparent;
+    }
+}

@@ -904,6 +904,15 @@
     --content-shadow-drawer-left: 16px 0 32px rgba(0, 0, 0, 0.2);
     --content-shadow-drawer-right: -16px 0 34px rgba(0, 0, 0, 0.25);
     --content-scrim: rgba(0, 0, 0, 0.58);
+    /* Ink on the reference's filled green controls — a literal #fff, not a
+       surface token, in both themes. */
+    --content-on-accent: #ffffff;
+    /* The dark glass chip the reference floats over a featured-media preview. */
+    --content-media-overlay-bg: rgba(6, 23, 38, 0.9);
+    --content-media-overlay-border: rgba(255, 255, 255, 0.35);
+    /* Hairline the reference draws between the two halves of the split
+       publish button, on the green face. */
+    --content-split-divider: rgba(255, 255, 255, 0.4);
 
     /* Generic tokens the SHARED primitives (Button, Input, Select, Textarea,
        Dialog) read. Overridden here so a primitive rendered inside the Content
@@ -918,6 +927,11 @@
     --border-strong: var(--mms-border-strong);
     --text: var(--mms-text);
     --text-muted: var(--mms-text-muted);
+    /* The reference draws every field as a 3px box, not the pill the rest of
+       the admin uses. Overriding the token rather than each control catches
+       the Select's visible wrapper too — its own `<select>` is an invisible
+       overlay, so styling the element directly has no effect. */
+    --input-radius: var(--content-radius-3);
 
     /* ── Structural geometry (reference `:root`) ───────────────────────── */
     --content-rail-w: 44px;
@@ -980,9 +994,11 @@
     --content-sp-52: 52px;
     --content-sp-60: 60px;
     --content-sp-64: 64px;
+    --content-sp-66: 66px;
     --content-sp-72: 72px;
     --content-sp-80: 80px;
     --content-sp-92: 92px;
+    --content-sp-120: 120px;
 
     /* ── Type sizes (reference, verbatim; name = value in px) ──────────── */
     --content-text-8: 8px;
@@ -996,6 +1012,8 @@
     --content-text-18: 18px;
     --content-text-21: 21px;
     --content-text-23: 23px;
+    --content-text-34: 34px;
+    --content-text-38: 38px;
     /* `.title-input` — the one fluid size the reference itself specifies. */
     --content-text-title: clamp(42px, 5vw, 68px);
 }

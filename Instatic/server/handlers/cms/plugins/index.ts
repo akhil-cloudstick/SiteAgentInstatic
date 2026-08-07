@@ -4,23 +4,23 @@
  * `plugins.install` / `plugins.lifecycle`) gate plus optional step-up.
  * See `resolvePluginRoutePolicy` below for the matrix.
  *
- *   GET    /admin/api/cms/plugins                                   — list installed plugins + admin pages
- *   POST   /admin/api/cms/plugins                                   — install from a manifest JSON body
- *   POST   /admin/api/cms/plugins/inspect-package                   — read a plugin .zip without installing
- *   POST   /admin/api/cms/plugins/package                           — install (or upgrade) from a .zip
- *   PATCH  /admin/api/cms/plugins/:id                               — enable / disable an installed plugin
- *   DELETE /admin/api/cms/plugins/:id[?force=true]                  — uninstall + delete on-disk assets
+ *   GET    /cms/api/cms/plugins                                   — list installed plugins + admin pages
+ *   POST   /cms/api/cms/plugins                                   — install from a manifest JSON body
+ *   POST   /cms/api/cms/plugins/inspect-package                   — read a plugin .zip without installing
+ *   POST   /cms/api/cms/plugins/package                           — install (or upgrade) from a .zip
+ *   PATCH  /cms/api/cms/plugins/:id                               — enable / disable an installed plugin
+ *   DELETE /cms/api/cms/plugins/:id[?force=true]                  — uninstall + delete on-disk assets
  *                                                                     (`force` skips lifecycle hooks)
- *   POST   /admin/api/cms/plugins/:id/pack/install                  — manual pack re-sync into the draft site
- *   GET    /admin/api/cms/plugins/:id/settings                      — masked settings
- *   PUT    /admin/api/cms/plugins/:id/settings                      — update settings, push into the running VM, fire `settings.changed`
- *   POST   /admin/api/cms/plugins/:id/restart                       — manual restart for a parked plugin
- *   GET    /admin/api/cms/plugins/events                            — SSE stream of lifecycle events
- *   GET    /admin/api/cms/plugins/:id/resources/:rid/records        — list records for a plugin resource
- *   POST   /admin/api/cms/plugins/:id/resources/:rid/records        — create a plugin record
- *   PATCH  /admin/api/cms/plugins/:id/resources/:rid/records/:rec   — update a plugin record
- *   DELETE /admin/api/cms/plugins/:id/resources/:rid/records/:rec   — delete a plugin record
- *   *      /admin/api/cms/plugins/:id/runtime/...                   — opaque runtime requests handled by
+ *   POST   /cms/api/cms/plugins/:id/pack/install                  — manual pack re-sync into the draft site
+ *   GET    /cms/api/cms/plugins/:id/settings                      — masked settings
+ *   PUT    /cms/api/cms/plugins/:id/settings                      — update settings, push into the running VM, fire `settings.changed`
+ *   POST   /cms/api/cms/plugins/:id/restart                       — manual restart for a parked plugin
+ *   GET    /cms/api/cms/plugins/events                            — SSE stream of lifecycle events
+ *   GET    /cms/api/cms/plugins/:id/resources/:rid/records        — list records for a plugin resource
+ *   POST   /cms/api/cms/plugins/:id/resources/:rid/records        — create a plugin record
+ *   PATCH  /cms/api/cms/plugins/:id/resources/:rid/records/:rec   — update a plugin record
+ *   DELETE /cms/api/cms/plugins/:id/resources/:rid/records/:rec   — delete a plugin record
+ *   *      /cms/api/cms/plugins/:id/runtime/...                   — opaque runtime requests handled by
  *                                                                     the plugin's own server module
  *
  * `handlePluginsRoutes` is a thin dispatcher: it resolves the per-route
@@ -72,17 +72,17 @@ import {
 // `resolvePluginRoutePolicy` matches these with `.test()` (named groups are
 // inert there); the route table reads the named groups (`id`, `rid`, `rec`,
 // `sid`) to feed each handler's positional args.
-const PLUGIN_ITEM_PATTERN = /^\/admin\/api\/cms\/plugins\/(?<id>[^/]+)$/
-const PLUGIN_RECORDS_PATTERN = /^\/admin\/api\/cms\/plugins\/(?<id>[^/]+)\/resources\/(?<rid>[^/]+)\/records$/
-const PLUGIN_RECORD_ITEM_PATTERN = /^\/admin\/api\/cms\/plugins\/(?<id>[^/]+)\/resources\/(?<rid>[^/]+)\/records\/(?<rec>[^/]+)$/
-const PLUGIN_RUNTIME_PATTERN = /^\/admin\/api\/cms\/plugins\/([^/]+)\/runtime(?:\/.*)?$/
-const PLUGIN_PACK_INSTALL_PATTERN = /^\/admin\/api\/cms\/plugins\/(?<id>[^/]+)\/pack\/install$/
-const PLUGIN_SETTINGS_PATTERN = /^\/admin\/api\/cms\/plugins\/(?<id>[^/]+)\/settings$/
-const PLUGIN_RESTART_PATTERN = /^\/admin\/api\/cms\/plugins\/(?<id>[^/]+)\/restart$/
-const PLUGIN_SCHEDULES_PATTERN = /^\/admin\/api\/cms\/plugins\/(?<id>[^/]+)\/schedules$/
-const PLUGIN_SCHEDULE_RUN_NOW_PATTERN = /^\/admin\/api\/cms\/plugins\/(?<id>[^/]+)\/schedules\/(?<sid>[^/]+)\/run-now$/
-const PLUGIN_SCHEDULE_PAUSE_PATTERN = /^\/admin\/api\/cms\/plugins\/(?<id>[^/]+)\/schedules\/(?<sid>[^/]+)\/pause$/
-const PLUGIN_SCHEDULE_RESUME_PATTERN = /^\/admin\/api\/cms\/plugins\/(?<id>[^/]+)\/schedules\/(?<sid>[^/]+)\/resume$/
+const PLUGIN_ITEM_PATTERN = /^\/cms\/api\/cms\/plugins\/(?<id>[^/]+)$/
+const PLUGIN_RECORDS_PATTERN = /^\/cms\/api\/cms\/plugins\/(?<id>[^/]+)\/resources\/(?<rid>[^/]+)\/records$/
+const PLUGIN_RECORD_ITEM_PATTERN = /^\/cms\/api\/cms\/plugins\/(?<id>[^/]+)\/resources\/(?<rid>[^/]+)\/records\/(?<rec>[^/]+)$/
+const PLUGIN_RUNTIME_PATTERN = /^\/cms\/api\/cms\/plugins\/([^/]+)\/runtime(?:\/.*)?$/
+const PLUGIN_PACK_INSTALL_PATTERN = /^\/cms\/api\/cms\/plugins\/(?<id>[^/]+)\/pack\/install$/
+const PLUGIN_SETTINGS_PATTERN = /^\/cms\/api\/cms\/plugins\/(?<id>[^/]+)\/settings$/
+const PLUGIN_RESTART_PATTERN = /^\/cms\/api\/cms\/plugins\/(?<id>[^/]+)\/restart$/
+const PLUGIN_SCHEDULES_PATTERN = /^\/cms\/api\/cms\/plugins\/(?<id>[^/]+)\/schedules$/
+const PLUGIN_SCHEDULE_RUN_NOW_PATTERN = /^\/cms\/api\/cms\/plugins\/(?<id>[^/]+)\/schedules\/(?<sid>[^/]+)\/run-now$/
+const PLUGIN_SCHEDULE_PAUSE_PATTERN = /^\/cms\/api\/cms\/plugins\/(?<id>[^/]+)\/schedules\/(?<sid>[^/]+)\/pause$/
+const PLUGIN_SCHEDULE_RESUME_PATTERN = /^\/cms\/api\/cms\/plugins\/(?<id>[^/]+)\/schedules\/(?<sid>[^/]+)\/resume$/
 const PLUGIN_EVENTS_PATH = '/cms/api/cms/plugins/events'
 
 // The bare `/plugins/:id` route must NOT claim the reserved single-segment
@@ -92,7 +92,7 @@ const PLUGIN_EVENTS_PATH = '/cms/api/cms/plugins/events'
 // path still resolves its original gate before 405ing — exactly as the old
 // exact-match-first dispatcher did.
 const PLUGIN_ITEM_DISPATCH_PATTERN =
-  /^\/admin\/api\/cms\/plugins\/(?<id>(?!(?:events|package|inspect-package)$)[^/]+)$/
+  /^\/cms\/api\/cms\/plugins\/(?<id>(?!(?:events|package|inspect-package)$)[^/]+)$/
 
 // ---------------------------------------------------------------------------
 // Per-route capability + step-up policy

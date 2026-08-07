@@ -6,6 +6,9 @@
 //
 // Routing headers (set by the tenant SERVER, never the browser):
 //   x-instatic-ai-classify: 1        -> use the cheap classifier model
+//   x-instatic-ai-vision: 1          -> the request carries an image; use the
+//                                       Design (multimodal) model, overriding
+//                                       the text-classified category
 //   x-instatic-ai-category: <slug>   -> use that category's model
 //   (absent / unknown slug)          -> the default category's model
 // The gateway never trusts a raw `model` from the client; it maps a category
@@ -73,8 +76,12 @@ export async function handleGateway(req, res, pathAfterAi) {
   // --- Model resolution (Codex #1, #13, #14) ---
   const classify = String(req.headers['x-instatic-ai-classify'] || '') === '1';
   const categorySlug = String(req.headers['x-instatic-ai-category'] || '').trim() || null;
+  // The request carries an image. The tenant classifies on prompt text alone,
+  // so without this a "rewrite this heading" prompt with a screenshot attached
+  // would route to the text-only Content model and the image would be refused.
+  const requiresVision = String(req.headers['x-instatic-ai-vision'] || '') === '1';
   const cfg = await readAiSettingsRaw();
-  let resolvedModel = resolveRoutedModel(cfg, { classify, categorySlug });
+  let resolvedModel = resolveRoutedModel(cfg, { classify, categorySlug, requiresVision });
 
   const isJson = !!body && String(req.headers['content-type'] || '').includes('json');
   if (isJson) {
@@ -112,7 +119,9 @@ export async function handleGateway(req, res, pathAfterAi) {
     if (classify) {
       console.log(`[ai-gateway] ${slug}: classifier picking category (via ${resolvedModel})`);
     } else {
-      const route = categorySlug ? `category "${categorySlug}"` : 'default category';
+      const route = requiresVision
+        ? `category "design" (image attached${categorySlug ? `, text classified as "${categorySlug}"` : ''})`
+        : categorySlug ? `category "${categorySlug}"` : 'default category';
       console.log(`[ai-gateway] ${slug}: ✦ USING MODEL: ${resolvedModel || '(tenant model)'}  — routed to ${route}`);
     }
   }

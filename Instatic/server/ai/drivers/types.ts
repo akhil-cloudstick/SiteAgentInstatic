@@ -142,8 +142,18 @@ export interface AiStreamRequest {
    * Gateway as `x-instatic-ai-category`, which resolves the concrete model
    * server-side (the tenant never names the model). Omit / null -> gateway uses
    * the operator's default. Ignored in standalone mode.
+   *
+   * `requiresVision` says this request carries at least one image. The
+   * classifier only reads the prompt TEXT, so "change this heading" routes to
+   * the text-only Content model even when the answer is supposed to be read off
+   * an attached screenshot. The gateway upgrades a vision-flagged request to
+   * the Design category's model, which the operator wires to a multimodal
+   * model. Forwarded as `x-instatic-ai-vision`.
    */
-  readonly managedRouting?: { readonly categorySlug: string | null }
+  readonly managedRouting?: {
+    readonly categorySlug: string | null
+    readonly requiresVision: boolean
+  }
   /**
    * Called with the raw response headers of each provider API call. Used in
    * managed mode to capture the gateway's `x-instatic-resolved-model` echo so

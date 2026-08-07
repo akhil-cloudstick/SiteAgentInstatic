@@ -2,7 +2,7 @@ import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
 import { Button } from '@ui/components/Button'
 import { Dialog } from '@ui/components/Dialog'
 import { Input } from '@ui/components/Input'
-import dialogStyles from '../../../../shared/dialogs/SiteCreateDialog/SiteCreateDialog.module.css'
+import dialogStyles from '../contentDialog.module.css'
 import { slugFromTitle } from '@core/utils/slug'
 import { getErrorMessage } from '@core/utils/errorMessage'
 

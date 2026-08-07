@@ -1,31 +1,33 @@
 import { useState, type KeyboardEvent, type MouseEvent } from 'react'
 import { Button } from '@ui/components/Button'
-import { EmptyState } from '@ui/components/EmptyState'
-import { SearchBar } from '@ui/components/SearchBar'
 import { Skeleton } from '@ui/components/Skeleton'
 import { cn } from '@ui/cn'
 import { BookOpenSolidIcon } from 'pixel-art-icons/icons/book-open-solid'
 import { BookPlusSolidIcon } from 'pixel-art-icons/icons/book-plus-solid'
-import { ChevronRightIcon } from 'pixel-art-icons/icons/chevron-right'
 import { CopySolidIcon } from 'pixel-art-icons/icons/copy-solid'
 import { Copy2SolidIcon } from 'pixel-art-icons/icons/copy-2-solid'
 import { ExternalLinkSolidIcon } from 'pixel-art-icons/icons/external-link-solid'
 import { FilePlusSolidIcon } from 'pixel-art-icons/icons/file-plus-solid'
 import { FileTextSolidIcon } from 'pixel-art-icons/icons/file-text-solid'
+import { MoreVerticalSolidIcon } from 'pixel-art-icons/icons/more-vertical-solid'
 import { MoveIcon } from 'pixel-art-icons/icons/move'
 import { Settings2SolidIcon } from 'pixel-art-icons/icons/settings-2-solid'
 import { UploadIcon } from 'pixel-art-icons/icons/upload'
 import { readTitleCell } from '@core/data/cells'
-import type { DataTable, DataRow, UpdateDataTableInput } from '@core/data/schemas'
+import type {
+  DataTable,
+  DataTableListItem,
+  DataRow,
+  UpdateDataTableInput,
+} from '@core/data/schemas'
 import { ExplorerItemContextMenu, type ExplorerContextMenuItem } from '@site/explorer-actions'
-import explorerStyles from '../../../site/panels/SiteExplorerPanel/SiteExplorerPanel.module.css'
 import { Panel } from '@admin/shared/Panel'
 import { ContentCollectionSettingsDialog } from '@content/components/ContentCollectionSettingsDialog/ContentCollectionSettingsDialog'
 import {
   ContentItemRenameDialog,
   type ContentItemRenamePayload,
 } from '@content/components/ContentItemRenameDialog/ContentItemRenameDialog'
-import styles from '../../ContentPage.module.css'
+import styles from './ContentExplorerPanel.module.css'
 import { publicContentPath } from '@content/utils/contentEntryUtils'
 
 type ContentExplorerContextTarget =
@@ -41,7 +43,8 @@ interface ContextMenuState {
 interface ContentExplorerPanelProps {
   loading: boolean
   error: string | null
-  collections: DataTable[]
+  /** Post-type tables, each carrying the server-computed `rowCount`. */
+  collections: DataTableListItem[]
   entries: DataRow[]
   selectedCollection: DataTable | null
   selectedCollectionId: string | null
@@ -77,7 +80,8 @@ interface ContentEntryActions {
   moveEntryToCollection: (entry: DataRow, tableId: string) => void | Promise<void>
 }
 
-function keyboardMenuPosition(element: HTMLElement) {
+/** Anchors a menu opened from a control (⋮ button or keyboard) to that control. */
+function anchoredMenuPosition(element: HTMLElement) {
   const rect = element.getBoundingClientRect()
   return {
     x: rect.left + Math.min(rect.width - 8, 24),
@@ -85,13 +89,13 @@ function keyboardMenuPosition(element: HTMLElement) {
   }
 }
 
-/** Compact "30 Jul"-style date for an entry row's status line. Uses the
- *  published date when live, else the last-updated date. */
-function entryDateLabel(entry: DataRow): string {
-  const iso = entry.publishedAt ?? entry.updatedAt
-  const date = new Date(iso)
-  if (Number.isNaN(date.getTime())) return ''
-  return date.toLocaleDateString(undefined, { day: 'numeric', month: 'short' })
+/**
+ * Author shown under an entry title. The row already carries its author /
+ * creator reference, so this needs no extra request.
+ */
+function entryAuthorLabel(entry: DataRow): string {
+  const user = entry.author ?? entry.createdBy ?? entry.updatedBy ?? null
+  return user?.displayName || user?.email || 'Unknown author'
 }
 
 export function ContentExplorerPanel({
@@ -128,22 +132,25 @@ export function ContentExplorerPanel({
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
   const [renameTarget, setRenameTarget] = useState<ContentExplorerContextTarget | null>(null)
   const [settingsTarget, setSettingsTarget] = useState<DataTable | null>(null)
-  const [search, setSearch] = useState('')
   const entryListLabel = selectedCollection?.pluralLabel || 'Entries'
   const singularLabel = selectedCollection?.singularLabel || 'entry'
   const newEntryLabel = `New ${singularLabel.toLowerCase()}`
-  // Client-side title filter for the entry list (redesign Screen 2). The
-  // collection count stays unfiltered — it reflects the whole collection.
-  const query = search.trim().toLowerCase()
-  const filteredEntries = query
-    ? entries.filter((entry) => readTitleCell(entry.cells).toLowerCase().includes(query))
-    : entries
+
+  /**
+   * Row count shown on a collection row. The active collection's entries are
+   * already in memory and stay correct across create / delete, so they win;
+   * every other collection falls back to the server-computed `rowCount` that
+   * `listCmsDataTables` returns alongside the table.
+   */
+  function collectionCount(collection: DataTableListItem): number {
+    return collection.id === selectedCollectionId ? entries.length : collection.rowCount
+  }
 
   function collectionForEntry(entry: DataRow): DataTable | null {
     return collections.find((collection) => collection.id === entry.tableId) ?? selectedCollection
   }
 
-  function openContextMenu(target: ContentExplorerContextTarget, event: MouseEvent<HTMLButtonElement>) {
+  function openContextMenu(target: ContentExplorerContextTarget, event: MouseEvent<HTMLElement>) {
     event.preventDefault()
     event.stopPropagation()
     setContextMenu({ x: event.clientX, y: event.clientY, target })
@@ -153,7 +160,17 @@ export function ContentExplorerPanel({
     if (event.key !== 'ContextMenu' && !(event.key === 'F10' && event.shiftKey)) return
     event.preventDefault()
     event.stopPropagation()
-    setContextMenu({ ...keyboardMenuPosition(event.currentTarget), target })
+    setContextMenu({ ...anchoredMenuPosition(event.currentTarget), target })
+  }
+
+  /**
+   * The reference's ⋮ trigger, revealed on hover / focus / selection. Opens the
+   * same menu the right-click and Shift+F10 paths open, anchored to the button.
+   */
+  function openTriggerMenu(target: ContentExplorerContextTarget, event: MouseEvent<HTMLButtonElement>) {
+    event.preventDefault()
+    event.stopPropagation()
+    setContextMenu({ ...anchoredMenuPosition(event.currentTarget), target })
   }
 
   async function copyEntryUrl(entry: DataRow) {
@@ -299,38 +316,22 @@ export function ContentExplorerPanel({
         ariaLabel="Content Explorer"
         testId="content-explorer-panel"
         onClose={onClose}
-        headerActions={(
-          <Button
-            variant="secondary"
-            size="xs"
-            onClick={createEntry}
-            disabled={!selectedCollectionId || !canCreateEntry}
-            aria-label={newEntryLabel}
-            tooltip={newEntryLabel}
-          >
-            <FilePlusSolidIcon size={13} aria-hidden="true" />
-            <span>{newEntryLabel}</span>
-          </Button>
-        )}
+        body="bare"
+        bodyClassName={styles.panelScroll}
       >
         {error && <p className={styles.error} role="alert">{error}</p>}
 
-          <SearchBar
-            className={styles.explorerSearch}
-            value={search}
-            onValueChange={setSearch}
-            placeholder="Search content"
-            aria-label="Search content"
-          />
-
-          <section className={explorerStyles.section} aria-label="Collections">
-            <div className={explorerStyles.sectionHeader}>
-              <h2 className={explorerStyles.sectionTitle}>Collections</h2>
-              {/* Hide the count while loading — `0` would look like an
-                  empty install. Same for the entries section below. */}
-              {!loading && (
-                <span className={explorerStyles.sectionCount}>{collections.length}</span>
-              )}
+        <section className={styles.section} aria-label="Collections">
+          <div className={styles.sectionHeader}>
+            <h2 className={styles.sectionTitle}>Collections</h2>
+            {/* Hide the count while loading — `0` would look like an
+                empty install. Same for the entries section below. */}
+            {!loading && (
+              <span className={styles.sectionCount}>{collections.length}</span>
+            )}
+            {/* The action keeps its fixed 44px track even when a capability
+                gate hides the button, so the count never shifts sideways. */}
+            <span className={styles.sectionAction}>
               {canCreateCollection && (
                 <Button
                   variant="ghost"
@@ -343,98 +344,124 @@ export function ContentExplorerPanel({
                   <BookPlusSolidIcon size={13} aria-hidden="true" />
                 </Button>
               )}
-            </div>
-            <div className={explorerStyles.rows}>
-              {loading
-                ? Array.from({ length: 2 }, (_, i) => (
-                    // Skeleton collection row mirrors the real row 1:1:
-                    // 14px icon + label text + small meta count slot.
-                    <div
-                      key={`skeleton-coll-${i}`}
-                      className={explorerStyles.row}
-                      aria-hidden="true"
-                    >
-                      <Skeleton width={14} height={14} radius={3} />
-                      <span className={explorerStyles.rowLabel}>
-                        <Skeleton width={`${56 + (i % 2) * 16}%`} height={12} />
-                      </span>
-                      <span className={explorerStyles.rowMeta}>
-                        <Skeleton width={16} height={10} />
-                      </span>
-                    </div>
-                  ))
-                : collections.map((collection) => (
-                <button
-                  key={collection.id}
-                  type="button"
-                  className={cn(
-                    explorerStyles.row,
-                    collection.id === selectedCollectionId && explorerStyles.rowActive,
-                  )}
-                  onClick={() => onSelectCollection(collection.id)}
-                  onContextMenu={(event) => openContextMenu({ kind: 'collection', collection }, event)}
-                  onKeyDown={(event) => openKeyboardContextMenu({ kind: 'collection', collection }, event)}
-                >
-                  <BookOpenSolidIcon size={14} aria-hidden="true" />
-                  <span className={explorerStyles.rowLabel}>{collection.name}</span>
-                  <span className={styles.collectionRowMeta}>
-                    {collection.id === selectedCollectionId && (
-                      <span>{entries.length}</span>
-                    )}
-                    <ChevronRightIcon size={12} aria-hidden="true" />
-                  </span>
-                </button>
-              ))}
-            </div>
-          </section>
-
-          <section className={explorerStyles.section} aria-label={entryListLabel}>
-            <div className={explorerStyles.sectionHeader}>
-              <h2 className={explorerStyles.sectionTitle}>Entries</h2>
-              {!loading && (
-                <span className={explorerStyles.sectionCount}>{filteredEntries.length}</span>
-              )}
-            </div>
-
-            {loading ? (
-              <ContentEntriesLoading />
-            ) : entries.length === 0 ? (
-              <EmptyState compact title="No entries yet." />
-            ) : filteredEntries.length === 0 ? (
-              <EmptyState compact title="No matching entries." />
-            ) : (
-              <div className={explorerStyles.rows}>
-                {filteredEntries.map((entry) => (
+            </span>
+          </div>
+          <div className={styles.rows}>
+            {loading
+              ? Array.from({ length: 2 }, (_, i) => (
+                  // Skeleton collection row mirrors the real row 1:1:
+                  // 14px icon + label text + trailing count slot.
+                  <div
+                    key={`skeleton-coll-${i}`}
+                    className={styles.skeletonRow}
+                    aria-hidden="true"
+                  >
+                    <Skeleton width={14} height={14} radius={3} />
+                    <span className={styles.rowLabel}>
+                      <Skeleton width={`${56 + (i % 2) * 16}%`} height={12} />
+                    </span>
+                    <span className={styles.rowMeta}>
+                      <Skeleton width={16} height={10} />
+                    </span>
+                  </div>
+                ))
+              : collections.map((collection) => (
                   <button
-                    key={entry.id}
+                    key={collection.id}
                     type="button"
                     className={cn(
-                      explorerStyles.row,
-                      styles.entryRow,
-                      entry.id === selectedEntryId && explorerStyles.rowActive,
+                      styles.row,
+                      collection.id === selectedCollectionId && styles.rowActive,
                     )}
-                    onClick={() => onSelectEntry(entry)}
-                    onContextMenu={(event) => openContextMenu({ kind: 'entry', entry }, event)}
-                    onKeyDown={(event) => openKeyboardContextMenu({ kind: 'entry', entry }, event)}
+                    onClick={() => onSelectCollection(collection.id)}
+                    onContextMenu={(event) => openContextMenu({ kind: 'collection', collection }, event)}
+                    onKeyDown={(event) => openKeyboardContextMenu({ kind: 'collection', collection }, event)}
                   >
-                    <span className={styles.entryTitleStack}>
-                      <span className={styles.entryTitle}>{readTitleCell(entry.cells)}</span>
-                      <span className={styles.entryStatusLine}>
-                        <span
-                          className={styles.statusDot}
-                          data-status={entry.status}
-                          aria-hidden="true"
-                        />
-                        <span className={styles.entryStatusText}>{entry.status}</span>
-                        <span aria-hidden="true">·</span>
-                        <span>{entryDateLabel(entry)}</span>
-                      </span>
-                    </span>
+                    <BookOpenSolidIcon size={14} aria-hidden="true" />
+                    <span className={styles.rowLabel}>{collection.name}</span>
+                    <span className={styles.rowMeta}>{collectionCount(collection)}</span>
                   </button>
                 ))}
-              </div>
+          </div>
+        </section>
+
+        <section className={styles.section} aria-label={entryListLabel}>
+          <div className={styles.sectionHeader}>
+            <h2 className={styles.sectionTitle}>{entryListLabel}</h2>
+            {!loading && (
+              <span className={styles.sectionCount}>{entries.length}</span>
             )}
-          </section>
+            <span className={styles.sectionAction}>
+              <Button
+                variant="ghost"
+                size="xs"
+                iconOnly
+                onClick={createEntry}
+                disabled={!selectedCollectionId || !canCreateEntry}
+                aria-label={newEntryLabel}
+                tooltip={newEntryLabel}
+              >
+                <FilePlusSolidIcon size={13} aria-hidden="true" />
+              </Button>
+            </span>
+          </div>
+
+          {loading ? (
+            <ContentEntriesLoading />
+          ) : entries.length === 0 ? (
+            <p className={styles.compactEmpty}>No entries yet.</p>
+          ) : (
+            <div className={styles.rows}>
+              {entries.map((entry) => {
+                const isActive = entry.id === selectedEntryId
+                const title = readTitleCell(entry.cells)
+                return (
+                  <div
+                    key={entry.id}
+                    className={cn(
+                      styles.entryRowWrap,
+                      isActive && styles.entryRowWrapActive,
+                    )}
+                  >
+                    <button
+                      type="button"
+                      className={cn(
+                        styles.row,
+                        styles.entryRow,
+                        isActive && styles.rowActive,
+                      )}
+                      aria-current={isActive ? 'true' : undefined}
+                      onClick={() => onSelectEntry(entry)}
+                      onContextMenu={(event) => openContextMenu({ kind: 'entry', entry }, event)}
+                      onKeyDown={(event) => openKeyboardContextMenu({ kind: 'entry', entry }, event)}
+                    >
+                      <span className={styles.entryPreview}>
+                        <FileTextSolidIcon size={14} aria-hidden="true" />
+                      </span>
+                      <span className={styles.entryTitleStack}>
+                        <strong>{title}</strong>
+                        <small>{entryAuthorLabel(entry)}</small>
+                      </span>
+                      <span className={styles.rowMeta}>{entry.status}</span>
+                    </button>
+                    <Button
+                      variant="ghost"
+                      size="xs"
+                      iconOnly
+                      className={styles.entryMenuTrigger}
+                      aria-label={`Options for ${title || 'Untitled'}`}
+                      tooltip="Options"
+                      aria-haspopup="menu"
+                      onClick={(event) => openTriggerMenu({ kind: 'entry', entry }, event)}
+                    >
+                      <MoreVerticalSolidIcon size={13} aria-hidden="true" />
+                    </Button>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </section>
       </Panel>
 
       {contextMenu && (
@@ -484,13 +511,12 @@ export function ContentExplorerPanel({
 }
 
 function ContentEntriesLoading() {
-  // Skeleton entry row mirrors the real `.entryRow` chrome: a two-line
-  // title + status·date stack (no thumbnail). Same `.row` + `.entryRow`
-  // button skeleton so padding / hover ring / radius match the loaded
-  // state and there's no visual shift when entries swap in.
+  // Skeleton entry row mirrors the real `.entryRow` chrome: a 28px preview
+  // tile plus a two-line title/author stack, inside the same 44px row box,
+  // so nothing shifts when entries swap in.
   return (
     <div
-      className={explorerStyles.rows}
+      className={styles.rows}
       data-testid="content-entries-loading"
       aria-busy="true"
       aria-label="Loading entries"
@@ -498,12 +524,13 @@ function ContentEntriesLoading() {
       {Array.from({ length: 3 }, (_, i) => (
         <div
           key={`skeleton-entry-${i}`}
-          className={cn(explorerStyles.row, styles.entryRow)}
+          className={styles.skeletonRow}
           aria-hidden="true"
         >
+          <Skeleton width={28} height={28} radius={2} />
           <span className={styles.entryTitleStack}>
-            <Skeleton width={`${60 + (i % 3) * 12}%`} height={12} />
-            <Skeleton width={`${40 + (i % 2) * 14}%`} height={10} />
+            <Skeleton width={`${60 + (i % 3) * 12}%`} height={11} />
+            <Skeleton width={`${40 + (i % 2) * 14}%`} height={9} />
           </span>
         </div>
       ))}

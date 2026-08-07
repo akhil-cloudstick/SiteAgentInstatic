@@ -5,16 +5,19 @@ import {
 } from '@admin/state/workspaceLayoutStorage'
 import { useAdminUi } from '@admin/state/adminUi'
 import { readTitleCell } from '@core/data/cells'
-import type {
-  DataTable,
-  DataRow,
-  DataRowStatus,
-  UpdateDataTableInput,
+import { dataTableHasField } from '@core/data/fields'
+import {
+  POST_TYPE_FIELD_BODY,
+  type DataTable,
+  type DataRow,
+  type DataRowStatus,
+  type UpdateDataTableInput,
 } from '@core/data/schemas'
 import { HeadingIcon } from 'pixel-art-icons/icons/heading'
 import { ImagesSolidIcon } from 'pixel-art-icons/icons/images-solid'
 import { TextPlusIcon } from 'pixel-art-icons/icons/text-plus'
 import { BracesIcon } from 'pixel-art-icons/icons/braces'
+import { PlusIcon } from 'pixel-art-icons/icons/plus'
 // Token-picker dialog is awaiting re-integration with the popover-based
 // DynamicBindingControl that a parallel session is rolling out. Until then
 // the slash-menu "Data token" action inserts a placeholder token string at
@@ -158,6 +161,12 @@ export function ContentPage() {
   const canMoveRows = canMoveDataRow(permissionUser)
   const canMoveSelectedEntry = canEditSelectedEntry && canMoveRows
   const canPublishSelectedEntry = canPublishContentEntry(permissionUser, workspace.selectedEntry)
+  // The Write/Live switch only applies to collections with an editable body
+  // region — the same gate the canvas uses to render the two modes. It moved
+  // out of the toolbar onto the canvas, where the reference draws it.
+  const bodyModeAvailable = workspace.selectedCollection
+    ? dataTableHasField(workspace.selectedCollection, POST_TYPE_FIELD_BODY)
+    : false
 
   // Mirror the selected entry's public URL into adminUi so the global
   // toolbar's "Open live page" icon button deep-links to the post the
@@ -430,6 +439,18 @@ export function ContentPage() {
 
   const notchActions: CanvasNotchAction[] = [
     {
+      // The reference's leading action: opens the same eleven-command
+      // catalogue that typing `/` produces, anchored to this button.
+      id: 'insert',
+      label: 'Insert',
+      icon: PlusIcon,
+      emphasis: 'primary',
+      onClick: () => {
+        const anchor = document.querySelector<HTMLElement>('[data-testid="canvas-notch-insert-btn"]')
+        bodyEditorRef.current?.openInsertMenu(anchor)
+      },
+    },
+    {
       id: 'heading',
       label: 'Heading',
       icon: HeadingIcon,
@@ -469,8 +490,6 @@ export function ContentPage() {
             publicPath={publicPath}
             canSaveDraft={canEditSelectedEntry}
             canPublish={canPublishSelectedEntry}
-            contentMode={contentMode}
-            onContentModeChange={setContentMode}
             onSaveDraft={() => void draft.handleSaveDraft()}
             onPublish={() => {
               if (workspace.selectedEntry) void handlePublishEntry(workspace.selectedEntry)
@@ -546,6 +565,8 @@ export function ContentPage() {
             focusTitleSignal={focusTitleSignal}
             focusBodySignal={focusBodySignal}
             contentMode={contentMode}
+            onContentModeChange={setContentMode}
+            bodyModeAvailable={bodyModeAvailable}
             onTitleChange={draft.setTitle}
             onTitleEnter={() => setFocusBodySignal((n) => n + 1)}
             onBodyChange={draft.setBody}

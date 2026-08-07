@@ -2,16 +2,14 @@ import { forwardRef, lazy, Suspense, useLayoutEffect, useRef, type KeyboardEvent
 import { Button } from '@ui/components/Button'
 import { Textarea } from '@ui/components/Input'
 import { SkeletonBlock } from '@ui/components/Skeleton'
-import { cn } from '@ui/cn'
 import { FilePlusSolidIcon } from 'pixel-art-icons/icons/file-plus-solid'
 import { dataTableHasField } from '@core/data/fields'
 import { POST_TYPE_FIELD_BODY } from '@core/data/schemas'
 import type { DataTable, DataRow } from '@core/data/schemas'
 import { CanvasNotch, type CanvasNotchAction } from '@site/canvas/CanvasNotch'
-import canvasStyles from '../../../site/canvas/CanvasRoot.module.css'
 import type { TiptapBodyEditorHandle } from '@content/TiptapBodyEditor'
-import type { ContentMode } from '../ContentModeToggle/ContentModeToggle'
-import styles from '../../ContentPage.module.css'
+import { ContentModeToggle, type ContentMode } from '../ContentModeToggle/ContentModeToggle'
+import styles from './ContentDocumentCanvas.module.css'
 
 const TiptapBodyEditor = lazy(() =>
   import('@content/TiptapBodyEditor').then((m) => ({ default: m.TiptapBodyEditor })),
@@ -47,6 +45,13 @@ interface ContentDocumentCanvasProps {
    * with inline editing wired up to the same body markdown.
    */
   contentMode: ContentMode
+  /**
+   * The reference floats the Write / Live switch over the canvas rather than
+   * docking it in the toolbar, so the canvas owns the change handler too.
+   */
+  onContentModeChange: (mode: ContentMode) => void
+  /** Whether this collection has an editable body region (gates the switch). */
+  bodyModeAvailable: boolean
   onTitleChange: (value: string) => void
   onTitleEnter: () => void
   onBodyChange: (markdown: string) => void
@@ -69,6 +74,8 @@ export const ContentDocumentCanvas = forwardRef<TiptapBodyEditorHandle, ContentD
       focusTitleSignal,
       focusBodySignal,
       contentMode,
+      onContentModeChange,
+      bodyModeAvailable,
       onTitleChange,
       onTitleEnter,
       onBodyChange,
@@ -112,8 +119,15 @@ export const ContentDocumentCanvas = forwardRef<TiptapBodyEditorHandle, ContentD
         role="region"
         aria-label="Content canvas"
         data-testid="content-canvas-root"
-        className={cn(canvasStyles.canvas, styles.contentCanvas)}
+        className={styles.canvas}
       >
+        {/* The reference floats the Write / Live switch over the canvas at
+            top-left, gated on the collection having an editable body — the
+            same gate the two modes themselves are rendered behind. */}
+        {selectedEntry && bodyModeAvailable && (
+          <ContentModeToggle mode={contentMode} onChange={onContentModeChange} />
+        )}
+
         {/* The insertion notch is meaningful only in Write mode — Live
             mode has its own block affordances inside the iframe. */}
         {showInsertNotch && contentMode === 'write' && (

@@ -1,44 +1,58 @@
+/* Selection format bar, transcribed from the MMSBUILD Content reference
+ * (`screens/content/src/styles.css` → `.editor-menu`). The CMS keeps a richer
+ * button set than the reference's three; only the chrome and the 44px target
+ * sizing come from the reference. */
 .bar {
     display: inline-flex;
     align-items: center;
-    gap: var(--space-4xs);
-    padding: var(--space-3xs);
-    border-radius: var(--panel-radius);
-    border: 1px solid var(--border);
-    background: var(--bg-body);
-    box-shadow: 0 12px 32px -16px var(--scrim-50);
+    gap: var(--content-sp-1);
+    padding: var(--content-sp-2);
+    border-radius: var(--content-radius-5);
+    border: 1px solid var(--mms-border-strong);
+    background: var(--mms-surface-raised);
+    box-shadow: var(--content-shadow-menu);
     white-space: nowrap;
 }
 
 .divider {
     width: 1px;
     height: 16px;
-    margin: 0 var(--space-3xs);
-    background: var(--border);
+    margin: var(--content-sp-0) var(--content-sp-2);
+    background: var(--mms-border);
 }
 
-/* Square icon button. Overrides the Button primitive's inline-flex sizing
- * so every mark toggle (Bold / Italic / Underline / Strike / Code / Link)
- * has the same 28×28 footprint regardless of icon width. */
-.markButton {
-    width: 28px;
-    height: 28px;
-    min-width: 28px;
-    min-height: 28px;
+/* Square icon button — the reference's 44×44 target, so every mark toggle
+ * (Bold / Italic / Underline / Strike / Code / Link) has the same footprint
+ * regardless of icon width. */
+.markButton.markButton {
+    width: var(--content-tap);
+    height: var(--content-tap);
+    min-width: var(--content-tap);
+    min-height: var(--content-tap);
     padding: 0;
     flex-shrink: 0;
+    border-radius: var(--content-radius-3);
+    color: var(--mms-text-muted);
     aspect-ratio: 1 / 1;
 }
 
-.blockTypeButton {
+.markButton.markButton:hover,
+.markButton.markButton[aria-pressed="true"] {
+    color: var(--content-accent);
+    background: var(--content-accent-soft);
+}
+
+.blockTypeButton.blockTypeButton {
     display: inline-flex;
     align-items: center;
-    gap: var(--space-3xs);
+    gap: var(--content-sp-3);
     min-width: 0;
-    height: 28px;
-    padding: 0 var(--space-s) 0 var(--space-m);
-    color: var(--text);
-    font-size: var(--text-s);
+    height: var(--content-tap);
+    padding: var(--content-sp-0) var(--content-sp-8) var(--content-sp-0)
+        var(--content-sp-10);
+    border-radius: var(--content-radius-3);
+    color: var(--mms-text);
+    font-size: var(--content-text-11);
     font-weight: 600;
 }
 

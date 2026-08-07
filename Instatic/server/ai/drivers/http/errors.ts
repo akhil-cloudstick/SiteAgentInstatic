@@ -33,11 +33,15 @@ export function classifyHttpError(
 }
 
 export interface ProviderHttpFailure {
-  kind: 'replayOverflow' | 'generic'
+  kind: 'replayOverflow' | 'imageUnsupported' | 'generic'
   message: string
 }
 
-/** Structured classification lets the tool loop retry only replay overflows. */
+/**
+ * Structured classification lets the tool loop retry the two failures a resend
+ * can actually fix: a context overflow (drop old images) and a model that
+ * cannot read images at all (drop every image).
+ */
 export function classifyHttpFailure(
   providerLabel: string,
   status: number,
@@ -63,6 +67,12 @@ export function classifyHttpFailure(
       message: `${providerLabel} could not accept this conversation because it exceeds the provider's request or context limit${detail ? `: ${detail}` : ''}. Your history is still saved; start a new conversation or choose a model with a larger context window.`,
     }
   }
+  if (modelRejectsImageInput(status, bodyText, detail)) {
+    return {
+      kind: 'imageUnsupported',
+      message: `${providerLabel} rejected this request because the model cannot read images${detail ? `: ${detail}` : ''}. Retrying without them failed — choose a vision-capable model.`,
+    }
+  }
   if (status >= 500) {
     return {
       kind: 'generic',
@@ -73,6 +83,31 @@ export function classifyHttpFailure(
     kind: 'generic',
     message: `${providerLabel} error (${status})${detail ? `: ${detail}` : ''}.`,
   }
+}
+
+/**
+ * True when the provider refused the request because the resolved model (or,
+ * on OpenRouter, every upstream endpoint available for it) takes text only.
+ *
+ * This is NOT knowable up front in every deployment. In managed mode the AI
+ * Gateway resolves the model per request from the prompt's task-type category,
+ * so the tenant server advertises a fixed permissive capability set and cannot
+ * tell whether THIS call landed on a vision model. On OpenRouter the catalogue
+ * flag is model-level while the refusal is endpoint-level — a key whose
+ * provider/data-policy settings exclude the image-capable endpoints gets this
+ * 404 for a model the catalogue lists as multimodal.
+ *
+ * Both cases are recoverable by resending without images, so this earns its own
+ * failure kind rather than dead-ending as `generic`.
+ */
+function modelRejectsImageInput(
+  status: number,
+  bodyText: string,
+  detail: string | null,
+): boolean {
+  if (status !== 400 && status !== 404 && status !== 415 && status !== 422) return false
+  const providerSignal = `${detail ?? ''} ${bodyText}`
+  return /(?:no endpoints found that support image input|(?:does not|doesn'?t|cannot|can'?t)[^.]{0,32}(?:image|vision)|(?:image|vision)[^.]{0,32}(?:is )?not supported|unsupported[^.]{0,16}(?:image|vision))/i.test(providerSignal)
 }
 
 function requestExceedsProviderContext(

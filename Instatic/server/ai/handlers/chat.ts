@@ -89,6 +89,7 @@ import {
   getManagedModel,
   getManagedAiConfig,
   classifyCategory,
+  resolveImageRouting,
 } from '../managed'
 import { AI_API_PREFIX } from './paths'
 
@@ -331,11 +332,6 @@ async function handleAiChat(
         }
       }
 
-      const messages = projectUserImagesForModel(
-        buildMessageHistory([...existingRecords, appendedMessage]),
-        modelCapabilities.visionInput,
-      )
-
       // Managed mode: auto-route this message to the operator's per-task-type
       // model (Design / Content / custom) and inject the operator's global
       // plain-English guidance. Classification is best-effort — a null category
@@ -356,6 +352,21 @@ async function handleAiChat(
           }
         }
       }
+
+      // Routing is decided per MESSAGE, not per conversation — see
+      // `resolveImageRouting`. Older images are projected down to breadcrumbs
+      // whenever this message lands on a text-only route; history itself is
+      // never mutated, so they return the moment the chat routes to Design.
+      const { requiresVision, routeReadsImages } = resolveImageRouting({
+        managed: isManagedAiMode(),
+        currentTurnHasImage: userContent.some((block) => block.kind === 'image'),
+        category: managedCategory,
+        visionInput: modelCapabilities.visionInput,
+      })
+      const messages = projectUserImagesForModel(
+        buildMessageHistory([...existingRecords, appendedMessage]),
+        routeReadsImages,
+      )
 
       const systemPrompt = buildSystemPromptForScope(scope, snapshot, guidance)
 
@@ -379,13 +390,13 @@ async function handleAiChat(
           modelId,
         },
       })
-      return { messages, systemPrompt, tokensAtStart, managedCategory }
+      return { messages, systemPrompt, tokensAtStart, managedCategory, requiresVision }
     } catch (err) {
       releaseConversation()
       throw err
     }
   })()
-  const { messages, systemPrompt, tokensAtStart, managedCategory } = prepared
+  const { messages, systemPrompt, tokensAtStart, managedCategory, requiresVision } = prepared
 
   // Captures the gateway's echo of the model that actually ran, so the audit
   // and per-message usage rows record the routed model rather than the nominal
@@ -470,7 +481,10 @@ async function handleAiChat(
           bridge,
           toolContextBase,
           ...(isManagedAiMode()
-            ? { managedRouting: { categorySlug: managedCategory }, onResponseHeaders }
+            ? {
+                managedRouting: { categorySlug: managedCategory, requiresVision },
+                onResponseHeaders,
+              }
             : {}),
         }
 

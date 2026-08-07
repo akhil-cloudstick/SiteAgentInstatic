@@ -1,14 +1,15 @@
-import { Suspense, lazy, type ReactNode } from 'react'
+import { Suspense, lazy } from 'react'
 import { Button } from '@ui/components/Button'
 import { Input, Textarea } from '@ui/components/Input'
 import { Select } from '@ui/components/Select'
 import { SkeletonBlock } from '@ui/components/Skeleton'
-import { RemixIcon } from '@ui/components/RemixIcon'
 import { cn } from '@ui/cn'
+import { CheckIcon } from 'pixel-art-icons/icons/check'
 import { Copy2SolidIcon } from 'pixel-art-icons/icons/copy-2-solid'
+import { ImagesSolidIcon } from 'pixel-art-icons/icons/images-solid'
+import { ImageXSolidIcon } from 'pixel-art-icons/icons/image-x-solid'
 import { Settings2SolidIcon } from 'pixel-art-icons/icons/settings-2-solid'
 import type { CmsMediaAsset } from '@core/persistence'
-import { MediaPickerField } from '@admin/pages/media/components/MediaPickerField'
 import { useWorkspaceLayout } from '@admin/state/workspaceLayout'
 import { dataTableHasField } from '@core/data/fields'
 import {
@@ -21,9 +22,8 @@ import {
   type DataRowStatus,
   type DataUserReference,
 } from '@core/data/schemas'
-import propertiesStyles from '../../../site/panels/PropertiesPanel/PropertiesPanel.module.css'
 import { PanelHeader } from '@admin/shared/PanelHeader'
-import styles from '../../ContentPage.module.css'
+import styles from './ContentSettingsPanel.module.css'
 
 // Lazy-load the generic custom-field editors: they pull in the Data
 // workspace's cell-editor graph (media picker workspace, relation picker),
@@ -95,9 +95,9 @@ function authorOptionLabel(author: DataUserReference): string {
 }
 
 /**
- * Human-readable schedule state for the Publishing card. Derived from the
- * row's real `scheduledPublishAt` — never fabricated. Renders "Not scheduled"
- * when the field is null/absent (the common case) or unparseable.
+ * Human-readable schedule state. Derived from the row's real
+ * `scheduledPublishAt` — never fabricated. Renders "Not scheduled" when the
+ * field is null/absent (the common case) or unparseable.
  */
 function scheduleLabel(entry: DataRow | null): string {
   const iso = entry?.scheduledPublishAt
@@ -160,8 +160,8 @@ export function ContentSettingsPanel({
   const setRightPanel = useWorkspaceLayout((s) => s.setRightPanel)
   const seoEnabled = selectedCollection ? dataTableHasField(selectedCollection, POST_TYPE_FIELD_SEO_TITLE) : false
   // SEO "Complete" is a presentation-derived summary of the available SEO
-  // title/description fields — NOT a persisted status or a validation API (per
-  // the guide). Computed locally so the criteria are transparent.
+  // title/description fields — NOT a persisted status or a validation API.
+  // Computed locally so the criteria are transparent.
   const seoComplete = seoTitle.trim().length > 0 && seoDescription.trim().length > 0
   const featuredMediaEnabled = selectedCollection ? dataTableHasField(selectedCollection, POST_TYPE_FIELD_FEATURED_MEDIA) : false
   const customFields = selectedCollection?.fields.filter(isEditableCustomField) ?? []
@@ -196,15 +196,15 @@ export function ContentSettingsPanel({
       data-testid="content-settings-panel"
       role="complementary"
       aria-label="Content settings"
-      className={cn(propertiesStyles.panel, propertiesStyles.panelDocked)}
+      className={styles.panel}
     >
       <PanelHeader
         panelId="content-settings"
         title="Settings"
         titleContent={(
-          <span className={propertiesStyles.headerNodeTitle}>
+          <span className={styles.headerTitle}>
             <Settings2SolidIcon size={13} aria-hidden="true" />
-            <span className={propertiesStyles.headerNodeLabel}>Settings</span>
+            <span className={styles.headerLabel}>Settings</span>
           </span>
         )}
         onClose={() => setRightPanel({ collapsed: true })}
@@ -215,75 +215,38 @@ export function ContentSettingsPanel({
           <ContentSettingsLoading />
         ) : (
           <>
-            {/* Presentation-level disclosure grouping (guide Screen 2). The
-                underlying inputs, ids, handlers, and permission gates are
-                unchanged — only their grouping/labelling is. */}
-            <SettingsSection title="Publishing">
-              <div className={styles.field}>
-                <span>Status</span>
-                <Select
-                  aria-label="Status"
-                  value={selectedEntry?.status ?? 'draft'}
-                  disabled={!canChangeStatus}
-                  onChange={(event) => {
-                    const nextStatus = event.target.value as DataRowStatus
-                    if (nextStatus === 'published' && !canPublishEntry) return
-                    if (nextStatus !== 'published' && !canEditEntry) return
-                    onStatusChange(nextStatus)
-                  }}
-                  options={statusOptions}
-                />
-              </div>
-              <div className={styles.metaBlock}>
-                <span>Schedule</span>
-                <strong>{scheduleLabel(selectedEntry)}</strong>
-              </div>
-            </SettingsSection>
+            {/* Flat, schema-driven field list in the reference's order:
+                Collection · Slug · SEO title · SEO description · Status ·
+                Public URL · Author · Featured media · custom fields.
+                Nothing is grouped and nothing collapses. The SEO badge and the
+                Schedule row are the two rows the current CMS adds on top of
+                the reference; they use the same label/value treatment. */}
+            <div className={styles.field}>
+              <span>Collection</span>
+              <Select
+                aria-label="Collection"
+                value={selectedEntry?.tableId ?? selectedCollection?.id ?? ''}
+                disabled={!canMoveSelectedEntry}
+                onChange={(event) => onCollectionChange(event.target.value)}
+                options={collections.map((collection) => ({
+                  value: collection.id,
+                  label: collection.pluralLabel || collection.name,
+                }))}
+              />
+            </div>
 
-            <SettingsSection title="URL">
-              <label className={styles.field} htmlFor={slugId}>
-                <span>Slug</span>
-                <Input
-                  id={slugId}
-                  value={slug}
-                  onChange={(event) => onSlugChange(event.target.value)}
-                  disabled={!canEditSelectedEntry}
-                />
-              </label>
-              <div className={styles.metaBlock}>
-                <span>Public URL</span>
-                <div className={styles.urlValueRow}>
-                  <strong>{publicPath || 'Not available'}</strong>
-                  {publicPath && (
-                    <Button
-                      variant="ghost"
-                      size="xs"
-                      iconOnly
-                      aria-label="Copy public URL"
-                      tooltip="Copy URL"
-                      onClick={() => void copyPublicUrl()}
-                    >
-                      <Copy2SolidIcon size={12} aria-hidden="true" />
-                    </Button>
-                  )}
-                </div>
-              </div>
-            </SettingsSection>
+            <label className={styles.field} htmlFor={slugId}>
+              <span>Slug</span>
+              <Input
+                id={slugId}
+                value={slug}
+                onChange={(event) => onSlugChange(event.target.value)}
+                disabled={!canEditSelectedEntry}
+              />
+            </label>
 
             {seoEnabled && (
-              <SettingsSection
-                title="SEO"
-                badge={
-                  <span
-                    className={cn(
-                      styles.seoBadge,
-                      seoComplete ? styles.seoBadgeOk : styles.seoBadgeWarn,
-                    )}
-                  >
-                    {seoComplete ? 'Complete' : 'Incomplete'}
-                  </span>
-                }
-              >
+              <>
                 <label className={styles.field} htmlFor={seoTitleId}>
                   <span>SEO title</span>
                   <Input
@@ -304,83 +267,156 @@ export function ContentSettingsPanel({
                     rows={4}
                   />
                 </label>
-              </SettingsSection>
+                <div className={styles.metaBlock}>
+                  <span>SEO status</span>
+                  <span
+                    className={cn(
+                      styles.seoBadge,
+                      seoComplete ? styles.seoBadgeOk : styles.seoBadgeWarn,
+                    )}
+                  >
+                    {seoComplete && <CheckIcon size={11} aria-hidden="true" />}
+                    {seoComplete ? 'Complete' : 'Incomplete'}
+                  </span>
+                </div>
+              </>
+            )}
+
+            <div className={styles.field}>
+              <span>Status</span>
+              <Select
+                aria-label="Status"
+                value={selectedEntry?.status ?? 'draft'}
+                disabled={!canChangeStatus}
+                onChange={(event) => {
+                  const nextStatus = event.target.value as DataRowStatus
+                  if (nextStatus === 'published' && !canPublishEntry) return
+                  if (nextStatus !== 'published' && !canEditEntry) return
+                  onStatusChange(nextStatus)
+                }}
+                options={statusOptions}
+              />
+            </div>
+
+            <div className={styles.metaBlock}>
+              <span>Schedule</span>
+              <strong>{scheduleLabel(selectedEntry)}</strong>
+            </div>
+
+            <div className={styles.metaBlock}>
+              <span>Public URL</span>
+              <div className={styles.urlValueRow}>
+                <strong>{publicPath || 'Not available'}</strong>
+                {publicPath && (
+                  <Button
+                    variant="ghost"
+                    size="xs"
+                    iconOnly
+                    aria-label="Copy public URL"
+                    tooltip="Copy URL"
+                    onClick={() => void copyPublicUrl()}
+                  >
+                    <Copy2SolidIcon size={12} aria-hidden="true" />
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            {selectedEntry && (
+              <div className={styles.field} aria-label="Content author">
+                <span>Author</span>
+                {canChangeAuthor && authorOptions.length > 0 ? (
+                  <>
+                    <Select
+                      aria-label="Author"
+                      value={selectedEntry.authorUserId ?? selectedAuthor?.id ?? ''}
+                      disabled={authorsLoading}
+                      onChange={(event) => onAuthorChange(event.target.value)}
+                      options={authorOptions.map((author) => ({
+                        value: author.id,
+                        label: authorOptionLabel(author),
+                      }))}
+                    />
+                    {/* The reference only shows the author's role in its
+                        read-only branch. Kept here too — same rationale as the
+                        SEO and Schedule rows: reference styling, no CMS
+                        information dropped. */}
+                    {authorRoleLabel && (
+                      <small className={styles.authorRoleBadge}>{authorRoleLabel}</small>
+                    )}
+                  </>
+                ) : (
+                  <div className={styles.authorReadonly}>
+                    <strong>{contentAuthorLabel(selectedEntry)}</strong>
+                    {authorRoleLabel && <small>{authorRoleLabel}</small>}
+                  </div>
+                )}
+              </div>
             )}
 
             {featuredMediaEnabled && (
-              <SettingsSection title="Featured media">
-                <div className={styles.featuredMediaField}>
-                  <MediaPickerField
-                    asset={featuredMediaAsset}
-                    hasValue={Boolean(featuredMediaId)}
-                    fallbackLabel={featuredMediaId ?? undefined}
-                    fallbackHint="Saved reference"
-                    mediaKind={featuredMediaAsset?.mimeType.startsWith('video/') ? 'video' : 'image'}
-                    subjectLabel="featured media"
-                    chooseLabel="Choose featured media"
+              <div className={styles.featuredField}>
+                <span>Featured media</span>
+                {featuredMediaAsset ? (
+                  <div className={styles.featuredPreview}>
+                    <img
+                      src={featuredMediaAsset.publicPath}
+                      // The reference's preview is image-only — no filename or
+                      // MIME caption — so the asset's name rides the alt text
+                      // to stay reachable rather than disappearing entirely.
+                      alt={featuredMediaAsset.altText || featuredMediaAsset.filename}
+                    />
+                    <Button
+                      variant="secondary"
+                      size="xs"
+                      className={styles.featuredBrowse}
+                      disabled={!canEditSelectedEntry}
+                      onClick={onChooseFeaturedMedia}
+                    >
+                      Browse
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="xs"
+                      iconOnly
+                      className={styles.featuredClear}
+                      aria-label="Clear featured media"
+                      tooltip="Clear featured media"
+                      disabled={!canEditSelectedEntry}
+                      onClick={onClearFeaturedMedia}
+                    >
+                      <ImageXSolidIcon size={14} aria-hidden="true" />
+                    </Button>
+                  </div>
+                ) : (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className={styles.mediaEmptyButton}
                     disabled={!canEditSelectedEntry}
-                    onBrowse={onChooseFeaturedMedia}
-                    onEdit={featuredMediaAsset ? onEditFeaturedMedia : undefined}
-                    onClear={featuredMediaId ? onClearFeaturedMedia : undefined}
-                  />
-                  {mediaError && <p className={styles.error} role="alert">{mediaError}</p>}
-                </div>
-              </SettingsSection>
+                    onClick={featuredMediaId ? onEditFeaturedMedia : onChooseFeaturedMedia}
+                  >
+                    <ImagesSolidIcon size={16} aria-hidden="true" />
+                    <span>
+                      {featuredMediaId ? 'Saved reference' : 'Choose featured media'}
+                    </span>
+                  </Button>
+                )}
+                {mediaError && <p className={styles.error} role="alert">{mediaError}</p>}
+              </div>
             )}
 
-            <SettingsSection title="Author &amp; collection">
-              <div className={styles.field}>
-                <span>Collection</span>
-                <Select
-                  aria-label="Collection"
-                  value={selectedEntry?.tableId ?? selectedCollection?.id ?? ''}
-                  disabled={!canMoveSelectedEntry}
-                  onChange={(event) => onCollectionChange(event.target.value)}
-                  options={collections.map((collection) => ({
-                    value: collection.id,
-                    label: collection.pluralLabel || collection.name,
-                  }))}
-                />
-              </div>
-              {selectedEntry && (
-                <div className={styles.authorBlock} aria-label="Content author">
-                  <span>Author</span>
-                  <div className={styles.authorRow}>
-                    {canChangeAuthor && authorOptions.length > 0 ? (
-                      <Select
-                        aria-label="Author"
-                        value={selectedEntry.authorUserId ?? selectedAuthor?.id ?? ''}
-                        disabled={authorsLoading}
-                        onChange={(event) => onAuthorChange(event.target.value)}
-                        options={authorOptions.map((author) => ({
-                          value: author.id,
-                          label: authorOptionLabel(author),
-                        }))}
-                      />
-                    ) : (
-                      <strong>{contentAuthorLabel(selectedEntry)}</strong>
-                    )}
-                    {authorRoleLabel && (
-                      <span className={styles.authorRoleBadge}>{authorRoleLabel}</span>
-                    )}
-                  </div>
-                </div>
-              )}
-            </SettingsSection>
-
             {selectedEntry && customFields.length > 0 && (
-              <SettingsSection title="More fields" defaultOpen={false}>
-                <Suspense fallback={null}>
-                  <ContentCustomFields
-                    fields={customFields}
-                    entryId={selectedEntry.id}
-                    tables={tables}
-                    customCells={customCells}
-                    readOnly={!canEditSelectedEntry}
-                    onCustomCellChange={onCustomCellChange}
-                  />
-                </Suspense>
-              </SettingsSection>
+              <Suspense fallback={null}>
+                <ContentCustomFields
+                  fields={customFields}
+                  entryId={selectedEntry.id}
+                  tables={tables}
+                  customCells={customCells}
+                  readOnly={!canEditSelectedEntry}
+                  onCustomCellChange={onCustomCellChange}
+                />
+              </Suspense>
             )}
           </>
         )}
@@ -389,44 +425,7 @@ export function ContentSettingsPanel({
   )
 }
 
-/**
- * Collapsible settings group. Uses native `<details>`/`<summary>` for built-in
- * accessible open/close and keyboard support; the chevron rotates via CSS on
- * `[open]`. Presentation only — no draft state is split across sections.
- */
-function SettingsSection({
-  title,
-  badge,
-  defaultOpen = true,
-  children,
-}: {
-  title: string
-  badge?: ReactNode
-  defaultOpen?: boolean
-  children: ReactNode
-}) {
-  return (
-    <details className={styles.settingsSection} open={defaultOpen}>
-      <summary className={styles.settingsSectionSummary}>
-        <span className={styles.settingsSectionTitle}>{title}</span>
-        {badge}
-        <RemixIcon
-          name="arrow-down-s-line"
-          size={16}
-          className={styles.settingsSectionChevron}
-        />
-      </summary>
-      <div className={styles.settingsSectionBody}>{children}</div>
-    </details>
-  )
-}
-
 function ContentSettingsLoading() {
-  // Universal three-bar block — same visual as every other settings /
-  // dialog / panel loading region in the editor. The bespoke
-  // `settingsSkeleton*` shapes that used to render label / input /
-  // textarea silhouettes have been retired in favour of
-  // `<SkeletonBlock>`.
   return (
     <div
       className={styles.settingsSkeleton}

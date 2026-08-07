@@ -12,6 +12,7 @@ import {
   managedCredentialView,
   managedDefaultsMap,
   managedModelList,
+  resolveImageRouting,
   __resetManagedModelCache,
 } from './managed'
 
@@ -73,5 +74,63 @@ describe('managed AI mode', () => {
     for (const scope of ['site', 'content', 'data', 'plugin']) {
       expect(defaults[scope]).toEqual({ credentialId: MANAGED_AI_CREDENTIAL_ID, modelId: MODEL })
     }
+  })
+})
+
+/**
+ * One thread, three messages, three different routes — the whole point of
+ * deciding this per message instead of latching the conversation onto Design
+ * the moment someone attaches a screenshot.
+ */
+describe('per-message image routing', () => {
+  const managed = { managed: true, visionInput: true }
+
+  it('routes a turn that carries an image to Design and keeps the image', () => {
+    expect(resolveImageRouting({
+      ...managed,
+      currentTurnHasImage: true,
+      // Text alone said "content" — the image outvotes it.
+      category: 'content',
+    })).toEqual({ requiresVision: true, routeReadsImages: true })
+  })
+
+  it('drops back to the text model on a later image-free turn', () => {
+    // "now just update the wording" — the screenshot from turn 1 is still in
+    // history, but this message must not be pinned to the expensive route.
+    expect(resolveImageRouting({
+      ...managed,
+      currentTurnHasImage: false,
+      category: 'content',
+    })).toEqual({ requiresVision: false, routeReadsImages: false })
+  })
+
+  it('returns to Design — and to the earlier images — when the text asks for design', () => {
+    expect(resolveImageRouting({
+      ...managed,
+      currentTurnHasImage: false,
+      category: 'design',
+    })).toEqual({ requiresVision: false, routeReadsImages: true })
+  })
+
+  it('treats an unclassified turn as text-only', () => {
+    // A failed/timed-out classify must not gamble that the default model reads
+    // images: a weaker answer beats a refused request.
+    expect(resolveImageRouting({ ...managed, currentTurnHasImage: false, category: null }))
+      .toEqual({ requiresVision: false, routeReadsImages: false })
+  })
+
+  it('defers to the real model capability in standalone mode', () => {
+    expect(resolveImageRouting({
+      managed: false,
+      currentTurnHasImage: true,
+      category: null,
+      visionInput: false,
+    })).toEqual({ requiresVision: false, routeReadsImages: false })
+    expect(resolveImageRouting({
+      managed: false,
+      currentTurnHasImage: false,
+      category: null,
+      visionInput: true,
+    })).toEqual({ requiresVision: false, routeReadsImages: true })
   })
 })

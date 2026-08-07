@@ -20,14 +20,32 @@
 
 import { Extension, type Editor, type Range } from '@tiptap/core'
 import Suggestion, { type SuggestionOptions } from '@tiptap/suggestion'
+import type { IconComponent } from 'pixel-art-icons/types'
+import { HeadingIcon } from 'pixel-art-icons/icons/heading'
+import { BulletlistSolidIcon } from 'pixel-art-icons/icons/bulletlist-solid'
+import { ListBoxSolidIcon } from 'pixel-art-icons/icons/list-box-solid'
+import { TextStartTIcon } from 'pixel-art-icons/icons/text-start-t'
+import { CodeIcon } from 'pixel-art-icons/icons/code'
+import { MinusIcon } from 'pixel-art-icons/icons/minus'
+import { Grid2x22SolidIcon } from 'pixel-art-icons/icons/grid-2x2-2-solid'
+import { ImagesSolidIcon } from 'pixel-art-icons/icons/images-solid'
+import { BracesIcon } from 'pixel-art-icons/icons/braces'
 
 export type SlashExternalAction = 'media' | 'dataToken'
+
+/** The two headings the reference groups the catalogue under, in order. */
+export const SLASH_COMMAND_GROUPS = ['Structure', 'Connect'] as const
+export type SlashCommandGroup = (typeof SLASH_COMMAND_GROUPS)[number]
 
 export interface SlashCommandItem {
   id: string
   label: string
   description: string
   keywords: readonly string[]
+  /** Heading this item sits under in the menu. */
+  group: SlashCommandGroup
+  /** Glyph rendered in the row's leading tile. */
+  icon: IconComponent
   command: (props: { editor: Editor; range: Range }) => void
 }
 
@@ -83,13 +101,19 @@ export const SlashCommand = Extension.create<SlashCommandOptions>({
 // Item catalogue
 // ---------------------------------------------------------------------------
 
-function buildSlashItems(onExternal: (action: SlashExternalAction) => void): SlashCommandItem[] {
+/**
+ * The full catalogue. Exported so the notch's manual "Insert" opener shows the
+ * exact same eleven commands, in the same order, as typing `/`.
+ */
+export function buildSlashItems(onExternal: (action: SlashExternalAction) => void): SlashCommandItem[] {
   return [
     {
       id: 'heading-2',
       label: 'Heading 2',
       description: 'Section title',
       keywords: ['h2', 'heading', 'section', 'title'],
+      group: 'Structure',
+      icon: HeadingIcon,
       command: ({ editor, range }) =>
         editor.chain().focus().deleteRange(range).setNode('heading', { level: 2 }).run(),
     },
@@ -98,6 +122,8 @@ function buildSlashItems(onExternal: (action: SlashExternalAction) => void): Sla
       label: 'Heading 3',
       description: 'Sub-section',
       keywords: ['h3', 'heading', 'subsection'],
+      group: 'Structure',
+      icon: HeadingIcon,
       command: ({ editor, range }) =>
         editor.chain().focus().deleteRange(range).setNode('heading', { level: 3 }).run(),
     },
@@ -106,6 +132,8 @@ function buildSlashItems(onExternal: (action: SlashExternalAction) => void): Sla
       label: 'Heading 4',
       description: 'Small heading',
       keywords: ['h4', 'heading'],
+      group: 'Structure',
+      icon: HeadingIcon,
       command: ({ editor, range }) =>
         editor.chain().focus().deleteRange(range).setNode('heading', { level: 4 }).run(),
     },
@@ -114,6 +142,8 @@ function buildSlashItems(onExternal: (action: SlashExternalAction) => void): Sla
       label: 'Bullet list',
       description: 'Unordered list',
       keywords: ['ul', 'list', 'bullet', 'unordered'],
+      group: 'Structure',
+      icon: BulletlistSolidIcon,
       command: ({ editor, range }) =>
         editor.chain().focus().deleteRange(range).toggleBulletList().run(),
     },
@@ -122,6 +152,8 @@ function buildSlashItems(onExternal: (action: SlashExternalAction) => void): Sla
       label: 'Numbered list',
       description: 'Ordered list',
       keywords: ['ol', 'list', 'number', 'ordered'],
+      group: 'Structure',
+      icon: ListBoxSolidIcon,
       command: ({ editor, range }) =>
         editor.chain().focus().deleteRange(range).toggleOrderedList().run(),
     },
@@ -130,6 +162,8 @@ function buildSlashItems(onExternal: (action: SlashExternalAction) => void): Sla
       label: 'Quote',
       description: 'Block quote',
       keywords: ['quote', 'blockquote'],
+      group: 'Structure',
+      icon: TextStartTIcon,
       command: ({ editor, range }) =>
         editor.chain().focus().deleteRange(range).toggleBlockquote().run(),
     },
@@ -138,6 +172,8 @@ function buildSlashItems(onExternal: (action: SlashExternalAction) => void): Sla
       label: 'Code block',
       description: 'Fenced code',
       keywords: ['code', 'pre', 'snippet'],
+      group: 'Structure',
+      icon: CodeIcon,
       command: ({ editor, range }) =>
         editor.chain().focus().deleteRange(range).toggleCodeBlock().run(),
     },
@@ -146,6 +182,8 @@ function buildSlashItems(onExternal: (action: SlashExternalAction) => void): Sla
       label: 'Divider',
       description: 'Horizontal rule',
       keywords: ['hr', 'divider', 'separator', 'line'],
+      group: 'Structure',
+      icon: MinusIcon,
       command: ({ editor, range }) =>
         editor.chain().focus().deleteRange(range).setHorizontalRule().run(),
     },
@@ -154,6 +192,8 @@ function buildSlashItems(onExternal: (action: SlashExternalAction) => void): Sla
       label: 'Table',
       description: '2-column, 3-row',
       keywords: ['table', 'grid'],
+      group: 'Structure',
+      icon: Grid2x22SolidIcon,
       command: ({ editor, range }) =>
         editor
           .chain()
@@ -167,6 +207,8 @@ function buildSlashItems(onExternal: (action: SlashExternalAction) => void): Sla
       label: 'Media',
       description: 'Image or video from library',
       keywords: ['image', 'img', 'video', 'media', 'picture'],
+      group: 'Connect',
+      icon: ImagesSolidIcon,
       command: ({ editor, range }) => {
         editor.chain().focus().deleteRange(range).run()
         onExternal('media')
@@ -177,6 +219,8 @@ function buildSlashItems(onExternal: (action: SlashExternalAction) => void): Sla
       label: 'Data token',
       description: 'Insert {source.field}',
       keywords: ['data', 'token', 'binding', 'field', 'dynamic'],
+      group: 'Connect',
+      icon: BracesIcon,
       command: ({ editor, range }) => {
         editor.chain().focus().deleteRange(range).run()
         onExternal('dataToken')

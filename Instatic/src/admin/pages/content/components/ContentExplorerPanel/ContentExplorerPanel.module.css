@@ -1,0 +1,226 @@
+/* Content explorer — section and row chrome.
+ *
+ * PHASE 3: transcribed from the MMSBUILD Content reference
+ * (`screens/content/src/styles.css` → `.panel-scroll`, `.explorer-section`,
+ * `.section-heading`, `.explorer-rows`, `.explorer-row`, `.row-label`,
+ * `.row-meta`, `.entry-row-wrap`, `.entry-preview`, `.entry-title-stack`,
+ * `.entry-menu-trigger`, `.compact-empty`). Every metric is the reference's,
+ * delivered through the fixed `--content-*` tokens in globals.css because
+ * literal px is gated in admin CSS modules.
+ *
+ * Content owns this file outright — the Site editor's SiteExplorerPanel module
+ * is no longer imported here.
+ */
+
+.panelScroll {
+    display: block;
+    min-height: 0;
+    padding: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-color: var(--mms-border-strong) transparent;
+    scrollbar-width: thin;
+}
+
+/* ── Sections ─────────────────────────────────────────────────────────── */
+
+.section {
+    display: block;
+    padding: var(--content-sp-9) var(--content-sp-6) var(--content-sp-11);
+}
+
+.section + .section {
+    border-top: 1px solid var(--mms-border);
+}
+
+.sectionHeader {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto var(--content-tap);
+    align-items: center;
+    min-height: var(--content-tap);
+    padding-left: var(--content-sp-7);
+}
+
+.sectionTitle {
+    margin: 0;
+    overflow: hidden;
+    color: var(--mms-text);
+    font-size: var(--content-text-10);
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-overflow: ellipsis;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.sectionCount {
+    color: var(--content-text-faint);
+    font-size: var(--content-text-10);
+}
+
+/* Keeps the trailing action inside the heading's fixed 44px track even when
+   the button is hidden by a capability gate, so the count never shifts. */
+.sectionAction {
+    display: grid;
+    place-items: center;
+    width: var(--content-tap);
+}
+
+/* ── Rows ─────────────────────────────────────────────────────────────── */
+
+.rows {
+    display: grid;
+    gap: var(--content-sp-1);
+}
+
+.row {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    min-width: 0;
+    min-height: var(--content-tap);
+    padding: var(--content-sp-0) var(--content-sp-8);
+    gap: var(--content-sp-8);
+    border: 0;
+    border-radius: var(--content-radius-3);
+    color: var(--mms-text-muted);
+    background: transparent;
+    text-align: left;
+    cursor: pointer;
+    font: inherit;
+    font-size: var(--content-text-11);
+}
+
+.row:hover {
+    color: var(--mms-text);
+    background: var(--content-surface-hover);
+}
+
+.rowActive {
+    color: var(--mms-text);
+    background: var(--content-surface-active);
+}
+
+.rowLabel {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.rowMeta {
+    margin-left: auto;
+    color: var(--content-text-faint);
+    font-size: var(--content-text-9);
+    text-transform: capitalize;
+}
+
+/* ── Entry rows ───────────────────────────────────────────────────────── */
+
+/* The row and its ⋮ trigger are siblings inside a positioned wrapper, so the
+   trigger can overlay the row's right edge without nesting a button. */
+.entryRowWrap {
+    position: relative;
+    min-width: 0;
+    border-radius: var(--content-radius-3);
+}
+
+.entryRowWrapActive {
+    background: var(--content-surface-active);
+}
+
+/* Reserves the trigger's overlay column so a long title never runs under it. */
+.entryRow {
+    padding-right: var(--content-sp-47);
+}
+
+.entryRowWrapActive .entryRow {
+    color: var(--mms-text);
+}
+
+.entryMenuTrigger.entryMenuTrigger {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: var(--content-tap);
+    min-width: var(--content-tap);
+    height: var(--content-tap);
+    min-height: var(--content-tap);
+    opacity: 0;
+}
+
+.entryRowWrap:hover .entryMenuTrigger.entryMenuTrigger,
+.entryRowWrap:focus-within .entryMenuTrigger.entryMenuTrigger,
+.entryRowWrapActive .entryMenuTrigger.entryMenuTrigger {
+    opacity: 1;
+}
+
+.entryPreview {
+    display: grid;
+    place-items: center;
+    width: var(--content-thumb);
+    height: var(--content-thumb);
+    flex: 0 0 var(--content-thumb);
+    overflow: hidden;
+    color: var(--content-text-faint);
+    background: var(--mms-bg);
+    border: 1px solid var(--mms-border);
+    border-radius: var(--content-radius-2);
+}
+
+.entryPreview img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.entryTitleStack {
+    display: grid;
+    min-width: 0;
+    gap: var(--content-sp-2);
+}
+
+.entryTitleStack strong,
+.entryTitleStack small {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.entryTitleStack strong {
+    color: inherit;
+    font-size: var(--content-text-11);
+    font-weight: 650;
+}
+
+.entryTitleStack small {
+    color: var(--content-text-faint);
+    font-size: var(--content-text-9);
+}
+
+.compactEmpty {
+    margin: var(--content-sp-6) var(--content-sp-8) var(--content-sp-14);
+    color: var(--content-text-faint);
+    font-size: var(--content-text-11);
+}
+
+.error {
+    margin: var(--content-sp-6) var(--content-sp-8);
+    color: var(--mms-danger);
+    font-size: var(--content-text-11);
+    line-height: 1.4;
+}
+
+/* ── Loading ──────────────────────────────────────────────────────────── */
+
+/* Skeleton rows mirror the real row box exactly (same height, padding, radius
+   and inner tracks) so nothing shifts when entries swap in. */
+.skeletonRow {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    min-height: var(--content-tap);
+    padding: var(--content-sp-0) var(--content-sp-8);
+    gap: var(--content-sp-8);
+    border-radius: var(--content-radius-3);
+}

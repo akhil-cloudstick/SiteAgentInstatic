@@ -1,15 +1,15 @@
 /**
  * Data-table endpoints.
  *
- *   GET    /admin/api/cms/data/tables              — list tables
- *   POST   /admin/api/cms/data/tables              — create a table (`content.manage`)
- *   GET    /admin/api/cms/data/tables/:id          — read one table (any data access)
- *   PATCH  /admin/api/cms/data/tables/:id          — partial update (`content.manage`)
- *   DELETE /admin/api/cms/data/tables/:id          — soft delete (`content.manage`)
+ *   GET    /cms/api/cms/data/tables              — list tables
+ *   POST   /cms/api/cms/data/tables              — create a table (`content.manage`)
+ *   GET    /cms/api/cms/data/tables/:id          — read one table (any data access)
+ *   PATCH  /cms/api/cms/data/tables/:id          — partial update (`content.manage`)
+ *   DELETE /cms/api/cms/data/tables/:id          — soft delete (`content.manage`)
  *
- *   GET    /admin/api/cms/data/tables/:id/rows          — list rows in a table
- *   POST   /admin/api/cms/data/tables/:id/rows          — create a draft row
- *   GET    /admin/api/cms/data/tables/:id/loop-preview  — published rows as LoopItems (editor canvas)
+ *   GET    /cms/api/cms/data/tables/:id/rows          — list rows in a table
+ *   POST   /cms/api/cms/data/tables/:id/rows          — create a draft row
+ *   GET    /cms/api/cms/data/tables/:id/loop-preview  — published rows as LoopItems (editor canvas)
  *
  * The `/tables/:id/rows` and `/loop-preview` routes live here (not in rows.ts)
  * because the URL is rooted under `/tables/...` and the handlers reuse the
@@ -383,9 +383,15 @@ async function handleTableLoopPreview(
 // Route patterns
 // ---------------------------------------------------------------------------
 
-const TABLE_ITEM_PATTERN = /^\/admin\/api\/cms\/data\/tables\/([^/]+)$/
-const TABLE_ROWS_PATTERN = /^\/admin\/api\/cms\/data\/tables\/([^/]+)\/rows$/
-const TABLE_LOOP_PREVIEW_PATTERN = /^\/admin\/api\/cms\/data\/tables\/([^/]+)\/loop-preview$/
+// Built from `CMS_API_PREFIX` rather than spelled out, because these three
+// were left behind at the pre-rename `/admin/api/cms` spelling while the bare
+// `/data/tables` route above already used the constant — so listing collections
+// worked while listing and creating their rows 404'd. Deriving them removes the
+// possibility of that drifting apart again.
+const TABLE_BASE = `${CMS_API_PREFIX}/data/tables`.replace(/\//g, '\\/')
+const TABLE_ITEM_PATTERN = new RegExp(`^${TABLE_BASE}\\/([^/]+)$`)
+const TABLE_ROWS_PATTERN = new RegExp(`^${TABLE_BASE}\\/([^/]+)\\/rows$`)
+const TABLE_LOOP_PREVIEW_PATTERN = new RegExp(`^${TABLE_BASE}\\/([^/]+)\\/loop-preview$`)
 
 // ---------------------------------------------------------------------------
 // Dispatcher

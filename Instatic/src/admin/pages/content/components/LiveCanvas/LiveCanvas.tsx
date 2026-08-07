@@ -622,6 +622,9 @@ export function LiveCanvas({
             : { type: 'paragraph' }
         editor.chain().focus('end').insertContent(node).run()
       },
+      // Live mode has no manual insert opener in the reference — the notch
+      // (which hosts the trigger) is Write-only. Kept for handle parity.
+      openInsertMenu: () => undefined,
     }),
     [editor],
   )

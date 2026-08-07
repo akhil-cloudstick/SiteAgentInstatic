@@ -13,6 +13,7 @@
 import type { SyntheticEvent } from "react";
 import type { IconComponent } from "pixel-art-icons/types";
 import { Button } from "@ui/components/Button";
+import { cn } from "@ui/cn";
 import styles from "./CanvasNotch.module.css";
 
 /** Notch action — a literal icon component plus what clicking it does. */
@@ -23,6 +24,12 @@ export interface CanvasNotchAction {
   onClick: () => void;
   /** Renders the action disabled, with this string as the tooltip. */
   disabledReason?: string;
+  /**
+   * Marks the reference's leading "+ Insert" action, which reads as the
+   * primary affordance (accent-on-tint, inverting on hover) and whose
+   * accessible name is its own label rather than "Add <label>".
+   */
+  emphasis?: "primary";
 }
 
 interface CanvasNotchProps {
@@ -40,20 +47,24 @@ export function CanvasNotch({ actions }: CanvasNotchProps) {
       <div className={styles.notch}>
         {actions.map((action) => {
           const ActionIcon = action.icon;
+          const isPrimary = action.emphasis === "primary";
+          // The reference labels every notch button; only the leading Insert
+          // action names itself, the rest read as "Add <thing>".
+          const accessibleName = isPrimary ? action.label : `Add ${action.label}`;
           return (
             <Button
               key={action.id}
               variant="ghost"
               size="sm"
-              iconOnly
-              className={styles.quickButton}
+              className={cn(styles.quickButton, isPrimary && styles.insertButton)}
               onClick={action.onClick}
               disabled={Boolean(action.disabledReason)}
-              aria-label={`Add ${action.label}`}
-              tooltip={action.disabledReason ?? `Add ${action.label}`}
+              aria-label={accessibleName}
+              tooltip={action.disabledReason ?? accessibleName}
               data-testid={`canvas-notch-${testIdPart(action.label)}-btn`}
             >
-              <ActionIcon size={14} aria-hidden="true" />
+              <ActionIcon size={13} aria-hidden="true" />
+              <span className={styles.quickButtonLabel}>{action.label}</span>
             </Button>
           );
         })}

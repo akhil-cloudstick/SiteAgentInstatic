@@ -1,8 +1,15 @@
 /**
  * CanvasNotch — fixed quick-action controls notched into the top of the
- * Content document canvas. The peek / roller / floating-control rules moved to
- * `CanvasDocumentModeDock.module.css` with the site canvas's mode pills; this
- * notch is always pinned.
+ * Content document canvas.
+ *
+ * PHASE 4: transcribed from the MMSBUILD Content reference
+ * (`screens/content/src/styles.css` → `.canvas-notch`). The reference draws a
+ * plain rounded-bottom bar with LABELLED buttons; the outward-curling corner
+ * masks the previous CMS notch used are not part of it and have been removed.
+ *
+ * This component is mounted by the Content document canvas ONLY — the site
+ * canvas dropped it (asserted by `src/__tests__/canvas/canvasNotch.test.ts`),
+ * so these rules cannot reach the Site workspace.
  */
 
 .shell {
@@ -18,65 +25,59 @@
     pointer-events: none;
 }
 
-@media (max-width: 900px) {
-    .shell {
-        left: calc(50% + 24px);
-    }
-}
-
 .notch {
-    --notch-bg: var(--bg-body);
-    --notch-radius: 16px;
-    --notch-corner: 16px;
-    --notch-corner-cut: calc(var(--notch-corner) - 0.5px);
-    position: relative;
-    isolation: isolate;
     display: flex;
     align-items: center;
-    gap: var(--space-3xs);
-    padding: var(--space-3xs);
+    padding: var(--content-sp-2);
+    gap: var(--content-sp-1);
     pointer-events: auto;
-    color: var(--text);
-    background: var(--notch-bg);
+    color: var(--mms-text);
+    background: var(--mms-workspace);
     border: 0;
-    border-radius: 0 0 var(--notch-radius) var(--notch-radius);
-    box-shadow: var(--canvas-chrome-shadow);
+    border-radius: 0 0 var(--content-radius-16) var(--content-radius-16);
+    box-shadow: var(--content-shadow-notch);
 }
 
-.notch > * {
-    position: relative;
-    z-index: 1;
+.quickButton.quickButton {
+    display: flex;
+    align-items: center;
+    min-height: var(--content-tap);
+    padding: var(--content-sp-0) var(--content-sp-9);
+    gap: var(--content-sp-6);
+    border: 0;
+    border-radius: var(--content-radius-3);
+    color: var(--mms-text-muted);
+    background: transparent;
+    font-size: var(--content-text-10);
+    font-weight: 700;
 }
 
-.notch::before {
-    content: "";
-    position: absolute;
-    top: 0;
-    left: calc(2px - var(--notch-corner));
-    right: calc(2px - var(--notch-corner));
-    z-index: 0;
-    height: var(--notch-corner);
-    transform: rotate(180deg);
-    pointer-events: none;
-    background:
-        radial-gradient(
-                circle at 0 0,
-                transparent var(--notch-corner-cut),
-                var(--notch-bg) var(--notch-corner)
-            )
-            left top / var(--notch-corner) var(--notch-corner) no-repeat,
-        radial-gradient(
-                circle at 100% 0,
-                transparent var(--notch-corner-cut),
-                var(--notch-bg) var(--notch-corner)
-            )
-            right top / var(--notch-corner) var(--notch-corner) no-repeat;
+.quickButton.quickButton:hover {
+    color: var(--mms-text);
+    background: var(--content-surface-hover);
 }
 
-.quickButton {
-    color: var(--text-muted);
+/* The reference's leading "+ Insert" action reads as the primary affordance
+   and inverts on hover. */
+.insertButton.insertButton {
+    color: var(--content-accent-hover);
+    background: var(--content-accent-soft);
 }
 
-.quickButton:hover {
-    color: var(--text);
+.insertButton.insertButton:hover {
+    color: var(--mms-surface-raised);
+    background: var(--content-accent);
+}
+
+/* Below 760px the reference collapses every notch button to its icon. */
+@media (max-width: 760px) {
+    .quickButton.quickButton {
+        justify-content: center;
+        width: var(--content-tap);
+        padding: 0;
+    }
+
+    .quickButtonLabel {
+        display: none;
+    }
 }

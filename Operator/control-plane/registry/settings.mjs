@@ -102,10 +102,24 @@ export function defaultModelOf({ categories, legacyModel }) {
 
 // Resolve the concrete model id for a routed call.
 //   { classify: true }          -> the classifier model (falls back to default)
+//   { requiresVision: true }    -> the Design model (the multimodal route)
 //   { categorySlug: '<slug>' }  -> that category's model
 //   absent / unknown slug       -> the default model (Codex #14: no magic string)
-export function resolveRoutedModel(cfg, { classify = false, categorySlug = null } = {}) {
+//
+// Vision wins over the classified category on purpose. The tenant classifies
+// on the prompt TEXT only, so "read the headings off this screenshot" lands in
+// Content — whose model the operator picks for cheap text work and which then
+// rejects the image outright. The image is the part of the request that cannot
+// be substituted, so it decides the route.
+export function resolveRoutedModel(
+  cfg,
+  { classify = false, categorySlug = null, requiresVision = false } = {},
+) {
   if (classify) return cfg.classifierModel || defaultModelOf(cfg);
+  if (requiresVision) {
+    const design = cfg.categories.find((c) => c.slug === 'design');
+    if (design && design.modelId) return design.modelId;
+  }
   if (categorySlug) {
     const hit = cfg.categories.find((c) => c.slug === categorySlug);
     if (hit && hit.modelId) return hit.modelId;

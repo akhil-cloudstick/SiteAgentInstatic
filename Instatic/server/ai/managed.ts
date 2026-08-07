@@ -40,6 +40,14 @@ const MANAGED_LABEL = 'Managed by operator'
  * `MANAGED_AI_CREDENTIAL_ID` to keep it off screen.
  */
 const MANAGED_PROVIDER: AiProviderId = 'openrouter' as AiProviderId
+/**
+ * The operator's multimodal route. `design` and `content` are the two builtin
+ * task-type categories every operator config must define, and Design is the one
+ * wired to an image-capable model — the gateway sends any vision-flagged call
+ * there. The tenant needs the slug to know whether THIS message's route can
+ * read an image (see `routeReadsImages` in handlers/chat.ts).
+ */
+export const MANAGED_VISION_CATEGORY = 'design'
 const MODEL_CACHE_TTL_MS = 10_000
 const CONFIG_CACHE_TTL_MS = 10_000
 // Classification is a tiny best-effort routing call — cap it hard so a slow or
@@ -269,23 +277,65 @@ export function managedDefaultsMap(
  * In managed mode the real model is resolved by the gateway per request (per
  * task-type category), so the tenant server can't introspect it — the
  * OpenRouter driver's sync `capabilities()` only knows a permissive default
- * that reports `visionInput: false`. Operators only wire modern OpenRouter chat
- * models into the gateway (multimodal + tool-calling), so we assume vision +
- * tools here. This is the single source of truth for BOTH the picker list and
- * the chat handler's vision gate: without it, every reference screenshot a
- * tenant attaches ("build a page like this design") is wrongly rejected, and
- * the tool loop would never let `render_snapshot` capture a screenshot the
- * model could actually see.
+ * that reports `visionInput: false`. Rejecting images on that basis would kill
+ * every reference screenshot a tenant attaches ("build a page like this
+ * design"), so `visionInput` is asserted here instead.
+ *
+ * That assertion is not blind optimism: the chat handler flags any request
+ * carrying an image and the gateway routes those to the Design category's
+ * model, which the operator wires to a multimodal model. Vision is therefore
+ * true *by construction* for exactly the requests that need it. If an operator
+ * still points Design at a text-only model, the tool loop's `imageUnsupported`
+ * retry resends without images rather than surfacing the provider's refusal.
  */
 export function managedModelCapabilities(): AiProviderCapabilities {
   return {
     toolCalling: true,
     visionInput: true,
-    // Managed mode's whole purpose is the model seeing tool-result screenshots
-    // (render_snapshot); vision is on, so accept tool-result images too.
-    toolResultImages: true,
+    // The gateway speaks the OpenRouter/Responses wire format, whose
+    // `function_call_output` item is text-only — a tool-result image is
+    // downgraded to a "[N screenshot(s) omitted]" note before it ever leaves.
+    // Claiming otherwise makes `render_snapshot` pay the html-to-image cost for
+    // a PNG that is always discarded, and tells the model it has seen a
+    // screenshot it never received.
+    toolResultImages: false,
     promptCache: false,
     streaming: true,
+  }
+}
+
+/**
+ * How ONE message's images affect its routing. Decided per message, never per
+ * conversation: a chat that starts with a design screenshot must be able to
+ * drop back to the cheap Content model for "fix that typo" and return to Design
+ * for "now restyle it", inside the same thread.
+ *
+ *  - `requiresVision` — this turn carries an image, so the gateway must
+ *    override the text-classified category and route to Design.
+ *  - `routeReadsImages` — the model this message lands on can decode an image.
+ *    False makes the handler project older images down to breadcrumbs, so a
+ *    screenshot from turn 1 cannot break a text-only turn 6. History is left
+ *    untouched, so the images return as soon as the chat routes to Design again.
+ *
+ * In standalone mode there is no category routing: the selected model's real
+ * `visionInput` decides both.
+ */
+export function resolveImageRouting(input: {
+  readonly managed: boolean
+  readonly currentTurnHasImage: boolean
+  readonly category: string | null
+  readonly visionInput: boolean
+}): { requiresVision: boolean; routeReadsImages: boolean } {
+  if (!input.managed) {
+    return { requiresVision: false, routeReadsImages: input.visionInput }
+  }
+  return {
+    requiresVision: input.currentTurnHasImage,
+    // An unknown category (classifier failed or timed out) is treated as
+    // text-only. Losing an old screenshot on that turn costs a weaker answer;
+    // assuming vision and being wrong costs a failed request.
+    routeReadsImages:
+      input.currentTurnHasImage || input.category === MANAGED_VISION_CATEGORY,
   }
 }
 

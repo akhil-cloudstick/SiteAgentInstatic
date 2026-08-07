@@ -38,6 +38,7 @@ import { MediaUploadPlaceholder } from './nodes/MediaUploadPlaceholder'
 import { useEditorMediaDrop } from './hooks/useEditorMediaDrop'
 import {
   SlashCommand,
+  buildSlashItems,
   type SlashCommandItem,
   type SlashExternalAction,
 } from './components/BodySlashMenu/SlashCommand'
@@ -50,6 +51,12 @@ import { BodyFloatingMenu } from './components/BodyFloatingMenu/BodyFloatingMenu
 import { MediaNodeToolbar } from './components/MediaNodeToolbar/MediaNodeToolbar'
 import styles from './TiptapBodyEditor.module.css'
 
+/** Caret rect fallback for the manual insert opener when no anchor is given. */
+function caretRect(activeEditor: Editor, pos: number): DOMRect {
+  const coords = activeEditor.view.coordsAtPos(pos)
+  return new DOMRect(coords.left, coords.top, 0, coords.bottom - coords.top)
+}
+
 export interface TiptapBodyEditorHandle {
   /** Move focus into the editor (start of doc). */
   focusStart: () => void
@@ -59,6 +66,12 @@ export interface TiptapBodyEditorHandle {
   insertMedia: (attrs: MediaAttributes) => void
   /** Append a heading or paragraph at the end of the document. */
   appendBlock: (kind: 'heading' | 'paragraph') => void
+  /**
+   * Open the full insert catalogue from a UI control (the canvas notch's
+   * "Insert" button) rather than a typed `/`. Anchored to the passed element.
+   * A no-op in Live mode, which has no manual opener in the reference.
+   */
+  openInsertMenu: (anchor: HTMLElement | null) => void
 }
 
 export interface TiptapBodyEditorProps {
@@ -294,8 +307,22 @@ export function TiptapBodyEditor({
             : { type: 'paragraph' }
         editor.chain().focus('end').insertContent(node).run()
       },
+      openInsertMenu: (anchor) => {
+        if (!editor || readOnly) return
+        editor.chain().focus().run()
+        const { from, to } = editor.state.selection
+        // Anchor to the button when we have one, else to the caret — the
+        // menu's own placement logic flips it above when space is tight.
+        const rect = anchor?.getBoundingClientRect() ?? caretRect(editor, from)
+        slashHandleRef.current?.openManual(
+          editor,
+          { from, to },
+          buildSlashItems((action) => externalActionRef.current(action)),
+          rect,
+        )
+      },
     }),
-    [editor],
+    [editor, readOnly],
   )
 
   // Render scaffolding.

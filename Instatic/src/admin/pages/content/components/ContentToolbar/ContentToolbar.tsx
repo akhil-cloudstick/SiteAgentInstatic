@@ -7,16 +7,16 @@ import { LoaderIcon } from 'pixel-art-icons/icons/loader'
 import { SaveSolidIcon } from 'pixel-art-icons/icons/save-solid'
 import { SendSolidIcon } from 'pixel-art-icons/icons/send-solid'
 import type { IconComponent } from 'pixel-art-icons/types'
-import { dataTableHasField } from '@core/data/fields'
-import { POST_TYPE_FIELD_BODY, type DataTable, type DataRow } from '@core/data/schemas'
+import type { DataTable, DataRow } from '@core/data/schemas'
+import { Button } from '@ui/components/Button'
 import {
   PublishActionGroup,
   type PublishActionMenuItem,
   type PublishActionStatusTone,
 } from '@site/toolbar/PublishActionGroup'
 import { SchedulePublishDialog } from '@admin/modals/SchedulePublishDialog'
-import { ContentModeToggle, type ContentMode } from '../ContentModeToggle/ContentModeToggle'
 import type { SaveMessage } from '@content/hooks/useContentEntryDraft'
+import styles from './ContentToolbar.module.css'
 
 interface ContentToolbarProps {
   contentLoading: boolean
@@ -27,10 +27,6 @@ interface ContentToolbarProps {
   publicPath: string
   canSaveDraft: boolean
   canPublish: boolean
-  /** Write/Live canvas mode — hosted here so the toggle sits in the toolbar
-   *  (mock Screen 2) rather than floating on the canvas. */
-  contentMode: ContentMode
-  onContentModeChange: (mode: ContentMode) => void
   onSaveDraft: () => void
   onPublish: () => void
   onSchedule: (entry: DataRow) => void
@@ -166,19 +162,11 @@ export function ContentToolbar({
   publicPath,
   canSaveDraft,
   canPublish,
-  contentMode,
-  onContentModeChange,
   onSaveDraft,
   onPublish,
   onSchedule,
 }: ContentToolbarProps) {
   const entryLabel = (selectedCollection?.singularLabel ?? 'entry').toLowerCase()
-  // The Write/Live toggle only applies to entries whose collection has an
-  // editable body region — same gate the canvas uses to render the modes.
-  const bodyEnabled = selectedCollection
-    ? dataTableHasField(selectedCollection, POST_TYPE_FIELD_BODY)
-    : false
-  const showModeToggle = Boolean(selectedEntry) && bodyEnabled
   // Destructure the derived view state so the JSX below keeps reading like
   // a flat list of locals — the architecture gate at
   // contentAdmin.test.tsx:1664 also relies on literal `isCleanPublished` /
@@ -224,12 +212,46 @@ export function ContentToolbar({
   ]
 
   return (
-    <>
-      {showModeToggle && (
-        <ContentModeToggle mode={contentMode} onChange={onContentModeChange} />
+    // `display: contents` wrapper — adds no box to the toolbar's flex row, but
+    // carries `data-editor-screen` so the Content palette and fixed geometry
+    // tokens resolve for these two controls. The workspace body's own scope
+    // stops outside the toolbar, and only these controls opt in.
+    <div className={styles.scope} data-editor-screen="content">
+      {/* Order matters: the reference reads status → Save draft → Publish. The
+          shared PublishActionGroup draws its status chip inside its own flex
+          row, after this button, so it is suppressed there (`statusLabel={null}`)
+          and rendered here instead. The group itself is untouched, so the Site
+          editor keeps its own arrangement. */}
+      {!isCleanPublished && (
+        <output className={styles.status} data-tone={statusTone}>
+          <span className={styles.statusDot} aria-hidden="true" />
+          {statusText}
+        </output>
       )}
+      {/* The reference keeps Save draft as a visible secondary action beside
+          the publish split-button, not only as a menu item. The menu entry
+          below is retained so the action stays reachable from the keyboard
+          menu and at narrow widths. */}
+      <Button
+        variant="secondary"
+        size="sm"
+        className={styles.saveDraftButton}
+        disabled={!selectedEntry || !canSaveDraft || isSaving || !isDirty}
+        aria-label={isSaving ? 'Saving draft' : 'Save draft'}
+        data-testid="toolbar-content-save-draft-button"
+        onClick={onSaveDraft}
+      >
+        {isSaving
+          ? <LoaderIcon size={13} aria-hidden="true" />
+          : <SaveSolidIcon size={13} aria-hidden="true" />}
+        <span className={styles.saveDraftLabel}>
+          {isSaving ? 'Saving' : 'Save draft'}
+        </span>
+      </Button>
       <PublishActionGroup
-        statusLabel={isCleanPublished ? null : statusText}
+        // Suppressed here — the chip is drawn above so it can sit before the
+        // Save-draft button, as the reference has it.
+        statusLabel={null}
         statusTone={statusTone}
         publishLabel={publishLabel}
         publishAriaLabel={isCleanPublished ? 'Published' : `Publish ${entryLabel}`}
@@ -251,6 +273,6 @@ export function ContentToolbar({
           onScheduled={onSchedule}
         />
       )}
-    </>
+    </div>
   )
 }
