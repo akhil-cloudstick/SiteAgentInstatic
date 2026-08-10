@@ -10,6 +10,7 @@
 
 import { lazy, Suspense, useRef, type CSSProperties, type ReactNode, type SyntheticEvent } from 'react'
 import { Toolbar } from '@site/toolbar/Toolbar'
+import { ProductHubHeader } from '@admin/shared/ProductHubHeader'
 import { AdminSectionNavigation } from '@admin/shared/AdminSectionNavigation'
 import { ConfirmDeleteProvider } from '@admin/shared/dialogs/ConfirmDeleteDialog'
 import { SidebarResizeHandle } from '@admin/shared/SidebarResizeHandle'
@@ -78,6 +79,11 @@ export function AdminWorkspaceCanvasLayout({
       data-editor-theme={appearance.theme}
       data-editor-text-scale={appearance.textScale}
     >
+      {/* Row 1 — the shared MMS Create shell. Deliberately OUTSIDE the
+          `data-editor-screen` body below: the shared row must look identical on
+          every product and every workspace, so it keeps the Dashboard palette
+          while each workspace re-skins only its sidebar, canvas and panel. */}
+      <ProductHubHeader />
       <Toolbar
         section={workspace}
         adminNavigationSlot={(

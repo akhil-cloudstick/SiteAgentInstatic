@@ -14,6 +14,7 @@ import type { DbClient } from '../../db/client'
 import { createSessionToken, hashSessionToken, sessionExpiry } from '../../auth/tokens'
 import { createSession } from '../../auth/sessions'
 import { verifySsoToken, ssoSecret } from '../../auth/tenantSso'
+import { parseHubContextFromSso } from '../../auth/hubContext'
 import { findActiveOwner } from '../../repositories/users'
 import { createAuditEvent } from '../../repositories/audit'
 import { setCookieHeader } from '../../http'
@@ -52,12 +53,18 @@ export async function handleSsoRoutes(req: Request, db: DbClient): Promise<Respo
   // both redundant and impossible.
   const token = createSessionToken()
   const expiresAt = sessionExpiry()
+  // The authorized scope the Hub opened us with (role, client, project, site,
+  // originating surface, return URL). Stored on the session so the Product Hub
+  // header row and `Back to Product Hub` survive reloads and soft navigation
+  // without re-round-tripping the hub. `null` on a self-hosted install.
+  const hubContext = parseHubContextFromSso(url)
   await createSession(db, {
     idHash: await hashSessionToken(token),
     userId: owner.id,
     expiresAt,
     mfaPassedAt: new Date(),
     stepUpExpiresAt: expiresAt,
+    hubContext,
     ...requestAuditContext(req),
   })
   await createAuditEvent(db, {

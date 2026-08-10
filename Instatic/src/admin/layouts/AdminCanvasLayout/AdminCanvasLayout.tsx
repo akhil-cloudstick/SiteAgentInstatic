@@ -57,6 +57,7 @@ import { useAdminUi } from '@admin/state/adminUi'
 import { useInstalledEditorPlugins } from '@admin/pages/plugins/hooks/useInstalledEditorPlugins'
 import { usePluginEventBridge } from '@admin/pages/plugins/hooks/usePluginEventBridge'
 import { AdminSectionNavigation } from '@admin/shared/AdminSectionNavigation'
+import { ProductHubHeader } from '@admin/shared/ProductHubHeader'
 import {
   CanvasFrameSkeletonFrame,
   DEFAULT_CANVAS_FRAME_SKELETON_BREAKPOINTS,
@@ -238,12 +239,17 @@ export function AdminCanvasLayout() {
         data-editor-theme={appearance.theme}
         data-editor-text-scale={appearance.textScale}
       >
-        {/* ── Top toolbar (z-60, Guideline #374) ───────────────────────────── */}
-        {/* Toolbar is now a prop-driven shell — this layout supplies the
-            site brand, the preview overlay lazy mount, and
-            the editor-specific right slot (zoom / publish / settings). The
-            lazy mount gates on `previewOpen` so the chunk loads only when the
-            user actually opens preview. */}
+        {/* ── Row 1: the shared MMS Create shell ───────────────────────────
+            Identical on Product Hub, MMS Design and here — brand, Product Hub
+            context, role-scoped Hub navigation, and the five shared utilities.
+            Owns no editor state. */}
+        <ProductHubHeader />
+
+        {/* ── Row 2: this product's specialist navigation (z-50) ───────────── */}
+        {/* Toolbar is a prop-driven shell — this layout supplies the preview
+            overlay lazy mount and the editor-specific right slot (presence /
+            sync / preview / publish). The lazy mount gates on `previewOpen` so
+            the chunk loads only when the user actually opens preview. */}
         <Toolbar
           section="site"
           adminNavigationSlot={(
@@ -280,10 +286,11 @@ export function AdminCanvasLayout() {
           )}
         />
 
-        {/* ── Workspace toolbar (second row) ───────────────────────────────
+        {/* ── Row 3: workspace toolbar ─────────────────────────────────────
             Breadcrumb · mode control · viewport control (zoom in Review).
-            Sits between the global header and the editor body, exactly as the
-            reference does, and is the single owner of the three modes. */}
+            The shared-header contract puts project-specific controls "in the
+            workspace toolbar below row 2" — this is that row, and it stays the
+            single owner of the three canvas modes. */}
         <WorkspaceToolbar mode={siteMode} />
 
         {loadEditorBody ? (

@@ -1232,4 +1232,16 @@ export const sqliteMigrations: Migration[] = [
         on plugin_staged_packages (uploaded_at desc);
     `,
   },
+  {
+    id: '025_sessions_hub_context',
+    sql: `
+      -- Product Hub hand-off scope for this session (see the Postgres twin for
+      -- the full rationale). SQLite has no ADD COLUMN IF NOT EXISTS; the
+      -- migration runner applies each id exactly once, so a bare ADD COLUMN is
+      -- safe. The \`_json\` suffix makes the SQLite adapter auto-parse on read
+      -- and auto-stringify on write.
+      alter table sessions
+        add column hub_context_json text;
+    `,
+  },
 ]

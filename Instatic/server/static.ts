@@ -2,6 +2,7 @@ import { extname, resolve, sep } from 'node:path'
 import { brotliCompressSync, constants as zlibConstants } from 'node:zlib'
 import { readdirSync } from 'node:fs'
 import { SESSION_COOKIE_NAME } from './auth/tokens'
+import { hubBaseUrl } from './auth/hubContext'
 
 const MIME_TYPES: Record<string, string> = {
   '.css': 'text/css; charset=utf-8',
@@ -418,8 +419,17 @@ function buildAuthenticatedShellPreloadHints(staticDir: string): string {
 //     whether to `await import('./AuthenticatedAdmin')` BEFORE the first
 //     React mount (eliminates the post-Suspense concurrent re-render
 //     delay — see main.tsx for the full sequence).
+//   - `window.__instaticHub = 1` tells the client this install runs behind a
+//     Product Hub, so the shared header row should fetch its authorized scope.
+//     Without the flag the fetch is skipped entirely: a plain self-hosted
+//     install has no Hub, and asking would cost a round-trip on every admin
+//     load to be told "null".
 const AUTHED_FLAG_SCRIPT = `
     <script>window.__instaticAuthed = 1;</script>`
+function hubFlagScript(): string {
+  return hubBaseUrl() ? `
+    <script>window.__instaticHub = 1;</script>` : ''
+}
 function injectAuthenticatedHints(html: string, staticDir: string): string {
   const preloadHints = buildAuthenticatedShellPreloadHints(staticDir)
   // Use `</head>` as the anchor — it's guaranteed to be in the document
@@ -428,7 +438,7 @@ function injectAuthenticatedHints(html: string, staticDir: string): string {
   // `<style>` block and `</head>`.
   return html.replace(
     '</head>',
-    `${AUTHED_FLAG_SCRIPT}\n${BOOT_API_KICKOFF}\n${preloadHints}\n  </head>`,
+    `${AUTHED_FLAG_SCRIPT}${hubFlagScript()}\n${BOOT_API_KICKOFF}\n${preloadHints}\n  </head>`,
   )
 }
 

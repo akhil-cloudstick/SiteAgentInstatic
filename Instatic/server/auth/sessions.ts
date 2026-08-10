@@ -1,6 +1,7 @@
 import { placeholder, type DbClient } from '../db/client'
 import { rowToUser, USER_JOINED_COLUMNS, type AuthUser, type JoinedUserRow } from '../repositories/users'
 import { deriveDeviceLabel } from './deviceLabel'
+import { readStoredHubContext, type HubContext } from './hubContext'
 
 const SESSION_IDLE_TIMEOUT_MS = 1000 * 60 * 60 * 24 * 30
 
@@ -73,13 +74,45 @@ export async function createSession(
      * dance when verifying handlers that require a step-up gate.
      */
     stepUpExpiresAt?: Date | null
+    /**
+     * Authorized scope a Product Hub hand-off opened this session with. Only
+     * the SSO route supplies it; every local login leaves it null, which is
+     * what makes the Product Hub header inert on a self-hosted install.
+     */
+    hubContext?: HubContext | null
   },
 ): Promise<void> {
   const deviceLabel = input.deviceLabel ?? deriveDeviceLabel(input.userAgent)
   await db`
-    insert into sessions (id_hash, user_id, expires_at, ip_address, user_agent, device_label, mfa_passed_at, step_up_expires_at)
-    values (${input.idHash}, ${input.userId}, ${input.expiresAt}, ${input.ipAddress}, ${input.userAgent}, ${deviceLabel}, ${input.mfaPassedAt ?? null}, ${input.stepUpExpiresAt ?? null})
+    insert into sessions (id_hash, user_id, expires_at, ip_address, user_agent, device_label, mfa_passed_at, step_up_expires_at, hub_context_json)
+    values (${input.idHash}, ${input.userId}, ${input.expiresAt}, ${input.ipAddress}, ${input.userAgent}, ${deviceLabel}, ${input.mfaPassedAt ?? null}, ${input.stepUpExpiresAt ?? null}, ${input.hubContext ?? null})
   `
+}
+
+/**
+ * Read the Hub scope back off a session row.
+ *
+ * Returns `null` for every session that was not opened through a Product Hub
+ * hand-off — the common case — as well as for a stored value that no longer
+ * validates. `readStoredHubContext` re-pins the value to the currently
+ * configured Hub origin, so a Hub that has moved since sign-in never leaves a
+ * stale return target behind.
+ */
+export async function findSessionHubContext(
+  db: DbClient,
+  idHash: string,
+): Promise<HubContext | null> {
+  const { rows } = await db.unsafe<{ hub_context_json: unknown }>(
+    `select hub_context_json
+     from sessions
+     where id_hash = ${placeholder(db.dialect, 1)}
+       and revoked_at is null
+     limit 1`,
+    [idHash],
+  )
+  const raw = rows[0]?.hub_context_json
+  if (raw === undefined) return null
+  return readStoredHubContext(raw)
 }
 
 async function findSessionUserRow(

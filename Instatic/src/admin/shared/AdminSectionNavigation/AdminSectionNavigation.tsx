@@ -214,7 +214,10 @@ function NavItem({
 }) {
   if (active) {
     return (
-      <span className={toolbarStyles.activeSection}>
+      // aria-current marks the ONE current destination in the shell. It never
+      // appears on a Product Hub link in row 1: inside this product, the active
+      // destination is always a row-2 one.
+      <span className={toolbarStyles.activeSection} aria-current="page">
         {icon}
         <span>{label}</span>
       </span>
@@ -256,7 +259,7 @@ function PluginsNavLink({
 
   if (active) {
     return (
-      <span className={toolbarStyles.activeSection}>
+      <span className={toolbarStyles.activeSection} aria-current="page">
         <FaIcon name="cube" size={NAV_ICON_SIZE} />
         <span>Plugins</span>
         {dot}

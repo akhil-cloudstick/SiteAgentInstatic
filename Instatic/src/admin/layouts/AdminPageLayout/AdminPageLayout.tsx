@@ -28,6 +28,7 @@
  */
 import { lazy, Suspense, type ReactNode } from 'react'
 import { Toolbar } from '@site/toolbar/Toolbar'
+import { ProductHubHeader } from '@admin/shared/ProductHubHeader'
 import { AdminSectionNavigation } from '@admin/shared/AdminSectionNavigation'
 import { SkeletonCards } from '@ui/components/Skeleton'
 import { useEditorAppearancePreferences } from '@site/preferences/editorPreferences'
@@ -143,6 +144,10 @@ export function AdminPageLayout({
       data-editor-theme={appearance.theme}
       data-editor-text-scale={appearance.textScale}
     >
+      {/* Row 1 — the shared MMS Create shell, identical on Product Hub, MMS
+          Design and here. Row 2 (`Toolbar`) carries only this product's own
+          navigation. See `@admin/shared/ProductHubHeader`. */}
+      <ProductHubHeader />
       <Toolbar
         section={workspace}
         adminNavigationSlot={(

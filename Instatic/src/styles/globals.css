@@ -288,6 +288,16 @@
     --toolbar-tab-gap: 9px;
     --toolbar-tab-pad: 11px;
 
+    /* Two-row shell geometry (MMSBUILD shared-header contract).
+       Row 1 — the shared Product Hub shell — keeps the approved 60px header
+       track, because it inherits that header's brand lockup, hairline and
+       round utility buttons verbatim. Row 2 — the product's own specialist
+       navigation — is deliberately shorter so the rows read as a hierarchy
+       rather than two equal bars. Both are FIXED for the same reason the
+       toolbar geometry above is: the reference specifies pixels. */
+    --hub-shell-height: 60px;
+    --product-row-height: 48px;
+
     --toolbar-bg: var(--mms-workspace);
     --toolbar-text: var(--mms-text);
     --toolbar-border: var(--mms-border);
@@ -306,6 +316,10 @@
     --danger-20: rgba(233, 75, 50, 0.2);
     --danger-30: rgba(233, 75, 50, 0.3);
     --danger-40: rgba(233, 75, 50, 0.4);
+    /* Foreground for copy sitting ON a SOLID --danger fill (the notification
+       unread badge). Distinct from --danger-text, which is for copy on the
+       TINTED --danger-10/20 fills. Cream on the darkened light-theme red. */
+    --danger-on: #fffdf5;
     --warning: #c24a0e;
     --warning-text: #8a3908;
     --warning-10: rgba(255, 107, 26, 0.1);
@@ -591,6 +605,9 @@
     --danger-light: #f0654a;
     --danger-lighter: #f6a494;
     --danger-text: #f6a999;
+    /* Dark theme brightens --danger to a coral; navy ink reads on it where
+       cream would not. See the light-theme declaration for the token's role. */
+    --danger-on: #001e2d;
     --warning: #ef8b3f;
     --warning-text: #f0a86f;
     --success: #1ba957;
@@ -837,6 +854,25 @@
     [data-editor-screen='site'] {
         --site-shell-height: 56px;
         --site-toolbar-height: 104px;
+    }
+}
+
+/* Two-row shell tiers. Mirrors the approved screen contract's header ladder
+   (61 → 58 → 56 px) so the shared Product Hub row keeps the same rhythm the
+   single-row header had at every breakpoint; the specialist row tracks it
+   proportionally. Declared on :root — unlike the site tiers above, both rows
+   are global chrome and exist on every admin route. */
+@media (max-width: 1100px) {
+    :root {
+        --hub-shell-height: 58px;
+        --product-row-height: 46px;
+    }
+}
+
+@media (max-width: 620px) {
+    :root {
+        --hub-shell-height: 56px;
+        --product-row-height: 44px;
     }
 }
 

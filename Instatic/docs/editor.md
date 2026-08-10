@@ -2,14 +2,14 @@
 
 Deep dive on the admin app and the visual editor — how the SPA boots, how routing works, how the editor store mutates pages, how the canvas renders.
 
-The frontend is a single React 19 + Vite SPA mounted at `/admin`. Inside it, two concerns coexist: the **admin shell** (auth, navigation, workspaces, plugin host UI) and the **visual editor** (`src/admin/pages/site/`). They share auth, routing, theming, and the spotlight palette; they differ in everything else — the editor owns a heavy Zustand store and a custom rendering pipeline.
+The frontend is a single React 19 + Vite SPA mounted at `/cms`. Inside it, two concerns coexist: the **admin shell** (auth, navigation, workspaces, plugin host UI) and the **visual editor** (`src/admin/pages/site/`). They share auth, routing, theming, and the spotlight palette; they differ in everything else — the editor owns a heavy Zustand store and a custom rendering pipeline.
 
 ---
 
 ## TL;DR
 
 - **Entry:** `src/admin/main.tsx` mounts `<Router><AdminRoutes /></Router><AdminContextMenuGuard />` with React 19 root-level error callbacks. `flushSync` forces the initial render synchronous to cut LCP.
-- **Router:** `src/admin/lib/routing/` — in-house router replacing `react-router-dom`. Ten workspace/page routes are wrapped in a per-route `<ErrorBoundary>` and `<Suspense>`, with root redirects plus a final `path="/admin/*"` catch-all redirecting unknown admin URLs to `/admin/dashboard` (login form when unauthenticated) instead of rendering an empty tree. Public-site 404s are NOT claimed — the publish pipeline's NotFound handling owns those.
+- **Router:** `src/admin/lib/routing/` — in-house router replacing `react-router-dom`. Ten workspace/page routes are wrapped in a per-route `<ErrorBoundary>` and `<Suspense>`, with root redirects plus a final `path="/cms/*"` catch-all redirecting unknown admin URLs to `/cms/dashboard` (login form when unauthenticated) instead of rendering an empty tree. Public-site 404s are NOT claimed — the publish pipeline's NotFound handling owns those.
 - **Cold path:** entry chunk is tiny. `AuthenticatedAdmin` is `React.lazy` and only loads post-login. Each workspace page is wrapped in `prewarmedLazy(...)`: the active page fires its import at module evaluation; the remaining pages pre-warm via `requestIdleCallback` after first paint so subsequent nav is synchronous (no Suspense flicker).
 - **Workspaces:** `dashboard`, `site` (the editor), `content`, `data`, `media`, `plugins`, `users`, `ai`, `account`, `pluginPage`. Capability-gated by `canAccessWorkspace`.
 - **Editor store** lives at `src/admin/pages/site/store/`. Zustand + Mutative (`zustand-mutative`) + `subscribeWithSelector`. 12 slices, one source of truth for the page tree. Undo/redo uses patch-based history (O(change) per step, not O(site)).
@@ -22,7 +22,7 @@ The frontend is a single React 19 + Vite SPA mounted at `/admin`. Inside it, two
 ## Process — what loads when
 
 ```text
-GET /admin/site
+GET /cms/site
     │
     ▼
 dist/index.html  (one HTML file for the whole SPA)
@@ -66,7 +66,7 @@ Why the split:
 - **`main.tsx`** is the only module pre-login can compile. Keep it minimal.
 - **`AdminEntry`** is eager-imported but small (~10 KB gz). Owns the boot probe and gate.
 - **`AuthenticatedAdmin`** is `React.lazy` so the login screen doesn't pay for SpotlightRoot, the editor store, or any workspace page chunk.
-- **Workspace pages** are wrapped in `prewarmedLazy(...)` — the active page pre-warms at module evaluation (alone, so no 8 sibling imports stealing CPU); after first paint a `requestIdleCallback` pre-warms the remaining pages. `/admin/site` delays sibling preloads slightly so `AdminCanvasEditorBody` claims the first post-paint slot. The result: subsequent workspace navigation renders synchronously with no Suspense fallback.
+- **Workspace pages** are wrapped in `prewarmedLazy(...)` — the active page pre-warms at module evaluation (alone, so no 8 sibling imports stealing CPU); after first paint a `requestIdleCallback` pre-warms the remaining pages. `/cms/site` delays sibling preloads slightly so `AdminCanvasEditorBody` claims the first post-paint slot. The result: subsequent workspace navigation renders synchronously with no Suspense fallback.
 - **Plugin runtime** (`globalThis.__instatic`) is installed lazily by `ensurePluginRuntime()` in `pluginRuntimeBootstrap.ts`. It's triggered on first admin-layout mount via `useInstalledEditorPlugins`, so plugin code never runs before login and the runtime download stays off the dashboard critical path.
 
 ---
@@ -81,18 +81,18 @@ The route table (`src/admin/router.tsx`):
 
 | Path                                    | Component shorthand               |
 |-----------------------------------------|-----------------------------------|
-| `/` → redirect to `/admin/dashboard`    | `<Navigate />`                    |
-| `/admin` → redirect to `/admin/dashboard` | `<Navigate />`                  |
-| `/admin/dashboard`                      | `<AdminEntry section="dashboard" />` |
-| `/admin/site`                           | `<AdminEntry section="site" />` (the editor) |
-| `/admin/content`                        | `<AdminEntry section="content" />` |
-| `/admin/data`                           | `<AdminEntry section="data" />`  |
-| `/admin/media`                          | `<AdminEntry section="media" />` |
-| `/admin/plugins`                        | `<AdminEntry section="plugins" />` |
-| `/admin/users`                          | `<AdminEntry section="users" />` |
-| `/admin/ai`                             | `<AdminEntry section="ai" />` (AI credentials, models, defaults) |
-| `/admin/account`                        | `<AdminEntry section="account" />` |
-| `/admin/plugins/:pluginId/:pageId`      | `<AdminEntry section="pluginPage" />` |
+| `/` → redirect to `/cms/dashboard`    | `<Navigate />`                    |
+| `/cms` → redirect to `/cms/dashboard` | `<Navigate />`                  |
+| `/cms/dashboard`                      | `<AdminEntry section="dashboard" />` |
+| `/cms/site`                           | `<AdminEntry section="site" />` (the editor) |
+| `/cms/content`                        | `<AdminEntry section="content" />` |
+| `/cms/data`                           | `<AdminEntry section="data" />`  |
+| `/cms/media`                          | `<AdminEntry section="media" />` |
+| `/cms/plugins`                        | `<AdminEntry section="plugins" />` |
+| `/cms/users`                          | `<AdminEntry section="users" />` |
+| `/cms/ai`                             | `<AdminEntry section="ai" />` (AI credentials, models, defaults) |
+| `/cms/account`                        | `<AdminEntry section="account" />` |
+| `/cms/plugins/:pluginId/:pageId`      | `<AdminEntry section="pluginPage" />` |
 
 Every route is wrapped with `withRouteBoundary(...)` → `<ErrorBoundary location="admin-route" resetKeys={[pathname]}>` and `<Suspense fallback={<AppLoadingScreen />}>`. The error boundary resets when the pathname changes so a broken route never strands the user.
 
@@ -140,19 +140,19 @@ useUrlQuerySync(
 
 | Workspace | URL form | Notes |
 |-----------|----------|-------|
-| **Site editor** | `/admin/site` | Home page (slug `index`); bare URL is canonical — no `?page=` written |
-| **Site editor** | `/admin/site?page=<slug>` | Opens the page with that slug |
-| **Site editor** | `/admin/site?table=pages&row=<rowId>` | Cross-workspace deep link from Data workspace; normalized to `?page=<slug>` after consume |
-| **Site editor** | `/admin/site?table=components&row=<rowId>` | Opens the Visual Component with that id; normalized after consume |
-| **Content** | `/admin/content?table=<collectionSlug>&row=<rowId>` | Opens the collection and entry |
-| **Data** | `/admin/data?table=<tableSlug>&row=<rowId>` | Opens the table and row |
+| **Site editor** | `/cms/site` | Home page (slug `index`); bare URL is canonical — no `?page=` written |
+| **Site editor** | `/cms/site?page=<slug>` | Opens the page with that slug |
+| **Site editor** | `/cms/site?table=pages&row=<rowId>` | Cross-workspace deep link from Data workspace; normalized to `?page=<slug>` after consume |
+| **Site editor** | `/cms/site?table=components&row=<rowId>` | Opens the Visual Component with that id; normalized after consume |
+| **Content** | `/cms/content?table=<collectionSlug>&row=<rowId>` | Opens the collection and entry |
+| **Data** | `/cms/data?table=<tableSlug>&row=<rowId>` | Opens the table and row |
 
 ### Site editor URL sync — `useSiteEditorUrlSync`
 
 `src/admin/pages/site/hooks/useSiteEditorUrlSync.ts` implements a bidirectional sync for the site editor:
 
 1. **READ (once, after load):** consumes `?page=<slug>` or `?table=…&row=…` from the initial URL and applies the selection to the editor store. Guarded by a ref so it fires at most once per mount.
-2. **WRITE (ongoing):** mirrors the active page's slug back into the URL so the address bar stays current. The home page (`slug === 'index'`) is always represented as the bare `/admin/site` — the `?page=` param is omitted.
+2. **WRITE (ongoing):** mirrors the active page's slug back into the URL so the address bar stays current. The home page (`slug === 'index'`) is always represented as the bare `/cms/site` — the `?page=` param is omitted.
 
 `usePersistence` reloads an already-hydrated editor store before URL consumption when the initial URL points at a page/component row that is missing from memory. Data-workspace mutations to system `page` and `component` tables also call `requestCmsSiteReload()` (`src/admin/state/adminEvents.ts`), which is retained if the Site editor is not mounted yet and consumed by `usePersistence` on the next mount.
 
@@ -160,7 +160,7 @@ useUrlQuerySync(
 
 ## Auth and access
 
-After login, every route renders `<AuthenticatedAdmin section={...}>`. Before rendering the workspace, it calls `canAccessWorkspace(currentUser, section)`. If the user's capabilities don't include the workspace, it `<Navigate>`s to `firstAccessibleWorkspace(currentUser)` (e.g. a contributor with only `media.read` lands on `/admin/media`).
+After login, every route renders `<AuthenticatedAdmin section={...}>`. Before rendering the workspace, it calls `canAccessWorkspace(currentUser, section)`. If the user's capabilities don't include the workspace, it `<Navigate>`s to `firstAccessibleWorkspace(currentUser)` (e.g. a contributor with only `media.read` lands on `/cms/media`).
 
 `src/admin/access.ts` owns the capability-to-workspace mapping. `src/admin/workspace.ts` owns the `AdminWorkspace` union and the workspace paths.
 
@@ -169,6 +169,17 @@ Sensitive actions (delete user, revoke another device, sign out all devices) req
 ---
 
 ## Admin shell layout
+
+### The shell is two rows
+
+Every layout mounts the same two-row header, in this order:
+
+1. **`ProductHubHeader`** (`src/admin/shared/ProductHubHeader/`) — the shared MMS Create shell. Brand, `Product Hub › <product>` context control, role-scoped Hub navigation, and the five utilities: Help → Notifications → Theme → Settings → Account. Identical on Product Hub, MMS Design and here. Owns the page's `banner` landmark.
+2. **`Toolbar`** (`src/admin/pages/site/toolbar/Toolbar.tsx`) — this product's specialist navigation: identity, the seven CMS destinations, and local actions (`Open live page`, `Back to Product Hub`). A labelled `navigation` region, not a second banner.
+
+The Site editor adds a third row, `WorkspaceToolbar` (breadcrumb · canvas mode · device/zoom). The shell is a flex column at `height: 100vh` with the body on `flex: 1`, so rows compose without height math.
+
+Each of the five utilities appears **exactly once** in the whole shell — row 2 must never add one back. Full contract, including the Hub context / return round-trip: [`features/product-hub-header.md`](features/product-hub-header.md).
 
 ### The three layouts
 
@@ -182,13 +193,15 @@ Every admin page picks one of three root layouts from `src/admin/layouts/`. Impo
 
 `AdminCanvasLayout` keeps the real editor shell mounted while `usePersistence()` loads the draft site document. In production it renders the toolbar/chrome first and lazy-loads `AdminCanvasEditorBody` after paint. The body owns the permanent rail, sidebars, canvas, DnD context, `ConfirmDeleteProvider`, `CodeEditorPanel`, first-party module registration, and loop-source registration. Rare modal surfaces such as `ImportHtmlModal` stay behind their own open-state lazy boundary inside the body. Loading states use the same local skeleton vocabulary: the editor-body lazy fallback and the canvas no-site fallback both render `CanvasFrameSkeletonFrame`, and sidebars use compact skeleton rows or blocks. Once the document is in the store, every breakpoint frame mounts immediately — the tree is already in memory, so there is nothing to stagger.
 
-The `adminUi` store (`src/admin/state/adminUi.ts`) is the small cross-shell state store: settings-modal open flag, site-import modal open flag, site name/favicon for the toolbar brand position, and `activeLivePath` — the public path the "Open live page" toolbar button opens. The toolbar renders a compact skeleton while the site identity is loading, then renders the configured site favicon when present; otherwise it shows the site name with the same compact bold typography as the admin navigation. The site name is exposed through the shared tooltip after identity loads. It lives outside `@site/` so `AdminPageLayout` can subscribe without pulling in the 165 KB editor graph. The editor's `settingsSlice` mirrors its state into `adminUi` via a registered bridge so both are always in sync.
+Two more small cross-shell stores sit beside it, both deliberately outside `@site/` for the same bundle reason: `src/admin/state/hubContext.ts` (the Product Hub scope this session was opened with — one fetch per page load, skipped entirely when `window.__instaticHub` is absent) and `src/admin/state/adminNotifications.ts` (the header bell's list and unread count, whose plugin-health half is derived live from `pluginIssuesStore`).
+
+The `adminUi` store (`src/admin/state/adminUi.ts`) is the small cross-shell state store: settings-modal open flag, site-import modal open flag, site name/favicon for the toolbar identity position, and `activeLivePath` — the public path the "Open live page" toolbar button opens. The toolbar renders a compact skeleton while the site identity is loading, then renders the configured site favicon when present; otherwise it shows the site name with the same compact bold typography as the admin navigation. The site name is exposed through the shared tooltip after identity loads. It lives outside `@site/` so `AdminPageLayout` can subscribe without pulling in the 165 KB editor graph. The editor's `settingsSlice` mirrors its state into `adminUi` via a registered bridge so both are always in sync.
 
 Canvas chrome state for Content, Data, and Media lives in `src/admin/state/workspaceLayout.ts`, with persistence in `src/admin/state/workspaceLayoutStorage.ts` and `src/admin/state/useWorkspaceLayoutPersistence.ts`. That store owns non-site sidebar widths, right-panel collapsed state, and the Data sidebar toggle. Site editor layout remains site-only: `src/admin/pages/site/hooks/useEditorLayoutPersistence.ts` subscribes to the editor store and delegates the storage mapping to `src/admin/pages/site/layout/siteEditorLayoutPersistence.ts`.
 
 `activeLivePath` is written by the active workspace and cleared on unmount. The Site editor delegates to `useActiveLivePath` (`src/admin/pages/site/hooks/useActiveLivePath.ts`) inside `AdminCanvasEditorBody` — it resolves templates to a routable path rather than their own (non-routable) slug: an everywhere template maps to the previewed page's path; a postTypes template maps to the previewed published row's permalink. Both resolutions follow the same selection as the `TemplateModeControl` preview dropdown so the button always opens what the canvas is showing. The Content workspace writes `activeLivePath` inline inside its own layout; non-editor layouts never write it, so it stays `null` there naturally.
 
-`AdminWorkspaceCanvasLayout` and `AdminPageLayout` both call `useSiteSummary()` — a lightweight hook that fires a single `cmsAdapter.loadSite()` per session and writes the name + favicon into `adminUi`. The Site editor's `usePersistence` writes the same fields when it hydrates the full site, so after navigating to `/admin/site` the toolbar updates without a second fetch.
+`AdminWorkspaceCanvasLayout` and `AdminPageLayout` both call `useSiteSummary()` — a lightweight hook that fires a single `cmsAdapter.loadSite()` per session and writes the name + favicon into `adminUi`. The Site editor's `usePersistence` writes the same fields when it hydrates the full site, so after navigating to `/cms/site` the toolbar updates without a second fetch.
 
 When a Content or Data workspace has a right-side panel available but the user closes it, `AdminWorkspaceCanvasLayout` renders a compact top-right canvas notch to reopen that panel without changing the selected row or entry. The notch reads and writes `useWorkspaceLayout`; it does not touch the Site editor store.
 
@@ -670,7 +683,7 @@ The modal uses the tile-card pattern from `docs/design.md`: `--bg-surface` paren
 
 Right-clicking a layer (DOM panel or canvas) offers **Save as layout…** — page mode only, disabled with an inline reason on the page root. The action opens `LayoutNameDialog` (`src/admin/pages/site/dialogs/`), then `saveNodeAsLayout` captures the node + its whole subtree **and every referenced style rule** into a `SavedLayout` (`@core/layouts`) on `site.layouts`. The snapshot shape deliberately mirrors the clipboard payload, and both flows share one engine (`@site/store/subtreeSnapshot`): collecting a subtree + its classes, and restoring a snapshot with fresh node ids, scoped classes cloned with remapped `scope.nodeId`, framework classes re-matched by name, and regular classes reused-or-reimported. Inserting a saved layout therefore reproduces the original selection exactly, the same way paste would.
 
-Saved layouts persist as rows in the `layouts` system table (`savedLayoutFromRow` / `savedLayoutToCells` in `@core/data/layoutFromRow`) through the same transactional site-document save as pages and components (`PUT /admin/api/cms/site-document`, dirty-tracked per layout id with explicit deleted-layout ids). Plugins can ship layouts too — `definePack({ layouts: [{ id, name, html, css? }] })` entries are authored as clean HTML (+ CSS) and compiled to snapshot form at plugin build time (`compilePackLayout`, using the same HTML-import pipeline as "Paste HTML here…"); they install into the same table with ids namespaced `<pluginId>/<id>` and are replaced on pack re-sync (see [`docs/features/plugin-system.md`](features/plugin-system.md)). The inserter's Layouts section groups them accordingly: the user's **Saved** layouts first, then one group per plugin labelled with the plugin's display name (`composeLayoutsSection` + `pluginRuntime.getPluginName`). In the inserter, snapshot-borne hazards disable items inline instead of failing on click: a snapshot carrying a `base.outlet` follows the outlet module's own placement rules, and in VC mode a snapshot whose component refs would create a dependency cycle is disabled. Refs to since-deleted Visual Components are stripped at insertion time. Right-clicking a saved layout in the inserter offers Rename… (closes the inserter and reopens `LayoutNameDialog`) and Delete (immediate — it's an undoable site mutation — confirmed via toast).
+Saved layouts persist as rows in the `layouts` system table (`savedLayoutFromRow` / `savedLayoutToCells` in `@core/data/layoutFromRow`) through the same transactional site-document save as pages and components (`PUT /cms/api/cms/site-document`, dirty-tracked per layout id with explicit deleted-layout ids). Plugins can ship layouts too — `definePack({ layouts: [{ id, name, html, css? }] })` entries are authored as clean HTML (+ CSS) and compiled to snapshot form at plugin build time (`compilePackLayout`, using the same HTML-import pipeline as "Paste HTML here…"); they install into the same table with ids namespaced `<pluginId>/<id>` and are replaced on pack re-sync (see [`docs/features/plugin-system.md`](features/plugin-system.md)). The inserter's Layouts section groups them accordingly: the user's **Saved** layouts first, then one group per plugin labelled with the plugin's display name (`composeLayoutsSection` + `pluginRuntime.getPluginName`). In the inserter, snapshot-borne hazards disable items inline instead of failing on click: a snapshot carrying a `base.outlet` follows the outlet module's own placement rules, and in VC mode a snapshot whose component refs would create a dependency cycle is disabled. Refs to since-deleted Visual Components are stripped at insertion time. Right-clicking a saved layout in the inserter offers Rename… (closes the inserter and reopens `LayoutNameDialog`) and Delete (immediate — it's an undoable site mutation — confirmed via toast).
 
 ---
 
@@ -699,7 +712,7 @@ Two folders carry the plugin frontend:
 - **`src/admin/plugin-host-hooks/`** — React hooks exposed to plugins via `globalThis.__instatic` (set up by `installPluginRuntime()` in `AuthenticatedAdmin`).
 - **`src/admin/plugin-host-ui/`** — UI primitives plugins call to render dashboard / panel / page surfaces.
 
-Plugin canvas modules render inside the canvas iframe like any other module. Plugin admin pages mount at `/admin/plugins/:pluginId/:pageId` via the `pluginPage` workspace.
+Plugin canvas modules render inside the canvas iframe like any other module. Plugin admin pages mount at `/cms/plugins/:pluginId/:pageId` via the `pluginPage` workspace.
 
 See [docs/features/plugin-system.md](features/plugin-system.md) for the plugin SDK surface and lifecycle.
 

@@ -61,6 +61,14 @@ The base layer uses six surface tones to convey depth without shadows or gradien
 
 Tile/card hovers change **tone**, not border. Compact interactive chrome — buttons, segmented controls, toolbar chips, selected rows, and pressed states — uses the foreground overlay scale (`--overlay-5/10/20/30`) instead of surface steps so the same state hierarchy has enough contrast in both dark and light themes.
 
+### 3b. The header is two rows, and the first one isn't ours
+
+The admin chrome opens with the **shared MMS Create shell** (`ProductHubHeader`) — brand, `Product Hub › <product>` context, role-scoped Hub navigation, and the five utilities in a fixed order: Help → Notifications → Theme → Settings → Account. It must look and behave identically on Product Hub, MMS Design and here, so it is styled from one token group and never given product-specific treatment.
+
+Row 2 (`Toolbar`) is this product's own navigation. Both rows read the same `--toolbar-*` palette so they can never drift apart; only the track height differs (`--hub-shell-height` vs `--product-row-height`), and that difference is what makes the pair read as a hierarchy rather than two competing bars.
+
+Full contract: [`features/product-hub-header.md`](features/product-hub-header.md).
+
 ### 4. Cards are tiles, not boxes
 
 The dashboard pattern — and any surface that wants to read as a unit — is a **borderless tile** sitting on a darker parent with a 1px grid gap. The gap reveals the parent and visually separates the cards without a stroke. The card has no border, just a background and a 16px radius. Hover lifts the surface, never the edge.

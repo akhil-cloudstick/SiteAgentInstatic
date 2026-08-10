@@ -1185,4 +1185,18 @@ export const pgMigrations: Migration[] = [
         on plugin_staged_packages (uploaded_at desc);
     `,
   },
+  {
+    id: '025_sessions_hub_context',
+    sql: `
+      -- The authorized scope (role, client, project, site, originating surface,
+      -- return URL) a Product Hub hand-off opened this session with.
+      --
+      -- On the session rather than the user: the same operator can hold two
+      -- sessions opened from two different Hub surfaces, and each must return
+      -- to its own. Nullable because a plain self-hosted install has no Hub in
+      -- front of it — NULL is the normal, expected value there, not a defect.
+      alter table sessions
+        add column if not exists hub_context_json jsonb;
+    `,
+  },
 ]

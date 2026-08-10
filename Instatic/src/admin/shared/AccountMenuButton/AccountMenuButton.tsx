@@ -9,8 +9,7 @@
  *   │ email@example.com            │
  *   │ [OWNER]                      │
  *   ├──────────────────────────────┤
- *   │ Settings                     │  → global Settings modal
- *   │ Account & security           │  → /admin/account (soft nav)
+ *   │ Account & security           │  → /cms/account (soft nav)
  *   │ Sign out                     │  → POST /logout, hard reload to /admin
  *   │ Sign out all devices         │  → POST /auth/logout-all, status inline
  *   └──────────────────────────────┘
@@ -33,11 +32,9 @@ import {
   ContextMenuItem,
   ContextMenuSeparator,
 } from '@ui/components/ContextMenu'
-import { SettingsCogSolidIcon } from 'pixel-art-icons/icons/settings-cog-solid'
 import { LockSolidIcon } from 'pixel-art-icons/icons/lock-solid'
 import { PowerOffIcon } from 'pixel-art-icons/icons/power-off'
 import { MonitorSolidIcon } from 'pixel-art-icons/icons/monitor-solid'
-import { useAdminUi } from '@admin/state/adminUi'
 import { useAuthenticatedAdminUser } from '@admin/sessionContext'
 import { useAdminNavigate } from '@admin/lib/useAdminNavigate'
 import { StepUpCancelledMessage, useStepUp } from '@admin/shared/StepUp'
@@ -51,7 +48,6 @@ const ACCOUNT_ROUTE = '/cms/account'
 export function AccountMenuButton(): ReactNode {
   const user = useAuthenticatedAdminUser()
   const navigate = useAdminNavigate()
-  const openSettings = useAdminUi((s) => s.openSettings)
   const { runStepUp } = useStepUp()
   const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState<null | 'logout' | 'logout-all'>(null)
@@ -150,19 +146,10 @@ export function AccountMenuButton(): ReactNode {
             </span>
           </header>
           <ContextMenuSeparator />
-          {/* Settings lost its dedicated toolbar gear in the MMSBUILD header
-              re-skin (the approved header has no gear). It lives here now —
-              same `adminUi.openSettings` action, same modal. */}
-          <ContextMenuItem
-            onClick={() => {
-              close()
-              openSettings('general')
-            }}
-            data-testid="account-menu-open-settings"
-          >
-            <SettingsCogSolidIcon size={12} aria-hidden="true" />
-            <span>Settings</span>
-          </ContextMenuItem>
+          {/* No Settings item here. Settings is a row-1 utility again under the
+              MMSBUILD shared-header contract (Help → Notifications → Theme →
+              Settings → Account), which requires each utility to appear exactly
+              once in the shell — see `ProductHubHeader/SettingsButton`. */}
           <ContextMenuItem
             onClick={() => {
               close()

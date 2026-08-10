@@ -386,14 +386,26 @@ describe('PublishButton — publish state machine', () => {
 // ---------------------------------------------------------------------------
 
 describe('Toolbar — structural requirements', () => {
-  it('source uses a native <header> as the top-level banner landmark', () => {
+  it('row 1 owns the banner landmark; row 2 is a labelled navigation region', () => {
+    // Under the MMSBUILD shared-header contract the shell is two rows.
+    // `ProductHubHeader` (row 1) is the page banner — it carries the brand and
+    // the shared utilities. `Toolbar` (row 2) sits beneath it and holds only
+    // this product's navigation, so a second <header> there would announce two
+    // banner landmarks on one page.
     const { readFileSync } = require('fs')
-    const src = readFileSync(
+    const hubRow = readFileSync(
+      new URL('../../admin/shared/ProductHubHeader/ProductHubHeader.tsx', import.meta.url),
+      'utf-8',
+    )
+    expect(hubRow).toContain('<header')
+    expect(hubRow).not.toContain('role="banner"')
+
+    const productRow = readFileSync(
       new URL('../../admin/pages/site/toolbar/Toolbar.tsx', import.meta.url),
       'utf-8',
     )
-    expect(src).toContain('<header')
-    expect(src).not.toContain('role="banner"')
+    expect(productRow).not.toContain('<header')
+    expect(productRow).toContain('role="navigation"')
   })
 
   it('source has data-testid="toolbar" for Playwright targeting', () => {
@@ -406,11 +418,11 @@ describe('Toolbar — structural requirements', () => {
   })
 
   it('Toolbar is a prop-driven shell — EDITOR-only buttons live in AdminCanvasLayout, global trailer lives in the shell', () => {
-    // The Toolbar shell owns the GLOBAL trailer (SettingsButton +
-    // OpenLivePageButton + AccountMenuButton) so the settings cog, live-page
-    // link, and account menu are identical on every admin route. SettingsButton
-    // reads the tiny `adminUi` store, so hosting it in the shell does NOT drag
-    // the editor store into non-editor bundles.
+    // Under the MMSBUILD shared-header contract the trailer is split: the five
+    // shared utilities (Help, Notifications, Theme, Settings, Account) live in
+    // row 1 (`ProductHubHeader`) and must appear exactly once, so row 2 keeps
+    // only this product's own actions — "Open live page" and
+    // "Back to Product Hub".
     //
     // EDITOR-only sub-components (ZoomControls / PublishButton / save status)
     // stay out of the shell — they are passed in via the `rightSlot` prop by
@@ -429,9 +441,13 @@ describe('Toolbar — structural requirements', () => {
     expect(toolbarSrc).not.toContain("from './ZoomControls'")
     expect(toolbarSrc).not.toContain("from './PublishButton'")
     expect(toolbarSrc).not.toContain('saveStatus={saveStatus}')
-    // The global trailer — including the settings cog — IS owned by the shell.
-    expect(toolbarSrc).toContain("from './SettingsButton'")
-    expect(toolbarSrc).toContain('<SettingsButton />')
+    // Row 2's own trailer: the live-page link and the Hub return.
+    expect(toolbarSrc).toContain('<OpenLivePageButton />')
+    expect(toolbarSrc).toContain('<BackToProductHubButton />')
+    // None of the five shared utilities may reappear here.
+    expect(toolbarSrc).not.toContain('<SettingsButton />')
+    expect(toolbarSrc).not.toContain('<ThemeToggleButton />')
+    expect(toolbarSrc).not.toContain('<AccountMenuButton />')
 
     // The editor-only buttons must be mounted from AdminCanvasLayout, which
     // must NOT re-mount the now-global SettingsButton.
@@ -609,11 +625,13 @@ describe('Toolbar — structural requirements', () => {
     // Guideline #357 (user directive #1532): WCAG 2.5.5 44px touch target requirement
     // is explicitly waived for editor chrome. Toolbar controls target 28px.
     // Pattern asserts a 24–29px height value declared in the shared Toolbar.module.css.
+    // SettingsButton is no longer here — it moved to row 1 with the rest of the
+    // shared utilities, which are round 44px header buttons, not compact
+    // 28px editor chrome.
     const files = [
       'ZoomControls.tsx',
       'PublishButton.tsx',
       'PublishActionGroup.tsx',
-      'SettingsButton.tsx',
     ]
     const { readFileSync, existsSync } = require('fs')
     // Read the shared Toolbar.module.css once — all Toolbar sub-components use it
@@ -767,8 +785,11 @@ describe('SettingsModal — WCAG 2.4.3 focus-return on close (Guideline #225)', 
 describe('SettingsButton — section ID matches a valid SectionId', () => {
   it("dispatches 'general' (a valid SectionId after dropping the Pages section)", () => {
     const { readFileSync } = require('fs')
+    // SettingsButton moved to row 1 when the shared header reclaimed the gear.
+    // Reading the URL object directly (not `.pathname`) keeps this resolvable
+    // on Windows, where a file: pathname is `/S:/…`.
     const src = readFileSync(
-      new URL('../../admin/pages/site/toolbar/SettingsButton.tsx', import.meta.url).pathname,
+      new URL('../../admin/shared/ProductHubHeader/SettingsButton.tsx', import.meta.url),
       'utf-8',
     ) as string
     // 'pages' / 'breakpoints' / 'conditions' were dropped from the modal —

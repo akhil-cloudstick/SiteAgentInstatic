@@ -32,6 +32,7 @@ import { isStateChangingMethod, originAllowed } from '../../auth/security'
 import type { CmsHandlerOptions } from './shared'
 import { handleSetupRoutes } from './setup'
 import { handleSsoRoutes } from './sso'
+import { handleHubContextRoutes } from './hubContext'
 import { handleAuthRoutes } from './auth'
 import { handleMeRoutes } from './me'
 import { handleUserPreferencesRoutes } from './userPreferences'
@@ -82,6 +83,9 @@ export async function handleCmsRequest(
   const response =
     (await handleSetupRoutes(req, db))
     ?? (await handleSsoRoutes(req, db))
+    // Sits next to the SSO hand-off that writes it: this route reads back the
+    // authorized scope that hand-off stored on the session.
+    ?? (await handleHubContextRoutes(req, db))
     ?? (await handleMeRoutes(req, db, options))
     ?? (await handleAuthRoutes(req, db))
     // User preferences sit next to /me/* because they share the same

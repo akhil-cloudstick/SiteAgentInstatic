@@ -100,6 +100,21 @@ function currentSlug(req) {
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => (
   { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
+// The authorized scope carried across a hand-off, per the MMSBUILD shared-header
+// contract: the specialist product renders it in its header row and returns to
+// `hubReturnUrl` on "Back to Product Hub". The registry is infrastructure-only
+// today (slug, ports, tier — no client or project record), so we send the scope
+// we actually hold. The CMS treats every absent field as absent rather than
+// substituting a default, so partial scope degrades cleanly.
+function hubContextParams(tenant, origin) {
+  const params = new URLSearchParams();
+  params.set('hubRole', 'operator');
+  params.set('hubSite', tenant.slug);
+  params.set('hubOrigin', origin);
+  params.set('hubReturnUrl', `${config.gatewayOrigin}/hub`);
+  return params.toString();
+}
+
 // Short-lived signed SSO hand-off URL for a tool. The tool validates the token
 // (server-side) and mints its own session — see Phase 3 (OD) / Phase 4 (Instatic).
 export function ssoUrl(tenant, target) {
@@ -109,7 +124,8 @@ export function ssoUrl(tenant, target) {
   if (target === 'instatic') {
     // Root path -> the gateway's session-routed catch-all forwards it to THIS
     // tenant's Instatic (the request carries the sa_hub cookie set at login).
-    return `${config.gatewayOrigin}/cms/api/cms/sso?token=${encodeURIComponent(token)}`;
+    return `${config.gatewayOrigin}/cms/api/cms/sso?token=${encodeURIComponent(token)}`
+      + `&${hubContextParams(tenant, 'hub')}`;
   }
   // OpenDesign: the tenant-agnostic /od mount. The gateway splits /od/sso off to
   // THIS tenant's daemon using the sa_hub cookie set at login — exactly like the
