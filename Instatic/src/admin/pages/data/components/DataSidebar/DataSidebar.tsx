@@ -15,9 +15,7 @@ import { useEffect, useEffectEvent, useRef, useState, type CSSProperties, type M
 import { Button } from '@ui/components/Button'
 import { Skeleton } from '@ui/components/Skeleton'
 import { railAccent, railTintVar } from '@ui/railAccent'
-import { DatabaseSolidIcon } from 'pixel-art-icons/icons/database-solid'
-import { LockSolidIcon } from 'pixel-art-icons/icons/lock-solid'
-import { PlusIcon } from 'pixel-art-icons/icons/plus'
+import { DatabaseSolidIcon, ListBoxSolidIcon, LockSolidIcon, PlusIcon, UploadIcon } from '@admin/pages/data/icons'
 import { useWorkspaceLayout } from '@admin/state/workspaceLayout'
 import { Panel } from '@admin/shared/Panel'
 import { SidebarResizeHandle } from '@admin/shared/SidebarResizeHandle'
@@ -44,6 +42,13 @@ interface DataSidebarProps {
   onCreateTable: () => void
   canCreateTable: boolean
   canManage: boolean
+  /** Opens the export dialog. The approved screen puts bundle actions in the
+   *  sidebar panel header, never in the grid — see the reference's own
+   *  contract test, which asserts the grid source contains neither string. */
+  onOpenExport?: () => void
+  onOpenImport?: () => void
+  canExport: boolean
+  canImport: boolean
 }
 
 interface TableContextMenuState {
@@ -63,6 +68,16 @@ const STRUCTURE_LOCKED_KINDS: ReadonlySet<DataTableListItem['kind']> = new Set([
   'layout',
 ])
 
+/**
+ * The short kind badge the approved screen prints next to a system table's
+ * name. `postType` reads differently depending on whether the table shipped
+ * with the install or the user created it.
+ */
+function tableKindLabel(table: DataTableListItem): string {
+  if (table.kind === 'postType') return table.system ? 'post-type' : 'custom post type'
+  return table.kind
+}
+
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
@@ -78,6 +93,10 @@ export function DataSidebar({
   onCreateTable,
   canCreateTable,
   canManage,
+  onOpenExport,
+  onOpenImport,
+  canExport,
+  canImport,
 }: DataSidebarProps) {
   const sidebarRef = useRef<HTMLElement | null>(null)
   const tableListRef = useRef<HTMLDivElement | null>(null)
@@ -137,10 +156,13 @@ export function DataSidebar({
             mock), kept a fixed width on every row so the database icons stay
             column-aligned whether or not the dot is showing. */}
         <span className={styles.tableSelectedDot} data-visible={selected || undefined} aria-hidden="true" />
-        <DatabaseSolidIcon size={13} aria-hidden="true" />
+        <DatabaseSolidIcon size={14} aria-hidden="true" />
         <span className={styles.tableLabel}>{table.pluralLabel}</span>
+        {table.system && (
+          <span className={styles.kindTag}>{tableKindLabel(table)}</span>
+        )}
         {locked && (
-          <LockSolidIcon size={12} className={styles.tableLockIcon} aria-hidden="true" />
+          <LockSolidIcon size={12} className={styles.tableLockIcon} aria-label="Protected system table" />
         )}
       </Button>
     )
@@ -212,7 +234,7 @@ export function DataSidebar({
             className={panelRailStyles.railButton}
           >
             <span className={panelRailStyles.activeIndicator} aria-hidden="true" />
-            <DatabaseSolidIcon size={16} className={panelRailStyles.railIcon} />
+            <ListBoxSolidIcon size={17} className={panelRailStyles.railIcon} />
           </Button>
         </div>
       </nav>
@@ -229,6 +251,36 @@ export function DataSidebar({
             title="Data tables"
             body="bare"
             onClose={() => setDataSidebarCollapsed(true)}
+            headerActions={(
+              <>
+                {canExport && onOpenExport && (
+                  <Button
+                    variant="ghost"
+                    size="xs"
+                    iconOnly
+                    aria-label="Export full site bundle"
+                    tooltip="Export full site bundle"
+                    onClick={onOpenExport}
+                  >
+                    <UploadIcon size={14} aria-hidden="true" />
+                  </Button>
+                )}
+                {canImport && onOpenImport && (
+                  <Button
+                    variant="ghost"
+                    size="xs"
+                    iconOnly
+                    aria-label="Import full site bundle"
+                    tooltip="Import full site bundle"
+                    onClick={onOpenImport}
+                  >
+                    {/* The approved screen reuses the upload glyph flipped,
+                        rather than shipping a second download icon. */}
+                    <UploadIcon size={14} className={styles.flipY} aria-hidden="true" />
+                  </Button>
+                )}
+              </>
+            )}
           >
             <div
               ref={tableListRef}
@@ -277,6 +329,10 @@ export function DataSidebar({
                 </>
               )}
 
+              {!loading && !error && systemTables.length > 0 && (
+                <div className={styles.sectionDivider} aria-hidden="true" />
+              )}
+
               {!loading && !error && (
                 <>
                   <div className={styles.sectionHeader}>
@@ -321,6 +377,12 @@ export function DataSidebar({
         </div>
       </div>
 
+      {/*
+        * No reopen notch here. The approved screen needs one because its
+        * sidebar hides completely when closed; ours keeps the 44px rail
+        * mounted, and the rail button is already the toggle. Adding a notch
+        * put a second identical glyph immediately beside it.
+        */}
       {!dataSidebarCollapsed && (
         <SidebarResizeHandle
           side="left"

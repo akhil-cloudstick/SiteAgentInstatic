@@ -1,131 +1,200 @@
+/* PHASE 8: transcribed from the MMSBUILD Media reference
+   (screens/media/src/styles.css → .upload-queue, .window-titlebar,
+   .queue-list, .queue-item, .queue-icon, .progress, .queue-actions,
+   .window-footer), with the approved upload-queue master's destination
+   subtitle, `N in flight • N done • N failed` summary line and per-row
+   percentage. */
+
+/* Context strip — where the batch is going, and how it is doing. Rendered only
+   while the queue has contents; see the component for why. */
 .summary {
-  font-size: var(--text-xs);
-  color: var(--text-subtle);
-  padding: 0 var(--space-3xs) var(--space-s) var(--space-3xs);
+    display: grid;
+    gap: var(--media-sp-2);
+    min-width: 0;
+    padding: var(--media-sp-10) var(--media-sp-12);
+    border-bottom: 1px solid var(--mms-border);
+    color: var(--mms-text-muted);
+    font-size: var(--media-text-12);
+}
+
+.destination {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--mms-text);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.counts {
+    min-width: 0;
+    font-size: var(--media-text-11);
+    font-variant-numeric: tabular-nums;
 }
 
 .list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3xs);
-  list-style: none;
-  margin: 0;
-  padding: 0;
+    max-height: var(--media-queue-list-max-h);
+    margin: var(--media-sp-0);
+    padding: var(--media-sp-6);
+    overflow-y: auto;
+    list-style: none;
+    scrollbar-width: thin;
 }
 
 .row {
-  display: grid;
-  grid-template-columns: 28px 1fr auto;
-  align-items: start;
-  gap: var(--space-s);
-  padding: var(--space-xs);
-  background: var(--bg-surface-2);
-  border-radius: var(--radius-sm);
+    display: grid;
+    min-width: 0;
+    min-height: var(--media-queue-row-h);
+    grid-template-columns: var(--media-queue-icon) minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--media-sp-7);
+    padding: var(--media-sp-8);
+    border-bottom: 1px solid var(--mms-border);
+    list-style: none;
 }
 
+.row:last-child {
+    border-bottom: 0;
+}
+
+/* `.queue-icon` — a typed tile: photo thumbnail, or a coloured glyph well. */
 .preview {
-  width: 28px;
-  height: 28px;
-  background: var(--bg-body);
-  border-radius: var(--radius-sm);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  color: var(--text-subtle);
+    display: grid;
+    width: var(--media-queue-icon);
+    height: var(--media-queue-icon);
+    place-items: center;
+    overflow: hidden;
+    border-radius: var(--media-radius-8);
+    background: var(--mms-surface-tint);
+    color: var(--mms-text-muted);
 }
 
 .previewImage {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.row[data-status='succeeded'] .preview {
+    background: var(--mms-surface-green);
+    color: var(--mms-success);
+}
+
+.row[data-status='failed'] .preview {
+    background: var(--mms-danger-bg);
+    color: var(--mms-danger);
 }
 
 .body {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4xs);
-  min-width: 0;
+    display: grid;
+    min-width: 0;
+    gap: var(--media-sp-2);
+}
+
+.name,
+.meta {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .name {
-  font-size: var(--text-s);
-  color: var(--text);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+    color: var(--mms-text);
+    font-size: var(--media-text-12);
+    font-weight: var(--media-weight-meta);
 }
 
 .meta {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-xs);
-  font-size: var(--text-2xs);
-  color: var(--text-subtle);
+    color: var(--mms-text-muted);
+    font-size: var(--media-text-11);
+}
+
+.warning,
+.error {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--media-sp-5);
+    margin: var(--media-sp-4) var(--media-sp-0) var(--media-sp-0);
+    font-size: var(--media-text-10);
+}
+
+.warning {
+    color: var(--mms-warning);
 }
 
 .error {
-  font-size: var(--text-2xs);
-  color: var(--danger);
-  white-space: pre-wrap;
-  word-break: break-word;
+    color: var(--mms-danger);
 }
 
-/* Non-blocking soft-limit advisory (10–49 MB) — the file still uploads. */
-.warning {
-  font-size: var(--text-2xs);
-  color: var(--warning-text);
-  white-space: pre-wrap;
-  word-break: break-word;
+/* `.progress` — a 4px track with an inline percentage beside it. */
+.progressRow {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--media-sp-8);
+    margin-top: var(--media-sp-7);
 }
 
-.progressBar {
-  display: block;
-  height: 3px;
-  background: var(--bg-body);
-  border-radius: var(--radius-sm);
-  overflow: hidden;
-  margin-top: var(--space-3xs);
+.progressTrack {
+    height: var(--media-progress-h);
+    overflow: hidden;
+    border-radius: var(--media-radius-pill);
+    background: var(--mms-surface-tint);
 }
 
 .progressFill {
-  display: block;
-  height: 100%;
-  background: var(--canvas-selection-ring-color);
-  transition: width 80ms ease-out;
+    display: block;
+    height: 100%;
+    background: var(--mms-action);
+    transition: width 160ms ease;
 }
 
-.progressFill[data-status='succeeded'] {
-  background: var(--success-bright);
-}
-
-.progressFill[data-status='failed'],
-.progressFill[data-status='cancelled'] {
-  background: var(--danger);
+.progressValue {
+    color: var(--mms-text-muted);
+    font-size: var(--media-text-11);
+    font-variant-numeric: tabular-nums;
 }
 
 .actions {
-  display: flex;
-  align-items: center;
-  gap: var(--space-4xs);
+    display: flex;
+    align-items: center;
+    gap: var(--media-sp-2);
 }
 
-.badgeBusy,
-.badgeSuccess,
-.badgeError,
-.badgeMuted {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-4xs);
-  padding: var(--space-px) var(--space-3xs);
-  border-radius: var(--radius-sm);
-  font-size: var(--text-3xs);
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+/* The approved upload-queue master ends at the last row: no footer bar. The
+   one that used to live here carried a second "Clear finished" button
+   duplicating the header's Clear, plus a concurrency note that said the same
+   thing whether the queue was empty or saturated — together they made an empty
+   panel look like a broken one. */
+
+/* ── Responsive ──────────────────────────────────────────────────────────────
+   Passed to the shared `FloatingWindow` as `className`, so the sheet
+   treatment lands WITHOUT editing that shell — it is also used by the Site
+   editor's code panel, agent panel and properties panel.
+
+   The doubled selector wins over `FloatingWindow.module.css .window`, whose
+   bundle order is not guaranteed relative to this module. */
+
+@media (max-width: 767px) {
+    .sheet.sheet {
+        z-index: 75;
+        top: auto;
+        right: 0;
+        bottom: 0;
+        left: var(--media-rail-w);
+        width: calc(100vw - var(--media-rail-w));
+        max-height: calc(100vh - var(--media-sp-80));
+        border-radius: var(--media-radius-14) var(--media-radius-14) 0 0;
+    }
+
+    .list {
+        max-height: calc(100vh - 210px);
+    }
 }
 
-.badgeBusy { color: var(--text-subtle); }
-.badgeSuccess { color: var(--success-bright); }
-.badgeError { color: var(--danger); }
-.badgeMuted { color: var(--text-subtle); }
+@media (prefers-reduced-motion: reduce) {
+    .progressFill {
+        transition: none;
+    }
+}

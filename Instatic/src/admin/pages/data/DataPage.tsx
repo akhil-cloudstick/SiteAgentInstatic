@@ -25,19 +25,18 @@ import {
 } from '@admin/access'
 import type { DataRow, DataRowCells, DataRowStatus } from '@core/data/schemas'
 import { pushToast } from '@ui/components/Toast'
+import { cn } from '@ui/cn'
 import { getErrorMessage } from '@core/utils/errorMessage'
 import { PublishActionGroup, type PublishActionMenuItem } from '@site/toolbar/PublishActionGroup'
-import { CheckIcon } from 'pixel-art-icons/icons/check'
-import { CircleAlertSolidIcon } from 'pixel-art-icons/icons/circle-alert-solid'
-import { LoaderIcon } from 'pixel-art-icons/icons/loader'
-import { SaveSolidIcon } from 'pixel-art-icons/icons/save-solid'
-import { SendSolidIcon } from 'pixel-art-icons/icons/send-solid'
+import { CheckIcon, CircleAlertSolidIcon, LoaderIcon, SaveSolidIcon, UploadIcon } from '@admin/pages/data/icons'
 import { useDataWorkspace } from './hooks/useDataWorkspace'
 import { DataSidebar } from './components/DataSidebar/DataSidebar'
 import { DataCanvas } from './components/DataCanvas/DataCanvas'
 import { DataWorkbenchHeader } from './components/DataWorkbenchHeader/DataWorkbenchHeader'
 import { DataInspector } from './components/DataInspector/DataInspector'
 import { NewTableDialog } from './components/NewTableDialog/NewTableDialog'
+import { DataMobileDock, type DataMobilePanel } from './components/DataMobileDock/DataMobileDock'
+import dockStyles from './components/DataMobileDock/DataMobileDock.module.css'
 import type { DataRowDraftState } from './components/DataInspector/RowDetail'
 
 function hasDraftChanges(row: DataRow): boolean {
@@ -78,6 +77,13 @@ export function DataPage() {
   const { runStepUp } = useStepUp()
 
   const [newTableDialogOpen, setNewTableDialogOpen] = useState(false)
+  // Seeded once from `?panel=` so a shared narrow-viewport link opens on the
+  // drawer it names; kept in sync by `handleMobileDrawerChange` thereafter.
+  const [mobileDrawer, setMobileDrawer] = useState<DataMobilePanel | null>(() => {
+    if (typeof window === 'undefined') return null
+    const panel = new URLSearchParams(window.location.search).get('panel')
+    return panel === 'tables' || panel === 'inspector' ? panel : null
+  })
   const [activeDraft, setActiveDraft] = useState<DataRowDraftState | null>(null)
   const activeDraftRef = useRef<DataRowDraftState | null>(null)
   const [publishState, setPublishState] = useState<'idle' | 'publishing' | 'published' | 'error'>('idle')
@@ -207,6 +213,20 @@ export function DataPage() {
     })
   }
 
+  /**
+   * Mirrors the open drawer into `?panel=` so a narrow-viewport view is
+   * shareable and survives reload, matching the reference's deep-link params.
+   * `history.replaceState` — a drawer toggle is not a navigation step.
+   */
+  function handleMobileDrawerChange(panel: DataMobilePanel | null) {
+    setMobileDrawer(panel)
+    if (typeof window === 'undefined') return
+    const url = new URL(window.location.href)
+    if (panel === null) url.searchParams.delete('panel')
+    else url.searchParams.set('panel', panel)
+    window.history.replaceState({}, '', url)
+  }
+
   function handleSelectRow(rowId: string | null) {
     workspace.selectRow(rowId)
     if (rowId !== null) {
@@ -294,7 +314,7 @@ export function DataPage() {
       ? CircleAlertSolidIcon
       : !hasPublishableChanges
         ? CheckIcon
-        : SendSolidIcon
+        : UploadIcon
 
   // ---------------------------------------------------------------------------
   // Right panel (inspector)
@@ -361,14 +381,8 @@ export function DataPage() {
   const workbenchHeader = selectedTable ? (
     <DataWorkbenchHeader
       table={selectedTable}
-      publishSlot={publishActionGroup}
-      onOpenExport={() => openSiteExport({
-        activeTableId: workspace.selectedTableId,
-        initialScope: 'all',
-      })}
-      onOpenImport={openSiteImport}
-      canExport={canExport}
-      canImport={canImport}
+      saveStatusLabel={publishStatus.label}
+      saveStatusTone={publishStatus.tone}
       onCreateRow={rowCreationSupported && canCreateRows ? () => { void handleAddRow() } : undefined}
     />
   ) : null
@@ -377,24 +391,49 @@ export function DataPage() {
   // Render
   // ---------------------------------------------------------------------------
 
+  // Below 1100px the workspace becomes records-first and the two side panels
+  // move behind the dock as drawers. The drawer instance is mounted only while
+  // open, so the desktop layout keeps exactly one of each panel.
+  const sidebarPanel = (
+    <DataSidebar
+      tables={workspace.tables}
+      loading={workspace.loadingTables}
+      error={workspace.tablesError}
+      selectedTableId={workspace.selectedTableId}
+      onSelectTable={(tableId) => {
+        workspace.selectTable(tableId)
+        setMobileDrawer(null)
+      }}
+      onOpenTableSettings={handleOpenTableSettings}
+      onDeleteTable={(table) => handleDeleteTable(table.id)}
+      onCreateTable={() => setNewTableDialogOpen(true)}
+      canCreateTable={canManageCustomTables}
+      canManage={canManageCustomTables}
+      onOpenExport={() => openSiteExport({
+        activeTableId: workspace.selectedTableId,
+        initialScope: 'all',
+      })}
+      onOpenImport={openSiteImport}
+      canExport={canExport}
+      canImport={canImport}
+    />
+  )
+
   return (
     <>
       <AdminWorkspaceCanvasLayout
         workspace="data"
-        contentSidebar={(
-          <DataSidebar
-            tables={workspace.tables}
-            loading={workspace.loadingTables}
-            error={workspace.tablesError}
-            selectedTableId={workspace.selectedTableId}
-            onSelectTable={workspace.selectTable}
-            onOpenTableSettings={handleOpenTableSettings}
-            onDeleteTable={(table) => handleDeleteTable(table.id)}
-            onCreateTable={() => setNewTableDialogOpen(true)}
-            canCreateTable={canManageCustomTables}
-            canManage={canManageCustomTables}
-          />
+        // The approved screen puts publishing in the product header, not in the
+        // grid's context bar. `toolbarRightSlot` is caller-owned, so passing it
+        // here places the control in the shared toolbar for the Data workspace
+        // only — every other section keeps the toolbar it has today.
+        // The toolbar renders outside the workspace scope, so the publish
+        // control carries its own attribute hook — see the [data-data-publish]
+        // token island in globals.css and the rules in Toolbar.module.css.
+        toolbarRightSlot={publishActionGroup && (
+          <div data-data-publish="">{publishActionGroup}</div>
         )}
+        contentSidebar={sidebarPanel}
         contentCanvas={(
           <DataCanvas
             table={selectedTable}
@@ -426,6 +465,33 @@ export function DataPage() {
         )}
         contentRightPanel={rightPanel}
       />
+
+      <DataMobileDock
+        active={mobileDrawer}
+        onChange={handleMobileDrawerChange}
+        inspectorLabel={workspace.selectedRow ? 'Details' : 'Schema'}
+      />
+
+      {mobileDrawer !== null && (
+        <div
+          className={dockStyles.drawerBackdrop}
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) handleMobileDrawerChange(null)
+          }}
+        >
+          <div
+            className={cn(
+              dockStyles.drawerPanel,
+              mobileDrawer === 'inspector' && dockStyles.drawerPanelRight,
+            )}
+            role="dialog"
+            aria-modal="true"
+            aria-label={mobileDrawer === 'tables' ? 'Data tables' : 'Record details'}
+          >
+            {mobileDrawer === 'tables' ? sidebarPanel : rightPanel}
+          </div>
+        </div>
+      )}
 
       {newTableDialogOpen && (
         <NewTableDialog

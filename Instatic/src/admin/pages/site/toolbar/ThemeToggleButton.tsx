@@ -33,7 +33,13 @@ export function ThemeToggleButton() {
       onClick={() => setEditorSelectPreference('theme', isDark ? 'light' : 'dark')}
       data-testid="toolbar-theme-toggle"
     >
-      <FaIcon name={isDark ? 'moon' : 'sun'} size={17} />
+      {/*
+        * The glyph shows the theme this button switches TO, not the one that
+        * is active — a sun while dark, a moon while light. That is the
+        * approved screen's convention, and it is what makes the control
+        * readable as an action rather than a status readout.
+        */}
+      <FaIcon name={isDark ? 'sun' : 'moon'} size={17} />
     </Button>
   )
 }

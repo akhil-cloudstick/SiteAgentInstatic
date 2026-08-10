@@ -63,6 +63,7 @@
     );
 }
 
+
 .rightPanelNotchButton.rightPanelNotchButton {
     background: var(--bg-surface-3);
     color: var(--text-muted);
@@ -71,4 +72,73 @@
 .rightPanelNotchButton.rightPanelNotchButton:hover {
     background: var(--bg-surface-4);
     color: var(--text);
+}
+
+/* ===========================================================================
+ * Approved-screen reopen notch — `.panel-notch.right-notch`.
+ *
+ * The reference draws this as a 44 × 44 TAB welded to the canvas edge: a 1px
+ * hairline on three sides with the right edge open, rounded 7px on the leading
+ * side only, on the raised surface with an action-green glyph, offset 12px from
+ * the top. The generic notch is a small ghost button floating inside a carved
+ * corner — a different object entirely, which is why sizing the icon alone
+ * never closed the gap.
+ *
+ * Scoped to the two re-skinned screens; Site and Media keep the carved notch.
+ * =========================================================================== */
+:global([data-editor-screen='data']) .rightPanelNotchShell,
+:global([data-editor-screen='content']) .rightPanelNotchShell {
+    top: 12px;
+    right: 0;
+}
+
+:global([data-editor-screen='data']) .rightPanelNotch,
+:global([data-editor-screen='content']) .rightPanelNotch {
+    display: grid;
+    width: 44px;
+    height: 44px;
+    place-items: center;
+    padding: 0;
+    border: 1px solid var(--mms-border);
+    /* Open on the trailing edge so the tab reads as part of the canvas. */
+    border-right: 0;
+    border-radius: 7px 0 0 7px;
+    background: var(--mms-surface-raised);
+    color: var(--mms-action-strong);
+    box-shadow: none;
+    /* Clip the button's hover fill to the tab's rounded edge. Without this the
+       square fill paints over the 7px corners and the tab snaps sharp on
+       hover. */
+    overflow: hidden;
+}
+
+/* The carved-corner gradients belong to the generic notch, not this tab. */
+:global([data-editor-screen='data']) .rightPanelNotch::before,
+:global([data-editor-screen='data']) .rightPanelNotch::after,
+:global([data-editor-screen='content']) .rightPanelNotch::before,
+:global([data-editor-screen='content']) .rightPanelNotch::after {
+    content: none;
+}
+
+/* The button fills the tab and carries no surface of its own — the tab is the
+   visible object, so a second inset background would read as a chip inside it. */
+:global([data-editor-screen='data']) .rightPanelNotchButton.rightPanelNotchButton,
+:global([data-editor-screen='content']) .rightPanelNotchButton.rightPanelNotchButton {
+    display: grid;
+    width: 44px;
+    height: 44px;
+    place-items: center;
+    padding: 0;
+    border: 0;
+    /* Match the tab so the hover fill keeps its shape even where `overflow`
+       cannot clip (the primitive raises its own stacking context). */
+    border-radius: 7px 0 0 7px;
+    background: transparent;
+    color: var(--mms-action-strong);
+}
+
+:global([data-editor-screen='data']) .rightPanelNotchButton.rightPanelNotchButton:hover,
+:global([data-editor-screen='content']) .rightPanelNotchButton.rightPanelNotchButton:hover {
+    background: var(--mms-surface-tint);
+    color: var(--mms-action-strong);
 }

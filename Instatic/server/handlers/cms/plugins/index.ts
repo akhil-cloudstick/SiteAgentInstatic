@@ -12,6 +12,8 @@
  *   DELETE /cms/api/cms/plugins/:id[?force=true]                  — uninstall + delete on-disk assets
  *                                                                     (`force` skips lifecycle hooks)
  *   POST   /cms/api/cms/plugins/:id/pack/install                  — manual pack re-sync into the draft site
+ *   POST   /cms/api/cms/plugins/:id/staged                        — park an inspected package for later approval
+ *   DELETE /cms/api/cms/plugins/:id/staged                        — discard the parked package
  *   GET    /cms/api/cms/plugins/:id/settings                      — masked settings
  *   PUT    /cms/api/cms/plugins/:id/settings                      — update settings, push into the running VM, fire `settings.changed`
  *   POST   /cms/api/cms/plugins/:id/restart                       — manual restart for a parked plugin
@@ -64,6 +66,7 @@ import {
   handlePluginScheduleRunNow,
   handlePluginSchedulesList,
 } from './schedules'
+import { handleDiscardStagedPackage, handleStagePackage } from './staged'
 
 // ---------------------------------------------------------------------------
 // Route patterns
@@ -83,6 +86,7 @@ const PLUGIN_SCHEDULES_PATTERN = /^\/cms\/api\/cms\/plugins\/(?<id>[^/]+)\/sched
 const PLUGIN_SCHEDULE_RUN_NOW_PATTERN = /^\/cms\/api\/cms\/plugins\/(?<id>[^/]+)\/schedules\/(?<sid>[^/]+)\/run-now$/
 const PLUGIN_SCHEDULE_PAUSE_PATTERN = /^\/cms\/api\/cms\/plugins\/(?<id>[^/]+)\/schedules\/(?<sid>[^/]+)\/pause$/
 const PLUGIN_SCHEDULE_RESUME_PATTERN = /^\/cms\/api\/cms\/plugins\/(?<id>[^/]+)\/schedules\/(?<sid>[^/]+)\/resume$/
+const PLUGIN_STAGED_PATTERN = /^\/cms\/api\/cms\/plugins\/(?<id>[^/]+)\/staged$/
 const PLUGIN_EVENTS_PATH = '/cms/api/cms/plugins/events'
 
 // The bare `/plugins/:id` route must NOT claim the reserved single-segment
@@ -131,6 +135,14 @@ function resolvePluginRoutePolicy(method: string, pathname: string): PluginRoute
   // draft site. Runs plugin code in the worker.
   if (method === 'POST' && PLUGIN_PACK_INSTALL_PATTERN.test(pathname)) {
     return { capability: 'plugins.install', stepUp: true }
+  }
+  // Staging parks an inspected package on the host without granting it
+  // anything — no code runs and no plugin row changes until it is approved
+  // through the install endpoint, which carries its own step-up. The install
+  // capability still gates it: only someone who could install should be able
+  // to leave a package sitting on the host.
+  if (PLUGIN_STAGED_PATTERN.test(pathname)) {
+    return { capability: 'plugins.install', stepUp: false }
   }
 
   // PATCH/DELETE on the item endpoint = enable/disable/uninstall.
@@ -209,6 +221,8 @@ const PLUGIN_ROUTES: readonly Route<[CmsHandlerOptions, AuthUser]>[] = [
   { method: 'POST', pattern: PLUGIN_SCHEDULE_PAUSE_PATTERN, handler: (req, db, p) => handlePluginSchedulePause(req, db, p.id, p.sid) },
   { method: 'POST', pattern: PLUGIN_SCHEDULE_RESUME_PATTERN, handler: (req, db, p) => handlePluginScheduleResume(req, db, p.id, p.sid) },
   { method: 'GET', pattern: PLUGIN_SCHEDULES_PATTERN, handler: (req, db, p) => handlePluginSchedulesList(req, db, p.id) },
+  { method: 'POST', pattern: PLUGIN_STAGED_PATTERN, handler: (req, db, p, options, user) => handleStagePackage(req, db, options, user, p.id) },
+  { method: 'DELETE', pattern: PLUGIN_STAGED_PATTERN, handler: (req, db, p, options) => handleDiscardStagedPackage(req, db, options, p.id) },
   { method: 'GET', pattern: PLUGIN_EVENTS_PATH, handler: async (req) => handlePluginEventsStream(req) },
   { method: 'PATCH', pattern: PLUGIN_RECORD_ITEM_PATTERN, handler: (req, db, p) => handlePluginRecordItem(req, db, p.id, p.rid, p.rec) },
   { method: 'DELETE', pattern: PLUGIN_RECORD_ITEM_PATTERN, handler: (req, db, p) => handlePluginRecordItem(req, db, p.id, p.rid, p.rec) },

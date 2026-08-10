@@ -26,6 +26,7 @@ import type {
   DataRowStatus,
   DataTable,
 } from '@core/data/schemas'
+import { LockSolidIcon } from '@admin/pages/data/icons'
 import { DataGridBulkActionBar } from './DataGridBulkActionBar'
 import { DataGridEmptyState } from './DataGridEmptyState'
 import { DataGridGroupHeader } from './DataGridGroupHeader'
@@ -45,6 +46,7 @@ import {
   groupRowsByStatus,
   STATUS_VIEW_ORDER_DEFAULT,
   STATUS_VIEW_ORDER_PAGES,
+  UPDATED_COLUMN_WIDTH,
   type SortState,
   type StatusFilter,
 } from './dataGridRows'
@@ -84,6 +86,17 @@ interface RowContextMenuState {
   y: number
   rowId: string
 }
+
+/**
+ * Kinds whose structure is authored in the Site editor rather than here. The
+ * approved screen prints a protected-content band above the grid for these so
+ * the locked built-in fields read as intentional.
+ */
+const STRUCTURE_MANAGED_KINDS: ReadonlySet<DataTable['kind']> = new Set([
+  'page',
+  'component',
+  'layout',
+])
 
 export function DataGrid({
   table,
@@ -225,18 +238,39 @@ export function DataGrid({
   // React Compiler requires this shape — direct `document.body.style.cursor`
   // writes from a function declared in the component body would be flagged
   // as render-time side effects (Rules of React: components must be pure).
-  const [resizing, setResizing] = useState<{ startX: number; startWidth: number } | null>(null)
+  //
+  // The approved screen lets EVERY column be resized, not just the primary
+  // one, clamped 120–420. Non-primary widths are session state (the primary
+  // column keeps its own persisted store, which predates this and holds a
+  // wider 200–720 range so already-saved widths are never clamped down).
+  const [resizing, setResizing] = useState<
+    { startX: number; startWidth: number; fieldId: string | null } | null
+  >(null)
+  const [columnWidths, setColumnWidths] = useState<Record<string, number>>({})
 
   function handlePrimaryResizeStart(e: ReactMouseEvent): void {
-    setResizing({ startX: e.clientX, startWidth: primaryWidth })
+    setResizing({ startX: e.clientX, startWidth: primaryWidth, fieldId: null })
+  }
+
+  function handleColumnResizeStart(fieldId: string, startWidth: number) {
+    return (e: ReactMouseEvent): void => {
+      setResizing({ startX: e.clientX, startWidth, fieldId })
+    }
   }
 
   useEffect(() => {
     if (resizing == null) return
-    const { startX, startWidth } = resizing
+    const { startX, startWidth, fieldId } = resizing
 
     function onMove(ev: MouseEvent): void {
-      setPrimaryWidth(startWidth + (ev.clientX - startX))
+      const next = startWidth + (ev.clientX - startX)
+      if (fieldId == null) {
+        setPrimaryWidth(next)
+        return
+      }
+      // The reference's non-primary clamp.
+      const clamped = Math.max(120, Math.min(420, next))
+      setColumnWidths((current) => ({ ...current, [fieldId]: clamped }))
     }
     function onUp(): void {
       setResizing(null)
@@ -256,20 +290,29 @@ export function DataGrid({
     }
   }, [resizing, setPrimaryWidth])
 
-  // [ checkbox 36px ] [ ...fields ] [ trailing actions minmax(min-content, 1fr) ]
-  const columnWidths = [
-    '36px',
-    ...orderedFields.map((f) =>
-      getColumnWidth(f, f.id === table.primaryFieldId, primaryWidth),
-    ),
-    'minmax(min-content, 1fr)',
+  // The approved screen runs a 52px gutter at both ends of the ladder:
+  // [ checkbox 52px ] [ ...fields ] [ Updated 170px ] [ row actions 52px ].
+  //
+  // The trailing gutter keeps `minmax(…, 1fr)` rather than a bare 52px so it
+  // still absorbs leftover width when the columns are narrower than the
+  // viewport — without that the row hover / selected fill would stop short of
+  // the right edge. 52px is its floor, which is the reference's fixed value.
+  const columnTracks = [
+    '52px',
+    ...orderedFields.map((f) => {
+      const override = columnWidths[f.id]
+      if (override != null && f.id !== table.primaryFieldId) return `${override}px`
+      return getColumnWidth(f, f.id === table.primaryFieldId, primaryWidth)
+    }),
+    `${UPDATED_COLUMN_WIDTH}px`,
+    'minmax(52px, 1fr)',
   ]
   const gridStyle = {
-    '--data-grid-columns': columnWidths.join(' '),
+    '--data-grid-columns': columnTracks.join(' '),
   } as CSSProperties
 
-  // Sticky-left offset for primary column = width of checkbox col (36px).
-  const primaryStickyLeft: CSSProperties = { left: '36px' }
+  // Sticky-left offset for primary column = width of checkbox col (52px).
+  const primaryStickyLeft: CSSProperties = { left: '52px' }
   const checkboxStickyLeft: CSSProperties = { left: '0' }
 
   // ── Toolbar / subtitle helpers ────────────────────────────────────────────
@@ -280,8 +323,10 @@ export function DataGrid({
   const sortField = sort != null ? table.fields.find((f) => f.id === sort.fieldId) : null
   const sortLabel = sortField?.label ?? null
 
-  // Non-primary field count drives the skeleton column ladder.
-  const skeletonFieldCount = orderedFields.filter((f) => f.id !== table.primaryFieldId).length
+  // Non-primary field count drives the skeleton column ladder. `+ 1` for the
+  // Updated virtual column, so the skeleton spans the same track count as a
+  // loaded row and the two states don't jump width during the swap.
+  const skeletonFieldCount = orderedFields.filter((f) => f.id !== table.primaryFieldId).length + 1
 
   // ── Render helpers ────────────────────────────────────────────────────────
   function renderRow(row: DataRow): ReactElement {
@@ -299,10 +344,17 @@ export function DataGrid({
         checked={selection.checkedIds.has(row.id)}
         readOnly={readOnly}
         showStatusDot={hasPublishWorkflow}
-        onSelect={() => onSelectRow(row.id)}
+        // Clicking the selected row again deselects it, as the approved screen
+        // does — that is also how the inspector returns to Table settings
+        // without needing a separate control.
+        onSelect={() => onSelectRow(row.id === selectedRowId ? null : row.id)}
         onCheckedChange={(next) => selection.toggleRow(row.id, next)}
         onPrimaryAction={getPrimaryAction(row)}
         onDelete={onDeleteRow != null ? () => onDeleteRow(row.id) : undefined}
+        onOpenMenu={(x, y) => {
+          onSelectRow(row.id)
+          setRowContextMenu({ x, y, rowId: row.id })
+        }}
         primaryStickyLeft={primaryStickyLeft}
         checkboxStickyLeft={checkboxStickyLeft}
       />
@@ -328,6 +380,20 @@ export function DataGrid({
         sortLabel={sortLabel}
         onClearSort={clearSort}
       />
+
+      {/*
+        * Structurally-managed system tables get the approved screen's
+        * protected-content band. It states where the structure is actually
+        * edited, so the read-only fields below don't read as a bug.
+        */}
+      {table.system && STRUCTURE_MANAGED_KINDS.has(table.kind) && (
+        <div className={styles.protectedNote}>
+          <LockSolidIcon size={13} aria-hidden="true" />
+          <span className={styles.protectedNoteText}>
+            Protected system content. Edit structure in Site; manage permitted custom fields here.
+          </span>
+        </div>
+      )}
 
       {/* ── Error state (outside the grid — full width) ─────────────────── */}
       {error != null && (
@@ -360,6 +426,11 @@ export function DataGrid({
               primaryStickyLeft={primaryStickyLeft}
               checkboxStickyLeft={checkboxStickyLeft}
               onPrimaryResizeStart={handlePrimaryResizeStart}
+              resolveColumnWidth={(field) =>
+                columnWidths[field.id]
+                ?? Number.parseInt(getColumnWidth(field, false, primaryWidth), 10)
+                ?? 190}
+              onColumnResizeStart={handleColumnResizeStart}
             />
 
             {loading && (

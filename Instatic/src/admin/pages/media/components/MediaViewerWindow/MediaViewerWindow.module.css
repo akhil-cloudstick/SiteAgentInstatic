@@ -1,157 +1,405 @@
+/* PHASE 7: transcribed from the MMSBUILD Media reference
+   (screens/media/src/styles.css → .floating-window, .media-viewer,
+   .window-titlebar, .viewer-layout, .viewer-preview, .preview-actions,
+   .play-button, .viewer-fields, .viewer-tabs, .readonly-field, .file-facts,
+   .folder-editor, .window-footer), with the approved masters' `File URL`
+   row and `Accessibility` grouping.
+
+   This window is ALSO rendered by the Content page, the Dashboard media
+   widget and two Site surfaces. It declares `data-editor-screen="media"` on
+   its own root so it carries this palette in all of them. */
+
 .window {
     position: fixed;
-    /* Sit above the sidebars (z-index 85, see LeftSidebar.module.css) so the
-     viewer always wins when dragged across them. The toolbar's own dropdowns
-     and modals live at 200+ which is intentionally still above us. */
+    /* Above the sidebars (85) so the viewer always wins when dragged across
+       them; the toolbar's own dropdowns and modals stay above at 200+. */
     z-index: 90;
-    --media-viewer-width: min(880px, calc(100vw - var(--space-2xl)));
-    --media-viewer-height: min(640px, calc(100vh - var(--space-2xl)));
-    left: max(var(--space-m), min(var(--panel-x), calc(100vw - var(--media-viewer-width) - var(--space-m))));
-    top: max(var(--space-m), min(var(--panel-y), calc(100vh - var(--media-viewer-height) - var(--space-m))));
-    width: var(--media-viewer-width);
-    height: var(--media-viewer-height);
-    background: var(--bg-surface);
-    border: 1px solid var(--overlay-10);
-    border-radius: var(--panel-radius);
-    box-shadow: var(--shadow-panel);
-    backdrop-filter: blur(var(--panel-blur));
     display: flex;
+    width: var(--media-viewer-w);
+    max-height: var(--media-viewer-max-h);
     flex-direction: column;
     overflow: hidden;
+    border: 1px solid var(--mms-border-strong);
+    border-radius: var(--media-radius-12);
+    background: var(--mms-surface-raised);
+    box-shadow: var(--media-shadow-window);
+    color: var(--mms-text);
+    /* `.media-viewer { right: 24px; bottom: 24px }` — the reference anchors
+       this window to the bottom-right corner and does not make it
+       draggable. */
+    right: var(--media-sp-24);
+    bottom: var(--media-sp-24);
 }
+
+/* ── Titlebar ────────────────────────────────────────────────────────────── */
+
+.titlebar {
+    display: flex;
+    cursor: default;
+    min-height: var(--media-titlebar-h);
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--media-sp-8);
+    padding: var(--media-sp-0) var(--media-sp-8) var(--media-sp-0) var(--media-sp-17);
+    border-bottom: 1px solid var(--mms-border);
+    background: var(--mms-surface);
+    user-select: none;
+}
+
+.titlebarText {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: var(--media-sp-9);
+}
+
+.titlebarIcon {
+    flex: 0 0 auto;
+    color: var(--mms-action-strong);
+}
+
+.titlebarTitle {
+    min-width: 0;
+    overflow: hidden;
+    font-size: var(--media-text-15);
+    font-weight: var(--media-weight-strong);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.titlebarMeta {
+    flex: 0 0 auto;
+    padding-left: var(--media-sp-9);
+    border-left: 1px solid var(--mms-border);
+    color: var(--mms-text-muted);
+    font-size: var(--media-text-10);
+    white-space: nowrap;
+}
+
+.titlebarActions {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: var(--media-sp-2);
+}
+
+/* Expanded: the replacement master draws the viewer as a large panel over
+   the canvas rather than a corner window. Same window, one control. */
+.windowExpanded.windowExpanded {
+    --media-viewer-w: min(945px, calc(100vw - var(--media-sp-80)));
+    --media-viewer-max-h: min(760px, calc(100vh - var(--media-sp-80)));
+}
+
+.windowExpanded .body {
+    grid-template-columns: 62% 38%;
+}
+
+/* ── Body ────────────────────────────────────────────────────────────────── */
 
 .body {
-    flex: 1 1 auto;
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 300px;
     min-height: 0;
+    max-height: var(--media-viewer-layout-max-h);
+    grid-template-columns: 45% 55%;
+    flex: 1 1 auto;
 }
 
-.viewer {
+.preview {
+    position: relative;
     display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    justify-content: stretch;
     min-width: 0;
-    min-height: 0;
-    background: var(--bg-body);
-}
-
-.sidebar {
-    display: flex;
+    min-height: var(--media-preview-min-h);
     flex-direction: column;
-    gap: var(--space-l);
-    padding: var(--space-l);
-    overflow: auto;
-    background: var(--bg-body);
+    justify-content: center;
+    overflow: hidden;
+    border-right: 1px solid var(--mms-border);
+    /* A fixed deep well in BOTH themes — media pixels are never recoloured,
+       only the surface behind them. */
+    background: var(--media-preview-well);
 }
 
-.section {
+.previewActions {
+    position: absolute;
+    right: var(--media-sp-10);
+    bottom: var(--media-sp-10);
+    left: var(--media-sp-10);
     display: flex;
-    flex-direction: column;
-    gap: var(--space-xs);
+    gap: var(--media-sp-7);
 }
 
-.sectionTitle {
-    font-size: var(--text-2xs);
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--text-subtle);
-    margin: 0;
+.previewAction.previewAction {
+    display: inline-flex;
+    min-height: var(--media-tap);
+    flex: 1;
+    align-items: center;
+    justify-content: center;
+    gap: var(--media-sp-7);
+    border: 1px solid var(--media-overlay-border);
+    border-radius: var(--media-radius-7);
+    background: var(--media-overlay-bg);
+    color: var(--media-on-accent);
 }
+
+.previewAction.previewAction:hover:not(:disabled) {
+    background: var(--media-overlay-bg);
+    border-color: var(--media-overlay-strong-border);
+}
+
+.fields {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    overflow-y: auto;
+    padding: var(--media-sp-14) var(--media-sp-16);
+    scrollbar-width: thin;
+}
+
+/* ── Tabs ────────────────────────────────────────────────────────────────── */
+
+.tabs {
+    display: grid;
+    min-height: var(--media-tap);
+    flex: 0 0 auto;
+    grid-template-columns: 1fr 1fr;
+    margin: calc(-1 * var(--media-sp-6)) var(--media-sp-0) var(--media-sp-12);
+    border-bottom: 1px solid var(--mms-border);
+}
+
+.tab.tab {
+    min-height: var(--media-tap);
+    border: 0;
+    border-bottom: 2px solid transparent;
+    border-radius: 0;
+    background: transparent;
+    color: var(--mms-text-muted);
+    font-size: var(--media-text-13);
+}
+
+.tab.tab[aria-selected='true'] {
+    border-bottom-color: var(--mms-action);
+    color: var(--mms-action-strong);
+    font-weight: var(--media-weight-strong);
+}
+
+/* ── Fields ──────────────────────────────────────────────────────────────── */
 
 .field {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-3xs);
+    display: grid;
+    min-width: 0;
+    gap: var(--media-sp-5);
+    margin-bottom: var(--media-sp-10);
 }
 
 .fieldLabel {
-    font-size: var(--text-2xs);
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--text-subtle);
+    color: var(--mms-text-muted);
+    font-size: var(--media-text-10);
+    font-weight: var(--media-weight-label);
+}
+
+.required {
+    color: var(--mms-danger);
+}
+
+/* `.readonly-field` — the reference renders Filename as a static face. */
+.readonlyField {
+    display: flex;
+    min-width: 0;
+    min-height: var(--media-tap);
+    align-items: center;
+    padding: var(--media-sp-0) var(--media-sp-11);
+    border: 1px solid var(--mms-border);
+    border-radius: var(--media-radius-7);
+    background: var(--mms-surface-tint);
+    color: var(--mms-text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.sectionHeading {
+    margin: var(--media-sp-14) var(--media-sp-0) var(--media-sp-8);
+    color: var(--mms-text);
+    font-size: var(--media-text-12);
+    font-weight: var(--media-weight-strong);
 }
 
 .actionsRow {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--space-xs);
-}
-
-.detailList {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-3xs);
-    margin: 0;
-    padding: 0;
-}
-
-.detailRow {
-    display: flex;
-    align-items: baseline;
-    gap: var(--space-s);
-    font-size: var(--text-s);
-}
-
-.detailLabel {
-    flex: 0 0 70px;
-    font-size: var(--text-xs);
-    color: var(--text-subtle);
-    margin: 0;
-}
-
-.detailValue {
-    flex: 1 1 auto;
-    margin: 0;
-    display: inline-flex;
     align-items: center;
-    gap: var(--space-3xs);
-    color: var(--text);
-    word-break: break-word;
+    justify-content: space-between;
+    gap: var(--media-sp-8);
+    margin-bottom: var(--media-sp-10);
+}
+
+/* `.file-facts` — a bordered 2-column key/value grid. */
+.facts {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    margin: var(--media-sp-4) var(--media-sp-0) var(--media-sp-0);
+    border: 1px solid var(--mms-border);
+    border-radius: var(--media-radius-7);
+}
+
+.fact {
+    min-width: 0;
+    padding: var(--media-sp-8) var(--media-sp-10);
+    border-right: 1px solid var(--mms-border);
+    border-bottom: 1px solid var(--mms-border);
+}
+
+.fact:nth-child(2n) {
+    border-right: 0;
+}
+
+.fact:nth-last-child(-n + 2) {
+    border-bottom: 0;
+}
+
+.factLabel {
+    color: var(--mms-text-muted);
+    font-size: var(--media-text-9);
+}
+
+.factValue {
+    margin: var(--media-sp-2) var(--media-sp-0) var(--media-sp-0);
+    overflow: hidden;
+    font-weight: var(--media-weight-meta);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ── Folders tab ─────────────────────────────────────────────────────────── */
+
+.folderHelp {
+    margin: var(--media-sp-0) var(--media-sp-0) var(--media-sp-10);
+    padding: var(--media-sp-11);
+    border-radius: var(--media-radius-7);
+    background: var(--mms-surface-tint);
+    color: var(--mms-text-muted);
+    font-size: var(--media-text-12);
 }
 
 .folderList {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--space-3xs);
+    gap: var(--media-sp-6);
+    margin: var(--media-sp-0);
+    padding: var(--media-sp-0);
     list-style: none;
-    padding: 0;
-    margin: 0;
 }
 
 .folderChip {
     display: inline-flex;
     align-items: center;
-    padding: var(--space-4xs) var(--space-xs);
-    background: var(--bg-surface-2);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    font-size: var(--text-xs);
-    color: var(--text);
+    gap: var(--media-sp-6);
+    padding: var(--media-sp-5) var(--media-sp-10);
+    border: 1px solid var(--mms-border);
+    border-radius: var(--media-radius-pill);
+    background: var(--mms-surface-tint);
+    color: var(--mms-text);
+    font-size: var(--media-text-11);
+}
+
+.folderChipIcon {
+    color: var(--media-folder-glyph);
 }
 
 .placeholder {
-    font-size: var(--text-xs);
-    color: var(--text-subtle);
-    margin: 0;
+    margin: var(--media-sp-0);
+    color: var(--mms-text-muted);
+    font-size: var(--media-text-11);
+}
+
+/* ── Footer ──────────────────────────────────────────────────────────────── */
+
+.footer {
+    display: flex;
+    min-height: var(--media-footer-h);
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--media-sp-8);
+    padding: var(--media-sp-7) var(--media-sp-12);
+    border-top: 1px solid var(--mms-border);
+    background: var(--mms-surface);
 }
 
 .warning {
-    font-size: var(--text-xs);
-    color: var(--warning);
-    margin: 0 0 var(--space-xs) 0;
+    margin: var(--media-sp-0);
+    color: var(--mms-warning);
+    font-size: var(--media-text-11);
 }
 
-@media (max-width: 700px) {
-    .body {
-        grid-template-columns: minmax(0, 1fr);
-        grid-template-rows: minmax(180px, 36%) minmax(0, 1fr);
+/* ── Responsive ──────────────────────────────────────────────────────────── */
+
+@media (max-width: 1250px) {
+    .window {
+        --media-viewer-w: min(620px, calc(100vw - 360px));
+    }
+}
+
+@media (max-width: 1024px) {
+    .window {
+        --media-viewer-w: calc(100vw - 326px);
     }
 
-    .sidebar {
-        min-height: 0;
+    .body {
+        grid-template-columns: 42% 58%;
+    }
+}
+
+@media (max-width: 767px) {
+    /* Full-width bottom sheet — the reference's mobile treatment for every
+       floating surface, which is also what stops them overlapping. */
+    .window {
+        z-index: 75;
+        top: auto;
+        right: 0;
+        bottom: 0;
+        left: var(--media-rail-w);
+        width: calc(100vw - var(--media-rail-w));
+        max-height: calc(100vh - var(--media-sp-80));
+        border-radius: var(--media-radius-14) var(--media-radius-14) 0 0;
+    }
+
+    .body {
+        display: block;
+        max-height: calc(100vh - 176px);
+        overflow-y: auto;
+    }
+
+    .preview {
+        min-height: 215px;
+        border-right: 0;
+        border-bottom: 1px solid var(--mms-border);
+    }
+
+    .fields {
+        overflow: visible;
+    }
+
+    .footer {
+        position: sticky;
+        bottom: 0;
+    }
+}
+
+@media (max-width: 430px) {
+    .titlebarMeta {
+        display: none;
+    }
+
+    .facts {
+        grid-template-columns: 1fr;
+    }
+
+    .fact {
+        border-right: 0;
+    }
+
+    .fact:nth-last-child(2) {
+        border-bottom: 1px solid var(--mms-border);
     }
 }

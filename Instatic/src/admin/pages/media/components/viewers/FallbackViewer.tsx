@@ -7,8 +7,7 @@
  * we still render something useful instead of breaking the window.
  */
 import { Button } from '@ui/components/Button'
-import { ImagesSolidIcon } from 'pixel-art-icons/icons/images-solid'
-import { ExternalLinkSolidIcon } from 'pixel-art-icons/icons/external-link-solid'
+import { FaIcon } from '@ui/components/FaIcon'
 import styles from './FallbackViewer.module.css'
 
 interface FallbackViewerProps {
@@ -20,7 +19,7 @@ interface FallbackViewerProps {
 export function FallbackViewer({ publicPath, filename, mimeType }: FallbackViewerProps) {
   return (
     <div className={styles.root}>
-      <ImagesSolidIcon size={48} />
+      <FaIcon name="file-lines" size={48} />
       <p className={styles.title}>{filename}</p>
       <p className={styles.meta}>{mimeType || 'Unknown type'}</p>
       <Button
@@ -29,7 +28,7 @@ export function FallbackViewer({ publicPath, filename, mimeType }: FallbackViewe
         onClick={() => window.open(publicPath, '_blank', 'noopener,noreferrer')}
         aria-label={`Open ${filename} in a new tab`}
       >
-        <ExternalLinkSolidIcon size={13} />
+        <FaIcon name="arrow-up-right-from-square" size={13} />
         <span>Open in new tab</span>
       </Button>
     </div>

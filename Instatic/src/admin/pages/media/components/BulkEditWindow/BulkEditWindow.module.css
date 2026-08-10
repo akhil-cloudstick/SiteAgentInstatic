@@ -1,91 +1,132 @@
+/* Transcribed from the MMSBUILD Media reference
+   (screens/media/src/styles.css → .floating-window, .bulk-window,
+   .window-titlebar, .bulk-content, .inline-field, .ghost-danger.wide).
+
+   Pinned bottom-right and 360px wide, exactly as the reference draws it. */
+
+.window {
+    position: fixed;
+    z-index: 90;
+    right: var(--media-sp-24);
+    bottom: var(--media-sp-24);
+    display: flex;
+    width: var(--media-bulk-w);
+    max-height: var(--media-viewer-max-h);
+    flex-direction: column;
+    overflow: hidden;
+    border: 1px solid var(--mms-border-strong);
+    border-radius: var(--media-radius-12);
+    background: var(--mms-surface-raised);
+    box-shadow: var(--media-shadow-window);
+    color: var(--mms-text);
+}
+
+/* `.window-titlebar` — shared with the viewer and the queue. */
+.titlebar {
+    display: flex;
+    min-height: var(--media-titlebar-h);
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--media-sp-8);
+    padding: var(--media-sp-0) var(--media-sp-8) var(--media-sp-0) var(--media-sp-17);
+    border-bottom: 1px solid var(--mms-border);
+    background: var(--mms-surface);
+    user-select: none;
+}
+
+.titlebarText {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: var(--media-sp-9);
+}
+
+.titlebarIcon {
+    flex: 0 0 auto;
+    color: var(--mms-action-strong);
+}
+
+.titlebarTitle {
+    min-width: 0;
+    overflow: hidden;
+    font-size: var(--media-text-15);
+    font-weight: var(--media-weight-strong);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.titlebarMeta {
+    flex: 0 0 auto;
+    padding-left: var(--media-sp-9);
+    border-left: 1px solid var(--mms-border);
+    color: var(--mms-text-muted);
+    font-size: var(--media-text-10);
+    white-space: nowrap;
+}
+
+/* `.bulk-content` */
+.content {
+    min-height: 0;
+    flex: 1 1 auto;
+    overflow-y: auto;
+    padding: var(--media-sp-18);
+    scrollbar-width: thin;
+}
+
 .help {
-  margin: 0 0 var(--space-s) 0;
-  font-size: var(--text-xs);
-  color: var(--text-subtle);
-  line-height: 1.4;
+    margin: var(--media-sp-0) var(--media-sp-0) var(--media-sp-14);
+    color: var(--mms-text-muted);
+    font-size: var(--media-text-12);
 }
 
-.notice {
-  margin: 0 0 var(--space-s) 0;
-  padding: var(--space-xs) var(--space-s);
-  background: var(--bg-surface-2);
-  border-radius: var(--radius-sm);
-  font-size: var(--text-xs);
-  color: var(--text-subtle);
+.field {
+    display: grid;
+    min-width: 0;
+    gap: var(--media-sp-5);
+    margin-bottom: var(--media-sp-12);
 }
 
-.section {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-xs);
-  padding-bottom: var(--space-s);
+.fieldLabel {
+    color: var(--mms-text-muted);
+    font-size: var(--media-text-10);
+    font-weight: var(--media-weight-label);
 }
 
-.sectionTitle {
-  font-size: var(--text-2xs);
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--text-subtle);
-  margin: 0;
+/* `.inline-field` — input plus a trailing action on one row. */
+.inlineField {
+    display: grid;
+    min-width: 0;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: var(--media-sp-7);
+    align-items: center;
 }
 
-.applyRow {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--space-xs);
-  padding-block: var(--space-s);
-  border-top: 1px solid var(--border);
+/* `.ghost-danger.wide` — full-width, transparent, danger ink. */
+.trashAction.trashAction {
+    width: 100%;
+    min-height: var(--media-tap);
+    justify-content: center;
+    border: 1px solid transparent;
+    border-radius: var(--media-radius-7);
+    background: transparent;
+    color: var(--mms-danger);
 }
 
-.actionsRow {
-  display: flex;
-  gap: var(--space-xs);
-  flex-wrap: wrap;
+.trashAction.trashAction:hover:not(:disabled) {
+    border-color: var(--mms-danger);
+    background: var(--mms-danger-bg);
+    color: var(--mms-danger);
 }
 
-.folderPicker {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3xs);
-}
-
-.folderPickerLabel {
-  font-size: var(--text-xs);
-  color: var(--text-subtle);
-}
-
-.folderChips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-3xs);
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.folderChip {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-3xs);
-  padding: var(--space-4xs) var(--space-3xs) var(--space-4xs) var(--space-xs);
-  background: var(--bg-surface-2);
-  border-radius: var(--radius-sm);
-  font-size: var(--text-xs);
-}
-
-.suggestions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-3xs);
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.suggestion {
-  font-size: var(--text-xs);
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-3xs);
+@media (max-width: 767px) {
+    /* Full-width bottom sheet, like every other floating surface. */
+    .window {
+        right: 0;
+        bottom: 0;
+        left: var(--media-rail-w);
+        width: calc(100vw - var(--media-rail-w));
+        max-height: calc(100vh - var(--media-sp-80));
+        border-radius: var(--media-radius-14) var(--media-radius-14) 0 0;
+    }
 }

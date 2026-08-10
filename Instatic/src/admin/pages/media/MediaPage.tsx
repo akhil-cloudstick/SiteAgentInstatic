@@ -18,8 +18,7 @@ import {
   readWorkspaceLayout,
   writeWorkspaceLayout,
 } from '@admin/state/workspaceLayoutStorage'
-import { Button } from '@ui/components/Button'
-import { UploadIcon } from 'pixel-art-icons/icons/upload'
+import { useAdminUi } from '@admin/state/adminUi'
 import { MediaSidebar, type MediaSidebarPanelId } from './components/MediaSidebar/MediaSidebar'
 import { MediaCanvas } from './components/MediaCanvas/MediaCanvas'
 import { MediaViewerWindow } from './components/MediaViewerWindow/MediaViewerWindow'
@@ -40,6 +39,8 @@ function readPersistedMediaPanel(): MediaSidebarPanelId | null {
 
 export function MediaPage() {
   const workspace = useMediaWorkspace()
+  // The reference pins a Settings action to the foot of the icon rail.
+  const openSettings = useAdminUi((s) => s.openSettings)
   // Initial value pulls from the per-workspace stored layout so the rail
   // remembers the last panel the user had open in the Media workspace.
   const [activePanel, setActivePanel] = useState<MediaSidebarPanelId | null>(
@@ -60,25 +61,39 @@ export function MediaPage() {
         asset: workspace.selectedAsset,
         tagPalette: workspace.tagPalette,
         folderById: workspace.folderById,
+        folders: workspace.folders,
         updateAsset: workspace.updateAsset,
         renameAsset: workspace.renameAsset,
         replaceAssetFile: workspace.replaceAssetFile,
         restoreAsset: workspace.restoreAsset,
         purgeAsset: workspace.purgeAsset,
+        trashAsset: workspace.trashAsset,
+        moveToFolder: (assetId: string, folderId: string | null) =>
+          workspace.moveAssetsToFolder([assetId], folderId),
       }
     : null
 
-  // Viewer and Bulk Edit visibility derive directly from the current
-  // selection — there is no independent "open" state because every close
-  // path also clears the selection ("closed" ≡ "no selection"). Deriving
-  // during render instead of syncing via an effect avoids the extra render
-  // commit (no-chain-state-updates) and the one-frame open lag.
+  // Viewer and Bulk Edit visibility is derived from the selection, but
+  // CLOSING a window must not clear the selection — dismissing the details
+  // panel and de-selecting the media are two different things.
+  //
+  // So a dismissal records the selection it applied to. The window stays
+  // hidden for exactly that selection and reopens the moment the selection
+  // changes, which keeps the derived model (no open/close effect chain)
+  // while letting the user close a window and keep working with the files
+  // they picked.
+  const selectionKey = Array.from(workspace.selectedAssetIds).sort().join(',')
+  const [dismissedSelection, setDismissedSelection] = useState<string | null>(null)
+  const dismissed = selectionKey !== '' && dismissedSelection === selectionKey
+
   //   - Viewer: a single primary selection (≤ 1 item) is showing.
   //   - Bulk Edit: a 2+ multi-selection is in flight (mutually exclusive
   //     with the viewer).
   const viewerOpen =
-    workspace.selectedAssetId !== null && workspace.selectedAssetIds.size <= 1
-  const bulkEditOpen = workspace.selectedAssetIds.size >= 2
+    !dismissed &&
+    workspace.selectedAssetId !== null &&
+    workspace.selectedAssetIds.size <= 1
+  const bulkEditOpen = !dismissed && workspace.selectedAssetIds.size >= 2
 
   // The upload queue IS genuinely stateful — it stays open after a transfer
   // completes (the user dismisses it) and the toolbar button toggles it — so
@@ -92,54 +107,47 @@ export function MediaPage() {
   }, [workspace.uploadQueue.active, uploadQueueOpen])
   /* eslint-enable react-hooks/set-state-in-effect */
 
-  const toolbarRightSlot = (
-    <Button
-      variant="ghost"
-      size="sm"
-      onClick={() => setUploadQueueOpen((open) => !open)}
-      aria-label="Toggle upload queue"
-      pressed={uploadQueueOpen}
-    >
-      <UploadIcon size={13} />
-      <span>Uploads</span>
-      {workspace.uploadQueue.active && (
-        <span aria-hidden="true" style={{ marginLeft: 4 }}>·</span>
-      )}
-    </Button>
-  )
-
   return (
     <>
       <AdminWorkspaceCanvasLayout
         workspace="media"
-        toolbarRightSlot={toolbarRightSlot}
         contentSidebar={(
           <MediaSidebar
             workspace={workspace}
             activePanel={activePanel}
             onActivePanelChange={setActivePanel}
+            onOpenSettings={() => openSettings()}
           />
         )}
-        contentCanvas={<MediaCanvas workspace={workspace} />}
+        contentCanvas={(
+          // The reference carries Upload + Upload queue in the canvas
+          // toolbar, not the app header.
+          <MediaCanvas
+            workspace={workspace}
+            onToggleUploadQueue={() => setUploadQueueOpen((open) => !open)}
+            uploadQueueOpen={uploadQueueOpen}
+          />
+        )}
         // No `contentRightPanel` — the asset inspector is a window now.
       />
 
       <MediaViewerWindow
         editor={viewerEditor}
         open={viewerOpen}
-        onClose={() => workspace.clearSelection()}
+        onClose={() => setDismissedSelection(selectionKey)}
       />
 
       <UploadQueueWindow
         queue={workspace.uploadQueue}
         open={uploadQueueOpen}
         onClose={() => setUploadQueueOpen(false)}
+        folderById={workspace.folderById}
       />
 
       <BulkEditWindow
         workspace={workspace}
         open={bulkEditOpen}
-        onClose={() => workspace.clearSelection()}
+        onClose={() => setDismissedSelection(selectionKey)}
       />
     </>
   )

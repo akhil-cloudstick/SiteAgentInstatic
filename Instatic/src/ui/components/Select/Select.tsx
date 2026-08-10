@@ -54,6 +54,13 @@ interface SelectProps extends Omit<SelectHTMLAttributes<HTMLSelectElement>, 'siz
   emphasis?: TextEmphasis
   menuMinWidth?: number
   /**
+   * Class applied to the open dropdown itself. The menu portals to
+   * `document.body`, so a workspace that restyles its controls cannot reach it
+   * through its own scope — this is the way in. Purely additive: omit it and
+   * the menu keeps the standard admin chrome.
+   */
+  menuClassName?: string
+  /**
    * Maximum height of the open dropdown in pixels. When the options exceed
    * this, the menu becomes vertically scrollable and is clamped to the
    * viewport (`min(menuMaxHeight, 100vh - 16px)`). Defaults to
@@ -121,6 +128,7 @@ export function Select({
   required,
   placeholder,
   menuMinWidth,
+  menuClassName,
   menuMaxHeight = DEFAULT_MENU_MAX_HEIGHT,
   searchable,
   searchPlaceholder = 'Search…',
@@ -391,6 +399,7 @@ export function Select({
           getAnchorRect={getAnchorRect}
           menuPlacement={menuPlacement}
           menuSizing={menuSizing}
+          menuClassName={menuClassName}
           maxHeight={menuMaxHeight}
           ariaLabel={ariaLabel}
           ariaLabelledBy={ariaLabelledBy}

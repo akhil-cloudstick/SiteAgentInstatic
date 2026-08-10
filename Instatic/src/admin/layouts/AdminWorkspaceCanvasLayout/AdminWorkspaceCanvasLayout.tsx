@@ -23,7 +23,11 @@ import { useWorkspaceLayout } from '@admin/state/workspaceLayout'
 import { useWorkspaceLayoutPersistence } from '@admin/state/useWorkspaceLayoutPersistence'
 import { Button } from '@ui/components/Button'
 import { cn } from '@ui/cn'
-import { Settings2SolidIcon } from 'pixel-art-icons/icons/settings-2-solid'
+// The approved screens draw this notch with the original pixel-art glyph, not
+// the Remix gear the shared vendor now renders. Content and Data both show it,
+// so the layout pulls from the approved set rather than each page re-declaring
+// its own notch.
+import { Settings2SolidIcon } from '@admin/pages/data/icons'
 import { canRunPluginBackgroundWork } from '@admin/access'
 import type { AdminWorkspace } from '@admin/workspace'
 import styles from '../AdminCanvasLayout/AdminCanvasLayout.module.css'
@@ -88,13 +92,15 @@ export function AdminWorkspaceCanvasLayout({
       <ConfirmDeleteProvider>
         <div
           className={styles.editorBody}
-          // Scopes the Content screen's own `--mms-*` palette and its fixed
-          // reference geometry (see the content block in globals.css). Set on
-          // the BODY rather than the shell on purpose: the shared toolbar sits
-          // outside this element and must keep the Dashboard palette, since the
-          // Content re-skin is scoped to the sidebar, canvas and settings panel.
-          // Data and Media render the same layout and are deliberately excluded.
-          data-editor-screen={workspace === 'content' ? 'content' : undefined}
+          // Scopes each workspace's own `--mms-*` palette and fixed reference
+          // geometry (see the matching blocks in globals.css). Set on the BODY
+          // rather than the shell on purpose: the shared toolbar sits outside
+          // this element and must keep the Dashboard palette, since every
+          // re-skin is scoped to the sidebar, canvas and right panel.
+          //
+          // Media joined the scoped screens with its own approved masters, so
+          // all three workspaces this layout serves are now covered.
+          data-editor-screen={workspace}
         >
           {contentSidebar ?? null}
           <div
@@ -157,7 +163,7 @@ function WorkspaceRightPanelNotch({ workspace, onOpen }: WorkspaceRightPanelNotc
           tooltip={`Open ${label} panel`}
           onClick={onOpen}
         >
-          <Settings2SolidIcon size={13} aria-hidden="true" />
+          <Settings2SolidIcon size={15} aria-hidden="true" />
         </Button>
       </div>
     </div>

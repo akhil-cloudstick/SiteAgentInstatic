@@ -12,7 +12,13 @@ import { safeParseJson } from '@core/utils/jsonValidate'
 
 const STORAGE_KEY = 'instatic-data-grid-primary-widths-v1'
 
-const PRIMARY_COLUMN_DEFAULT_WIDTH = 280
+/**
+ * The approved screen's first-column width. Narrower than the old 280 default,
+ * which — combined with the uncapped field list — was part of what pushed the
+ * ladder past the viewport. A width the user has already dragged and saved
+ * still wins over this.
+ */
+const PRIMARY_COLUMN_DEFAULT_WIDTH = 220
 const PRIMARY_COLUMN_MIN_WIDTH = 200
 const PRIMARY_COLUMN_MAX_WIDTH = 720
 

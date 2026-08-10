@@ -11,6 +11,7 @@ interface SelectMenuProps {
   getAnchorRect: () => DOMRect | null
   menuPlacement: MenuPlacement
   menuSizing: MenuSizing
+  menuClassName?: string
   maxHeight: number
   ariaLabel: string | undefined
   ariaLabelledBy: string | undefined
@@ -41,6 +42,7 @@ export function SelectMenu({
   getAnchorRect,
   menuPlacement,
   menuSizing,
+  menuClassName,
   maxHeight,
   ariaLabel,
   ariaLabelledBy,
@@ -90,6 +92,7 @@ export function SelectMenu({
       side={menuPlacement === 'left-start' ? 'left' : 'auto'}
       align="start"
       offset={6}
+      menuClassName={menuClassName}
       width={menuSizing.width}
       minWidth={menuSizing.minWidth}
       maxHeight={maxHeight}

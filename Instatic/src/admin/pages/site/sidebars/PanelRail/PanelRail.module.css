@@ -88,3 +88,36 @@
         transition: none;
     }
 }
+
+/*
+ * Data workspace — the approved screen's 44px rail (the shared default is 42px),
+ * top-aligned with the reference's own padding rather than the generic gap.
+ */
+:global([data-editor-screen='data']) .rail {
+    flex: 0 0 var(--data-rail-w);
+    width: var(--data-rail-w);
+    min-width: var(--data-rail-w);
+    gap: 0;
+    padding: var(--data-sp-16) 0 var(--data-sp-10);
+    border-right: 1px solid var(--mms-border);
+    background: var(--mms-workspace);
+}
+
+/*
+ * Data workspace — the approved screen's rail colours.
+ *
+ * The shared rail tints glyphs with a categorical accent; the reference uses
+ * the workspace ink, switching to action green for the pressed panel, and
+ * closes the rail with a hairline on its trailing edge.
+ */
+:global([data-editor-screen='data']) .railIcon {
+    color: var(--mms-text);
+}
+
+:global([data-editor-screen='data']) .railButton[aria-pressed='true'] .railIcon {
+    color: var(--mms-action-strong);
+}
+
+:global([data-editor-screen='data']) .activeIndicator {
+    background: var(--mms-action);
+}

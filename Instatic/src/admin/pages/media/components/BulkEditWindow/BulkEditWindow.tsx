@@ -1,27 +1,23 @@
 /**
- * BulkEditWindow — floating panel shown when 2+ assets are selected. Lets
- * the user batch-apply alt text, tag additions/removals, folder
- * additions/removals, and bulk trash/restore actions without losing the
- * canvas selection state.
+ * BulkEditWindow — shown when 2+ assets are selected.
  *
- * Each mutation is applied per-asset client-side via the existing single-
- * asset endpoints. The window keeps a local "operations" pending state so
- * the user composes a batch, hits "Apply", and we run them in series with
- * a small progress badge.
+ * Transcribed from the MMSBUILD Media reference (`screens/media/src/App.jsx`
+ * → `BulkWindow`). The reference's window is deliberately small: one help
+ * line, an "Add tag" field with an inline Add button, a "Move to folder"
+ * select, and a full-width "Move N items to Trash" action. Nothing else.
+ *
+ * Pinned bottom-right (`.bulk-window { right: 24px; bottom: 24px; width:
+ * 360px }`), mutually exclusive with the viewer, and dismissed by Escape or
+ * a click outside.
  */
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Button } from '@ui/components/Button'
-import { Input, Textarea } from '@ui/components/Input'
+import { FaIcon } from '@ui/components/FaIcon'
+import { Input } from '@ui/components/Input'
+import { Select } from '@ui/components/Select'
 import { canDeleteMedia, canWriteMedia } from '@admin/access'
 import { useCurrentAdminUser } from '@admin/sessionContext'
-import { CheckIcon } from 'pixel-art-icons/icons/check'
-import { TrashSolidIcon } from 'pixel-art-icons/icons/trash-solid'
-import { FolderGlyphIcon } from 'pixel-art-icons/icons/folder-glyph'
-import { CloseIcon } from 'pixel-art-icons/icons/close'
-import { ReloadIcon } from 'pixel-art-icons/icons/reload'
-import type { CmsMediaFolder } from '@core/persistence/cmsMedia'
-import { FloatingWindow } from '@admin/shared/FloatingWindow'
-import { TagEditor } from '../TagEditor/TagEditor'
 import type { UseMediaWorkspaceResult } from '../../hooks/useMediaWorkspace'
 import styles from './BulkEditWindow.module.css'
 
@@ -31,75 +27,38 @@ interface BulkEditWindowProps {
   onClose: () => void
 }
 
-interface BatchPlan {
-  altText: string | null
-  addTags: string[]
-  removeTags: string[]
-  addFolders: string[]
-  removeFolders: string[]
-}
-
-const EMPTY_PLAN: BatchPlan = {
-  altText: null,
-  addTags: [],
-  removeTags: [],
-  addFolders: [],
-  removeFolders: [],
-}
-
-function planHasChanges(plan: BatchPlan): boolean {
-  return (
-    plan.altText !== null ||
-    plan.addTags.length > 0 ||
-    plan.removeTags.length > 0 ||
-    plan.addFolders.length > 0 ||
-    plan.removeFolders.length > 0
-  )
-}
-
-// Module-level helpers — extracted so the React Compiler can compile the
-// component body (it bails on try/finally inside component/hook bodies).
-
-async function runApplyPlan(
-  plan: BatchPlan,
+// Module-level so the React Compiler can compile the component body — it
+// bails on try/finally inside a component or hook.
+async function runAddTag(
+  tag: string,
   assets: UseMediaWorkspaceResult['selectedAssets'],
   workspace: UseMediaWorkspaceResult,
   setBusy: (v: boolean) => void,
-  setProgress: (v: { done: number; total: number } | null) => void,
-  resetPlan: () => void,
+  clearTag: () => void,
 ): Promise<void> {
-  const count = assets.length
   try {
-    let done = 0
     for (const asset of assets) {
-      const patch: Parameters<typeof workspace.updateAsset>[1] = {}
-      if (plan.altText !== null && asset.mimeType.startsWith('image/')) {
-        patch.altText = plan.altText
-      }
-      if (plan.addTags.length > 0 || plan.removeTags.length > 0) {
-        const nextTags = Array.from(new Set([
-          ...asset.tags.filter((tag) => !plan.removeTags.includes(tag)),
-          ...plan.addTags,
-        ])).sort()
-        patch.tags = nextTags
-      }
-      if (Object.keys(patch).length > 0) {
-        await workspace.updateAsset(asset.id, patch)
-      }
-      if (plan.addFolders.length > 0 || plan.removeFolders.length > 0) {
-        await workspace.setAssetFolders(asset.id, {
-          add: plan.addFolders.length > 0 ? plan.addFolders : undefined,
-          remove: plan.removeFolders.length > 0 ? plan.removeFolders : undefined,
-        })
-      }
-      done += 1
-      setProgress({ done, total: count })
+      if (asset.tags.includes(tag)) continue
+      await workspace.updateAsset(asset.id, {
+        tags: [...asset.tags, tag].sort(),
+      })
     }
-    resetPlan()
+    clearTag()
   } finally {
     setBusy(false)
-    // Hold the progress badge for a beat so the user sees the completion.
-    setTimeout(() => setProgress(null), 800)
+  }
+}
+
+async function runMoveToFolder(
+  folderId: string | null,
+  assetIds: string[],
+  workspace: UseMediaWorkspaceResult,
+  setBusy: (v: boolean) => void,
+): Promise<void> {
+  try {
+    await workspace.moveAssetsToFolder(assetIds, folderId)
+  } finally {
+    setBusy(false)
   }
 }
 
@@ -107,299 +66,172 @@ async function runTrashAll(
   assets: UseMediaWorkspaceResult['selectedAssets'],
   workspace: UseMediaWorkspaceResult,
   setBusy: (v: boolean) => void,
-  setProgress: (v: { done: number; total: number } | null) => void,
 ): Promise<void> {
-  const count = assets.length
   try {
-    let done = 0
-    for (const asset of assets) {
-      await workspace.trashAsset(asset.id)
-      done += 1
-      setProgress({ done, total: count })
-    }
+    for (const asset of assets) await workspace.trashAsset(asset.id)
   } finally {
     setBusy(false)
-    setTimeout(() => setProgress(null), 800)
-  }
-}
-
-async function runRestoreAll(
-  assets: UseMediaWorkspaceResult['selectedAssets'],
-  workspace: UseMediaWorkspaceResult,
-  setBusy: (v: boolean) => void,
-  setProgress: (v: { done: number; total: number } | null) => void,
-): Promise<void> {
-  const count = assets.length
-  try {
-    let done = 0
-    for (const asset of assets) {
-      await workspace.restoreAsset(asset.id)
-      done += 1
-      setProgress({ done, total: count })
-    }
-  } finally {
-    setBusy(false)
-    setTimeout(() => setProgress(null), 800)
   }
 }
 
 export function BulkEditWindow({ workspace, open, onClose }: BulkEditWindowProps) {
   const currentUser = useCurrentAdminUser()
-  const [plan, setPlan] = useState<BatchPlan>(EMPTY_PLAN)
+  const [tag, setTag] = useState('')
   const [busy, setBusy] = useState(false)
-  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null)
+  const panelRef = useRef<HTMLElement | null>(null)
 
   const assets = workspace.selectedAssets
   const count = assets.length
-  const allImages = assets.every((a) => a.mimeType.startsWith('image/'))
   const canWrite = canWriteMedia(currentUser)
   const canDelete = canDeleteMedia(currentUser)
 
-  function resetPlan() {
-    setPlan(EMPTY_PLAN)
+  // Escape, or a click outside, closes.
+  //
+  // "Outside" deliberately EXCLUDES `data-media-surface` — the canvas and
+  // the folder sidebar. This window is derived from the selection, so a
+  // click on a tile is a selection change, not a dismissal. Without the
+  // exclusion, adding a third asset to the selection would close the window
+  // and clear everything.
+  useEffect(() => {
+    if (!open) return undefined
+    function onKey(event: KeyboardEvent) {
+      if (event.key === 'Escape') { event.preventDefault(); onClose() }
+    }
+    function onPointerDown(event: MouseEvent) {
+      const node = panelRef.current
+      if (!node) return
+      const target = event.target as HTMLElement | null
+      if (node.contains(target)) return
+      if (target?.closest('[data-media-surface]')) return
+      onClose()
+    }
+    document.addEventListener('keydown', onKey)
+    document.addEventListener('mousedown', onPointerDown)
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      document.removeEventListener('mousedown', onPointerDown)
+    }
+  }, [open, onClose])
+
+  if (!open) return null
+
+  async function addTag() {
+    const next = tag.trim().toLowerCase()
+    if (!next || !canWrite || busy) return
+    setBusy(true)
+    await runAddTag(next, assets, workspace, setBusy, () => setTag(''))
   }
 
-  async function applyPlan() {
-    if (!canWrite || !planHasChanges(plan) || busy) return
+  async function moveToFolder(value: string) {
+    if (!value || !canWrite || busy) return
     setBusy(true)
-    setProgress({ done: 0, total: count })
-    await runApplyPlan(plan, assets, workspace, setBusy, setProgress, resetPlan)
+    await runMoveToFolder(
+      value === '__root__' ? null : value,
+      assets.map((asset) => asset.id),
+      workspace,
+      setBusy,
+    )
   }
 
   async function trashAll() {
     if (!canDelete || busy) return
     setBusy(true)
-    setProgress({ done: 0, total: count })
-    await runTrashAll(assets, workspace, setBusy, setProgress)
+    await runTrashAll(assets, workspace, setBusy)
   }
 
-  async function restoreAll() {
-    if (!canWrite || busy) return
-    setBusy(true)
-    setProgress({ done: 0, total: count })
-    await runRestoreAll(assets, workspace, setBusy, setProgress)
-  }
-
-  const anyTrashed = assets.some((a) => a.deletedAt !== null)
-  const anyActive = assets.some((a) => a.deletedAt === null)
-
-  return (
-    <FloatingWindow
-      panelId="mediaBulkEdit"
-      open={open}
-      onClose={onClose}
-      title={`Bulk edit · ${count} selected`}
-      defaultPosition={{ x: 24, y: 120 }}
-      width={360}
-      maxHeight={560}
-      ariaLabel="Bulk edit selected media"
-      testId="media-bulk-edit"
+  return createPortal(
+    <section
+      ref={panelRef}
+      className={styles.window}
+      // Portals to `document.body`, outside whichever workspace opened it.
+      data-editor-screen="media"
+      role="dialog"
+      aria-label={`Bulk edit ${count} media items`}
+      data-testid="media-bulk-edit"
     >
-      <p className={styles.help}>
-        Edits apply to all <strong>{count}</strong> selected items. Tag changes are union/diff
-        — adds merge with each asset's existing tags, removes only drop matching tags.
-      </p>
+      <div className={styles.titlebar}>
+        <div className={styles.titlebarText}>
+          <span className={styles.titlebarIcon} aria-hidden="true">
+            <FaIcon name="layer-group" size={14} />
+          </span>
+          <strong className={styles.titlebarTitle}>Bulk edit</strong>
+          <span className={styles.titlebarMeta}>{count} selected</span>
+        </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          iconOnly
+          aria-label="Close bulk edit"
+          onClick={onClose}
+        >
+          <FaIcon name="xmark" size={13} />
+        </Button>
+      </div>
 
-      {!canWrite && (
-        <p className={styles.notice} role="status">
-          Media metadata and folder edits are read-only for your role.
+      <div className={styles.content}>
+        <p className={styles.help}>
+          Apply shared metadata without replacing any original files.
         </p>
-      )}
 
-      {canWrite && !allImages && (
-        <p className={styles.notice} role="status">
-          Alt text is only applied to image assets in the selection.
-        </p>
-      )}
-
-      {canWrite && (
-        <>
-          <section className={styles.section}>
-            <h3 className={styles.sectionTitle}>Alt text</h3>
-            <Textarea
-              value={plan.altText ?? ''}
-              onChange={(e) => setPlan((prev) => ({ ...prev, altText: e.target.value || null }))}
-              placeholder={plan.altText === null ? 'Leave existing alt text untouched' : ''}
-              rows={2}
-              aria-label="Bulk alt text"
+        <label className={styles.field}>
+          <span className={styles.fieldLabel}>Add tag</span>
+          <div className={styles.inlineField}>
+            <Input
+              value={tag}
+              onChange={(event) => setTag(event.target.value)}
+              disabled={!canWrite || busy}
+              placeholder="e.g. campaign"
+              aria-label="Tag to add"
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') { event.preventDefault(); void addTag() }
+              }}
             />
-            {plan.altText !== null && (
-              <Button
-                variant="ghost"
-                size="xs"
-                onClick={() => setPlan((prev) => ({ ...prev, altText: null }))}
-              >
-                Don't change
-              </Button>
-            )}
-          </section>
-
-          <section className={styles.section}>
-            <h3 className={styles.sectionTitle}>Add tags</h3>
-            <TagEditor
-              value={plan.addTags}
-              onChange={(next) => setPlan((prev) => ({ ...prev, addTags: next }))}
-              palette={workspace.tagPalette}
-              placeholder="Tags to add"
-            />
-          </section>
-
-          <section className={styles.section}>
-            <h3 className={styles.sectionTitle}>Remove tags</h3>
-            <TagEditor
-              value={plan.removeTags}
-              onChange={(next) => setPlan((prev) => ({ ...prev, removeTags: next }))}
-              palette={workspace.tagPalette}
-              placeholder="Tags to remove"
-            />
-          </section>
-
-          <section className={styles.section}>
-            <h3 className={styles.sectionTitle}>Folders</h3>
-            <FolderPicker
-              label="Add to folders"
-              selected={plan.addFolders}
-              onChange={(next) => setPlan((prev) => ({ ...prev, addFolders: next }))}
-              folders={workspace.folders}
-            />
-            <FolderPicker
-              label="Remove from folders"
-              selected={plan.removeFolders}
-              onChange={(next) => setPlan((prev) => ({ ...prev, removeFolders: next }))}
-              folders={workspace.folders}
-            />
-          </section>
-
-          <div className={styles.applyRow}>
             <Button
-              variant="ghost"
-              size="sm"
-              onClick={resetPlan}
-              disabled={busy || !planHasChanges(plan)}
+              variant="secondary"
+              size="md"
+              disabled={!tag.trim() || !canWrite || busy}
+              onClick={() => void addTag()}
             >
-              Reset
-            </Button>
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={() => void applyPlan()}
-              disabled={busy || !planHasChanges(plan)}
-            >
-              {busy && progress ? `Applying ${progress.done}/${progress.total}…` : (
-                <>
-                  <CheckIcon size={13} />
-                  <span>Apply to {count}</span>
-                </>
-              )}
+              Add
             </Button>
           </div>
-        </>
-      )}
+        </label>
 
-      {(canDelete || canWrite) && (
-        <section className={styles.section}>
-          <h3 className={styles.sectionTitle}>Actions</h3>
-          <div className={styles.actionsRow}>
-            {canDelete && anyActive && (
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={() => void trashAll()}
-                disabled={busy}
-              >
-                <TrashSolidIcon size={13} />
-                <span>Move to Trash</span>
-              </Button>
-            )}
-            {canWrite && anyTrashed && (
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => void restoreAll()}
-                disabled={busy}
-              >
-                <ReloadIcon size={13} />
-                <span>Restore</span>
-              </Button>
-            )}
-          </div>
-        </section>
-      )}
-    </FloatingWindow>
-  )
-}
+        <label className={styles.field}>
+          <span className={styles.fieldLabel}>Move to folder</span>
+          <Select
+            aria-label="Move to folder"
+            fieldSize="md"
+            disabled={!canWrite || busy}
+            value=""
+            onChange={(event) => void moveToFolder(event.target.value)}
+            options={[
+              { value: '', label: 'Choose folder', textValue: 'Choose folder' },
+              { value: '__root__', label: 'All media (root)', textValue: 'All media (root)' },
+              ...workspace.folders.map((folder) => ({
+                value: folder.id,
+                label: folder.name,
+                textValue: folder.name,
+              })),
+            ]}
+          />
+        </label>
 
-interface FolderPickerProps {
-  label: string
-  selected: string[]
-  onChange: (next: string[]) => void
-  folders: CmsMediaFolder[]
-}
-
-function FolderPicker({ label, selected, onChange, folders }: FolderPickerProps) {
-  const [draft, setDraft] = useState('')
-  const needle = draft.trim().toLowerCase()
-  const matches = folders
-    .filter((folder) => !selected.includes(folder.id))
-    .filter((folder) => !needle || folder.name.toLowerCase().includes(needle))
-    .slice(0, 6)
-
-  function pick(folder: CmsMediaFolder) {
-    onChange([...selected, folder.id])
-    setDraft('')
-  }
-
-  function remove(folderId: string) {
-    onChange(selected.filter((id) => id !== folderId))
-  }
-
-  return (
-    <div className={styles.folderPicker}>
-      <span className={styles.folderPickerLabel}>{label}</span>
-      <ul className={styles.folderChips} aria-label={label}>
-        {selected.map((id) => {
-          const folder = folders.find((f) => f.id === id)
-          if (!folder) return null
-          return (
-            <li key={id} className={styles.folderChip}>
-              <FolderGlyphIcon size={11} />
-              <span>{folder.name}</span>
-              <Button
-                variant="ghost"
-                size="xs"
-                iconOnly
-                aria-label={`Remove ${folder.name}`}
-                onClick={() => remove(id)}
-              >
-                <CloseIcon size={10} />
-              </Button>
-            </li>
-          )
-        })}
-      </ul>
-      <Input
-        value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-        placeholder="Search folders…"
-        aria-label={`Add ${label.toLowerCase()}`}
-      />
-      {matches.length > 0 && (
-        <ul className={styles.suggestions} aria-label="Matching folders">
-          {matches.map((folder) => (
-            <li key={folder.id}>
-              <Button
-                variant="ghost"
-                size="xs"
-                onClick={() => pick(folder)}
-                className={styles.suggestion}
-              >
-                <FolderGlyphIcon size={11} />
-                <span>{folder.name}</span>
-              </Button>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
+        {canDelete && (
+          <Button
+            variant="ghost"
+            size="md"
+            tone="danger"
+            className={styles.trashAction}
+            disabled={busy}
+            onClick={() => void trashAll()}
+          >
+            <FaIcon name="trash" size={12} />
+            <span>Move {count} items to Trash</span>
+          </Button>
+        )}
+      </div>
+    </section>,
+    document.body,
   )
 }

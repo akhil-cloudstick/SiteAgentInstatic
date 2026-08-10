@@ -3,17 +3,8 @@ import { createPortal } from 'react-dom'
 import {
   ContextMenu,
   ContextMenuItem,
-  ContextMenuSeparator,
 } from '@ui/components/ContextMenu'
-import { ArrowDownIcon } from 'pixel-art-icons/icons/arrow-down'
-import { ArrowUpIcon } from 'pixel-art-icons/icons/arrow-up'
-import { BoxSolidIcon } from 'pixel-art-icons/icons/box-solid'
-import { CopySolidIcon } from 'pixel-art-icons/icons/copy-solid'
-import { EditSolidIcon } from 'pixel-art-icons/icons/edit-solid'
-import { ExternalLinkSolidIcon } from 'pixel-art-icons/icons/external-link-solid'
-import { LayoutSolidIcon } from 'pixel-art-icons/icons/layout-solid'
-import { OpenSolidIcon } from 'pixel-art-icons/icons/open-solid'
-import { TrashSolidIcon } from 'pixel-art-icons/icons/trash-solid'
+import { CircleAlertSolidIcon, CopySolidIcon, ExternalLinkSolidIcon, LayoutSolidIcon, OpenSolidIcon, SaveSolidIcon, TrashSolidIcon, UploadIcon } from '@admin/pages/data/icons'
 import type { DataRow, DataRowStatus, DataTable } from '@core/data/schemas'
 
 interface DataRowContextMenuProps {
@@ -152,13 +143,16 @@ export function DataRowContextMenu({
         </ContextMenuItem>
       )}
 
-      {primaryAction?.label !== 'Open row' && (
+      {/* The approved screen's menu opens straight onto the row's primary
+          action — there is no separate "Inspect row" entry, because clicking
+          the row already opens the inspector. */}
+      {primaryAction === null && (
         <ContextMenuItem
-          ref={primaryAction === null ? firstItemRef : undefined}
+          ref={firstItemRef}
           onClick={() => runAndClose(onInspectRow)}
         >
-          <span aria-hidden="true"><EditSolidIcon size={13} /></span>
-          Inspect row
+          <span aria-hidden="true"><ExternalLinkSolidIcon size={14} /></span>
+          Inspect record
         </ContextMenuItem>
       )}
 
@@ -173,44 +167,43 @@ export function DataRowContextMenu({
         </ContextMenuItem>
       )}
 
-      {publishable && (
-        <>
-          <ContextMenuSeparator />
-          <ContextMenuItem
-            disabled={row.status === 'published'}
-            onClick={() => {
-              void setRowStatusFromMenu(row.id, 'published', onSetRowStatus, onClose)
-            }}
-          >
-            <span aria-hidden="true"><ArrowUpIcon size={13} /></span>
-            Publish
-          </ContextMenuItem>
-          <ContextMenuItem
-            disabled={row.status === 'draft'}
-            onClick={() => {
-              void setRowStatusFromMenu(row.id, 'draft', onSetRowStatus, onClose)
-            }}
-          >
-            <span aria-hidden="true"><EditSolidIcon size={13} /></span>
-            Move to draft
-          </ContextMenuItem>
-          <ContextMenuItem
-            disabled={row.status === 'unpublished'}
-            onClick={() => {
-              void setRowStatusFromMenu(row.id, 'unpublished', onSetRowStatus, onClose)
-            }}
-          >
-            <span aria-hidden="true"><BoxSolidIcon size={13} /></span>
-            Archive
-          </ContextMenuItem>
-        </>
+      {/* Status transitions. The approved screen HIDES the transition a row is
+          already in rather than showing it disabled, so the menu only ever
+          offers moves that would actually change something. */}
+      {publishable && row.status !== 'published' && (
+        <ContextMenuItem
+          onClick={() => {
+            void setRowStatusFromMenu(row.id, 'published', onSetRowStatus, onClose)
+          }}
+        >
+          <span aria-hidden="true"><UploadIcon size={14} /></span>
+          Publish
+        </ContextMenuItem>
       )}
-
-      {(onExportRows != null || onDeleteRow != null) && <ContextMenuSeparator />}
+      {publishable && row.status !== 'draft' && (
+        <ContextMenuItem
+          onClick={() => {
+            void setRowStatusFromMenu(row.id, 'draft', onSetRowStatus, onClose)
+          }}
+        >
+          <span aria-hidden="true"><SaveSolidIcon size={14} /></span>
+          Move to draft
+        </ContextMenuItem>
+      )}
+      {publishable && row.status === 'published' && (
+        <ContextMenuItem
+          onClick={() => {
+            void setRowStatusFromMenu(row.id, 'unpublished', onSetRowStatus, onClose)
+          }}
+        >
+          <span aria-hidden="true"><CircleAlertSolidIcon size={14} /></span>
+          Unpublish
+        </ContextMenuItem>
+      )}
 
       {onExportRows != null && (
         <ContextMenuItem onClick={() => runAndClose(() => onExportRows([row.id]))}>
-          <span aria-hidden="true"><ArrowDownIcon size={13} /></span>
+          <span aria-hidden="true"><UploadIcon size={14} /></span>
           Export row
         </ContextMenuItem>
       )}

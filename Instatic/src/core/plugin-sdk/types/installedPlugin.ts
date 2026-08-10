@@ -85,7 +85,27 @@ export interface PluginAdminPageRoute extends Omit<PluginAdminPage, 'route'> {
 // Admin payload — sent to the admin shell to render the Plugins workspace
 // ---------------------------------------------------------------------------
 
+/**
+ * A package uploaded and inspected but NOT yet approved. Nothing about it is
+ * active — no code runs and no permission is granted until an operator approves
+ * it through the install endpoint. It exists so "an update is waiting for this
+ * plugin" survives a page refresh and is visible to whoever can approve it,
+ * rather than living only in the uploader's tab.
+ */
+export interface StagedPluginPackage {
+  pluginId: string
+  fileName: string
+  fileSize: number
+  storagePath: string
+  manifest: PluginManifest
+  /** Version installed when the package was staged, if the plugin exists. */
+  fromVersion: string | null
+  uploadedBy: string | null
+  uploadedAt: string
+}
+
 export interface CmsPluginsPayload {
   plugins: InstalledPlugin[]
   adminPages: PluginAdminPageRoute[]
+  stagedPackages: StagedPluginPackage[]
 }

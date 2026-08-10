@@ -178,3 +178,40 @@
     border-color: var(--mms-action);
     background: var(--mms-surface-raised);
 }
+
+/* ── Plugins screen ──────────────────────────────────────────────────────
+ * The approved Plugins screen draws a select as a plain 44px bordered box:
+ * `--mms-border-strong` hairline, 7px corners, raised face. Focus is carried
+ * by the border alone — the generic `--focus-ring` glow the open state adds
+ * stacked a second ring around a control that was already ringed, which read
+ * as a rendering fault rather than an affordance.
+ */
+:global([data-editor-screen='plugins']) .select {
+    min-height: 44px;
+    padding: 9px 11px;
+    border: 1px solid var(--mms-border-strong);
+    border-radius: 7px;
+    background: var(--mms-surface-raised);
+    color: var(--mms-text);
+    font-family: var(--font-mms);
+    font-size: 13px;
+}
+
+:global([data-editor-screen='plugins']) .select.size-xs,
+:global([data-editor-screen='plugins']) .select.size-sm,
+:global([data-editor-screen='plugins']) .select.size-md {
+    min-height: 44px;
+    padding: 9px 11px;
+    font-size: 13px;
+}
+
+:global([data-editor-screen='plugins']) .select:hover {
+    border-color: var(--mms-border-strong);
+}
+
+:global([data-editor-screen='plugins']) .select:focus-within,
+:global([data-editor-screen='plugins']) .select[data-open="true"] {
+    border-color: var(--mms-action);
+    background: var(--mms-surface-raised);
+    box-shadow: none;
+}

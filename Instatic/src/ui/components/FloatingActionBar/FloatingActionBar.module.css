@@ -39,6 +39,33 @@
     animation: slideIn 180ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+/*
+ * Data workspace — the approved Data Workbench screen floats its bulk-action
+ * bar clear of the 70px grid footer at 82px.
+ *
+ * Additive and scoped to an ancestor attribute that only the Data workspace
+ * body carries, so no other screen using this primitive is affected. (The bar
+ * is `position: fixed`, but fixed positioning does not change DOM ancestry, so
+ * the descendant selector still matches.)
+ */
+:global([data-editor-screen='data']) .bar {
+    bottom: var(--data-sp-82);
+    border-radius: var(--data-radius-9);
+    background: var(--mms-surface-raised);
+    box-shadow: var(--data-shadow-menu);
+}
+
+/*
+ * Below 620px the global toast goes full-bleed along the bottom edge. Lift the
+ * bar clear of that band so a toast fired while rows are selected can never
+ * sit on top of the bulk actions (plan hazard H4).
+ */
+@media (max-width: 620px) {
+    :global([data-editor-screen='data']) .bar {
+        bottom: var(--data-sp-140);
+    }
+}
+
 @keyframes slideIn {
     from {
         transform: translate(-50%, 16px);

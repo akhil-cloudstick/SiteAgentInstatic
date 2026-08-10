@@ -262,3 +262,83 @@
 :global([data-editor-screen='site']) .sectionContent .sectionContent {
     padding: 0 0 11px;
 }
+
+/* ===========================================================================
+ * Data workspace — the approved MMSBUILD Data Workbench `.disclosure`.
+ *
+ * The reference draws each inspector group as a bordered 7px card on the
+ * surface tone with a 48px trigger row, rather than the admin's flush
+ * accordion. Additive and scoped to an ancestor attribute that only the Data
+ * workspace body carries, so every other consumer of this primitive is
+ * untouched.
+ * =========================================================================== */
+:global([data-editor-screen='data']) .section {
+    margin-top: var(--data-sp-14);
+    border: 1px solid var(--mms-border);
+    border-radius: var(--data-radius-7);
+    background: var(--mms-surface);
+    overflow: hidden;
+}
+
+:global([data-editor-screen='data']) .sectionToggle {
+    min-height: var(--data-sp-48);
+    padding: 0 var(--data-sp-12);
+    font-size: var(--data-text-12);
+    font-weight: var(--data-weight-680);
+    text-align: left;
+}
+
+:global([data-editor-screen='data']) .sectionIcon {
+    color: var(--mms-text);
+}
+
+/*
+ * Data workspace — the approved screen's disclosure header is flat.
+ *
+ * The generic header paints its own surface, which made each card read as two
+ * stacked tones. The reference draws one continuous face with only the trigger
+ * row's hairline separating header from body.
+ */
+:global([data-editor-screen='data']) .sectionHeader {
+    background: transparent;
+}
+
+:global([data-editor-screen='data']) .sectionToggle {
+    background: transparent;
+}
+
+:global([data-editor-screen='data']) .sectionOpen .sectionHeader {
+    border-bottom: 1px solid var(--mms-border);
+}
+
+/*
+ * Data workspace — disclosure caret.
+ *
+ * The approved screen marks each section as expandable with a chevron that
+ * flips on open. Drawn as a rotated border box on `::after` rather than added
+ * to the primitive's markup, so no other consumer of Section gains an arrow.
+ * `aria-expanded` already carries the state, so no extra wiring is needed.
+ */
+:global([data-editor-screen='data']) .sectionToggle::after {
+    content: "";
+    width: 7px;
+    height: 7px;
+    margin-left: auto;
+    border-right: 1.5px solid currentColor;
+    border-bottom: 1.5px solid currentColor;
+    /* Pointing down when collapsed. */
+    transform: rotate(45deg) translate(-2px, -2px);
+    transition: transform 140ms ease;
+    opacity: 0.7;
+}
+
+:global([data-editor-screen='data']) .sectionToggle[aria-expanded="true"]::after {
+    /* Flipped to point up when open. */
+    transform: rotate(225deg) translate(-2px, -2px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    :global([data-editor-screen='data']) .sectionToggle::after {
+        transition: none;
+    }
+}

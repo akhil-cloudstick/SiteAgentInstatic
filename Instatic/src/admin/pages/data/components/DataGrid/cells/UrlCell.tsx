@@ -1,7 +1,7 @@
 import type { ReactElement } from 'react'
 import { Input } from '@ui/components/Input'
 import { Button } from '@ui/components/Button'
-import { ExternalLinkSolidIcon } from 'pixel-art-icons/icons/external-link-solid'
+import { ExternalLinkSolidIcon } from '@admin/pages/data/icons'
 import { readStringCell } from '@core/data/cells'
 import type { CellEditorProps } from '@admin/pages/data/types'
 import type { DataField } from '@core/data/schemas'

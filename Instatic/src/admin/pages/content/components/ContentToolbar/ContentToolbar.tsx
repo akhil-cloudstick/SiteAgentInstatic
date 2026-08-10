@@ -1,11 +1,11 @@
 import { useState } from 'react'
+import { UploadIcon } from '@admin/pages/data/icons'
 import { CalendarSolidIcon } from 'pixel-art-icons/icons/calendar-solid'
 import { CheckIcon } from 'pixel-art-icons/icons/check'
 import { CircleAlertSolidIcon } from 'pixel-art-icons/icons/circle-alert-solid'
 import { ExternalLinkSolidIcon } from 'pixel-art-icons/icons/external-link-solid'
 import { LoaderIcon } from 'pixel-art-icons/icons/loader'
 import { SaveSolidIcon } from 'pixel-art-icons/icons/save-solid'
-import { SendSolidIcon } from 'pixel-art-icons/icons/send-solid'
 import type { IconComponent } from 'pixel-art-icons/types'
 import type { DataTable, DataRow } from '@core/data/schemas'
 import { Button } from '@ui/components/Button'
@@ -117,7 +117,7 @@ function derivePublishIcon(args: {
   return saveMessage === 'publishing' ? LoaderIcon
     : isCleanPublished ? CheckIcon
     : saveMessage === 'error' ? CircleAlertSolidIcon
-    : SendSolidIcon
+    : UploadIcon
 }
 
 function derivePublishState(args: {

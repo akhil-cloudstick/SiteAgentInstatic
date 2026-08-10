@@ -5,9 +5,7 @@ import {
   ContextMenuItem,
   ContextMenuSeparator,
 } from '@ui/components/ContextMenu'
-import { DatabaseSolidIcon } from 'pixel-art-icons/icons/database-solid'
-import { Settings2SolidIcon } from 'pixel-art-icons/icons/settings-2-solid'
-import { TrashSolidIcon } from 'pixel-art-icons/icons/trash-solid'
+import { DatabaseSolidIcon, Settings2SolidIcon, TrashSolidIcon } from '@admin/pages/data/icons'
 import type { DataTableListItem } from '@core/data/schemas'
 
 interface DataTableContextMenuProps {

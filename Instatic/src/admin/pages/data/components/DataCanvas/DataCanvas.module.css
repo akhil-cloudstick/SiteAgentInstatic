@@ -25,3 +25,16 @@
     justify-content: center;
 }
 
+
+/*
+ * One continuous workspace surface.
+ *
+ * The shared canvas paints `--bg-surface-2` (a raised card tone) and the stage
+ * behind it paints the neutral canvas gutter. In dark mode that made the grid
+ * read as a lighter slab sitting on the workspace. The approved screen has no
+ * separate surface here at all — the grid region is the SAME colour as the
+ * tables panel beside it, which is why no seam is visible in the mock.
+ */
+.canvas {
+    background: var(--mms-workspace);
+}

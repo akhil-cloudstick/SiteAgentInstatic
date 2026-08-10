@@ -36,6 +36,24 @@ export interface MediaFilters {
 const VIDEO_PREFIX = 'video/'
 const IMAGE_PREFIX = 'image/'
 
+/**
+ * Short uppercase type label — `JPG`, `SVG`, `MP4`. Derived from the real
+ * MIME type, never from the filename, so a mislabelled extension can't lie
+ * about what the file actually is.
+ *
+ * Lives here rather than beside the canvas items because a module that
+ * exports components may not also export helpers (react-refresh).
+ */
+export function assetTypeLabel(mimeType: string): string {
+  if (isSvgMime(mimeType)) return 'SVG'
+  const subtype = mimeType.split('/')[1] ?? ''
+  const normalized = subtype.split('+')[0].replace(/^x-/, '')
+  if (!normalized) return 'FILE'
+  if (normalized === 'jpeg') return 'JPG'
+  if (normalized === 'quicktime') return 'MOV'
+  return normalized.slice(0, 4).toUpperCase()
+}
+
 export function bucketForMime(mimeType: string): 'image' | 'video' | 'other' {
   if (mimeType.startsWith(IMAGE_PREFIX)) return 'image'
   if (mimeType.startsWith(VIDEO_PREFIX)) return 'video'

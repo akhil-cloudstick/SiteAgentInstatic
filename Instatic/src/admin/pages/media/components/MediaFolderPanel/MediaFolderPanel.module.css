@@ -1,44 +1,170 @@
-/* Layout chrome only — actual tree row visuals come from the shared
-   Tree primitives so density / hover / selection / focus all stay in
-   lockstep with the rest of the editor trees. */
+/* Transcribed from the MMSBUILD Media reference
+   (screens/media/src/styles.css → .folder-section, .section-label,
+   .folder-row, .smart-folders, .permission-note).
+
+   The reference draws these as plain rows, not editor tree rows — so this
+   module owns the row visuals outright rather than overriding the shared
+   Tree primitive. */
 
 .root {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4xs);
-  padding: var(--space-xs);
+    display: flex;
+    min-width: 0;
+    flex: 1;
+    flex-direction: column;
 }
 
-.tree {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-px);
+/* `.permission-note` */
+.permissionNote {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--media-sp-6);
+    margin: var(--media-sp-12) var(--media-sp-0) var(--media-sp-0);
+    padding: var(--media-sp-10) var(--media-sp-12);
+    border: 1px solid var(--mms-border);
+    border-radius: var(--media-radius-7);
+    background: var(--mms-surface-tint);
+    color: var(--mms-text-muted);
+    font-size: var(--media-text-11);
+}
+
+/* `.folder-section` — blocks separated by a hairline, not by a gap. */
+.section {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    padding: var(--media-sp-13) var(--media-sp-0);
+    border-top: 1px solid var(--mms-border);
+}
+
+/* `.smart-folders` */
+.sectionLast {
+    padding-bottom: var(--media-sp-40);
 }
 
 .sectionHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: var(--space-xs) var(--space-s) var(--space-4xs) var(--space-s);
-  margin-top: var(--space-xs);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--media-sp-8);
 }
 
+/* `.section-label` */
 .sectionLabel {
-  font-size: var(--text-2xs);
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--text-subtle);
+    margin: var(--media-sp-0) var(--media-sp-0) var(--media-sp-5);
+    overflow: hidden;
+    color: var(--mms-text-muted);
+    font-size: var(--media-text-10);
+    font-weight: var(--media-weight-eyebrow);
+    letter-spacing: 0.1em;
+    text-overflow: ellipsis;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+/* `.folder-row` — the reference's row, verbatim. Doubled selector so it
+   beats the Button primitive's ghost face. */
+.folderRow.folderRow {
+    display: flex;
+    width: 100%;
+    min-width: 0;
+    min-height: var(--media-tap);
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--media-sp-8);
+    padding: var(--media-sp-0) var(--media-sp-10);
+    border: 1px solid transparent;
+    border-radius: var(--media-radius-7);
+    background: transparent;
+    color: var(--mms-text);
+    font-size: var(--media-text-13);
+    font-weight: var(--media-weight-body);
+    text-align: left;
+}
+
+.folderRow.folderRow:hover:not(:disabled) {
+    background: var(--mms-surface-tint);
+    color: var(--mms-text);
+}
+
+/* `.folder-row.active` */
+.folderRow.folderRowActive {
+    border-color: var(--mms-border);
+    background: var(--mms-surface-green);
+    color: var(--mms-action-strong);
+    font-weight: var(--media-weight-strong);
+}
+
+/* `.folder-row span` — icon + label lockup. */
+.rowLabel {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: var(--media-sp-10);
+}
+
+.rowLabelText {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* `.folder-row span i` — a fixed 16px gutter so every label starts on the
+   same x, whatever the glyph's natural width. */
+.rowIcon {
+    display: inline-grid;
+    width: var(--media-sp-16);
+    flex: 0 0 var(--media-sp-16);
+    place-items: center;
+    color: var(--mms-text-muted);
+}
+
+.folderRowActive .rowIcon {
+    color: var(--mms-action-strong);
+}
+
+/* `.folder-row b` — the count. */
+.rowCount {
+    min-width: var(--media-sp-25);
+    flex: 0 0 auto;
+    color: var(--mms-text-muted);
+    font-size: var(--media-text-11);
+    font-weight: var(--media-weight-meta);
+    text-align: right;
+}
+
+/* `.folder-row > i` — the smart-folder chevron. */
+.rowChevron {
+    flex: 0 0 auto;
+    color: var(--mms-text-muted);
+}
+
+/* Nesting is real here even though the reference's sample folders are flat;
+   the indent is applied through a custom property the row reads back. */
+.folderRowNested.folderRowNested {
+    padding-left: calc(var(--media-sp-10) + var(--media-row-indent));
+}
+
+.dropActive.dropActive {
+    border-color: var(--mms-action);
+    background: var(--mms-surface-green);
 }
 
 .createRow {
-  display: flex;
-  align-items: center;
-  gap: var(--space-xs);
-  padding-right: var(--space-s);
-  padding-block: var(--space-3xs);
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: var(--media-sp-8);
+    padding: var(--media-sp-4) var(--media-sp-10);
 }
 
 .createRow > :last-child {
-  flex: 1 1 auto;
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.emptyNote {
+    margin: var(--media-sp-4) var(--media-sp-10);
+    color: var(--mms-text-muted);
+    font-size: var(--media-text-11);
 }

@@ -42,3 +42,35 @@
     gap: var(--space-4xs);
     flex-shrink: 0;
 }
+
+/*
+ * Data workspace — the approved screen's `.panel-header`.
+ *
+ * The generic header is a 36px bar with 11px/700 type; the reference draws a
+ * 64px band with a 15px/740 title, a 9px icon gap and a hairline underneath.
+ * Additive and scoped to an ancestor only the Data workspace body carries.
+ */
+:global([data-editor-screen='data']) .header {
+    height: var(--data-panel-header-h);
+    padding-left: var(--data-sp-18);
+    padding-right: var(--data-sp-10);
+    gap: var(--data-sp-9);
+    border-bottom: 1px solid var(--mms-border);
+}
+
+:global([data-editor-screen='data']) .title {
+    gap: var(--data-sp-9);
+    font-size: var(--data-text-15);
+    font-weight: var(--data-weight-740);
+    color: var(--mms-text);
+}
+
+/* The reference tints the panel's leading glyph with the action green. */
+:global([data-editor-screen='data']) .title svg,
+:global([data-editor-screen='data']) .title i {
+    color: var(--mms-action-strong);
+}
+
+:global([data-editor-screen='data']) .actions {
+    gap: var(--data-sp-2);
+}

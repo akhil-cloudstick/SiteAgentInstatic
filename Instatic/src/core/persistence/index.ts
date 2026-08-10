@@ -24,11 +24,13 @@ export {
 } from './cmsData'
 
 export {
+  discardCmsPluginStagedPackage,
   inspectCmsPluginPackage,
   installCmsPluginPackage,
   installCmsPluginManifest,
   installCmsPluginPack,
   listCmsPlugins,
+  stageCmsPluginPackage,
   listCmsPluginSchedules,
   getCmsPluginSettings,
   pauseCmsPluginSchedule,

@@ -1,7 +1,7 @@
 import type { ReactElement } from 'react'
 import type { DataTable, DataRow, DataRowCells, UpdateDataTableInput } from '@core/data/schemas'
 import { PanelHeader } from '@admin/shared/PanelHeader'
-import { Settings2SolidIcon } from 'pixel-art-icons/icons/settings-2-solid'
+import { Settings2SolidIcon } from '@admin/pages/data/icons'
 import { useWorkspaceLayout } from '@admin/state/workspaceLayout'
 import { cn } from '@ui/cn'
 import propertiesStyles from '@admin/pages/site/panels/PropertiesPanel/PropertiesPanel.module.css'

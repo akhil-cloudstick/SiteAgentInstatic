@@ -3,10 +3,7 @@ import { Button } from '@ui/components/Button'
 import { Input } from '@ui/components/Input'
 import { Select } from '@ui/components/Select'
 import { Switch } from '@ui/components/Switch'
-import { PlusIcon } from 'pixel-art-icons/icons/plus'
-import { TrashSolidIcon } from 'pixel-art-icons/icons/trash-solid'
-import { ArrowUpIcon } from 'pixel-art-icons/icons/arrow-up'
-import { ArrowDownIcon } from 'pixel-art-icons/icons/arrow-down'
+import { ArrowDownIcon, ArrowUpIcon, PlusIcon, TrashSolidIcon } from '@admin/pages/data/icons'
 import type {
   DataFieldType,
   RepeaterItemField,

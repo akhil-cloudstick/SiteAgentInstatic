@@ -79,3 +79,18 @@
     font-size: var(--text-m);
     font-weight: 700;
 }
+
+/*
+ * `+ New field` — full-width outlined action at the FOOT of the schema list,
+ * where the approved screen puts it. Lives here rather than in
+ * DataInspector.module.css because this is the stylesheet the composer imports;
+ * a class defined in the other module would resolve to `undefined` at runtime.
+ */
+.newFieldAction {
+    min-height: var(--data-tap);
+    margin-top: var(--data-sp-12);
+    gap: var(--data-sp-8);
+    border-radius: var(--data-radius-6);
+    font-size: var(--data-text-12);
+    font-weight: var(--data-weight-650);
+}

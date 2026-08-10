@@ -1156,4 +1156,33 @@ export const pgMigrations: Migration[] = [
         on media_assets (content_hash);
     `,
   },
+  {
+    id: '024_plugin_staged_packages',
+    sql: `
+      -- A package that has been uploaded and inspected but NOT yet approved.
+      --
+      -- Uploading is one operator's act; approving is a deliberate second one
+      -- that may need a step-up, a colleague, or a maintenance window. Holding
+      -- the opened package only in browser memory meant a refresh — or handing
+      -- the tab to someone with the capability — silently discarded it, and the
+      -- recovery screen could never show "an update is waiting for this
+      -- plugin". This table is that waiting state.
+      --
+      -- No FK to installed_plugins: a staged package for a FRESH install has no
+      -- plugin row to reference yet. Uninstall sweeps the row explicitly.
+      create table if not exists plugin_staged_packages (
+        plugin_id text primary key,
+        file_name text not null,
+        file_size integer not null,
+        storage_path text not null,
+        manifest_json jsonb not null,
+        from_version text,
+        uploaded_by text,
+        uploaded_at timestamptz not null default now()
+      );
+
+      create index if not exists plugin_staged_packages_uploaded_idx
+        on plugin_staged_packages (uploaded_at desc);
+    `,
+  },
 ]

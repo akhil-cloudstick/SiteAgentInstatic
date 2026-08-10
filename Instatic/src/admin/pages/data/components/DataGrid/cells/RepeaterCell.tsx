@@ -1,13 +1,7 @@
 import { useState, type ReactElement } from 'react'
 import { nanoid } from 'nanoid'
 import { Button } from '@ui/components/Button'
-import { ArrowUpIcon } from 'pixel-art-icons/icons/arrow-up'
-import { ArrowDownIcon } from 'pixel-art-icons/icons/arrow-down'
-import { CopySolidIcon } from 'pixel-art-icons/icons/copy-solid'
-import { ChevronDownIcon } from 'pixel-art-icons/icons/chevron-down'
-import { ChevronUpIcon } from 'pixel-art-icons/icons/chevron-up'
-import { PlusIcon } from 'pixel-art-icons/icons/plus'
-import { TrashSolidIcon } from 'pixel-art-icons/icons/trash-solid'
+import { ArrowDownIcon, ArrowUpIcon, ChevronDownIcon, ChevronUpIcon, CopySolidIcon, PlusIcon, TrashSolidIcon } from '@admin/pages/data/icons'
 import { readRepeaterCell } from '@core/data/cells'
 import type {
   DataField,

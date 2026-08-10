@@ -11,7 +11,7 @@
  * all three kinds.
  */
 import type { ReactNode } from 'react'
-import { DatabaseSolidIcon } from 'pixel-art-icons/icons/database-solid'
+import { DatabaseSolidIcon } from '@admin/pages/data/icons'
 import { EmptyState } from '@ui/components/EmptyState'
 import { DataGrid } from '../DataGrid/DataGrid'
 import { DataGridSkeleton } from '../DataGrid/DataGridSkeleton'

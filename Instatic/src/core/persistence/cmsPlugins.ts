@@ -24,6 +24,7 @@ const PluginsListEnvelope = Type.Object(
   {
     plugins: Type.Optional(Type.Array(Type.Unknown())),
     adminPages: Type.Optional(Type.Array(Type.Unknown())),
+    stagedPackages: Type.Optional(Type.Array(Type.Unknown())),
   },
   { additionalProperties: true },
 )
@@ -55,7 +56,47 @@ function emptyPayload(body: Partial<CmsPluginsPayload>): CmsPluginsPayload {
   return {
     plugins: Array.isArray(body.plugins) ? body.plugins : [],
     adminPages: Array.isArray(body.adminPages) ? body.adminPages : [],
+    // Older servers (and every mutation response) omit the key entirely; an
+    // absent list means "nothing is waiting", not "unknown".
+    stagedPackages: Array.isArray(body.stagedPackages) ? body.stagedPackages : [],
   }
+}
+
+/**
+ * Park an inspected package on the host without installing it. Approval still
+ * goes through `installCmsPluginPackage`, which carries its own step-up — this
+ * only records that a package is waiting, so the state survives a refresh and
+ * is visible to whoever holds the capability to approve it.
+ */
+export async function stageCmsPluginPackage(
+  pluginId: string,
+  file: File,
+  fetchImpl: FetchLike = globalThis.fetch.bind(globalThis),
+  basePath = '/cms/api/cms',
+): Promise<void> {
+  const form = new FormData()
+  form.append('file', file)
+  await apiRequest(`${basePath}/plugins/${encodeURIComponent(pluginId)}/staged`, {
+    method: 'POST',
+    body: form,
+    schema: Type.Object({}, { additionalProperties: true }),
+    fetchImpl,
+    fallbackMessage: 'Could not stage plugin package',
+  })
+}
+
+/** Discard a parked package. Idempotent — discarding nothing succeeds. */
+export async function discardCmsPluginStagedPackage(
+  pluginId: string,
+  fetchImpl: FetchLike = globalThis.fetch.bind(globalThis),
+  basePath = '/cms/api/cms',
+): Promise<void> {
+  await apiRequest(`${basePath}/plugins/${encodeURIComponent(pluginId)}/staged`, {
+    method: 'DELETE',
+    schema: Type.Object({}, { additionalProperties: true }),
+    fetchImpl,
+    fallbackMessage: 'Could not discard staged package',
+  })
 }
 
 export async function listCmsPlugins(

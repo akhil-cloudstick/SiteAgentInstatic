@@ -29,6 +29,8 @@ import {
 } from '@core/persistence'
 import { StepUpCancelledMessage, useStepUp } from '@admin/shared/StepUp'
 import { pluginAdminUi } from '../PluginAdminUi'
+import { pluginDialogScopeRef } from '../pluginDialogScope'
+import dialogStyles from '../pluginDialog.module.css'
 import styles from './PluginSchedulesDialog.module.css'
 import { getErrorMessage } from '@core/utils/errorMessage'
 
@@ -94,12 +96,21 @@ export function PluginSchedulesDialog({
   return (
     <Dialog
       open
+      ref={pluginDialogScopeRef}
       onClose={onClose}
-      eyebrow="Scheduled jobs"
-      title={pluginName}
-      size="lg"
+      eyebrow="cms.schedule"
+      title={`${pluginName} schedules`}
       loading={loading}
+      className={dialogStyles.dialog}
+      bodyClassName={dialogStyles.body}
+      footerClassName={dialogStyles.footer}
     >
+      {!loading && data && data.schedules.length > 0 && (
+        <p className={dialogStyles.lead}>
+          Schedules appear only for plugins granted <code>cms.schedule</code>.
+        </p>
+      )}
+
       {error && (
         <pluginAdminUi.Alert tone="danger" title="Could not load schedules">
           {error}

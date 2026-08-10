@@ -2,13 +2,13 @@ import { useState, type ReactElement } from 'react'
 import { Button } from '@ui/components/Button'
 import { Input } from '@ui/components/Input'
 import { Section } from '@ui/components/Section'
+import { Select } from '@ui/components/Select'
 import { ControlRow } from '@ui/components/ControlRow'
 import sectionStyles from '@ui/components/Section/Section.module.css'
-import { Settings2SolidIcon } from 'pixel-art-icons/icons/settings-2-solid'
-import { TrashSolidIcon } from 'pixel-art-icons/icons/trash-solid'
+import { FileTextSolidIcon, Settings2SolidIcon, TrashSolidIcon } from '@admin/pages/data/icons'
 import { useConfirmDelete } from '@admin/shared/dialogs/ConfirmDeleteDialog'
 import { StepUpCancelledMessage } from '@admin/shared/StepUp'
-import type { DataTable, DataRow, UpdateDataTableInput } from '@core/data/schemas'
+import type { DataField, DataTable, DataRow, UpdateDataTableInput } from '@core/data/schemas'
 import { FieldsSection } from './FieldsSection'
 import styles from './DataInspector.module.css'
 import { getErrorMessage } from '@core/utils/errorMessage'
@@ -115,6 +115,17 @@ function tableToDraft(table: DataTable): SettingsDraft {
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
+
+/**
+ * Types that cannot serve as a row's display name — page trees and component
+ * param schemas are documents, and a repeater is a collection. The approved
+ * screen omits all three from the primary-field select.
+ */
+const NON_PRIMARY_FIELD_TYPES: ReadonlySet<DataField['type']> = new Set([
+  'pageTree',
+  'fieldSchema',
+  'repeater',
+])
 
 export function TableSettings({
   table,
@@ -256,6 +267,40 @@ export function TableSettings({
         </div>
       </Section>
       )}
+
+      {/*
+        * ── Display ──
+        * The approved screen surfaces the primary field as a select here, not
+        * only as the star toggle inside the field list. Changing it re-titles
+        * every row in the grid and every relation picker that points at this
+        * table, so it belongs somewhere you can see the current value without
+        * scanning the schema.
+        *
+        * Structural and repeater fields are excluded: they have no single
+        * display value to stand in as a row title.
+        */}
+      <Section title="Display" icon={FileTextSolidIcon} defaultOpen>
+        <div className={sectionStyles.sectionBody}>
+          <div className={styles.formGroup}>
+            <label className={styles.label} htmlFor="primary-field">Primary field</label>
+            <Select
+              id="primary-field"
+              value={draft.primaryFieldId}
+              disabled={!canEdit}
+              onChange={(event) => { void handlePrimaryFieldChange(event.target.value) }}
+            >
+              {table.fields
+                .filter((field) => !NON_PRIMARY_FIELD_TYPES.has(field.type))
+                .map((field) => (
+                  <option key={field.id} value={field.id}>{field.label}</option>
+                ))}
+            </Select>
+            <p className={styles.caption}>
+              Used as the row display name in grids and relation pickers.
+            </p>
+          </div>
+        </div>
+      </Section>
 
       {/* ── Fields ── */}
       <FieldsSection

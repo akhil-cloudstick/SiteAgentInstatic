@@ -1,13 +1,39 @@
-/* Plugins page body — laid out by AdminPageLayout so this just adds the
-   gap rhythm between the permission-review banner, the list, and the
-   eventual modals. The layout provides the scroll container, max-width,
-   padding, and page header. */
-.pluginsBody {
-    display: grid;
-    gap: var(--space-3xl);
+/* Plugins lifecycle workspace — the installed control room, plus the column
+ * geometry all three views share.
+ *
+ * Every value is transcribed from the approved MMSBUILD Plugins screen's
+ * `styles.css` and delivered through the `--plugins-*` tokens declared in the
+ * `[data-editor-screen='plugins']` block of globals.css. Nothing here is
+ * interpreted or re-derived — where a number looks arbitrary (17px padding,
+ * 122px tiles, 226px button) it is the reference's number.
+ *
+ * Plugin-authored admin pages live in `PluginAdminPage.module.css` and keep
+ * the generic admin ramp; this file is the Plugins screen itself.
+ */
+
+/* ── Shared column ──────────────────────────────────────────────────────
+   The wrap is measured against the VIEWPORT, not its container, because the
+   install-review action bar is `position: fixed` and computes its inset from
+   `100vw`. Sharing one basis is what keeps the bar's buttons aligned with the
+   panel above them; a container-relative column would drift by half a
+   scrollbar. `AdminPageLayout`'s `mode="plugins"` zeroes the body padding so
+   this column is the only thing setting the horizontal inset. */
+.wrap {
+    width: min(1284px, calc(100vw - 64px));
+    /* Below 320px the reference stops adapting and simply refuses to get
+       narrower, rather than collapsing its grids into unreadable slivers. */
+    min-width: 288px;
+    margin: 0 auto;
 }
 
-.fileInput {
+.pluginsBody {
+    min-height: 100%;
+    background: var(--mms-workspace);
+    color: var(--mms-text);
+}
+
+.fileInput,
+.srOnly {
     position: absolute;
     width: 1px;
     height: 1px;
@@ -17,290 +43,465 @@
     white-space: nowrap;
 }
 
-.error,
-.emptyState {
+/* ── Page heading ───────────────────────────────────────────────────────── */
+.pageHeading {
+    display: flex;
+    min-height: 142px;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--plugins-sp-30);
+    padding: var(--plugins-sp-26) var(--plugins-sp-4) var(--plugins-sp-15);
+}
+
+.headingText {
+    min-width: 0;
+}
+
+.eyebrow {
+    margin: 0 0 var(--plugins-sp-5);
+    color: var(--mms-text-muted);
+    font-size: var(--plugins-text-10);
+    font-weight: var(--plugins-weight-760);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+}
+
+.pageHeading h1 {
+    margin: 0 0 var(--plugins-sp-3);
+    overflow-wrap: anywhere;
+    font-size: var(--plugins-text-45);
+    line-height: 1;
+    letter-spacing: -0.045em;
+}
+
+.pageLead {
     margin: 0;
-    font-size: var(--text-s);
-    line-height: 1.5;
+    color: var(--mms-text-muted);
+    font-size: var(--plugins-text-15);
+}
+
+/* The reference pins the upload button to a fixed minimum so the heading's
+   right edge doesn't move as the label changes between idle and uploading. */
+.uploadButton {
+    min-width: var(--plugins-upload-w);
+    flex-shrink: 0;
+}
+
+/* ── Metric tiles ───────────────────────────────────────────────────────── */
+.metrics {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: var(--plugins-sp-14);
+    margin: 0;
+    padding: 0;
+}
+
+.metric {
+    display: grid;
+    grid-template-columns: 68px minmax(0, 1fr);
+    min-height: var(--plugins-metric-min-h);
+    align-items: center;
+    margin: 0;
+    padding: var(--plugins-sp-17);
+    border: 1px solid var(--mms-border);
+    border-radius: var(--plugins-radius-9);
+    background: var(--mms-surface);
+}
+
+.metricDisc {
+    display: grid;
+    width: var(--plugins-metric-disc);
+    height: var(--plugins-metric-disc);
+    place-items: center;
+    border-radius: 50%;
+    font-size: var(--plugins-text-28);
+}
+
+.metric[data-tone='green'] .metricDisc {
+    background: var(--mms-surface-green);
+    color: var(--mms-action-strong);
+}
+
+.metric[data-tone='amber'] .metricDisc {
+    background: var(--mms-warning-bg);
+    color: var(--mms-warning);
+}
+
+.metric[data-tone='blue'] .metricDisc {
+    background: var(--plugins-metric-blue-bg);
+    color: var(--mms-blue);
+}
+
+.metricBody {
+    min-width: 0;
+}
+
+.metricValueRow {
+    display: flex;
+    align-items: baseline;
+    gap: var(--plugins-sp-9);
+    margin: 0 0 var(--plugins-sp-5);
+    min-width: 0;
+}
+
+.metricValue {
+    font-size: var(--plugins-text-33);
+    line-height: 1;
+    letter-spacing: -0.04em;
+    font-variant-numeric: tabular-nums;
+}
+
+.metricLabel {
+    overflow-wrap: anywhere;
+    font-size: var(--plugins-text-13);
+}
+
+.metricDetail {
+    display: block;
+    margin: 0;
+    overflow-wrap: anywhere;
+    color: var(--mms-text-muted);
+}
+
+/* ── Trust banner ───────────────────────────────────────────────────────── */
+.trustBanner {
+    display: flex;
+    min-height: 55px;
+    align-items: center;
+    gap: var(--plugins-sp-13);
+    margin: var(--plugins-sp-16) 0 var(--plugins-sp-26);
+    padding: 0 var(--plugins-sp-18);
+    border: 1px solid var(--mms-border);
+    border-radius: var(--plugins-radius-8);
+    background: var(--mms-surface);
+}
+
+.trustBanner i {
+    flex-shrink: 0;
+    color: var(--mms-action-strong);
+    font-size: var(--plugins-text-18);
+}
+
+.trustBanner span {
+    min-width: 0;
+}
+
+/* ── Toolbar ────────────────────────────────────────────────────────────── */
+.filters {
+    display: grid;
+    grid-template-columns: minmax(250px, 320px) 170px 170px;
+    gap: var(--plugins-sp-10);
+    margin-bottom: var(--plugins-sp-18);
+}
+
+/* The reference draws its own search field rather than the admin's pill-shaped
+   SearchBar: a 46px bordered box with a 42px icon gutter. Wrapping the shared
+   Input keeps the clear-on-Escape and autocomplete behaviour. */
+.searchField {
+    display: flex;
+    min-height: var(--plugins-search-h);
+    align-items: center;
+    border: 1px solid var(--mms-border-strong);
+    border-radius: var(--plugins-radius-7);
+    background: var(--mms-surface-raised);
+}
+
+/* Focus is carried by the border, not a ring. The inner input is borderless and
+   fills the box, so a ring on it would halo the whole field on every click —
+   this keeps the cue for keyboard users without the halo. */
+.searchField:focus-within {
+    border-color: var(--mms-action);
+}
+
+.searchField > i {
+    width: 42px;
+    flex-shrink: 0;
+    color: var(--mms-text-muted);
+    text-align: center;
+}
+
+.searchField input {
+    width: 100%;
+    min-width: 0;
+    height: var(--plugins-tap);
+    min-height: var(--plugins-tap);
+    padding: 0 var(--plugins-sp-10) 0 0;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: var(--mms-text);
+    font: inherit;
+}
+
+.filterSelect {
+    min-width: 0;
+}
+
+/* The open dropdown. It portals to `document.body`, outside this screen's
+   token scope, so the values here are literals rather than `--plugins-*`.
+   The admin's generic menu is a 16px-radius pill-ish card with 12px rows;
+   this screen draws every control as a 7px box, and a dropdown that rounder
+   than the control it belongs to reads as a different design system. */
+.filterMenu {
+    border-radius: 7px;
+}
+
+.filterMenu [role='option'] {
+    border-radius: 4px;
+}
+
+/* ── Card grid + empty state ────────────────────────────────────────────── */
+.pluginGrid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--plugins-sp-16);
+}
+
+.emptyState {
+    display: grid;
+    min-height: 310px;
+    place-items: center;
+    align-content: center;
+    padding: var(--plugins-sp-24);
+    border: 1px dashed var(--mms-border-strong);
+    border-radius: var(--plugins-radius-9);
+    text-align: center;
+}
+
+.emptyState > i {
+    margin-bottom: var(--plugins-sp-14);
+    color: var(--mms-text-muted);
+    font-size: var(--plugins-text-30);
+}
+
+.emptyState h2 {
+    margin: 0 0 var(--plugins-sp-6);
+    overflow-wrap: anywhere;
+    font-size: var(--plugins-text-20);
+}
+
+.emptyState p {
+    max-width: 62ch;
+    margin: 0 0 var(--plugins-sp-16);
+    color: var(--mms-text-muted);
+}
+
+/* ── Live footer ────────────────────────────────────────────────────────── */
+.liveFooter {
+    display: flex;
+    min-height: 65px;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--plugins-sp-9);
+    padding: var(--plugins-sp-12) var(--plugins-sp-4) var(--plugins-sp-24);
+    color: var(--mms-text-muted);
+    font-size: var(--plugins-text-11);
+}
+
+.liveDot {
+    width: 9px;
+    height: 9px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    background: var(--mms-danger);
+}
+
+.liveFooter[data-connected='true'] .liveDot {
+    background: var(--mms-success);
+    box-shadow: 0 0 0 4px var(--plugins-live-glow);
+}
+
+.liveFooterText {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.liveFooterCount {
+    margin-left: auto;
+    white-space: nowrap;
+}
+
+/* ── Role banner ────────────────────────────────────────────────────────── */
+/* The reference pins this bottom-RIGHT, where the admin's global toast stack
+   already lives — and that stack grows upward, so no fixed offset clears it for
+   an arbitrary number of toasts. The banner is persistent and the toasts are
+   transient, so the banner yields the corner rather than the other way round.
+   Everything else about it is the reference's. */
+.roleBanner {
+    position: fixed;
+    z-index: 45;
+    left: var(--plugins-sp-18);
+    bottom: var(--plugins-sp-18);
+    display: flex;
+    max-width: var(--plugins-role-banner-w);
+    min-height: 54px;
+    align-items: center;
+    gap: var(--plugins-sp-11);
+    padding: var(--plugins-sp-10) var(--plugins-sp-14);
+    border: 1px solid var(--mms-border);
+    border-radius: var(--plugins-radius-8);
+    background: var(--mms-surface-raised);
+    box-shadow: var(--plugins-shadow-menu);
+}
+
+.roleBanner i {
+    flex-shrink: 0;
+    color: var(--mms-warning);
+}
+
+.roleBanner span {
+    min-width: 0;
+}
+
+/* ── Inline alerts (upload failure, removal failure) ────────────────────── */
+.alerts {
+    display: grid;
+    gap: var(--plugins-sp-12);
+    margin-bottom: var(--plugins-sp-16);
 }
 
 .error {
-    color: var(--danger);
+    margin: 0;
+    overflow-wrap: anywhere;
+    color: var(--mms-danger);
+    font-size: var(--plugins-text-12);
+    line-height: 1.5;
     white-space: pre-wrap;
 }
 
 .errorHint {
-    margin-top: var(--space-xs);
-    font-size: var(--text-s);
+    margin-top: var(--plugins-sp-4);
+    color: var(--mms-text-muted);
+    font-size: var(--plugins-text-11);
     line-height: 1.5;
-    color: var(--text-subtle);
 }
 
-.errorHint a {
-    color: var(--text);
-    text-decoration: underline;
-}
-
-/* Failed-uninstall alert — error message plus the force-remove escape
-   hatch ("Remove anyway") and a dismiss action. */
 .removeFailure {
     display: grid;
-    gap: var(--space-xs);
+    gap: var(--plugins-sp-8);
     justify-items: start;
+    padding: var(--plugins-sp-15);
+    border: 1px solid var(--mms-danger);
+    border-radius: var(--plugins-radius-8);
+    background: var(--mms-danger-bg);
 }
 
 .removeFailureActions {
     display: flex;
-    gap: var(--space-s);
-    margin-top: var(--space-3xs);
+    flex-wrap: wrap;
+    gap: var(--plugins-sp-8);
 }
 
-.emptyState {
-    padding: var(--space-6xl);
-    border: 1px dashed var(--overlay-10);
-    border-radius: 8px;
-    color: var(--text-subtle);
-    text-align: center;
+/* ── Responsive — the reference's four steps ────────────────────────────── */
+@media (max-width: 1250px) {
+    .wrap {
+        width: min(1180px, calc(100vw - 38px));
+    }
 }
 
-.pluginsList {
-    display: grid;
-    gap: var(--space-px);
+@media (max-width: 1024px) {
+    .metrics {
+        grid-template-columns: 1fr 1fr;
+    }
 }
 
-/* ── Control-room summary tiles (redesign Screen 5) ─────────────────── */
-.summaryTiles {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-    gap: var(--space-m);
-    margin: 0 0 var(--space-l);
-}
-
-.summaryTile {
-    display: grid;
-    gap: var(--space-2xs);
-    padding: var(--space-l);
-    background: var(--bg-surface-2);
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--card-radius);
-}
-
-.summaryTile[data-tone='attention'] {
-    border-color: var(--warning-30);
-    background: var(--warning-10);
-}
-
-.summaryLabel {
-    display: flex;
-    align-items: baseline;
-    gap: var(--space-s);
-    font-size: var(--text-m);
-    font-weight: 600;
-    color: var(--text);
-}
-
-.summaryValue {
-    font-family: var(--font-display);
-    font-size: var(--text-4xl);
-    font-weight: 800;
-    line-height: 1;
-    color: var(--text);
-    font-variant-numeric: tabular-nums;
-}
-
-.summaryCaption {
-    margin: 0;
-    font-size: var(--text-xs);
-    color: var(--text-subtle);
-}
-
-/* Plugin admin page body — same gap rhythm as the Plugins list. The
-   layout provides the page header (title + plugin name as description)
-   so the inner content goes straight to the substantive UI. */
-.pluginPageBody {
-    display: grid;
-    gap: var(--space-3xl);
-}
-
-.mapSurface {
-    position: relative;
-    min-height: min(560px, calc(100vh - 230px));
-    overflow: hidden;
-    border: 1px solid var(--overlay-10);
-    border-radius: 8px;
-    background:
-        linear-gradient(135deg, var(--plugins-hero-tint-a), var(--plugins-hero-tint-b)),
-        var(--bg-surface-2);
-}
-
-.mapGrid {
-    position: absolute;
-    inset: 0;
-    background-image:
-        linear-gradient(var(--overlay-10) 1px, transparent 1px),
-        linear-gradient(90deg, var(--overlay-10) 1px, transparent 1px);
-    background-size: 56px 56px;
-    opacity: 0.42;
-}
-
-.mapCenterLabel {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    padding: var(--space-s) var(--space-l);
-    border: 1px solid var(--overlay-10);
-    border-radius: 8px;
-    background: var(--bg-surface);
-    color: var(--text);
-    font-size: var(--text-s);
-    font-weight: 800;
-}
-
-.mapPin {
-    position: absolute;
-    left: var(--pin-x);
-    top: var(--pin-y);
-    display: grid;
-    gap: var(--space-4xs);
-    min-width: 120px;
-    max-width: 180px;
-    padding: var(--space-s) var(--space-m) var(--space-s) var(--space-5xl);
-    transform: translate(-14px, -14px);
-    border: 1px solid var(--overlay-10);
-    border-radius: 8px;
-    background: var(--bg-surface);
-    box-shadow: 0 18px 50px var(--scrim-30);
-}
-
-.mapPin > span {
-    position: absolute;
-    top: 10px;
-    left: 9px;
-    width: 9px;
-    height: 9px;
-    border-radius: 999px;
-    background: var(--overlay);
-}
-
-.mapPin strong {
-    overflow-wrap: anywhere;
-    font-size: var(--text-s);
-}
-
-.mapPin small {
-    color: var(--text-subtle);
-    font-size: var(--text-xs);
-}
-
-.markdownPanel {
-    display: grid;
-    gap: var(--space-l);
-    padding: var(--space-3xl);
-    border: 1px solid var(--overlay-10);
-    border-radius: 8px;
-    background: var(--bg-surface);
-}
-
-.markdownPanel p {
-    margin: 0;
-    color: var(--text);
-    font-size: var(--text-l);
-    line-height: 1.65;
-}
-
-.resourceLayout {
-    display: grid;
-    grid-template-columns: minmax(240px, 320px) minmax(0, 1fr);
-    gap: var(--space-2xl);
-    align-items: start;
-}
-
-.resourceForm,
-.resourceRecord {
-    display: grid;
-    gap: var(--space-l);
-    padding: var(--space-xl);
-    border: 1px solid var(--overlay-10);
-    border-radius: 8px;
-    background: var(--bg-surface);
-}
-
-.resourceForm h2 {
-    margin: 0;
-    font-size: var(--text-xl);
-    line-height: 1.25;
-    letter-spacing: 0;
-}
-
-.resourceField {
-    display: grid;
-    gap: var(--space-xs);
-}
-
-.resourceField span,
-.resourceRecord dt {
-    color: var(--text-subtle);
-    font-size: var(--text-xs);
-    font-weight: 750;
-}
-
-.resourceField input:not([type="checkbox"]),
-.resourceField textarea {
-    width: 100%;
-    min-width: 0;
-    padding: var(--space-s) var(--space-m);
-    border: 1px solid var(--overlay-10);
-    border-radius: 7px;
-    background: var(--bg-surface-2);
-    color: var(--text);
-    font: inherit;
-    font-size: var(--text-m);
-}
-
-.resourceField textarea {
-    min-height: 84px;
-    resize: vertical;
-}
-
-.resourceRecords {
-    display: grid;
-    gap: var(--space-m);
-}
-
-.resourceRecord {
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: start;
-}
-
-.resourceRecord dl {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-    gap: var(--space-l);
-    margin: 0;
-}
-
-.resourceRecord div {
-    display: grid;
-    gap: var(--space-3xs);
-    min-width: 0;
-}
-
-.resourceRecord dd {
-    margin: 0;
-    overflow-wrap: anywhere;
-    color: var(--text);
-    font-size: var(--text-m);
-    line-height: 1.45;
-}
-
-@media (max-width: 720px) {
-    .mapSurface {
-        min-height: 460px;
+@media (max-width: 767px) {
+    .wrap {
+        width: calc(100vw - 28px);
     }
 
-    .resourceLayout,
-    .resourceRecord {
+    .pageHeading {
+        min-height: 130px;
+        align-items: flex-start;
+        padding-top: var(--plugins-sp-24);
+    }
+
+    .pageHeading h1 {
+        font-size: var(--plugins-text-35);
+    }
+
+    .pageLead {
+        font-size: var(--plugins-text-12);
+    }
+
+    /* Icon-only upload. The reference collapses the label with `font-size: 0`
+       and restores the glyph — the accessible name still comes from the
+       button's aria-label, so the control never goes silent. */
+    .uploadButton {
+        width: 48px;
+        min-width: var(--plugins-tap);
+        padding: 0;
+        font-size: 0;
+    }
+
+    .uploadButton i {
+        font-size: var(--plugins-text-14);
+    }
+
+    .metrics {
+        gap: var(--plugins-sp-8);
+    }
+
+    .metric {
+        grid-template-columns: 48px minmax(0, 1fr);
+        min-height: 94px;
+        padding: var(--plugins-sp-10);
+    }
+
+    .metricDisc {
+        width: 44px;
+        height: 44px;
+        font-size: var(--plugins-text-18);
+    }
+
+    .metricValue {
+        font-size: var(--plugins-text-22);
+    }
+
+    .metricLabel,
+    .metricDetail {
+        font-size: var(--plugins-text-9);
+    }
+
+    .trustBanner {
+        margin-bottom: var(--plugins-sp-15);
+        font-size: var(--plugins-text-10);
+    }
+
+    .filters {
+        grid-template-columns: minmax(0, 1fr) 135px;
+    }
+
+    /* Sort is the first control to go — status filtering and search carry the
+       list on a phone. */
+    .sortSelect {
+        display: none;
+    }
+
+    .pluginGrid {
         grid-template-columns: 1fr;
+    }
+
+    .liveFooterCount {
+        display: none;
+    }
+
+    /* On a phone there is no room beside the toast stack either way, so the
+       banner spans the width and sits above where toasts appear. */
+    .roleBanner {
+        right: var(--plugins-sp-10);
+        left: var(--plugins-sp-10);
+        bottom: 84px;
+        max-width: none;
+    }
+}
+
+@media (max-width: 430px) {
+    .metrics {
+        grid-template-columns: 1fr;
+    }
+
+    .metric {
+        grid-template-columns: 50px minmax(0, 1fr);
     }
 }

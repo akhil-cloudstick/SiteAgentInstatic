@@ -723,6 +723,14 @@
        still win on specificity. */
     --input-radius: var(--site-control-radius);
 
+    /* Publish split button — matched to the Content toolbar so the two
+       workspaces present the same primary action at the same size. */
+    --site-tap: 44px;
+    --site-sp-7: 7px;
+    --site-sp-17: 17px;
+    --site-on-accent: #ffffff;
+    --site-split-divider: rgba(255, 255, 255, 0.4);
+
     /* Type. The approved screen sets Inter at a FIXED 13px base and sizes
        everything off it. The admin's generic ramp is fluid (`clamp()`) and
        lands 1–2px smaller at most widths, which is why the whole screen read
@@ -1050,6 +1058,794 @@
     [data-editor-screen='content'] {
         --content-doc-w: 760px;
     }
+}
+
+/* ===========================================================================
+ * MMS DATA SCREEN — `[data-editor-screen='data']`
+ *
+ * Same arrangement as the Site and Content blocks above, for the fourth
+ * pixel-matched screen in the MMSBUILD library: the Data Workbench. Every
+ * value below is transcribed VERBATIM from that screen's `src/styles.css`;
+ * nothing here is interpreted, rounded, or re-derived.
+ *
+ * The palette equals the Site/Content screens' (all three descend from the
+ * locked MMSBUILD shell contract) but is restated rather than inherited, so a
+ * future change to one screen cannot silently drift the others.
+ *
+ * The attribute is set on the workspace BODY, not the shell, so the shared
+ * toolbar keeps the Dashboard palette — the Data re-skin is scoped to the
+ * sidebar, grid and inspector only.
+ *
+ * GEOMETRY IS FIXED, NOT FLUID — the reference specifies exact pixels (78px
+ * rows, 54px header, 52px gutters, 44px tap targets). Routing them through the
+ * fluid `--space-*` / `--text-*` ramps would drift every metric off the
+ * approved screen, and those ramps cannot express 8px or 9px text at all. The
+ * numeric `--data-sp-*` and `--data-text-*` scales exist because
+ * `admin-spacing-token-policy` and `admin-typography-token-policy` forbid
+ * literal px in margin/padding/gap and font-size — the token is the delivery
+ * mechanism, the value is the reference's.
+ * =========================================================================== */
+[data-editor-screen='data'] {
+    /* ── Palette (reference `:root`) ───────────────────────────────────── */
+    --mms-bg: #fbf7ea;
+    --mms-workspace: #fffdf8;
+    --mms-surface: #fffef9;
+    --mms-surface-raised: #ffffff;
+    --mms-surface-tint: #f4f5ed;
+    --mms-surface-green: #eef6ef;
+    --mms-border: #e8ddbd;
+    --mms-border-strong: #d9d1ba;
+    --mms-text: #082a38;
+    --mms-text-muted: #5a6a70;
+    --mms-action: #15964e;
+    --mms-action-strong: #087b3d;
+    --mms-success: #137d43;
+    --mms-yellow: #f3c94f;
+    --mms-warning: #b06a0b;
+    --mms-danger: #c64539;
+    --mms-danger-bg: #fff0ec;
+    /* NEW — the warm face behind a selected grid row / selected table row.
+       The generic set has no equivalent; Site/Content never needed it. */
+    --mms-selected: #fff6df;
+    --mms-focus: 0 0 0 3px rgba(243, 201, 79, 0.78);
+    --data-shadow-menu: 0 18px 48px rgba(8, 39, 49, 0.16);
+
+    /* Literals the reference hardcodes rather than tokenizing. Transcribed
+       as tokens here because module CSS may not carry hex. */
+    --data-dot-warning: #f39a19;
+    --data-dot-neutral: #9ba5a4;
+    --data-tag-bg: #fff0d4;
+    --data-tag-text: #77500b;
+    --data-scrollbar-thumb: #929a97;
+    --data-modal-scrim: rgba(0, 22, 31, 0.48);
+    --data-drawer-scrim: rgba(0, 22, 31, 0.25);
+    --data-on-action: #ffffff;
+    --data-chevron-divider: rgba(255, 255, 255, 0.26);
+    --data-drawer-shadow-left: 18px 0 48px rgba(8, 39, 49, 0.18);
+    --data-drawer-shadow-right: -18px 0 48px rgba(8, 39, 49, 0.18);
+    --data-selected-border: color-mix(in srgb, var(--mms-yellow) 62%, var(--mms-border));
+
+    /* Generic tokens the SHARED primitives (Button, Input, Select, Checkbox,
+       Dialog, ContextMenu) read. Overridden here so a primitive rendered
+       inside the Data workspace picks up the reference's faces instead of the
+       Dashboard ramp — WITHOUT editing any shared component. Scoped to this
+       subtree, so no other workspace is affected. */
+    --bg-body: var(--mms-workspace);
+    --bg-surface: var(--mms-surface);
+    --bg-surface-2: var(--mms-surface-raised);
+    --border-subtle: var(--mms-border);
+    --border-muted: var(--mms-border);
+    --border: var(--mms-border);
+    --border-strong: var(--mms-border-strong);
+    --text: var(--mms-text);
+    --text-muted: var(--mms-text-muted);
+    --text-subtle: var(--mms-text-muted);
+    /* The reference draws every control as a 6–7px box, never the admin's
+       pill (`1em`). Retuning the token catches Select's visible wrapper too. */
+    --input-radius: var(--data-radius-7);
+
+    /* ── Structural geometry (reference `:root` + measured blocks) ──────── */
+    --data-shell-h: 61px;
+    --data-left-track: 344px;
+    --data-right-track: 330px;
+    --data-rail-w: 44px;
+    --data-panel-header-h: 64px;
+    --data-context-h: 78px;
+    --data-toolbar-h: 74px;
+    --data-protected-h: 38px;
+    --data-head-h: 54px;
+    --data-row-h: 78px;
+    --data-footer-h: 70px;
+    --data-group-h: 44px;
+    --data-gutter: 52px;
+    --data-table-min-w: 760px;
+    --data-dock-h: 62px;
+    --data-drawer-w: 410px;
+    --data-menu-w: 224px;
+    --data-schema-menu-w: 156px;
+    --data-publish-menu-w: 248px;
+    --data-modal-w: 480px;
+    --data-thumb-w: 134px;
+    --data-thumb-h: 70px;
+    --data-media-thumb-w: 84px;
+    --data-media-thumb-h: 58px;
+    /* Every interactive target in the reference is at least 44 × 44. */
+    --data-tap: 44px;
+
+    /* ── Radii (reference, verbatim) ───────────────────────────────────── */
+    --data-radius-4: 4px;
+    --data-radius-5: 5px;
+    --data-radius-6: 6px;
+    --data-radius-7: 7px;
+    --data-radius-8: 8px;
+    --data-radius-9: 9px;
+    --data-radius-10: 10px;
+    --data-radius-12: 12px;
+
+    /* ── Spacing (reference, verbatim; name = value in px) ─────────────── */
+    --data-sp-0: 0px;
+    --data-sp-1: 1px;
+    --data-sp-2: 2px;
+    --data-sp-3: 3px;
+    --data-sp-4: 4px;
+    --data-sp-5: 5px;
+    --data-sp-6: 6px;
+    --data-sp-7: 7px;
+    --data-sp-8: 8px;
+    --data-sp-9: 9px;
+    --data-sp-10: 10px;
+    --data-sp-11: 11px;
+    --data-sp-12: 12px;
+    --data-sp-13: 13px;
+    --data-sp-14: 14px;
+    --data-sp-16: 16px;
+    --data-sp-17: 17px;
+    --data-sp-18: 18px;
+    --data-sp-20: 20px;
+    --data-sp-21: 21px;
+    --data-sp-22: 22px;
+    --data-sp-24: 24px;
+    --data-sp-25: 25px;
+    --data-sp-26: 26px;
+    --data-sp-28: 28px;
+    --data-sp-38: 38px;
+    --data-sp-42: 42px;
+    --data-sp-48: 48px;
+    --data-sp-52: 52px;
+    --data-sp-82: 82px;
+    /* Clears the full-bleed toast band below 620px — see FloatingActionBar. */
+    --data-sp-140: 140px;
+
+    /* ── Type sizes (reference, verbatim; name = value in px) ──────────── */
+    --data-text-8: 8px;
+    --data-text-9: 9px;
+    --data-text-10: 10px;
+    --data-text-11: 11px;
+    --data-text-12: 12px;
+    --data-text-13: 13px;
+    --data-text-14: 14px;
+    --data-text-15: 15px;
+    --data-text-16: 16px;
+    --data-text-19: 19px;
+    --data-text-22: 22px;
+
+    /* ── Weights. Non-standard steps are load-bearing and only render on a
+       variable font — `--font-mms` is Inter Variable. ─────────────────── */
+    --data-weight-450: 450;
+    --data-weight-600: 600;
+    --data-weight-610: 610;
+    --data-weight-650: 650;
+    --data-weight-680: 680;
+    --data-weight-720: 720;
+    --data-weight-740: 740;
+    --data-weight-760: 760;
+
+    /* Type. The approved screen sets Inter at a FIXED 13px base and sizes
+       everything off it, exactly as the Site block does. */
+    font-family: var(--font-mms);
+    font-size: var(--data-text-13);
+    line-height: 1.45;
+}
+
+
+/* ===========================================================================
+ * Data publish control — token island for the SHARED toolbar.
+ *
+ * The Data workspace hands its publish control to the toolbar, which lives
+ * OUTSIDE the [data-editor-screen='data'] element — so none of the --data-*
+ * tokens resolve there. This block re-declares just the values that the
+ * control needs, keyed off an attribute only the Data workspace's toolbar slot
+ * carries. Without it the rules in Toolbar.module.css collapse to zero-size
+ * padding and the button renders broken.
+ * =========================================================================== */
+[data-data-publish] {
+    --data-tap: 44px;
+    --data-radius-7: 7px;
+    --data-sp-7: 7px;
+    --data-sp-11: 11px;
+    --data-sp-13: 13px;
+    --data-text-10: 10px;
+    --data-text-11: 11px;
+    --data-weight-720: 720;
+    --data-on-action: #ffffff;
+    --data-chevron-divider: rgba(255, 255, 255, 0.26);
+    /* The approved screen's greens, which differ from the generic ramp. */
+    --mms-action: #15964e;
+    --mms-action-strong: #087b3d;
+}
+
+/* Dark mirror — transcribed from the reference's `html[data-theme="dark"]`
+   block. `--mms-focus` and the geometry are NOT re-declared there. */
+[data-editor-theme='dark'] [data-editor-screen='data'],
+[data-editor-screen='data'][data-editor-theme='dark'] {
+    --mms-bg: #001e2d;
+    --mms-workspace: #062936;
+    --mms-surface: #082f3b;
+    --mms-surface-raised: #103a46;
+    --mms-surface-tint: #173f49;
+    --mms-surface-green: #123f30;
+    /* Alpha, not hex — the reference's dark hairline. */
+    --mms-border: rgba(248, 241, 223, 0.14);
+    --mms-border-strong: #31505a;
+    --mms-text: #f8f1df;
+    --mms-text-muted: #b4c1be;
+    --mms-action: #27ba66;
+    --mms-action-strong: #34cb73;
+    --mms-success: #32c772;
+    /* Warning flips to the identity yellow on navy (the burnt orange dies). */
+    --mms-warning: #f3c94f;
+    --mms-danger: #ff8d7f;
+    --mms-danger-bg: #402825;
+    --mms-selected: #222f27;
+    --data-shadow-menu: 0 22px 56px rgba(0, 0, 0, 0.38);
+
+    /* The reference re-themes the "Required" pill's face and ink only. */
+    --data-tag-bg: #46391d;
+    --data-tag-text: var(--mms-yellow);
+}
+
+/* The reference shrinks the shell and restacks the workspace at three
+   breakpoints. Geometry only — the layout rules live in the modules. */
+@media (max-width: 1100px) {
+    [data-editor-screen='data'] {
+        --data-shell-h: 58px;
+        --data-context-h: 66px;
+        --data-toolbar-h: 70px;
+    }
+}
+
+@media (max-width: 620px) {
+    [data-editor-screen='data'] {
+        --data-shell-h: 56px;
+        --data-context-h: 58px;
+        --data-toolbar-h: 114px;
+        --data-protected-h: 44px;
+        --data-row-h: 72px;
+        --data-footer-h: 52px;
+        --data-panel-header-h: 58px;
+    }
+}
+
+/* ===========================================================================
+ * MMS PLUGINS SCREEN — `[data-editor-screen='plugins']`
+ *
+ * Same arrangement as the Site, Content and Data blocks above, for the fifth
+ * pixel-matched screen in the MMSBUILD library: the Plugins lifecycle
+ * workspace (installed control room / install review / plugin recovery).
+ * Every value below is transcribed VERBATIM from that screen's
+ * `src/styles.css`; nothing here is interpreted, rounded, or re-derived.
+ *
+ * The palette equals the Site/Content/Data screens' (all descend from the
+ * locked MMSBUILD shell contract) but is restated rather than inherited, so a
+ * future change to one screen cannot silently drift the others.
+ *
+ * The attribute is set on the workspace BODY, not the shell, so the shared
+ * toolbar keeps its own palette — this re-skin is scoped to the page body.
+ *
+ * GEOMETRY IS FIXED, NOT FLUID — the reference specifies exact pixels (235px
+ * cards, 74px icon tiles, 122px metric tiles, 44px tap targets). Routing them
+ * through the fluid `--space-*` / `--text-*` ramps would drift every metric off
+ * the approved screen. The numeric `--plugins-sp-*` / `--plugins-text-*` scales
+ * exist because `admin-spacing-token-policy` and
+ * `admin-typography-token-policy` forbid literal px in margin/padding/gap and
+ * font-size — the token is the delivery mechanism, the value is the
+ * reference's.
+ * =========================================================================== */
+[data-editor-screen='plugins'] {
+    /* ── Palette (reference `:root`) ───────────────────────────────────── */
+    --mms-bg: #fbf7ea;
+    --mms-workspace: #fffdf8;
+    --mms-surface: #fffef9;
+    --mms-surface-raised: #ffffff;
+    --mms-surface-tint: #f4f5ed;
+    --mms-surface-green: #eef6ef;
+    --mms-border: #e8ddbd;
+    --mms-border-strong: #d9d1ba;
+    --mms-text: #082a38;
+    --mms-text-muted: #5a6a70;
+    --mms-action: #15964e;
+    --mms-action-strong: #087b3d;
+    --mms-yellow: #f3c94f;
+    --mms-success: #137d43;
+    --mms-warning: #b06a0b;
+    --mms-danger: #c64539;
+    --mms-danger-bg: #fff0ec;
+    /* NEW — the tinted face behind a warning-toned metric disc, the recovery
+       nav's selected row, and the risk banner. The generic set has no
+       equivalent; Site/Content/Data never needed it. */
+    --mms-warning-bg: #fff8e6;
+    /* NEW — the informational hue behind the lifecycle-stream metric. This is
+       the ONLY screen that uses blue as an identity tone. */
+    --mms-blue: #315f9e;
+    --mms-focus: 0 0 0 3px rgba(243, 201, 79, 0.78);
+    /* Retuned rather than layered. The reference declares its focus ring as a
+       document-level rule on every control; adding that on top of the admin's
+       own `--focus-ring` gave keyboard users TWO concentric rings — a green one
+       from the primitive and a yellow one from the rule. Pointing the existing
+       token at the reference's value means every primitive that already draws a
+       focus ring draws the right one, exactly once. Controls that show focus
+       through their border instead (Select, the search field) are handled in
+       their own modules. */
+    --focus-ring: var(--mms-focus);
+    --plugins-shadow-menu: 0 18px 48px rgba(8, 39, 49, 0.16);
+
+    /* Literals the reference hardcodes rather than tokenizing. Transcribed
+       as tokens here because module CSS may not carry hex. The four icon-tile
+       gradients are the plugin card's whole identity, so they are named for
+       the STATUS they represent, not the colour. */
+    --plugins-icon-green-a: #19b95e;
+    --plugins-icon-green-b: #07823f;
+    --plugins-icon-slate-a: #8294a2;
+    --plugins-icon-slate-b: #50616f;
+    --plugins-icon-red-a: #f2232e;
+    --plugins-icon-red-b: #ba0916;
+    --plugins-icon-blue-a: #275d72;
+    --plugins-icon-blue-b: #082f3b;
+    --plugins-icon-inner-highlight: rgba(255, 255, 255, 0.18);
+    --plugins-on-solid: #ffffff;
+    --plugins-modal-scrim: rgba(0, 20, 29, 0.58);
+    --plugins-skip-ink: #082a38;
+    --plugins-error-border: color-mix(in srgb, var(--mms-danger) 58%, var(--mms-border));
+    --plugins-update-border: color-mix(in srgb, var(--mms-warning) 56%, var(--mms-border));
+    --plugins-metric-blue-bg: color-mix(in srgb, var(--mms-blue) 14%, var(--mms-surface));
+    --plugins-live-glow: color-mix(in srgb, var(--mms-success) 15%, transparent);
+    --plugins-actionbar-bg: color-mix(in srgb, var(--mms-workspace) 96%, transparent);
+
+    /* Generic tokens the SHARED primitives (Button, Input, Select, Switch,
+       Dialog, ContextMenu, SearchBar) read. Overridden here so a primitive
+       rendered inside the Plugins workspace picks up the reference's faces
+       instead of the Dashboard ramp — WITHOUT editing any shared component.
+       Scoped to this subtree, so no other workspace is affected. */
+    --bg-body: var(--mms-workspace);
+    --bg-surface: var(--mms-surface);
+    --bg-surface-2: var(--mms-surface-raised);
+    --bg-surface-3: var(--mms-surface-tint);
+    --border-subtle: var(--mms-border);
+    --border-muted: var(--mms-border);
+    --border: var(--mms-border);
+    --border-strong: var(--mms-border-strong);
+    --text-bright: var(--mms-text);
+    --text: var(--mms-text);
+    --text-muted: var(--mms-text-muted);
+    --text-subtle: var(--mms-text-muted);
+    --danger: var(--mms-danger);
+    --success: var(--mms-success);
+    --warning: var(--mms-warning);
+    /* The reference draws every control as a 7px box, never the admin's
+       pill (`1em`). Retuning the token catches Select's visible wrapper too. */
+    --input-radius: var(--plugins-radius-7);
+
+    /* ── Structural geometry (reference `:root` + measured blocks) ──────── */
+    --plugins-shell-h: 61px;
+    --plugins-wrap-w: 1284px;
+    --plugins-wrap-gutter: 64px;
+    --plugins-card-min-h: 235px;
+    --plugins-card-icon: 74px;
+    --plugins-metric-min-h: 122px;
+    --plugins-metric-disc: 64px;
+    --plugins-summary-icon: 48px;
+    --plugins-review-aside-w: 360px;
+    --plugins-recovery-left-w: 290px;
+    --plugins-recovery-right-w: 330px;
+    --plugins-permission-icon: 42px;
+    --plugins-risk-w: 55px;
+    --plugins-stepper-dot: 34px;
+    --plugins-stepper-rule-w: 52px;
+    --plugins-menu-w: 190px;
+    --plugins-menu-top: 49px;
+    --plugins-modal-w: 580px;
+    --plugins-actionbar-h: 74px;
+    --plugins-search-h: 46px;
+    --plugins-upload-w: 226px;
+    --plugins-role-banner-w: 430px;
+    --plugins-stepup-disc: 58px;
+    --plugins-toggle-w: 40px;
+    --plugins-toggle-h: 24px;
+    --plugins-toggle-thumb: 18px;
+    --plugins-toggle-thumb-offset: 16px;
+    --plugins-switch-w: 50px;
+    --plugins-switch-h: 44px;
+    --plugins-switch-thumb: 24px;
+    --plugins-switch-travel: 17px;
+    /* Every interactive target in the reference is at least 44 × 44. */
+    --plugins-tap: 44px;
+
+    /* ── Radii (reference, verbatim) ───────────────────────────────────── */
+    --plugins-radius-5: 5px;
+    --plugins-radius-6: 6px;
+    --plugins-radius-7: 7px;
+    --plugins-radius-8: 8px;
+    --plugins-radius-9: 9px;
+    --plugins-radius-10: 10px;
+    --plugins-radius-12: 12px;
+    --plugins-radius-14: 14px;
+    --plugins-radius-pill: 999px;
+
+    /* ── Spacing (reference, verbatim; name = value in px) ─────────────── */
+    --plugins-sp-0: 0px;
+    --plugins-sp-2: 2px;
+    --plugins-sp-3: 3px;
+    --plugins-sp-4: 4px;
+    --plugins-sp-5: 5px;
+    --plugins-sp-6: 6px;
+    --plugins-sp-7: 7px;
+    --plugins-sp-8: 8px;
+    --plugins-sp-9: 9px;
+    --plugins-sp-10: 10px;
+    --plugins-sp-11: 11px;
+    --plugins-sp-12: 12px;
+    --plugins-sp-13: 13px;
+    --plugins-sp-14: 14px;
+    --plugins-sp-15: 15px;
+    --plugins-sp-16: 16px;
+    --plugins-sp-17: 17px;
+    --plugins-sp-18: 18px;
+    --plugins-sp-20: 20px;
+    --plugins-sp-22: 22px;
+    --plugins-sp-24: 24px;
+    --plugins-sp-25: 25px;
+    --plugins-sp-26: 26px;
+    --plugins-sp-28: 28px;
+    --plugins-sp-30: 30px;
+    --plugins-sp-35: 35px;
+    --plugins-sp-88: 88px;
+
+    /* ── Type sizes (reference, verbatim; name = value in px) ──────────── */
+    --plugins-text-9: 9px;
+    --plugins-text-10: 10px;
+    --plugins-text-11: 11px;
+    --plugins-text-12: 12px;
+    --plugins-text-13: 13px;
+    --plugins-text-14: 14px;
+    --plugins-text-15: 15px;
+    --plugins-text-16: 16px;
+    --plugins-text-17: 17px;
+    --plugins-text-18: 18px;
+    --plugins-text-19: 19px;
+    --plugins-text-20: 20px;
+    --plugins-text-22: 22px;
+    --plugins-text-23: 23px;
+    --plugins-text-25: 25px;
+    --plugins-text-28: 28px;
+    --plugins-text-30: 30px;
+    --plugins-text-33: 33px;
+    --plugins-text-35: 35px;
+    --plugins-text-37: 37px;
+    --plugins-text-45: 45px;
+
+    /* ── Weights. Non-standard steps are load-bearing and only render on a
+       variable font — `--font-mms` is Inter Variable. ─────────────────── */
+    --plugins-weight-500: 500;
+    --plugins-weight-650: 650;
+    --plugins-weight-680: 680;
+    --plugins-weight-700: 700;
+    --plugins-weight-720: 720;
+    --plugins-weight-730: 730;
+    --plugins-weight-750: 750;
+    --plugins-weight-760: 760;
+
+    /* Type. The approved screen sets Inter at a FIXED 13px base and sizes
+       everything off it, exactly as the Site/Content/Data blocks do. */
+    font-family: var(--font-mms);
+    font-size: var(--plugins-text-13);
+    line-height: 1.4;
+}
+
+[data-editor-screen='plugins'] button:disabled {
+    cursor: not-allowed;
+    opacity: 0.48;
+}
+
+/* Dark mirror — transcribed from the reference's `html[data-theme="dark"]`
+   block. `--mms-focus`, `--mms-yellow` and the geometry are NOT re-declared
+   there, so they are not re-declared here either. */
+[data-editor-theme='dark'] [data-editor-screen='plugins'],
+[data-editor-screen='plugins'][data-editor-theme='dark'] {
+    --mms-bg: #001e2d;
+    --mms-workspace: #062936;
+    --mms-surface: #082f3b;
+    --mms-surface-raised: #103a46;
+    --mms-surface-tint: #173f49;
+    --mms-surface-green: #123f30;
+    /* Alpha, not hex — the reference's dark hairline. */
+    --mms-border: rgba(248, 241, 223, 0.14);
+    --mms-border-strong: #31505a;
+    --mms-text: #f8f1df;
+    --mms-text-muted: #b4c1be;
+    --mms-action: #27ba66;
+    --mms-action-strong: #34cb73;
+    --mms-success: #32c772;
+    /* Warning flips to the identity yellow on navy (the burnt orange dies). */
+    --mms-warning: #f3c94f;
+    --mms-warning-bg: #493f20;
+    --mms-danger: #ff8d7f;
+    --mms-danger-bg: #402825;
+    --mms-blue: #8bb7ff;
+    --plugins-shadow-menu: 0 22px 56px rgba(0, 0, 0, 0.38);
+}
+
+/* The reference shrinks the shell at 767px. Geometry only — the layout rules
+   live in the modules. */
+@media (max-width: 767px) {
+    [data-editor-screen='plugins'] {
+        --plugins-shell-h: 57px;
+    }
+}
+
+/* ===========================================================================
+ * MMS MEDIA SCREEN — `[data-editor-screen='media']`
+ *
+ * Same arrangement as the Site / Content / Data / Plugins blocks above, for
+ * the fifth pixel-matched screen in the MMSBUILD library: the Media
+ * workspace.
+ *
+ * Two sources, per the approved migration rule for this screen:
+ *   • STRUCTURE + geometry — `screens/media/src/styles.css`, transcribed
+ *     verbatim. Every literal px the reference specifies is delivered as a
+ *     `--media-sp-*` / `--media-text-*` / `--media-radius-*` token, because
+ *     literal px in margin/padding/gap and literal `font-size: Npx` are
+ *     gated in admin CSS modules.
+ *   • LOOKS — the approved design masters (`docs/cms-new-ui-review/
+ *     04-media-*-approved-*.png`). The only place these override the
+ *     reference stylesheet is the folder-tile glyph, which the masters draw
+ *     in amber where the runnable prototype draws it green.
+ * =========================================================================== */
+
+[data-editor-screen='media'] {
+    /* ── Type (reference `:root` / `body`) ─────────────────────────────────
+       The approved screen sets Inter on the root and draws EVERY string in
+       it at a 13px / 1.4 base — headings, labels, rows, captions. The rest
+       of the admin keeps Nunito Sans / Nunito, so this is scoped. */
+    font-family: var(--font-mms);
+    font-size: var(--media-text-13);
+    line-height: 1.4;
+
+    /* ── Palette (reference `:root`) ───────────────────────────────────── */
+    --mms-bg: #fbf7ea;
+    --mms-workspace: #fffdf8;
+    --mms-surface: #fffef9;
+    --mms-surface-raised: #ffffff;
+    --mms-surface-tint: #f4f5ed;
+    --mms-surface-green: #eef6ef;
+    --mms-border: #e8ddbd;
+    --mms-border-strong: #d9d1ba;
+    --mms-text: #082a38;
+    --mms-text-muted: #5a6a70;
+    --mms-action: #15964e;
+    --mms-action-strong: #087b3d;
+    --mms-yellow: #f3c94f;
+    --mms-success: #137d43;
+    --mms-warning: #b06a0b;
+    --mms-danger: #c64539;
+    --mms-danger-bg: #fff0ec;
+
+    /* Media-prefixed aliases. The reference's bare alias names are NOT
+       reproduced — they would collide with this file's global vocabulary
+       and leak into every other workspace. */
+    --media-surface-hover: var(--mms-surface-tint);
+    --media-surface-active: var(--mms-surface-green);
+    --media-accent: var(--mms-action);
+    --media-accent-hover: var(--mms-action-strong);
+    --media-on-accent: #ffffff;
+
+    /* The approved masters draw the folder-tile glyph in amber; the runnable
+       prototype draws it green. Looks come from the masters, so amber wins.
+       Sampled from `04-media-light-approved-adaptive-workspace.png`. */
+    --media-folder-glyph: #fe9802;
+    /* Warm ivory the masters give the folder tiles — a step above the
+       canvas so the tiles read without relying on their border alone. */
+    --media-folder-tile-bg: #fef7eb;
+
+    /* Focus is AMBER on this screen (reference `--mms-focus`), not the
+       admin's green `--focus-ring`. Scoped here so no other workspace
+       changes. */
+    --media-focus: 0 0 0 3px rgba(243, 201, 79, 0.78);
+    --media-shadow-menu: 0 18px 48px rgba(8, 39, 49, 0.16);
+    --media-shadow-window: 0 24px 70px rgba(8, 39, 49, 0.24);
+    --media-scrim: rgba(0, 20, 29, 0.58);
+    /* Glass chips the reference floats over a preview image. */
+    --media-overlay-bg: rgba(8, 42, 56, 0.82);
+    --media-overlay-border: rgba(255, 255, 255, 0.38);
+    --media-overlay-strong-border: rgba(255, 255, 255, 0.45);
+    --media-checkmark-bg: rgba(8, 42, 56, 0.72);
+    --media-checkmark-border: rgba(255, 255, 255, 0.86);
+    /* The reference's preview well is a fixed deep navy in both themes —
+       media pixels are never recoloured, only the well behind them. */
+    --media-preview-well: #112e39;
+    --media-selected-halo: color-mix(in srgb, var(--mms-action) 18%, transparent);
+
+    /* Generic tokens the SHARED primitives (Button, Input, Select, Textarea,
+       Dialog) read. Overridden here so a primitive rendered inside the Media
+       workspace picks up the reference's faces instead of the Dashboard
+       ramp. Scoped to this subtree, so no other workspace is affected. */
+    --bg-body: var(--mms-workspace);
+    --bg-surface: var(--mms-surface);
+    --bg-surface-2: var(--mms-surface-raised);
+    --border-subtle: var(--mms-border);
+    --border-muted: var(--mms-border);
+    --border: var(--mms-border);
+    --border-strong: var(--mms-border-strong);
+    --text: var(--mms-text);
+    --text-muted: var(--mms-text-muted);
+    /* The reference draws every control as a 7px box, not the pill the rest
+       of the admin uses. Overriding the token rather than each control
+       catches the Select's visible wrapper too — its own `<select>` is an
+       invisible overlay, so styling the element directly has no effect. */
+    --input-radius: var(--media-radius-7);
+
+    /* ── Structural geometry (reference `:root` / `.workspace`) ────────── */
+    --media-rail-w: 50px;
+    --media-sidebar-w: 276px;
+    /* Every interactive target in the reference is at least 44 × 44. */
+    --media-tap: 44px;
+    --media-rail-btn-h: 56px;
+    --media-toolbar-h: 64px;
+    --media-titlebar-h: 54px;
+    --media-footer-h: 58px;
+    --media-search-h: 46px;
+    --media-row-h: 72px;
+    --media-queue-row-h: 70px;
+    --media-list-thumb-w: 92px;
+    --media-list-thumb-h: 70px;
+    --media-folder-icon: 40px;
+    --media-queue-icon: 36px;
+    --media-play-btn: 58px;
+    --media-empty-icon: 62px;
+    --media-empty-min-h: 360px;
+    --media-empty-copy-w: 390px;
+    --media-viewer-w: min(620px, calc(100vw - 380px));
+    --media-viewer-max-h: min(690px, calc(100vh - 105px));
+    --media-viewer-layout-max-h: calc(100vh - 225px);
+    --media-preview-min-h: 330px;
+    --media-bulk-w: 360px;
+    --media-queue-w: 390px;
+    --media-queue-max-h: 600px;
+    --media-queue-list-max-h: 430px;
+    --media-queue-left: 342px;
+    --media-storage-w: min(520px, calc(100vw - 380px));
+    --media-modal-w: min(650px, 100%);
+    --media-modal-heading-h: 76px;
+    --media-modal-actions-h: 66px;
+    --media-compare-arrow-w: 44px;
+    --media-file-drop-h: 151px;
+    --media-toast-h: 48px;
+    --media-grid-min: 130px;
+    --media-grid-cols: 5;
+    --media-tile-min-h: 72px;
+    --media-thumb-ratio: 1.28;
+    --media-compare-ratio: 1.5;
+    --media-badge-h: 26px;
+    --media-checkmark: 28px;
+    --media-progress-h: 4px;
+    --media-filter-col: 142px;
+    --media-search-min: 230px;
+
+    /* ── Radii (reference, verbatim; name = value in px) ───────────────── */
+    --media-radius-4: 4px;
+    --media-radius-6: 6px;
+    --media-radius-7: 7px;
+    --media-radius-8: 8px;
+    --media-radius-9: 9px;
+    --media-radius-10: 10px;
+    --media-radius-12: 12px;
+    --media-radius-14: 14px;
+    --media-radius-16: 16px;
+    --media-radius-pill: 999px;
+
+    /* ── Spacing (reference, verbatim; name = value in px) ─────────────── */
+    --media-sp-0: 0px;
+    --media-sp-2: 2px;
+    --media-sp-3: 3px;
+    --media-sp-4: 4px;
+    --media-sp-5: 5px;
+    --media-sp-6: 6px;
+    --media-sp-7: 7px;
+    --media-sp-8: 8px;
+    --media-sp-9: 9px;
+    --media-sp-10: 10px;
+    --media-sp-11: 11px;
+    --media-sp-12: 12px;
+    --media-sp-13: 13px;
+    --media-sp-14: 14px;
+    --media-sp-15: 15px;
+    --media-sp-16: 16px;
+    --media-sp-17: 17px;
+    --media-sp-18: 18px;
+    --media-sp-19: 19px;
+    --media-sp-20: 20px;
+    --media-sp-21: 21px;
+    --media-sp-22: 22px;
+    --media-sp-24: 24px;
+    --media-sp-25: 25px;
+    --media-sp-26: 26px;
+    --media-sp-27: 27px;
+    --media-sp-28: 28px;
+    --media-sp-32: 32px;
+    --media-sp-40: 40px;
+    --media-sp-42: 42px;
+    --media-sp-49: 49px;
+    --media-sp-52: 52px;
+    /* The admin shell header height — the reference's `--shell-height`. */
+    --media-sp-60: 60px;
+    --media-sp-80: 80px;
+
+    /* Panel width the sidebar renders at, clamped so the rail is never pushed
+       off-screen on a narrow viewport. */
+    --media-sidebar-render-w: min(
+        var(--media-sidebar-w),
+        calc(100vw - var(--media-rail-w))
+    );
+
+    /* ── Type sizes (reference, verbatim; name = value in px) ──────────── */
+    --media-text-9: 9px;
+    --media-text-10: 10px;
+    --media-text-11: 11px;
+    --media-text-12: 12px;
+    --media-text-13: 13px;
+    --media-text-15: 15px;
+    --media-text-18: 18px;
+    --media-text-21: 21px;
+    --media-text-26: 26px;
+
+    /* ── Type weights (reference, verbatim) ────────────────────────────── */
+    --media-weight-body: 500;
+    --media-weight-meta: 600;
+    --media-weight-label: 680;
+    --media-weight-strong: 700;
+    --media-weight-heading: 750;
+    --media-weight-eyebrow: 760;
+}
+
+/* Dark mirror — transcribed from the reference's
+   `html[data-theme="dark"]` block, with the masters' amber glyph. */
+[data-editor-theme='dark'] [data-editor-screen='media'],
+[data-editor-screen='media'][data-editor-theme='dark'] {
+    --mms-bg: #001e2d;
+    --mms-workspace: #062936;
+    --mms-surface: #082f3b;
+    --mms-surface-raised: #103a46;
+    --mms-surface-tint: #173f49;
+    --mms-surface-green: #123f30;
+    /* Alpha, not hex — the reference's dark hairline. */
+    --mms-border: rgba(248, 241, 223, 0.14);
+    --mms-border-strong: #31505a;
+    --mms-text: #f8f1df;
+    --mms-text-muted: #b4c1be;
+    --mms-action: #27ba66;
+    --mms-action-strong: #34cb73;
+    --mms-success: #32c772;
+    /* Warning flips to the identity yellow on navy (the burnt orange dies). */
+    --mms-warning: #f3c94f;
+    --mms-danger: #ff8d7f;
+    --mms-danger-bg: #402825;
+
+    /* Brighter amber on navy, per `04-media-dark-approved-adaptive-workspace`. */
+    --media-folder-glyph: #ffb300;
+    /* Dark tiles read by their border, not by a lighter fill — the masters
+       keep every surface at one value and separate with hairlines only. */
+    --media-folder-tile-bg: var(--mms-surface);
+    --media-shadow-menu: 0 22px 56px rgba(0, 0, 0, 0.38);
+    --media-shadow-window: 0 28px 80px rgba(0, 0, 0, 0.52);
 }
 
 :root[data-editor-text-scale='small'],

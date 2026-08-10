@@ -22,13 +22,54 @@ import {
 export type { PluginEvent }
 
 type Listener = (event: PluginEvent) => void
+type StatusListener = () => void
 
 const listeners = new Set<Listener>()
 let source: EventSource | null = null
 
+/**
+ * Connection state, exposed so the Plugins workspace can report whether the
+ * lifecycle stream is actually live rather than asserting that it is.
+ *
+ * Held as a plain boolean snapshot (not read from `source.readyState` on
+ * demand) because `useSyncExternalStore` requires `getSnapshot` to be stable
+ * between renders — reading a mutating property would return a fresh value
+ * mid-render and loop.
+ */
+const statusListeners = new Set<StatusListener>()
+let connected = false
+
+function setConnected(next: boolean): void {
+  if (connected === next) return
+  connected = next
+  for (const listener of statusListeners) {
+    try { listener() } catch (err) {
+      console.error('[plugin-events] status listener threw:', err)
+    }
+  }
+}
+
+/** True while the EventSource is OPEN. False before the first connect, and
+ *  whenever the transport has dropped and is retrying. */
+export function getPluginStreamConnected(): boolean {
+  return connected
+}
+
+export function subscribePluginStreamStatus(listener: StatusListener): () => void {
+  statusListeners.add(listener)
+  return () => {
+    statusListeners.delete(listener)
+  }
+}
+
 function ensureConnected(): void {
   if (source) return
   source = new EventSource('/cms/api/cms/plugins/events', { withCredentials: true })
+  // EventSource auto-reconnects on transport errors; `onerror` fires on every
+  // drop and `onopen` on every successful (re)connect, so the pair tracks the
+  // real state across the whole retry cycle without bespoke retry logic.
+  source.onopen = () => setConnected(true)
+  source.onerror = () => setConnected(false)
   for (const kind of PLUGIN_EVENT_KINDS) {
     source.addEventListener(kind, (event) => {
       try {
@@ -56,6 +97,9 @@ function disconnectIfIdle(): void {
   if (listeners.size > 0) return
   source?.close()
   source = null
+  // A closed-by-us stream is not "connected" — without this the last consumer
+  // to unmount would leave the flag stuck true for the next one to read.
+  setConnected(false)
 }
 
 export function subscribePluginEvents(listener: Listener): () => void {

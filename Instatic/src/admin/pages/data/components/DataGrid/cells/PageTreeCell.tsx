@@ -18,7 +18,7 @@
  */
 import type { ReactElement } from 'react'
 import { Button } from '@ui/components/Button'
-import { LayoutSolidIcon } from 'pixel-art-icons/icons/layout-solid'
+import { LayoutSolidIcon } from '@admin/pages/data/icons'
 import type { CellEditorProps } from '@admin/pages/data/types'
 import type { DataField } from '@core/data/schemas'
 import { readNodeTreeCell } from '@core/data/cells'

@@ -97,3 +97,35 @@
 
 /* The dialog body's skeleton is rendered via the shared
  * `<SkeletonBlock>` primitive — see `src/ui/components/Skeleton/`. */
+
+/* ===========================================================================
+ * Data workspace — the approved MMSBUILD Data Workbench `.modal`.
+ *
+ * A 12px card capped at 480px with 64px header/footer bands and an 18px body,
+ * over a deep-teal scrim. Additive and scoped to an ancestor attribute only
+ * the Data workspace body carries; every other dialog in the admin is
+ * untouched. The primitive's focus trap, Escape handling and body-scroll lock
+ * are deliberately left alone — the reference modal has none of them, and
+ * dropping them here would be an accessibility regression.
+ * =========================================================================== */
+:global([data-editor-screen='data']) .backdrop {
+    background: var(--data-modal-scrim);
+}
+
+:global([data-editor-screen='data']) .dialog {
+    max-width: min(var(--data-modal-w), calc(100vw - 28px));
+    border: 1px solid var(--mms-border);
+    border-radius: var(--data-radius-12);
+    background: var(--mms-surface-raised);
+    box-shadow: var(--data-shadow-menu);
+}
+
+:global([data-editor-screen='data']) .header {
+    min-height: var(--data-panel-header-h);
+    padding: 0 var(--data-sp-14) 0 var(--data-sp-18);
+    border-bottom: 1px solid var(--mms-border);
+}
+
+:global([data-editor-screen='data']) .title {
+    font-size: var(--data-text-16);
+}

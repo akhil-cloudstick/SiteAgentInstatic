@@ -9,7 +9,7 @@
 import type { ReactElement } from 'react'
 import { Button } from '@ui/components/Button'
 import { SearchBar } from '@ui/components/SearchBar'
-import { ArrowDownIcon } from 'pixel-art-icons/icons/arrow-down'
+import { ArrowDownIcon } from '@admin/pages/data/icons'
 import { DataGridViewChips } from './DataGridViewChips'
 import type {
   SortState,

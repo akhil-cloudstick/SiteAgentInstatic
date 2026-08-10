@@ -26,8 +26,11 @@ import {
   type PluginSettingsSchema,
   type PluginSettingsValue,
 } from '@core/persistence'
+import { FaIcon } from '@ui/components/FaIcon'
 import { StepUpCancelledMessage, useStepUp } from '@admin/shared/StepUp'
 import { pluginAdminUi } from '../PluginAdminUi'
+import { pluginDialogScopeRef } from '../pluginDialogScope'
+import dialogStyles from '../pluginDialog.module.css'
 import { getErrorMessage } from '@core/utils/errorMessage'
 
 // ---------------------------------------------------------------------------
@@ -125,28 +128,38 @@ export function PluginSettingsDialog({
   return (
     <Dialog
       open
+      ref={pluginDialogScopeRef}
       onClose={saving ? () => {} : onClose}
-      eyebrow="Plugin settings"
-      title={pluginName}
-      size="lg"
+      eyebrow="Plugin-owned settings"
+      title={`${pluginName} settings`}
       loading={loading}
+      className={dialogStyles.dialog}
+      bodyClassName={dialogStyles.body}
+      footerClassName={dialogStyles.footer}
       footer={
         <>
-          <Button variant="secondary" size="sm" type="button" onClick={onClose} disabled={saving}>
-            Cancel
+          <Button variant="secondary" size="lg" type="button" onClick={onClose} disabled={saving}>
+            <span>Cancel</span>
           </Button>
           <Button
             variant="primary"
-            size="sm"
+            size="lg"
             type="button"
             onClick={() => void save()}
             disabled={loading || saving || !schema || schema.length === 0 || loadError !== null}
           >
-            {saving ? 'Saving...' : 'Save settings'}
+            <FaIcon name="floppy-disk" size={14} />
+            <span>{saving ? 'Saving…' : 'Save settings'}</span>
           </Button>
         </>
       }
     >
+      {!loading && !loadError && schema && schema.length > 0 && (
+        <p className={dialogStyles.lead}>
+          These fields are declared by this plugin&rsquo;s manifest. Secret values
+          remain masked.
+        </p>
+      )}
       {loadError && (
         <pluginAdminUi.Alert tone="danger" title="Could not load settings">
           {loadError}

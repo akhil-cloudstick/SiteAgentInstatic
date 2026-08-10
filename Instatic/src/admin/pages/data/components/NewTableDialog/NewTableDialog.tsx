@@ -1,47 +1,33 @@
-import { useId, useRef, useState, type FormEvent } from 'react'
-import { Button } from '@ui/components/Button'
+/**
+ * NewTableDialog — the approved screen's `NewTableComposer`, verbatim.
+ *
+ * The reference asks for exactly three things: a table name, a kind, and an
+ * ordered list of initial fields (label + type). Everything else it derives —
+ * slug from the name, singular/plural labels from the name, the primary field
+ * from the kind's guarded base fields. That derivation lives in
+ * `deriveTableInput` below, so the dialog stays as small as the mock's while
+ * the server still receives a fully-formed `CreateDataTableInput`.
+ *
+ * Field id, type and order remain immutable once created — the same guarantee
+ * the richer composer gave — because they are only ever set here, at creation.
+ */
+import { useState, type ReactElement } from 'react'
 import { Dialog } from '@ui/components/Dialog'
+import { Button } from '@ui/components/Button'
 import { Input } from '@ui/components/Input'
-import { SegmentedControl } from '@ui/components/SegmentedControl'
-import { pushToast } from '@ui/components/Toast'
-import { buildPostTypeDefaultFields, isPrimaryFieldCandidate } from '@core/data/fields'
+import { Select } from '@ui/components/Select'
 import {
+  DATA_FIELD_TYPES,
   type CreateDataTableInput,
   type DataField,
+  type DataFieldType,
   type DataTable,
   type DataTableKind,
 } from '@core/data/schemas'
 import { StepUpCancelledMessage } from '@admin/shared/StepUp'
-import { FieldSchemaComposer } from '../FieldSchemaComposer'
-import styles from './NewTableDialog.module.css'
 import { getErrorMessage } from '@core/utils/errorMessage'
-
-// ---------------------------------------------------------------------------
-// Private helpers
-// ---------------------------------------------------------------------------
-
-function slugify(name: string): string {
-  return name
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-}
-
-function singularFromPlural(value: string): string {
-  if (/[^aeiou]ies$/i.test(value)) return value.replace(/ies$/i, 'y')
-  if (/(?:s|x|z|ch|sh)es$/i.test(value)) return value.replace(/es$/i, '')
-  if (/ss$/i.test(value)) return value
-  return value.replace(/s$/i, '') || value
-}
-
-function errorMessage(err: unknown): string {
-  return getErrorMessage(err, 'Could not create table').replace(/^\[[^\]]+\]\s*/, '')
-}
-
-// ---------------------------------------------------------------------------
-// Props
-// ---------------------------------------------------------------------------
+import { PlusIcon, TrashSolidIcon } from '@admin/pages/data/icons'
+import styles from './NewTableDialog.module.css'
 
 interface NewTableDialogProps {
   open: boolean
@@ -50,130 +36,117 @@ interface NewTableDialogProps {
   tables: DataTable[]
 }
 
+/** The reference's two kinds, in its wording. */
 const KIND_OPTIONS: ReadonlyArray<{ value: DataTableKind; label: string }> = [
-  { value: 'data', label: 'Data table' },
-  { value: 'postType', label: 'Post type' },
+  { value: 'data', label: 'Plain data' },
+  { value: 'postType', label: 'Custom post type' },
 ]
 
-const KIND_DESCRIPTIONS: Record<DataTableKind, string> = {
-  data: 'A grid of structured records — products, FAQs, team members, etc.',
-  postType: 'Authored content with title, body, slug, and publish workflow.',
-  page: 'System table for page content (managed internally).',
-  component: 'System table for visual component definitions (managed internally).',
-  layout: 'System table for saved layout snapshots (managed internally).',
+/**
+ * The field types a user may pick at creation. `pageTree` and `fieldSchema` are
+ * excluded — they are structural document types with their own dedicated
+ * editors, exactly as the reference's `AUTHORABLE_FIELD_TYPES` excludes them.
+ */
+const AUTHORABLE_FIELD_TYPES = DATA_FIELD_TYPES.filter(
+  (type) => type !== 'pageTree' && type !== 'fieldSchema',
+)
+
+interface DraftField {
+  id: string
+  label: string
+  type: DataFieldType
 }
 
-const FORM_ID = 'new-table-dialog-form'
-const SLUG_PLACEHOLDER = 'projects'
+/** `Project facts` → `projectFacts`, matching the reference's machine-id rule. */
+function toMachineId(label: string): string {
+  return label
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+(.)/g, (_, next: string | undefined) => next?.toUpperCase() ?? '')
+    .replace(/[^a-zA-Z0-9]/g, '')
+}
 
-// ---------------------------------------------------------------------------
-// Component
-// ---------------------------------------------------------------------------
+function toSlug(name: string): string {
+  return name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
+}
+
+/**
+ * Builds the guarded base schema for a kind, then appends the user's fields.
+ *
+ * Post types start with the mandatory `title` / `slug` plus a `body`; plain data
+ * tables start with `name`. Base ids win over a user field of the same id, so a
+ * table can never end up with two `title` columns.
+ */
+function deriveTableInput(
+  name: string,
+  kind: DataTableKind,
+  drafts: DraftField[],
+): CreateDataTableInput {
+  const trimmed = name.trim()
+  const baseFields: DataField[] = kind === 'postType'
+    ? [
+        { type: 'text', id: 'title', label: 'Title', required: true },
+        { type: 'text', id: 'slug', label: 'Slug', required: true },
+        { type: 'richText', id: 'body', label: 'Body', format: 'markdown', builtIn: true },
+      ]
+    : [{ type: 'text', id: 'name', label: 'Name', required: true }]
+
+  const extras = drafts
+    .filter((draft) => !baseFields.some((base) => base.id === draft.id))
+    .map((draft) => ({ type: draft.type, id: draft.id, label: draft.label } as DataField))
+
+  return {
+    name: trimmed,
+    slug: toSlug(trimmed),
+    kind,
+    singularLabel: trimmed.replace(/s$/i, '') || 'Record',
+    pluralLabel: trimmed,
+    primaryFieldId: kind === 'postType' ? 'title' : 'name',
+    fields: [...baseFields, ...extras],
+  }
+}
 
 export function NewTableDialog({
   open,
   onClose,
   onCreate,
   tables,
-}: NewTableDialogProps) {
+}: NewTableDialogProps): ReactElement {
   const [name, setName] = useState('')
-  const [slug, setSlug] = useState('')
-  const [slugTouched, setSlugTouched] = useState(false)
   const [kind, setKind] = useState<DataTableKind>('data')
-  const [singularLabel, setSingularLabel] = useState('')
-  const [singularTouched, setSingularTouched] = useState(false)
-  const [pluralLabel, setPluralLabel] = useState('')
-  const [pluralTouched, setPluralTouched] = useState(false)
-  const [fieldsByKind, setFieldsByKind] = useState<Record<'data' | 'postType', DataField[]>>({
-    data: [{ type: 'text', id: 'name', label: 'Name', required: true }],
-    postType: buildPostTypeDefaultFields(),
-  })
-  const [primaryFieldsByKind, setPrimaryFieldsByKind] = useState<Record<'data' | 'postType', string>>({
-    data: 'name',
-    postType: 'title',
-  })
+  const [fieldLabel, setFieldLabel] = useState('')
+  const [fieldType, setFieldType] = useState<DataFieldType>('text')
+  const [fields, setFields] = useState<DraftField[]>([])
   const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-  const inputRef = useRef<HTMLInputElement>(null)
-  const nameId = useId()
-  const slugId = useId()
-  const singularId = useId()
-  const pluralId = useId()
-
-  // Derived values
   const trimmedName = name.trim()
-  const generatedSlug = trimmedName ? slugify(trimmedName) : ''
-  const displayedSlug = slugTouched ? slug : generatedSlug
-  const effectiveSlug = kind === 'postType'
-    ? slugify(displayedSlug || trimmedName)
-    : generatedSlug
+  const nameTaken = tables.some(
+    (table) => table.name.toLowerCase() === trimmedName.toLowerCase(),
+  )
+  const canCreate = trimmedName.length > 0 && !nameTaken && !saving
 
-  const displayedPlural = pluralTouched ? pluralLabel : trimmedName
-  const displayedSingular = singularTouched
-    ? singularLabel
-    : singularFromPlural(displayedPlural.trim())
-  const editableKind = kind === 'postType' ? 'postType' : 'data'
-  const fields = fieldsByKind[editableKind]
-  const primaryFieldId = primaryFieldsByKind[editableKind]
-
-  const canCreate = Boolean(trimmedName && effectiveSlug && fields.length > 0 && primaryFieldId && !saving)
-
-  function resetForm() {
-    setName('')
-    setSlug('')
-    setSlugTouched(false)
-    setKind('data')
-    setSingularLabel('')
-    setSingularTouched(false)
-    setPluralLabel('')
-    setPluralTouched(false)
-    setFieldsByKind({
-      data: [{ type: 'text', id: 'name', label: 'Name', required: true }],
-      postType: buildPostTypeDefaultFields(),
-    })
-    setPrimaryFieldsByKind({ data: 'name', postType: 'title' })
-    setSaving(false)
+  function addDraftField(): void {
+    const id = toMachineId(fieldLabel)
+    if (!id || fields.some((field) => field.id === id)) return
+    setFields((current) => [...current, { id, label: fieldLabel.trim(), type: fieldType }])
+    setFieldLabel('')
   }
 
-  function handleClose() {
-    resetForm()
-    onClose()
-  }
-
-  async function handleSubmit(event: FormEvent) {
-    event.preventDefault()
+  async function handleCreate(): Promise<void> {
     if (!canCreate) return
-
-    const routeBase = kind === 'postType' ? `/${effectiveSlug}` : ''
-
-    const input: CreateDataTableInput = {
-      name: trimmedName,
-      slug: effectiveSlug,
-      kind,
-      routeBase,
-      singularLabel: displayedSingular.trim() || trimmedName,
-      pluralLabel: displayedPlural.trim() || trimmedName,
-      primaryFieldId,
-      fields,
-    }
-
     setSaving(true)
+    setError(null)
     try {
-      await onCreate(input)
-      resetForm()
+      await onCreate(deriveTableInput(name, kind, fields))
     } catch (err) {
       if (err instanceof Error && err.message === StepUpCancelledMessage) {
         setSaving(false)
         return
       }
-      const message = errorMessage(err)
-      console.error('[NewTableDialog] Table creation failed:', err)
-      pushToast({
-        kind: 'error',
-        title: 'Table creation failed',
-        body: message,
-        location: 'data-workspace',
-      })
+      console.error('[NewTableDialog] Create table failed:', err)
+      setError(getErrorMessage(err, 'Could not create the table'))
+    } finally {
       setSaving(false)
     }
   }
@@ -181,148 +154,117 @@ export function NewTableDialog({
   return (
     <Dialog
       open={open}
-      onClose={handleClose}
+      onClose={onClose}
       title="New table"
-      eyebrow="Data model"
-      size="2xl"
-      initialFocusRef={inputRef}
-      className={styles.dialog}
-      bodyClassName={styles.dialogBody}
-      footer={
+      size="sm"
+      footer={(
         <>
-          <Button variant="ghost" size="sm" type="button" onClick={handleClose}>
-            Cancel
-          </Button>
-          <Button
-            variant="primary"
-            size="sm"
-            type="submit"
-            form={FORM_ID}
-            disabled={!canCreate}
-          >
-            {saving ? 'Creating…' : 'Create'}
+          <Button variant="ghost" onClick={onClose} disabled={saving}>Cancel</Button>
+          <Button variant="primary" onClick={() => { void handleCreate() }} disabled={!canCreate}>
+            Create table
           </Button>
         </>
-      }
+      )}
     >
-      <form id={FORM_ID} className={styles.form} onSubmit={handleSubmit}>
-        <div className={styles.setupPane}>
-          <div className={styles.setupSections}>
-            <section className={styles.setupSection}>
-              <div className={styles.kindPicker}>
-                <SegmentedControl
-                  value={kind}
-                  options={KIND_OPTIONS}
-                  onChange={setKind}
-                  fullWidth
-                  aria-label="Table kind"
-                />
-                <span className={styles.caption}>{KIND_DESCRIPTIONS[kind]}</span>
-              </div>
+      <p className={styles.intro}>
+        Choose a plain data table for operational records or a custom post type
+        for Content-managed entries, then create its initial schema in the same
+        guarded action.
+      </p>
 
-              <div className={styles.field}>
-                <label htmlFor={nameId} className={styles.label}>Name</label>
-                <Input
-                  id={nameId}
-                  ref={inputRef}
-                  fieldSize="sm"
-                  value={name}
-                  onChange={(event) => setName(event.target.value)}
-                  placeholder="Projects"
-                  autoComplete="off"
-                  spellCheck={false}
-                />
-              </div>
+      <div className={styles.fieldControl}>
+        <label className={styles.label} htmlFor="new-table-name">Table name</label>
+        <Input
+          id="new-table-name"
+          autoFocus
+          value={name}
+          onChange={(event) => setName(event.target.value)}
+        />
+        {nameTaken && (
+          <p className={styles.error} role="alert">A table named “{trimmedName}” already exists.</p>
+        )}
+      </div>
 
-              {kind === 'postType' && (
-                <div className={styles.field}>
-                  <label htmlFor={slugId} className={styles.label}>Slug</label>
-                  <Input
-                    id={slugId}
-                    fieldSize="sm"
-                    value={displayedSlug}
-                    onChange={(event) => {
-                      setSlugTouched(true)
-                      setSlug(slugify(event.target.value))
-                    }}
-                    placeholder={SLUG_PLACEHOLDER}
-                    autoComplete="off"
-                    spellCheck={false}
-                  />
-                  <span className={styles.caption}>
-                    {slugTouched
-                      ? `Entry URLs use /${effectiveSlug || SLUG_PLACEHOLDER}/…`
-                      : 'Generated from the name; edit to change entry URLs.'}
-                  </span>
-                  <div className={styles.routePreview}>
-                    <span>Entry URL pattern</span>
-                    <code>/{effectiveSlug || SLUG_PLACEHOLDER}/entry-slug</code>
-                  </div>
-                </div>
-              )}
+      <div className={styles.fieldControl}>
+        <label className={styles.label} htmlFor="new-table-kind">Kind</label>
+        <Select
+          id="new-table-kind"
+          value={kind}
+          onChange={(event) => setKind(event.target.value as DataTableKind)}
+        >
+          {KIND_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>{option.label}</option>
+          ))}
+        </Select>
+      </div>
 
-              <div className={styles.labelGrid}>
-                <div className={styles.field}>
-                  <label htmlFor={singularId} className={styles.label}>Singular label</label>
-                  <Input
-                    id={singularId}
-                    fieldSize="sm"
-                    value={displayedSingular}
-                    onChange={(event) => {
-                      setSingularTouched(true)
-                      setSingularLabel(event.target.value)
-                    }}
-                    placeholder="Project"
-                    autoComplete="off"
-                    spellCheck={false}
-                  />
-                </div>
-                <div className={styles.field}>
-                  <label htmlFor={pluralId} className={styles.label}>Plural label</label>
-                  <Input
-                    id={pluralId}
-                    fieldSize="sm"
-                    value={displayedPlural}
-                    onChange={(event) => {
-                      setPluralTouched(true)
-                      setPluralLabel(event.target.value)
-                    }}
-                    placeholder="Projects"
-                    autoComplete="off"
-                    spellCheck={false}
-                  />
-                </div>
-              </div>
-            </section>
+      <div className={styles.schemaDraft}>
+        <h3 className={styles.schemaHeading}>Initial fields</h3>
+        <p className={styles.schemaCopy}>
+          {kind === 'postType'
+            ? 'Title, slug, and body are added as guarded post-type fields.'
+            : 'Name is added as the primary field.'}
+        </p>
+
+        {fields.map((field) => (
+          <div className={styles.draftRow} key={field.id}>
+            <span className={styles.draftRowText}>
+              <b className={styles.draftLabel}>{field.label}</b>
+              <small className={styles.draftType}>{field.type}</small>
+            </span>
+            <Button
+              variant="ghost"
+              size="xs"
+              iconOnly
+              tone="danger"
+              dangerHover
+              aria-label={`Remove ${field.label}`}
+              tooltip={`Remove ${field.label}`}
+              onClick={() => setFields((current) => current.filter((item) => item.id !== field.id))}
+            >
+              <TrashSolidIcon size={13} aria-hidden="true" />
+            </Button>
           </div>
-        </div>
+        ))}
 
-        <div className={styles.schemaPane}>
-          <FieldSchemaComposer
-            fields={fields}
-            tables={tables}
-            onChange={(nextFields) => {
-              setFieldsByKind((current) => ({ ...current, [editableKind]: nextFields }))
-              const candidates = nextFields.filter(isPrimaryFieldCandidate)
-              if (!candidates.some((field) => field.id === primaryFieldId)) {
-                setPrimaryFieldsByKind((current) => ({
-                  ...current,
-                  [editableKind]: candidates[0]?.id ?? '',
-                }))
-              }
-            }}
-            title="Record structure"
-            primaryFieldId={primaryFieldId}
-            onPrimaryFieldChange={(fieldId) => {
-              setPrimaryFieldsByKind((current) => ({
-                ...current,
-                [editableKind]: fieldId,
-              }))
+        <div className={styles.draftAdd}>
+          <Input
+            aria-label="Field label"
+            placeholder="Field label"
+            className={styles.draftAddInput}
+            value={fieldLabel}
+            onChange={(event) => setFieldLabel(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key !== 'Enter') return
+              event.preventDefault()
+              addDraftField()
             }}
           />
-
+          <Select
+            aria-label="Field type"
+            className={styles.draftAddSelect}
+            value={fieldType}
+            onChange={(event) => setFieldType(event.target.value as DataFieldType)}
+          >
+            {AUTHORABLE_FIELD_TYPES.map((type) => (
+              <option key={type} value={type}>{type}</option>
+            ))}
+          </Select>
+          <Button
+            variant="ghost"
+            size="xs"
+            iconOnly
+            aria-label="Add field to table schema"
+            tooltip="Add field to table schema"
+            disabled={fieldLabel.trim().length === 0}
+            onClick={addDraftField}
+          >
+            <PlusIcon size={13} aria-hidden="true" />
+          </Button>
         </div>
-      </form>
+      </div>
+
+      {error != null && <p className={styles.error} role="alert">{error}</p>}
     </Dialog>
   )
 }

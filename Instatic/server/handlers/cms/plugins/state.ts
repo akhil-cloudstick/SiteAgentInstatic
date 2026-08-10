@@ -35,6 +35,7 @@ import { badRequest, jsonResponse, methodNotAllowed, readValidatedBody } from '.
 import { Type } from '@core/utils/typeboxHelpers'
 import { deactivatePluginModulePack } from '@core/plugins/modulePackLoader'
 import { clearPluginScheduleRuns } from '../../../repositories/pluginSchedules'
+import { sweepStagedPackage } from './staged'
 import { type CmsHandlerOptions } from '../shared'
 import {
   lifecycleErrorMessage,
@@ -201,6 +202,11 @@ async function removePluginCompletely(
   await clearPluginScheduleRuns(db, pluginId)
   if (options.uploadsDir) {
     await removeAllPluginAssets(options.uploadsDir, pluginId)
+    // A pending update for a plugin that no longer exists is dead weight. No
+    // FK does this for us — `plugin_staged_packages` deliberately has none,
+    // because a package staged for a FRESH install has no plugin row to
+    // reference.
+    await sweepStagedPackage(db, options.uploadsDir, pluginId)
   }
   await activateInstalledServerPlugins(db, options.uploadsDir)
   await recordPluginAuditEvent(

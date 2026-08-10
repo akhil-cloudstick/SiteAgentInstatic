@@ -212,3 +212,42 @@
     animation-duration: 0.01ms;
   }
 }
+
+/* Data workspace, narrow viewports — reserve the 62px the fixed bottom dock
+   occupies so the grid footer is never hidden underneath it. */
+@media (max-width: 1100px) {
+    :global([data-editor-screen='data']).editorBody {
+        padding-bottom: var(--data-dock-h);
+    }
+}
+
+/* Data workspace — the approved screen eases its panel tracks rather than
+   snapping them, so collapsing a panel reads as motion instead of a jump. */
+@media (prefers-reduced-motion: no-preference) {
+    :global([data-editor-screen='data']) > .canvasStage {
+        transition: flex-basis 160ms ease, width 160ms ease;
+    }
+}
+
+/* Data workspace — the stage carries the workspace tone, not the canvas gutter,
+   so the centre column matches the sidebar exactly (see DataCanvas.module.css). */
+:global([data-editor-screen='data']) > .canvasStage {
+    background: var(--mms-workspace);
+}
+
+/*
+ * Data workspace — square the canvas edge when the right panel is open.
+ *
+ * `.canvasStageRightSidebarOpen` rounds the stage's top-right corner by 12px.
+ * That is why the corner appears only while the inspector is OPEN and vanishes
+ * when it is collapsed — the class is applied on exactly that condition.
+ *
+ * It reads as a cut corner only in dark mode, where the stage and the surface
+ * behind it are different tones; in light mode they are close enough to hide
+ * the arc. The approved screen has no rounding between the grid and the
+ * inspector — they meet on a straight hairline.
+ */
+:global([data-editor-screen='data']) .canvasStageRightSidebarOpen,
+:global([data-editor-screen='content']) .canvasStageRightSidebarOpen {
+    border-top-right-radius: 0;
+}

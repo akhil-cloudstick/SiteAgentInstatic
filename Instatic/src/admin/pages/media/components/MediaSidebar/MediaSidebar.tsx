@@ -1,33 +1,32 @@
 /**
- * MediaSidebar — left rail + panel slot for the Media workspace.
+ * MediaSidebar — icon rail + folder column for the Media workspace.
  *
- * Mirrors the structure of `ContentSidebar`: a panel rail with one toggle
- * for the Folders panel and a panel slot that mounts the panel body.
+ * Transcribed from the MMSBUILD Media reference (`screens/media/src/App.jsx`
+ * → `.context-rail` + `.folder-sidebar`). Behaviour is the reference's, not
+ * an interpretation of it:
  *
- * The Folders panel itself owns the entire folder navigation: the regular
- * folder tree, the built-in smart folders (Recent uploads, Missing alt
- * text), and the Trash sentinel — all as rows in one tree. There are no
- * separate Smart / Trash panels.
+ *   • The folder column is PART OF THE WORKSPACE. It is always mounted and
+ *     never swaps its contents.
+ *   • The close button exists in the markup but the reference hides it on
+ *     desktop (`.sidebar-close { display: none }`) and only shows it at
+ *     ≤767px, where the column becomes a drawer. So there is no desktop X.
+ *   • Storage does NOT replace the folder column. It opens `.storage-panel`,
+ *     a fixed panel on the right of the canvas, and the folders stay put.
+ *   • The Folders rail button is active whenever Storage is closed.
  *
- * Reuses the editor's PanelRail / LeftSidebar CSS so the visual language is
- * identical across Site / Content / Media.
+ * Media used to borrow the Site editor's `LeftSidebar` + `PanelRail` CSS
+ * modules; it owns `MediaSidebar.module.css` now, so restyling Media cannot
+ * repaint the Site editor.
  */
-import { useRef, type CSSProperties } from 'react'
+import { useRef } from 'react'
 import { Button } from '@ui/components/Button'
-import { assignRailAccents, railTintVar } from '@ui/railAccent'
-import { CloudUploadSolidIcon } from 'pixel-art-icons/icons/cloud-upload-solid'
-import { FolderGlyphIcon } from 'pixel-art-icons/icons/folder-glyph'
-import type { IconComponent } from 'pixel-art-icons/types'
-import { useWorkspaceLayout } from '@admin/state/workspaceLayout'
+import { FaIcon } from '@ui/components/FaIcon'
 import { hasCapability } from '@admin/access'
 import { useCurrentAdminUser } from '@admin/sessionContext'
-import { SidebarResizeHandle } from '@admin/shared/SidebarResizeHandle'
-import { Panel } from '@admin/shared/Panel'
-import leftSidebarStyles from '@site/sidebars/LeftSidebar/LeftSidebar.module.css'
-import panelRailStyles from '@site/sidebars/PanelRail/PanelRail.module.css'
 import { MediaFolderPanel } from '../MediaFolderPanel/MediaFolderPanel'
 import { MediaStoragePanel } from '../MediaStoragePanel/MediaStoragePanel'
 import type { UseMediaWorkspaceResult } from '../../hooks/useMediaWorkspace'
+import styles from './MediaSidebar.module.css'
 
 export type MediaSidebarPanelId = 'folders' | 'storage'
 
@@ -35,152 +34,150 @@ interface MediaSidebarProps {
   workspace: UseMediaWorkspaceResult
   activePanel: MediaSidebarPanelId | null
   onActivePanelChange: (panel: MediaSidebarPanelId | null) => void
+  /** Opens the admin Settings modal — the reference's rail-foot action. */
+  onOpenSettings?: () => void
 }
 
-interface RailItem {
-  id: MediaSidebarPanelId
-  label: string
-  icon: IconComponent
-  iconName: string
-}
-
-/**
- * Every available rail item. The actual rendered set is filtered by
- * `useRailItems` below so panels gated on a capability (e.g. storage =
- * `storage.elect`) are hidden for users who can't use them anyway —
- * rather than showing a button that produces a 403 on first click.
- */
-const ALL_RAIL_ITEMS: RailItem[] = [
-  { id: 'folders', label: 'Folders', icon: FolderGlyphIcon, iconName: 'folder' },
-  { id: 'storage', label: 'Storage', icon: CloudUploadSolidIcon, iconName: 'cloud-upload' },
-]
-
-const PANEL_TITLES: Record<MediaSidebarPanelId, string> = {
-  folders: 'Folders',
-  storage: 'Storage',
-}
-
-export function MediaSidebar({ workspace, activePanel, onActivePanelChange }: MediaSidebarProps) {
+export function MediaSidebar({
+  workspace,
+  activePanel,
+  onActivePanelChange,
+  onOpenSettings,
+}: MediaSidebarProps) {
   const sidebarRef = useRef<HTMLElement | null>(null)
-  const leftSidebarWidth = useWorkspaceLayout((s) => s.leftSidebarWidth)
-  const setLeftSidebarWidth = useWorkspaceLayout((s) => s.setLeftSidebarWidth)
   const currentUser = useCurrentAdminUser()
-  const panelWidth = activePanel ? leftSidebarWidth : 0
-  const style = {
-    '--left-sidebar-panel-width': `${panelWidth}px`,
-    '--left-sidebar-panel-layout-width': `${leftSidebarWidth}px`,
-  } as CSSProperties
 
-  // Storage election changes which adapter handles each asset role.
-  // Gated by `storage.elect` (split from the old `runtime.manage`). Hide
-  // the rail button entirely for users who can't use it; the API
-  // endpoints also enforce this gate server-side as defense-in-depth.
-  const railItems: RailItem[] = ALL_RAIL_ITEMS.filter((item) => {
-    if (item.id === 'storage') return hasCapability(currentUser, 'storage.elect')
-    return true
-  })
-  const railAccents = assignRailAccents(
-    railItems,
-    (item) => `media:${item.id}:${item.label}`,
-  )
+  // Storage election changes which adapter handles each asset role. Gated by
+  // `storage.elect`. Hide the rail button entirely for users who can't use
+  // it; the API endpoints also enforce this gate server-side.
+  const canElectStorage = hasCapability(currentUser, 'storage.elect')
+  const storageOpen = activePanel === 'storage' && canElectStorage
 
-  // Defensive: if the user previously had the storage panel open and then
-  // had their capability revoked, collapse it on the next render so they
-  // don't end up looking at a stale 403-shaped error.
-  if (activePanel === 'storage' && !railItems.some((item) => item.id === 'storage')) {
-    onActivePanelChange(null)
+  // Defensive: if the user had Storage open and then lost the capability,
+  // collapse it on the next render rather than showing a stale 403.
+  if (activePanel === 'storage' && !canElectStorage) {
+    onActivePanelChange('folders')
   }
 
-  function handleRailToggle(panelId: MediaSidebarPanelId) {
-    const next = activePanel === panelId ? null : panelId
-    onActivePanelChange(next)
-  }
+  // The reference's drawer flag. On desktop the column is always visible;
+  // below 767px `foldersOpen` slides it in over the canvas.
+  const foldersOpen = activePanel === 'folders'
 
   return (
     <aside
       ref={sidebarRef}
-      className={leftSidebarStyles.sidebar}
+      className={styles.sidebar}
+      data-media-surface=""
       data-testid="media-left-sidebar"
-      data-expanded={activePanel ? 'true' : 'false'}
-      data-active-panel={activePanel ?? 'none'}
-      style={style}
+      data-expanded={foldersOpen ? 'true' : 'false'}
+      data-active-panel={activePanel ?? 'folders'}
     >
       <nav
-        aria-label="Media panel dock"
-        className={panelRailStyles.rail}
+        aria-label="Media workspace sections"
+        className={styles.rail}
         data-testid="media-panel-rail"
       >
-        <div className={panelRailStyles.itemGroup}>
-          {railItems.map((item, index) => {
-            const Icon = item.icon
-            const active = activePanel === item.id
-            const action = active ? 'Close' : 'Open'
-            const accent = railAccents[index] ?? 'mint'
-            const buttonStyle = {
-              '--rail-icon-tint': railTintVar(accent),
-            } as CSSProperties
-            return (
-              <Button
-                key={item.id}
-                variant="ghost"
-                size="md"
-                iconOnly
-                pressed={active}
-                aria-label={`${action} ${item.label} panel`}
-                tooltip={`${item.label} panel`}
-                data-testid={`media-panel-rail-${item.id}`}
-                data-icon={item.iconName}
-                data-accent={accent}
-                style={buttonStyle}
-                onClick={() => handleRailToggle(item.id)}
-                className={panelRailStyles.railButton}
-              >
-                <span className={panelRailStyles.activeIndicator} aria-hidden="true" />
-                <Icon size={16} className={panelRailStyles.railIcon} />
-              </Button>
-            )
-          })}
-        </div>
+        {/* Folders is active whenever Storage is closed — the reference
+            keys it off `!storageOpen`, not off its own toggle. */}
+        <Button
+          variant="ghost"
+          size="md"
+          iconOnly
+          pressed={!storageOpen}
+          aria-label="Folders and media"
+          tooltip="Folders"
+          tooltipSide="right"
+          data-testid="media-panel-rail-folders"
+          onClick={() => onActivePanelChange(foldersOpen && !storageOpen ? null : 'folders')}
+          className={styles.railButton}
+        >
+          <FaIcon name="folder-open" size={17} />
+        </Button>
+
+        {canElectStorage && (
+          <Button
+            variant="ghost"
+            size="md"
+            iconOnly
+            pressed={storageOpen}
+            aria-label="Storage and migrations"
+            tooltip="Storage"
+            tooltipSide="right"
+            data-testid="media-panel-rail-storage"
+            onClick={() => {
+              onActivePanelChange('storage')
+              workspace.clearSelection()
+            }}
+            className={styles.railButton}
+          >
+            <FaIcon name="hard-drive" size={17} />
+          </Button>
+        )}
+
+        {onOpenSettings && (
+          <Button
+            variant="ghost"
+            size="md"
+            iconOnly
+            aria-label="Media settings"
+            tooltip="Settings"
+            tooltipSide="right"
+            data-testid="media-panel-rail-settings"
+            onClick={onOpenSettings}
+            className={`${styles.railButton} ${styles.railBottom}`}
+          >
+            <FaIcon name="gear" size={17} />
+          </Button>
+        )}
       </nav>
 
-      <div
-        className={leftSidebarStyles.panelSlot}
-        data-testid="media-left-sidebar-panel-slot"
-        inert={activePanel ? undefined : true}
-      >
-        <div className={leftSidebarStyles.panelMount}>
-          {activePanel && (
-            <Panel
-              panelId={`media-${activePanel}`}
-              title={PANEL_TITLES[activePanel]}
-              ariaLabel={`${PANEL_TITLES[activePanel]} panel`}
-              testId={`media-${activePanel}-panel`}
-              onClose={() => onActivePanelChange(null)}
-              // The folder tree owns its own scroll container (`body="bare"`),
-              // but the storage panel is a stack of small cards that
-              // wants the standard 8px-padded scroll surface.
-              body={activePanel === 'folders' ? 'bare' : 'padded'}
-            >
-              {activePanel === 'folders' ? (
-                <MediaFolderPanel workspace={workspace} />
-              ) : (
-                <MediaStoragePanel />
-              )}
-            </Panel>
-          )}
+      {/* The folder column is always mounted and never swaps its contents. */}
+      <div className={styles.panelBody} data-testid="media-folders-panel-slot">
+        <div className={styles.heading}>
+          <div className={styles.headingText}>
+            <p className={styles.eyebrow}>Media library</p>
+            <h1 className={styles.title}>Folders</h1>
+          </div>
+          {/* Present in the reference markup but hidden by CSS on desktop;
+              it only appears at ≤767px, where this column is a drawer. */}
+          <Button
+            variant="ghost"
+            size="sm"
+            iconOnly
+            aria-label="Close folders"
+            className={styles.sidebarClose}
+            onClick={() => onActivePanelChange(null)}
+          >
+            <FaIcon name="xmark" size={13} />
+          </Button>
         </div>
+
+        <MediaFolderPanel workspace={workspace} />
       </div>
 
-      {activePanel && (
-        <SidebarResizeHandle
-          side="left"
-          width={leftSidebarWidth}
-          targetRef={sidebarRef}
-          cssVariable="--left-sidebar-panel-width"
-          layoutCssVariable="--left-sidebar-panel-layout-width"
-          ariaLabel="Resize media sidebar"
-          onResize={setLeftSidebarWidth}
-        />
+      {/* `.storage-panel` — a fixed panel over the canvas. The folder column
+          stays exactly where it is. */}
+      {storageOpen && (
+        <div className={styles.storagePanel} data-testid="media-storage-panel-shell">
+          <div className={styles.storageHeading}>
+            <div className={styles.storageHeadingText}>
+              <FaIcon name="hard-drive" size={14} />
+              <strong>Storage</strong>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              iconOnly
+              aria-label="Close storage"
+              onClick={() => onActivePanelChange('folders')}
+            >
+              <FaIcon name="xmark" size={13} />
+            </Button>
+          </div>
+          <div className={styles.storageBody}>
+            <MediaStoragePanel />
+          </div>
+        </div>
       )}
     </aside>
   )

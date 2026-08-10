@@ -61,3 +61,21 @@
 .searchBar .input::placeholder {
     color: var(--text-subtle);
 }
+
+/*
+ * Data workspace — the approved screen's `.search-control`: a 44px box with a
+ * 7px radius on the raised surface, strong hairline, 12px text.
+ */
+:global([data-editor-screen='data']) .searchBar {
+    height: var(--data-tap);
+    padding: 0 var(--data-sp-12);
+    gap: var(--data-sp-9);
+    border: 1px solid var(--mms-border-strong);
+    border-radius: var(--data-radius-7);
+    background: var(--mms-surface-raised);
+}
+
+:global([data-editor-screen='data']) .searchBar .input {
+    height: var(--data-tap);
+    font-size: var(--data-text-12);
+}

@@ -264,3 +264,13 @@
     line-height: 1.4;
     text-align: center;
 }
+
+/* The approved screen opens the composer with one line of orienting copy
+   rather than a section heading. */
+.dialogIntro {
+    margin: 0 0 var(--data-sp-4);
+    color: var(--mms-text-muted);
+    font-size: var(--data-text-11);
+    line-height: 1.6;
+    overflow-wrap: anywhere;
+}

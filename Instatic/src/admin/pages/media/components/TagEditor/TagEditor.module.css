@@ -1,56 +1,71 @@
+/* PHASE 10: transcribed to the MMSBUILD Media reference's language, with the
+   approved masters' treatment of the Tags control: removable chips inside a
+   single bordered field with a dropdown caret at its right edge. */
+
 .root {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3xs);
+    display: grid;
+    min-width: 0;
+    gap: var(--media-sp-5);
 }
 
+/* The field itself — chips and the inline input share one bordered box, so
+   it reads as a control rather than a loose list. */
 .chips {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-3xs);
-  list-style: none;
-  margin: 0;
-  padding: var(--space-3xs);
-  min-height: 28px;
-  background: transparent;
-  border: 1px solid var(--overlay-20);
-  border-radius: var(--input-radius);
+    display: flex;
+    min-width: 0;
+    min-height: var(--media-tap);
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--media-sp-5);
+    margin: var(--media-sp-0);
+    padding: var(--media-sp-5) var(--media-sp-8);
+    border: 1px solid var(--mms-border-strong);
+    border-radius: var(--media-radius-7);
+    background: var(--mms-surface-raised);
+    list-style: none;
 }
 
 .chipItem {
-  display: inline-flex;
-  min-width: 0;
-  list-style: none;
+    display: inline-flex;
+    min-width: 0;
+    list-style: none;
 }
 
+/* The input shares the field, so it drops its own chassis. */
 .inputLi {
-  flex: 1 1 80px;
-  display: flex;
-  align-items: center;
-  list-style: none;
+    display: flex;
+    min-width: var(--media-sp-80);
+    flex: 1 1 auto;
+    list-style: none;
 }
 
 .input {
-  width: 100%;
-  border: none;
-  background: transparent;
-  padding: var(--space-4xs) var(--space-3xs);
-  height: 22px;
-  font-size: var(--text-xs);
+    width: 100%;
+    min-width: 0;
+    min-height: var(--media-sp-24);
+    padding: var(--media-sp-0);
+    border: 0;
+    background: transparent;
+}
+
+/* The masters' trailing caret: opens the suggestion list. */
+.caret {
+    flex: 0 0 auto;
+    color: var(--mms-text-muted);
 }
 
 .suggestions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-3xs);
-  list-style: none;
-  margin: 0;
-  padding: 0;
+    display: grid;
+    gap: var(--media-sp-2);
+    margin: var(--media-sp-0);
+    padding: var(--media-sp-4);
+    border: 1px solid var(--mms-border);
+    border-radius: var(--media-radius-7);
+    background: var(--mms-surface);
+    list-style: none;
 }
 
 .suggestion {
-  font-size: var(--text-xs);
-  padding: var(--space-4xs) var(--space-xs);
-  color: var(--text-subtle);
+    width: 100%;
+    justify-content: flex-start;
 }

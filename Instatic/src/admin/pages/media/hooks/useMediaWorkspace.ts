@@ -73,6 +73,14 @@ export interface UseMediaWorkspaceResult extends WorkspaceLoadState {
   assets: CmsMediaAsset[]
   visibleAssets: CmsMediaAsset[]
   tagPalette: string[]
+  /**
+   * How many assets are in Trash. The sidebar shows this count while the
+   * ACTIVE set is loaded, and the workspace only ever holds one set at a
+   * time — so it comes from its own small read of the same list endpoint
+   * (no new endpoint, no schema change). Refreshed on mount and after the
+   * only three operations that can change it.
+   */
+  trashedCount: number
 
   // Selection
   folderSelection: FolderSelection
@@ -137,6 +145,7 @@ export function useMediaWorkspace(): UseMediaWorkspaceResult {
   const [query, setQuery] = useState('')
   const [tag, setTag] = useState('')
   const [sort, setSort] = useState<MediaSort>('newest')
+  const [trashedCount, setTrashedCount] = useState(0)
 
   // Pure expression so the React Compiler memoizes it keyed on `folders` —
   // the previous pre-declared-then-mutated Map defeated auto-memoization and
@@ -178,6 +187,26 @@ export function useMediaWorkspace(): UseMediaWorkspaceResult {
   useEffect(() => {
     void refresh()
   }, [refresh])
+  /* eslint-enable react-hooks/set-state-in-effect */
+
+  // Trash badge. Deliberately NOT part of `refresh()` — the count only moves
+  // when something is trashed, restored or purged, so re-reading the whole
+  // trashed set on every filter change would be waste. A failure here is
+  // cosmetic (the badge keeps its last value), so it never surfaces an error.
+  // Kept memoized: it is referenced in a useEffect dependency array below.
+  const refreshTrashedCount = useCallback(async () => {
+    try {
+      const trashed = await listCmsMediaAssets({ trash: true })
+      setTrashedCount(trashed.length)
+    } catch (err) {
+      console.error('[useMediaWorkspace] trash count refresh failed:', err)
+    }
+  }, [])
+
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    void refreshTrashedCount()
+  }, [refreshTrashedCount])
   /* eslint-enable react-hooks/set-state-in-effect */
 
   const setFolderSelection = (selection: FolderSelection) => {
@@ -405,6 +434,7 @@ export function useMediaWorkspace(): UseMediaWorkspaceResult {
       // reload from the server.
       await deleteCmsMediaAsset(assetId)
       removeAsset(assetId)
+      void refreshTrashedCount()
     })
   }
 
@@ -414,6 +444,7 @@ export function useMediaWorkspace(): UseMediaWorkspaceResult {
       // The asset is now active; if we're on the Trash view, remove it from
       // the visible list. The next active-view load picks it back up.
       removeAsset(assetId)
+      void refreshTrashedCount()
       return null
     })
 
@@ -421,6 +452,7 @@ export function useMediaWorkspace(): UseMediaWorkspaceResult {
     await assetMut('Could not delete asset permanently', async () => {
       await purgeCmsMediaAsset(assetId)
       removeAsset(assetId)
+      void refreshTrashedCount()
     })
   }
 
@@ -525,6 +557,7 @@ export function useMediaWorkspace(): UseMediaWorkspaceResult {
     assets,
     visibleAssets,
     tagPalette,
+    trashedCount,
     folderSelection,
     setFolderSelection,
     selectedAssetId,

@@ -1,15 +1,7 @@
 import { useEffect, useEffectEvent, useState, type ReactElement, type ReactNode } from 'react'
 import { Button } from '@ui/components/Button'
 import { Section } from '@ui/components/Section'
-import { ExternalLinkSolidIcon } from 'pixel-art-icons/icons/external-link-solid'
-import { LayoutSolidIcon } from 'pixel-art-icons/icons/layout-solid'
-import { CalendarSolidIcon } from 'pixel-art-icons/icons/calendar-solid'
-import { ReloadIcon } from 'pixel-art-icons/icons/reload'
-import { TargetSolidIcon } from 'pixel-art-icons/icons/target-solid'
-import { UsersSolidIcon } from 'pixel-art-icons/icons/users-solid'
-import { FileTextSolidIcon } from 'pixel-art-icons/icons/file-text-solid'
-import { DatabaseSolidIcon } from 'pixel-art-icons/icons/database-solid'
-import { SearchSolidIcon } from 'pixel-art-icons/icons/search-solid'
+import { CalendarSolidIcon, DatabaseSolidIcon, ExternalLinkSolidIcon, FileTextSolidIcon, LayoutSolidIcon, ReloadIcon, SearchSolidIcon, TargetSolidIcon, UsersSolidIcon } from '@admin/pages/data/icons'
 import type { IconComponent } from 'pixel-art-icons/types'
 import { CellEditorRenderer } from '@admin/pages/data/components/DataGrid/cells/CellEditorRenderer'
 import { RelationPickerDialog } from '@admin/pages/data/components/RelationPickerDialog/RelationPickerDialog'
@@ -172,6 +164,7 @@ function RowHeaderCard({
         variant="primary"
         size="sm"
         fullWidth
+        className={styles.heroAction}
         onClick={() => onAction?.()}
         disabled={!onAction}
         aria-label={actionAriaLabel}
@@ -193,11 +186,19 @@ function MetaItem({ icon: Icon, label, value }: {
   value: string
 }): ReactElement {
   return (
+    /*
+     * Two children, not three — the row is a two-column grid (label | value),
+     * so the glyph has to live INSIDE the label cell. As three siblings the
+     * value wrapped onto its own line and every row read as a stack.
+     * Mirrors the reference's `<dt><svg/>Created</dt><dd>…</dd>`.
+     */
     <div className={styles.metaItem}>
-      <span className={styles.metaIcon} aria-hidden="true">
-        <Icon size={14} />
+      <span className={styles.metaKey}>
+        <span className={styles.metaIcon} aria-hidden="true">
+          <Icon size={14} />
+        </span>
+        {label}
       </span>
-      <span className={styles.metaKey}>{label}</span>
       <span className={styles.metaValue}>{value}</span>
     </div>
   )

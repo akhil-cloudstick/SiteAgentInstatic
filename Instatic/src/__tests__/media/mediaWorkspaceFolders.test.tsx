@@ -290,7 +290,7 @@ describe('Media workspace folder grid', () => {
       />,
     )
 
-    fireEvent.drop(screen.getByRole('treeitem', { name: 'assets' }), {
+    fireEvent.drop(screen.getByRole('button', { name: /^assets/ }), {
       dataTransfer: transferWithAssets(['asset_1']),
     })
 
@@ -299,7 +299,10 @@ describe('Media workspace folder grid', () => {
     })
   })
 
-  it('counts only images in image-metadata smart folders', () => {
+  // The MMSBUILD reference draws smart folders with a trailing chevron and
+  // NO count — only the Library rows carry counts. The image-only narrowing
+  // of the predicates themselves is covered by `smartFolders.test.ts`.
+  it('renders smart folders without a count, per the reference', () => {
     renderWithMediaSession(
       <MediaFolderPanel
         workspace={workspace({
@@ -317,7 +320,10 @@ describe('Media workspace folder grid', () => {
       />,
     )
 
-    expect(screen.getByRole('treeitem', { name: 'Missing title — 1 asset' })).toBeTruthy()
+    // Present as a plain row…
+    expect(screen.getByRole('button', { name: 'Missing title' })).toBeTruthy()
+    // …and deliberately without a count suffix.
+    expect(screen.queryByRole('button', { name: /^Missing title — / })).toBeNull()
   })
 
   it('counts foldered assets in All files', () => {
@@ -335,7 +341,7 @@ describe('Media workspace folder grid', () => {
       />,
     )
 
-    expect(screen.getByRole('treeitem', { name: 'All files — 1 asset' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'All media — 1 asset' })).toBeTruthy()
   })
 
   it('keeps foldered images visible in the All files image picker view', async () => {

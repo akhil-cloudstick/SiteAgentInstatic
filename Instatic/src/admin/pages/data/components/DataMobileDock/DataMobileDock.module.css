@@ -1,0 +1,111 @@
+/**
+ * `.mobile-dock` and its drawers, from the approved MMSBUILD Data Workbench
+ * screen. Hidden above 1100px — the workspace is a three-column layout there.
+ */
+
+.dock {
+    display: none;
+}
+
+.drawerBackdrop {
+    display: none;
+}
+
+@media (max-width: 1100px) {
+    .dock {
+        position: fixed;
+        z-index: 80;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        height: var(--data-dock-h);
+        /* Keeps the dock clear of the home indicator on iOS. */
+        padding-bottom: env(safe-area-inset-bottom);
+        border-top: 1px solid var(--mms-border);
+        background: var(--mms-workspace);
+    }
+
+    .dockButton {
+        position: relative;
+        display: inline-flex;
+        min-width: 0;
+        min-height: 56px;
+        align-items: center;
+        justify-content: center;
+        gap: var(--data-sp-8);
+        padding: 0 var(--data-sp-4);
+        border: 0;
+        background: transparent;
+        color: var(--mms-text);
+        cursor: pointer;
+        font: inherit;
+        font-size: var(--data-text-12);
+    }
+
+    .dockButton[data-active='true'] {
+        color: var(--mms-action-strong);
+    }
+
+    /* The reference's 3px green indicator across the top of the active tab. */
+    .dockButton[data-active='true']::after {
+        content: "";
+        position: absolute;
+        top: 0;
+        right: 28%;
+        left: 28%;
+        height: 3px;
+        background: var(--mms-action);
+    }
+
+    .dockButton:focus-visible {
+        position: relative;
+        z-index: 3;
+        outline: none;
+        box-shadow: var(--mms-focus);
+    }
+
+    /* Long labels ellipsise rather than widening their third of the dock. */
+    .dockLabel {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    /*
+     * The scrim spans exactly from below the shell header to above the dock,
+     * so neither is ever covered by it.
+     */
+    .drawerBackdrop {
+        position: fixed;
+        z-index: 95;
+        inset: var(--data-shell-h) 0 var(--data-dock-h);
+        display: flex;
+        justify-content: flex-start;
+        background: var(--data-drawer-scrim);
+    }
+
+    .drawerPanel {
+        display: flex;
+        width: min(var(--data-drawer-w), 100vw);
+        min-width: 0;
+        flex-direction: column;
+        overflow: hidden;
+        background: var(--mms-workspace);
+        box-shadow: var(--data-drawer-shadow-left);
+    }
+
+    /* The inspector drawer slides in from the right instead. */
+    .drawerPanelRight {
+        margin-left: auto;
+        box-shadow: var(--data-drawer-shadow-right);
+    }
+}
+
+@media (max-width: 620px) {
+    .drawerPanel {
+        width: 100vw;
+    }
+}

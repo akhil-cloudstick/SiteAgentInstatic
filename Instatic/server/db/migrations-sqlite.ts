@@ -1211,4 +1211,25 @@ export const sqliteMigrations: Migration[] = [
         on media_assets (content_hash);
     `,
   },
+  {
+    id: '024_plugin_staged_packages',
+    sql: `
+      -- Uploaded-but-unapproved plugin packages (see the Postgres twin for the
+      -- full rationale). No FK to installed_plugins: a staged package for a
+      -- fresh install has no plugin row to reference yet.
+      create table if not exists plugin_staged_packages (
+        plugin_id text primary key,
+        file_name text not null,
+        file_size integer not null,
+        storage_path text not null,
+        manifest_json text not null,
+        from_version text,
+        uploaded_by text,
+        uploaded_at text not null default (datetime('now'))
+      );
+
+      create index if not exists plugin_staged_packages_uploaded_idx
+        on plugin_staged_packages (uploaded_at desc);
+    `,
+  },
 ]

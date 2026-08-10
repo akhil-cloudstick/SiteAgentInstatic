@@ -1,0 +1,142 @@
+/* Shared frame overrides for every dialog the Plugins workspace opens —
+ * settings, schedules and removal.
+ *
+ * The approved MMSBUILD Plugins screen draws one modal shell: a 580px panel
+ * with a 12px radius, a bordered 76px heading, a 22px body, and a footer that
+ * sits a step DARKER than the panel. `Dialog` already provides the anatomy,
+ * focus trap, Escape and backdrop behaviour, so only the geometry is restated
+ * here — through `className` / `bodyClassName` / `footerClassName`, never by
+ * editing the shared primitive.
+ *
+ * Tokens resolve because `pluginDialogScopeRef` stamps
+ * `data-editor-screen="plugins"` on the portaled dialog root.
+ */
+
+/* `[data-ui-dialog]` is carried for specificity, not selection: the primitive
+   sets its own width and max-height through `.dialog[data-size="…"]`, which
+   would otherwise outrank a bare class from this module. */
+.dialog[data-ui-dialog] {
+    /* The reference's panel width sits between the primitive's `lg` (520) and
+       `xl` (640) steps, so it is set here rather than by picking a `size`. */
+    width: min(var(--plugins-modal-w), 100%);
+    max-width: min(var(--plugins-modal-w), 100%);
+    max-height: calc(100vh - 48px);
+    border: 1px solid var(--mms-border-strong);
+    border-radius: var(--plugins-radius-12);
+    background: var(--mms-surface-raised);
+    box-shadow: var(--plugins-shadow-menu);
+}
+
+.body {
+    padding: var(--plugins-sp-22);
+}
+
+.body > p {
+    margin: 0;
+    color: var(--mms-text-muted);
+}
+
+.footer {
+    min-height: 66px;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--plugins-sp-9);
+    padding: var(--plugins-sp-10) var(--plugins-sp-22);
+    border-top: 1px solid var(--mms-border);
+    background: var(--mms-surface);
+}
+
+/* Form rows inside a plugins dialog. The reference labels every field with a
+   small uppercase-weight caption above the control. */
+.field {
+    display: grid;
+    gap: var(--plugins-sp-6);
+    margin: var(--plugins-sp-14) 0;
+    color: var(--mms-text-muted);
+    font-size: var(--plugins-text-11);
+    font-weight: var(--plugins-weight-680);
+}
+
+.fieldControl {
+    color: var(--mms-text);
+    font-weight: 400;
+}
+
+.lead {
+    margin: 0;
+    overflow-wrap: anywhere;
+    color: var(--mms-text-muted);
+}
+
+.stack {
+    display: grid;
+    gap: var(--plugins-sp-12);
+}
+
+/* Step-up-style identity disc, reused by the removal warning's icon slot. */
+.disc {
+    display: grid;
+    width: var(--plugins-stepup-disc);
+    height: var(--plugins-stepup-disc);
+    margin: 0 auto var(--plugins-sp-14);
+    place-items: center;
+    border-radius: 50%;
+    background: var(--mms-surface-green);
+    color: var(--mms-action-strong);
+    font-size: var(--plugins-text-23);
+}
+
+/* Danger callout — the removal dialog's warning block. */
+.warning {
+    display: flex;
+    gap: var(--plugins-sp-13);
+    padding: var(--plugins-sp-15);
+    border: 1px solid var(--mms-danger);
+    border-radius: var(--plugins-radius-8);
+    background: var(--mms-danger-bg);
+}
+
+.warning > i {
+    flex-shrink: 0;
+    color: var(--mms-danger);
+    font-size: var(--plugins-text-20);
+}
+
+.warning div {
+    min-width: 0;
+}
+
+.warning strong {
+    display: block;
+    overflow-wrap: anywhere;
+}
+
+.warning p {
+    margin: var(--plugins-sp-4) 0 0;
+    overflow-wrap: anywhere;
+    color: var(--mms-text-muted);
+}
+
+.note {
+    margin: 0;
+    overflow-wrap: anywhere;
+    color: var(--mms-text-muted);
+}
+
+/* A phone gets a bottom sheet, not a shrunken desktop panel.
+   Pinning it to the viewport with `position: fixed` takes it out of the
+   backdrop's centred grid, so the sheet meets the bottom edge instead of
+   floating above the backdrop's own padding. */
+@media (max-width: 767px) {
+    .dialog[data-ui-dialog] {
+        position: fixed;
+        inset: auto 0 0 0;
+        width: 100%;
+        max-width: 100%;
+        max-height: calc(100vh - var(--plugins-shell-h));
+        border-right: 0;
+        border-bottom: 0;
+        border-left: 0;
+        border-radius: var(--plugins-radius-14) var(--plugins-radius-14) 0 0;
+    }
+}

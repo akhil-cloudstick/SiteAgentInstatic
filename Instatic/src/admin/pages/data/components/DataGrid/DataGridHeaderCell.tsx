@@ -1,5 +1,5 @@
 import type { CSSProperties, MouseEvent as ReactMouseEvent, ReactElement } from 'react'
-import { ArrowDownIcon } from 'pixel-art-icons/icons/arrow-down'
+import { ArrowDownIcon } from '@admin/pages/data/icons'
 import type { DataField } from '@core/data/schemas'
 import styles from './DataGrid.module.css'
 

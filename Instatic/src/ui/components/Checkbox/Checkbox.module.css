@@ -116,3 +116,26 @@
     background: var(--mms-action);
     color: var(--mms-surface-raised);
 }
+
+/*
+ * Data workspace — the approved screen's 17px selection box.
+ *
+ * Uses  like the site-screen block above: without it the leading
+ * attribute selector does not survive CSS-module scoping, which is why an
+ * earlier non-global version of this rule never applied.
+ */
+:global([data-editor-screen='data']) .checkbox[data-size=sm] {
+    width: 17px;
+    height: 17px;
+}
+
+:global([data-editor-screen='data']) .checkbox .box {
+    border-color: var(--mms-border-strong);
+    border-radius: var(--data-radius-4);
+}
+
+:global([data-editor-screen='data']) .checkbox .input:checked + .box {
+    border-color: var(--mms-action);
+    background: var(--mms-action);
+    color: var(--mms-surface-raised);
+}

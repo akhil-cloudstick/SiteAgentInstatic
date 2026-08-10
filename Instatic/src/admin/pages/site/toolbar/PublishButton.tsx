@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { UploadIcon } from '@admin/pages/data/icons'
 import { selectActivePage, useEditorStore } from '@site/store/store'
 import { getCmsPublishStatus, publishCmsDraft } from '@core/persistence'
 import { LoaderIcon } from 'pixel-art-icons/icons/loader'
@@ -162,7 +163,7 @@ export function PublishButton({
     isPublishing ? LoaderIcon :
     state === 'published' ? CheckIcon :
     state === 'error' ? CircleAlertSolidIcon :
-    CloudUploadSolidIcon
+    UploadIcon
 
   const menuItems: PublishActionMenuItem[] = [
     {

@@ -1,11 +1,12 @@
 import { useId, useState, type FormEvent } from 'react'
+import { Section } from '@ui/components/Section'
 import { Button } from '@ui/components/Button'
 import { Dialog } from '@ui/components/Dialog'
 import { Input, Textarea } from '@ui/components/Input'
 import { Select } from '@ui/components/Select'
 import { Switch } from '@ui/components/Switch'
 import { pushToast } from '@ui/components/Toast'
-import { PlusIcon } from 'pixel-art-icons/icons/plus'
+import { PlusIcon, Settings2SolidIcon } from '@admin/pages/data/icons'
 import {
   DataFieldSchema,
   RepeaterItemFieldSchema,
@@ -474,11 +475,18 @@ export function NewFieldDialog({
       )}
 
       <form id={formId} className={styles.form} onSubmit={handleSubmit}>
+        {/*
+          * The approved screen asks for three things — label, machine id, type
+          * — with no section headings above them. Everything else this dialog
+          * can configure is still here, moved into `Advanced` below so the
+          * default surface matches the reference without losing a single
+          * option.
+          */}
         <section className={styles.formSection}>
-          <div className={styles.sectionHeading}>
-            <h3>Field identity</h3>
-            <p>Name the value authors will see and the stable key used by templates.</p>
-          </div>
+          <p className={styles.dialogIntro}>
+            Add an authorable field to this table. Structural page-tree and
+            field-schema types keep their dedicated editors.
+          </p>
 
           <div className={styles.field}>
             <label htmlFor={labelInputId} className={styles.label}>
@@ -558,6 +566,8 @@ export function NewFieldDialog({
           </div>
         </section>
 
+        {/* Everything the reference does not show, kept and reachable. */}
+        <Section title="Advanced" icon={Settings2SolidIcon}>
         <section className={styles.formSection}>
           <div className={styles.sectionHeading}>
             <h3>Authoring</h3>
@@ -655,6 +665,7 @@ export function NewFieldDialog({
             />
           </section>
         )}
+        </Section>
 
         {submitError && (
           <p role="alert" className={styles.errorText}>

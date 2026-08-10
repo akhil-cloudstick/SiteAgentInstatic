@@ -6,8 +6,7 @@
 import type { ReactElement } from 'react'
 import { Button } from '@ui/components/Button'
 import { FloatingActionBar } from '@ui/components/FloatingActionBar'
-import { ArrowDownIcon } from 'pixel-art-icons/icons/arrow-down'
-import { TrashSolidIcon } from 'pixel-art-icons/icons/trash-solid'
+import { ArrowDownIcon, TrashSolidIcon } from '@admin/pages/data/icons'
 import type { DataRowStatus } from '@core/data/schemas'
 import styles from './DataGrid.module.css'
 

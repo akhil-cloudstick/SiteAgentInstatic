@@ -41,6 +41,37 @@
 .fa-solid::before {
   content: var(--fa);
 }
+
+/*
+ * Upstream Font Awesome animation utility. Only `fa-spin` is vendored — it is
+ * the busy affordance the approved MMSBUILD Plugins screen uses (`fa-spinner
+ * fa-spin` replaces a button's glyph while a lifecycle action is in flight).
+ * The upstream timing (2s linear infinite) is reproduced exactly.
+ *
+ * `prefers-reduced-motion` pins the animation to a single 0.01ms iteration,
+ * matching the global reduced-motion block in globals.css — a spinner that
+ * cannot spin still reads as "this control is busy" via its disabled state.
+ */
+.fa-spin {
+  animation-name: fa-spin;
+  animation-duration: 2s;
+  animation-iteration-count: infinite;
+  animation-timing-function: linear;
+}
+
+@keyframes fa-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fa-spin {
+    animation-delay: -1ms;
+    animation-duration: 1ms;
+    animation-iteration-count: 1;
+  }
+}
+
 .fa-0 { --fa: "\30"; }
 .fa-1 { --fa: "\31"; }
 .fa-2 { --fa: "\32"; }

@@ -1,6 +1,6 @@
 import type { ReactElement } from 'react'
 import { Button } from '@ui/components/Button'
-import { LinkIcon } from 'pixel-art-icons/icons/link'
+import { LinkIcon } from '@admin/pages/data/icons'
 import { readStringArrayCell } from '@core/data/cells'
 import type { CellEditorProps } from '@admin/pages/data/types'
 import type { DataField, DataRow } from '@core/data/schemas'

@@ -11,6 +11,34 @@ export const SIDEBAR_MAX_WIDTH = 520
 export const LEFT_SIDEBAR_DEFAULT_WIDTH = 320
 export const RIGHT_SIDEBAR_DEFAULT_WIDTH = 360
 
+/**
+ * Per-workspace starting widths.
+ *
+ * These are DEFAULTS for a workspace that has never been resized — a stored
+ * width always wins. The Data workspace is a pixel-match reproduction of the
+ * approved MMSBUILD Data Workbench screen, which specifies a 300px table panel
+ * and a 330px inspector; the other workspaces keep the generic admin widths.
+ *
+ * Kept as a lookup rather than by reassigning the shared constants above,
+ * because those are read by Content and Media too — changing them would move
+ * panels on screens this re-skin is not allowed to touch.
+ */
+const WORKSPACE_DEFAULT_WIDTHS: Partial<
+  Record<EditorWorkspaceId, { left?: number; right?: number }>
+> = {
+  data: { left: 300, right: 330 },
+}
+
+function defaultLeftWidth(workspace: EditorWorkspaceId | null): number {
+  if (workspace === null) return LEFT_SIDEBAR_DEFAULT_WIDTH
+  return WORKSPACE_DEFAULT_WIDTHS[workspace]?.left ?? LEFT_SIDEBAR_DEFAULT_WIDTH
+}
+
+function defaultRightWidth(workspace: EditorWorkspaceId | null): number {
+  if (workspace === null) return RIGHT_SIDEBAR_DEFAULT_WIDTH
+  return WORKSPACE_DEFAULT_WIDTHS[workspace]?.right ?? RIGHT_SIDEBAR_DEFAULT_WIDTH
+}
+
 export interface WorkspacePanelState {
   collapsed: boolean
   width: number
@@ -68,10 +96,10 @@ function initialNonSiteLayout(): Pick<
     : false
 
   return {
-    leftSidebarWidth: leftSidebarWidth(layout, LEFT_SIDEBAR_DEFAULT_WIDTH),
+    leftSidebarWidth: leftSidebarWidth(layout, defaultLeftWidth(workspace)),
     rightPanel: {
       collapsed: !rightOpen,
-      width: rightPanelWidth(layout, RIGHT_SIDEBAR_DEFAULT_WIDTH),
+      width: rightPanelWidth(layout, defaultRightWidth(workspace)),
     },
     dataSidebarCollapsed,
   }

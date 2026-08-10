@@ -51,6 +51,7 @@ import {
   type PluginSecretState,
 } from '../../../repositories/pluginSecrets'
 import { collectEnabledAdminPages } from '@core/plugins/manifest'
+import { listStagedPackages } from '../../../repositories/pluginStagedPackages'
 import { assertPathWithin } from '../../../util/pathWithin'
 import { badRequest, jsonResponse } from '../../../http'
 import { getErrorMessage } from '@core/utils/errorMessage'
@@ -208,9 +209,14 @@ export async function pluginsPayload(db: DbClient) {
   const okPlugins = presented
     .filter((r): r is { kind: 'ok'; plugin: InstalledPlugin } => r.kind === 'ok')
     .map((r) => r.plugin)
+  // Packages uploaded but not yet approved. Travels with the plugins list so
+  // the workspace can report "an update is waiting" on the card and the
+  // recovery screen without a second round trip.
+  const stagedPackages = await listStagedPackages(db)
   return {
     plugins: pluginsWithCrashes,
     adminPages: collectEnabledAdminPages(okPlugins),
+    stagedPackages,
   }
 }
 

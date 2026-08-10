@@ -18,7 +18,7 @@
 import { useEffect, useEffectEvent, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Button } from '@ui/components/Button'
-import { CloseIcon } from 'pixel-art-icons/icons/close'
+import { FaIcon } from '@ui/components/FaIcon'
 import type { CmsMediaAsset } from '@core/persistence/cmsMedia'
 import { MediaSidebar, type MediaSidebarPanelId } from '../MediaSidebar/MediaSidebar'
 import { MediaCanvas } from '../MediaCanvas/MediaCanvas'
@@ -177,6 +177,11 @@ function MediaPickerModalBody({
   return createPortal(
     <div
       className={styles.backdrop}
+      // The picker portals to `document.body`, so it lands OUTSIDE whichever
+      // workspace opened it (Site / Content / Data / Settings each scope their
+      // own palette). Declaring the media screen here means the picker carries
+      // the Media palette wherever it is mounted.
+      data-editor-screen="media"
       role="presentation"
       onClick={(event) => {
         // Click outside the dialog body closes — matches every other modal
@@ -200,7 +205,7 @@ function MediaPickerModalBody({
             aria-label="Close picker"
             onClick={onClose}
           >
-            <CloseIcon size={14} />
+            <FaIcon name="xmark" size={14} />
           </Button>
         </header>
 
@@ -211,7 +216,15 @@ function MediaPickerModalBody({
             onActivePanelChange={setActivePanel}
           />
           <div className={styles.canvasArea}>
-            <MediaCanvas workspace={workspace} selectionMode={allowMultiple ? 'multiple' : 'standard'} />
+            {/* `chrome="embedded"` drops the page breadcrumb, library heading,
+                upload triggers and footer count — this modal is mounted from
+                Settings, Content, two Data grid cells and two Site property
+                controls, and a picker must stay a picker. */}
+            <MediaCanvas
+              workspace={workspace}
+              selectionMode={allowMultiple ? 'multiple' : 'standard'}
+              chrome="embedded"
+            />
           </div>
         </div>
 

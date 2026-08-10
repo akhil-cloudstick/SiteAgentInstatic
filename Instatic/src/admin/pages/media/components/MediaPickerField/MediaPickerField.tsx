@@ -17,9 +17,7 @@
  * `onClear` events.
  */
 import { Button } from '@ui/components/Button'
-import { ImagesSolidIcon } from 'pixel-art-icons/icons/images-solid'
-import { EditSolidIcon } from 'pixel-art-icons/icons/edit-solid'
-import { VideoSolidIcon } from 'pixel-art-icons/icons/video-solid'
+import { FaIcon } from '@ui/components/FaIcon'
 import type { CmsMediaAsset } from '@core/persistence/cmsMedia'
 import { blurHashToDataUrl, pickVariantUrl } from '@admin/pages/media/utils/variants'
 import styles from './MediaPickerField.module.css'
@@ -140,7 +138,7 @@ export function MediaPickerField({
           onClick={onBrowse}
           aria-label={browseAria}
         >
-          <ImagesSolidIcon size={13} />
+          <FaIcon name="images" size={13} />
           <span>{browseVisible}</span>
         </Button>
         {showEdit && onEdit && (
@@ -152,7 +150,7 @@ export function MediaPickerField({
             aria-label={`Edit ${subject} in viewer`}
             tooltip="Edit asset (alt text, caption, tags…)"
           >
-            <EditSolidIcon size={13} />
+            <FaIcon name="pen" size={13} />
             <span>Edit</span>
           </Button>
         )}
@@ -214,7 +212,7 @@ function PickedTile({
     body = (
       <>
         <span className={styles.thumb} aria-hidden="true">
-          {mediaKind === 'image' ? <ImagesSolidIcon size={18} /> : <VideoSolidIcon size={18} />}
+          {mediaKind === 'image' ? <FaIcon name="images" size={18} /> : <FaIcon name="video" size={18} />}
         </span>
         <span className={styles.meta}>
           <span className={styles.empty}>No {subjectLabel} selected</span>
@@ -226,7 +224,7 @@ function PickedTile({
     body = (
       <>
         <span className={styles.thumb} aria-hidden="true">
-          {mediaKind === 'image' ? <ImagesSolidIcon size={18} /> : <VideoSolidIcon size={18} />}
+          {mediaKind === 'image' ? <FaIcon name="images" size={18} /> : <FaIcon name="video" size={18} />}
         </span>
         <span className={styles.meta}>
           <span className={styles.name}>{fallbackLabel ?? `Unresolved ${subjectLabel}`}</span>
@@ -253,7 +251,7 @@ function PickedTile({
           {thumbUrl ? (
             <img src={thumbUrl} alt="" loading="lazy" decoding="async" />
           ) : (
-            <VideoSolidIcon size={18} />
+            <FaIcon name="video" size={18} />
           )}
         </span>
         <span className={styles.meta}>

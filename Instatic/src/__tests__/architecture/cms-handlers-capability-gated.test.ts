@@ -88,6 +88,7 @@ const ALLOWLIST: ReadonlyMap<string, string> = new Map([
   ['plugins/records.ts', 'Parent dispatcher (plugins/index.ts) gates all routes here.'],
   ['plugins/events.ts', 'Parent dispatcher (plugins/index.ts) gates all routes here.'],
   ['plugins/pack.ts', 'Parent dispatcher (plugins/index.ts) gates all routes here.'],
+  ['plugins/staged.ts', 'Parent dispatcher (plugins/index.ts) gates all routes here.'],
   ['plugins/shared.ts', 'Shared plugin helpers (payload builders, audit envelopes); no handlers.'],
   // Data sub-handlers — meta and search use the access helpers (which
   // wrap requireCapability inside data/access.ts); rows.ts and preview.ts

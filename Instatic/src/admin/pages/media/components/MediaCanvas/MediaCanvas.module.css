@@ -1,148 +1,429 @@
+/* PHASE 2 + 5 + 6: transcribed from the MMSBUILD Media reference
+   (screens/media/src/styles.css → .media-canvas, .canvas-toolbar,
+   .breadcrumbs, .toolbar-actions, .queue-trigger, .library-heading,
+   .selection-summary, .folder-tiles, .folder-icon, .filter-bar,
+   .search-field, .segmented, .asset-grid, .asset-card, .checkmark,
+   .asset-visual, .type-badge, .asset-copy, .list-view, .empty-state).
+
+   Media used to borrow the Site editor's CanvasRoot module for its surface.
+   It owns `.canvas` now, so restyling Media cannot repaint the Site canvas.
+
+   Every metric is the reference's, delivered through the fixed `--media-*`
+   tokens in globals.css because literal px is gated in admin CSS modules.
+   Colours come from the approved masters where the two disagree — the
+   folder-tile glyph is amber there and green in the runnable reference. */
+
+/* ── Canvas shell ────────────────────────────────────────────────────────── */
+
 .canvas {
-    /* Composes with `CanvasRoot.module.css .canvas` which owns the
-     surface chrome (rounded top-left, --bg-surface-2 background) so the
-     Media canvas matches Site / Content visually. We only add the flex
-     layout the inner content needs. */
+    position: relative;
     display: flex;
-    flex-direction: column;
+    min-width: 0;
     min-height: 0;
-    color: var(--text);
+    flex: 1;
+    flex-direction: column;
+    overflow-y: auto;
+    padding: var(--media-sp-0) var(--media-sp-26) var(--media-sp-80);
+    background: var(--mms-workspace);
+    color: var(--mms-text);
+    scrollbar-width: thin;
 }
 
+/* Drop-anywhere affordance while files are dragged over the canvas. */
 .canvasDropping::after {
-    content: "";
     position: absolute;
-    inset: 8px;
-    border: 2px dashed var(--canvas-selection-ring-color);
-    border-radius: var(--radius);
+    z-index: 1;
+    inset: var(--media-sp-8);
+    border: 2px dashed var(--mms-action);
+    border-radius: var(--media-radius-10);
+    content: '';
     pointer-events: none;
 }
 
+/* ── Sticky toolbar ──────────────────────────────────────────────────────── */
+
 .toolbar {
-    padding: var(--space-s);
+    position: sticky;
+    z-index: 20;
+    top: 0;
+    display: flex;
+    min-height: var(--media-toolbar-h);
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--media-sp-12);
+    /* Bleeds to the canvas edge so the hairline spans the full width. */
+    margin: var(--media-sp-0) calc(-1 * var(--media-sp-26));
+    padding: var(--media-sp-0) var(--media-sp-26);
+    border-bottom: 1px solid var(--mms-border);
+    background: color-mix(in srgb, var(--mms-workspace) 96%, transparent);
+    backdrop-filter: blur(12px);
 }
 
-.statusBar {
-    padding: var(--space-3xs) var(--space-l);
-    font-size: var(--text-xs);
-    color: var(--text-subtle);
+.toolbarActions {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: var(--media-sp-8);
 }
 
-.body {
-    flex: 1 1 auto;
-    min-height: 0;
-    overflow: auto;
+/* `.breadcrumbs` — folder path, shown only inside a folder. */
+.breadcrumbs {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: var(--media-sp-11);
+}
+
+.breadcrumbSeparator {
+    flex: 0 0 auto;
+    color: var(--mms-border-strong);
+}
+
+.breadcrumbCurrent {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--mms-text);
+    font-weight: var(--media-weight-strong);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* `.queue-trigger` — ghost until the queue has rows, then a raised chip. */
+.queueTrigger.queueTrigger {
+    border: 1px solid transparent;
+    background: transparent;
+}
+
+.queueTriggerActive.queueTriggerActive {
+    border-color: var(--mms-border);
+    background: var(--mms-surface-raised);
+}
+
+.queueCount {
+    display: grid;
+    min-width: var(--media-sp-21);
+    height: var(--media-sp-21);
+    place-items: center;
+    border-radius: var(--media-radius-pill);
+    background: var(--mms-warning);
+    color: var(--media-on-accent);
+    font-size: var(--media-text-10);
+    font-weight: var(--media-weight-meta);
+}
+
+/* ── Library heading ─────────────────────────────────────────────────────── */
+
+.libraryHeading {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: var(--media-sp-20);
+    padding: var(--media-sp-27) var(--media-sp-0) var(--media-sp-19);
+}
+
+.libraryHeadingText {
+    min-width: 0;
+}
+
+.eyebrow {
+    margin: var(--media-sp-0) var(--media-sp-0) var(--media-sp-5);
+    color: var(--mms-text-muted);
+    font-size: var(--media-text-10);
+    font-weight: var(--media-weight-eyebrow);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+}
+
+.libraryTitle {
+    margin: var(--media-sp-0) var(--media-sp-0) var(--media-sp-4);
+    overflow: hidden;
+    color: var(--mms-text);
+    font-size: var(--media-text-26);
+    font-weight: var(--media-weight-heading);
+    letter-spacing: -0.035em;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.libraryDescription {
+    margin: var(--media-sp-0);
+    color: var(--mms-text-muted);
+    font-size: var(--media-text-13);
+}
+
+.selectionSummary {
+    display: grid;
+    min-height: var(--media-tap);
+    flex: 0 0 auto;
+    place-items: center;
+    color: var(--mms-text-muted);
+    font-weight: var(--media-weight-meta);
+    white-space: nowrap;
+}
+
+/* ── Folder tiles ────────────────────────────────────────────────────────── */
+
+.folderTiles {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: var(--media-sp-12);
+    margin: var(--media-sp-0) var(--media-sp-0) var(--media-sp-18);
+    padding: var(--media-sp-0);
+    list-style: none;
+}
+
+.folderTileItem {
+    display: block;
+    min-width: 0;
+    list-style: none;
+}
+
+.folderTile.folderTile {
+    display: grid;
+    width: 100%;
+    min-width: 0;
+    min-height: var(--media-tile-min-h);
+    grid-template-columns: var(--media-tap) minmax(0, 1fr) var(--media-sp-16);
+    align-items: center;
+    gap: var(--media-sp-4);
+    padding: var(--media-sp-10) var(--media-sp-12);
+    border: 1px solid var(--mms-border);
+    border-radius: var(--media-radius-9);
+    background: var(--media-folder-tile-bg);
+    color: var(--mms-text);
+    text-align: left;
+}
+
+.folderTile.folderTile:hover:not(:disabled) {
+    border-color: var(--mms-action);
+    background: var(--media-folder-tile-bg);
+}
+
+/* `.folder-icon` — a 40px mint well holding a green folder glyph. */
+.folderTileIcon {
+    display: grid;
+    width: var(--media-folder-icon);
+    height: var(--media-folder-icon);
+    place-items: center;
+    border-radius: var(--media-radius-8);
+    background: var(--mms-surface-green);
+    color: var(--mms-action-strong);
+}
+
+.folderTileBody {
+    display: block;
+    min-width: 0;
+}
+
+.folderTileName {
+    display: block;
+    overflow: hidden;
+    color: var(--mms-text);
+    font-size: var(--media-text-15);
+    font-weight: var(--media-weight-strong);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.folderTileMeta {
+    display: block;
+    margin-top: var(--media-sp-3);
+    overflow: hidden;
+    color: var(--mms-text-muted);
+    font-size: var(--media-text-12);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.folderTileChevron {
+    color: var(--mms-text-muted);
+}
+
+.folderTileDropActive.folderTileDropActive {
+    border-color: var(--mms-action);
+    background: var(--mms-surface-green);
+}
+
+/* ── Filter bar ──────────────────────────────────────────────────────────── */
+
+/* `.filter-bar` — search, media type, sort, view toggle. */
+.filterBar {
+    display: grid;
+    grid-template-columns:
+        minmax(var(--media-search-min), 1fr)
+        var(--media-filter-col)
+        var(--media-filter-col)
+        auto;
+    align-items: center;
+    gap: var(--media-sp-9);
+    margin-bottom: var(--media-sp-17);
+}
+
+/* `.search-field` — a bordered box holding a leading glyph and a bare
+   input. The reference uses no pill and no clear button here.
+
+   All four controls in this row share `--media-search-h` so the search box,
+   both selects and the view toggle line up exactly. */
+.searchField {
+    display: flex;
+    min-width: 0;
+    height: var(--media-search-h);
+    align-items: center;
+    border: 1px solid var(--mms-border-strong);
+    border-radius: var(--media-radius-7);
+    background: var(--mms-surface-raised);
+}
+
+.searchField:focus-within {
+    box-shadow: var(--media-focus);
+}
+
+.searchIcon {
+    display: grid;
+    width: var(--media-sp-42);
+    flex: 0 0 var(--media-sp-42);
+    place-items: center;
+    color: var(--mms-text-muted);
+}
+
+.searchInput {
+    width: 100%;
+    min-width: 0;
+    height: 100%;
+    padding: var(--media-sp-0) var(--media-sp-10) var(--media-sp-0) var(--media-sp-0);
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: var(--mms-text);
+    font: inherit;
+    font-size: var(--media-text-13);
+}
+
+.searchInput::placeholder {
+    color: var(--mms-text-muted);
+}
+
+/* Boxy, not pill. The Select primitive's own chassis is reached through
+   `--input-radius`, which the doubled selector re-points for this row only. */
+.filterSelect.filterSelect {
+    min-width: 0;
+    height: var(--media-search-h);
+    border-radius: var(--media-radius-7);
+}
+
+.filterSelect.filterSelect > select,
+.filterSelect.filterSelect > div {
+    height: 100%;
+    min-height: 100%;
+    border-radius: var(--media-radius-7);
 }
 
 .viewGroup {
     display: inline-flex;
-    align-items: center;
-    gap: var(--space-3xs);
+    height: var(--media-search-h);
+    align-items: stretch;
+    overflow: hidden;
+    border: 1px solid var(--mms-border);
+    border-radius: var(--media-radius-7);
+    background: var(--mms-surface-tint);
 }
 
-/* ── Grid view ─────────────────────────────────────────────────────────── */
+.viewButton.viewButton {
+    display: grid;
+    width: var(--media-tap);
+    min-width: var(--media-tap);
+    height: 100%;
+    min-height: 100%;
+    place-items: center;
+    border: 0;
+    border-right: 1px solid var(--mms-border);
+    border-radius: 0;
+    background: transparent;
+    color: var(--mms-text-muted);
+}
+
+.viewButton.viewButton:last-child {
+    border-right: 0;
+}
+
+.viewButton.viewButton[aria-pressed='true'] {
+    background: var(--mms-surface-raised);
+    color: var(--mms-action-strong);
+}
+
+.statusBar {
+    padding: var(--media-sp-0) var(--media-sp-0) var(--media-sp-8);
+    color: var(--mms-text-muted);
+    font-size: var(--media-text-11);
+}
+
+.body {
+    min-width: 0;
+    min-height: 0;
+    flex: 1 1 auto;
+}
+
+/* ── Asset grid ──────────────────────────────────────────────────────────── */
+
+/* `.asset-grid` — the reference pins FIVE columns. `auto-fill` would pack a
+   wide canvas with many small tiles; the reference's cards are meant to be
+   large, so the column count is fixed and the tiles grow with the canvas. */
 .grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-    gap: var(--space-l);
+    grid-template-columns: repeat(
+        var(--media-grid-cols),
+        minmax(var(--media-grid-min), 1fr)
+    );
+    gap: var(--media-sp-15) var(--media-sp-12);
+    margin: var(--media-sp-0);
+    padding: var(--media-sp-0);
     list-style: none;
-    padding: 0;
-    margin: 0;
 }
 
 .tileItem {
     position: relative;
-    list-style: none;
     display: block;
+    min-width: 0;
+    list-style: none;
 }
 
-.tile {
+.tile.tile {
     display: flex;
-    flex-direction: column;
-    gap: var(--space-s);
-    padding: var(--space-s);
     width: 100%;
     height: 100%;
+    min-width: 0;
+    flex-direction: column;
     align-items: stretch;
     justify-content: flex-start;
-    border-radius: var(--radius);
+    gap: var(--media-sp-0);
+    overflow: hidden;
+    padding: var(--media-sp-0);
+    border: 2px solid transparent;
+    border-radius: var(--media-radius-9);
+    background: var(--mms-surface);
+    text-align: left;
 }
 
-/* Higher specificity (.tile.tileSelected over .tile) so the Button
-   primitive's `[aria-pressed="true"]` and `:focus-visible` styles don't
-   knock out our selected ring. The token-name distinction matters here:
-   `--canvas-selection-ring` is the FULL box-shadow shorthand we use for
-   the canvas-level node ring; `--canvas-selection-ring-color` is just the
-   colour and is what gets fed to `outline` / `color-mix` here. */
 .tile.tileSelected {
-    outline: 2px solid var(--canvas-selection-ring-color);
-    outline-offset: -2px;
-    box-shadow:
-        inset 0 0 0 2px var(--canvas-selection-ring-color),
-        0 0 0 4px
-            color-mix(
-                in srgb,
-                var(--canvas-selection-ring-color) 35%,
-                transparent
-            );
+    border-color: var(--mms-action);
+    box-shadow: 0 0 0 2px var(--media-selected-halo);
 }
 
 .tilePreview {
-    width: 100%;
-    aspect-ratio: 1 / 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: var(--bg-surface-2);
-    border-radius: var(--radius-sm);
-    overflow: hidden;
-    color: var(--text-subtle);
-}
-
-.folderPreview {
-    width: 100%;
-    aspect-ratio: 1 / 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: var(--bg-surface-2);
-    border-radius: var(--radius-sm);
-    color: var(--text-subtle);
-}
-
-.folderTile {
-    cursor: pointer;
-}
-
-.parentFolderTile .folderPreview {
-    color: var(--text-muted);
-}
-
-.parentFolderIcon {
     position: relative;
-    display: inline-flex;
+    display: flex;
+    width: 100%;
+    aspect-ratio: var(--media-thumb-ratio);
     align-items: center;
     justify-content: center;
-    width: 48px;
-    height: 48px;
+    overflow: hidden;
+    border-radius: var(--media-radius-7) var(--media-radius-7) 0 0;
+    background: var(--mms-surface-tint);
+    color: var(--mms-text-muted);
 }
 
-.parentFolderArrow {
-    position: absolute;
-    right: 2px;
-    bottom: 2px;
-    filter: drop-shadow(0 0 2px var(--bg-surface-2));
-}
-
-.folderDropActive {
-    outline: 2px solid var(--tree-drop-inside-border);
-    outline-offset: -2px;
-    background: var(--tree-drop-inside-bg);
-}
-
-/* Skeleton previews render a direct child span. Loaded previews render image,
- * video, or icon content directly inside `.tilePreview`, so this only matches
- * during loading. */
+/* Skeleton previews render a direct child span; loaded previews render the
+   image, video or glyph directly, so this only matches while loading. */
 .tilePreview > span {
     display: block;
     width: 100%;
@@ -157,129 +438,146 @@
     object-fit: cover;
 }
 
+.typeBadge {
+    position: absolute;
+    right: var(--media-sp-7);
+    bottom: var(--media-sp-7);
+    display: inline-flex;
+    min-height: var(--media-badge-h);
+    align-items: center;
+    gap: var(--media-sp-5);
+    padding: var(--media-sp-0) var(--media-sp-8);
+    border-radius: var(--media-radius-pill);
+    background: var(--media-overlay-bg);
+    color: var(--media-on-accent);
+    font-size: var(--media-text-10);
+}
+
 .tileBody {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-4xs);
-    text-align: start;
+    display: grid;
+    width: 100%;
     min-width: 0;
+    gap: var(--media-sp-2);
+    padding: var(--media-sp-10) var(--media-sp-10) var(--media-sp-12);
+    text-align: start;
+}
+
+.tileTitle,
+.tileLabel,
+.tileMeta {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.tileTitle {
+    color: var(--mms-text);
+    font-size: var(--media-text-12);
+    font-weight: var(--media-weight-strong);
 }
 
 .tileLabel {
-    font-size: var(--text-s);
-    font-weight: 500;
-    color: var(--text);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    color: var(--mms-text-muted);
+    font-size: var(--media-text-10);
 }
 
 .tileMeta {
-    font-size: var(--text-2xs);
-    color: var(--text-subtle);
+    color: var(--mms-text-muted);
+    font-size: var(--media-text-9);
 }
 
-/* ── List view ─────────────────────────────────────────────────────────── */
+/* `.checkmark` — hidden until hover / selection / keyboard focus. */
+.checkmark.checkmark {
+    position: absolute;
+    z-index: 3;
+    top: var(--media-sp-3);
+    left: var(--media-sp-3);
+    display: grid;
+    width: var(--media-tap);
+    height: var(--media-tap);
+    min-height: var(--media-tap);
+    place-items: center;
+    padding: var(--media-sp-0);
+    border: 0;
+    border-radius: var(--media-radius-8);
+    background: transparent;
+    color: var(--media-on-accent);
+    opacity: 0;
+    transition: opacity 120ms ease;
+}
+
+.checkmark.checkmark::before {
+    position: absolute;
+    z-index: -1;
+    width: var(--media-checkmark);
+    height: var(--media-checkmark);
+    border: 1px solid var(--media-checkmark-border);
+    border-radius: var(--media-radius-6);
+    background: var(--media-checkmark-bg);
+    content: '';
+}
+
+.tileItem:hover .checkmark,
+.tileItem:focus-within .checkmark,
+.rowItem:hover .checkmark,
+.rowItem:focus-within .checkmark,
+.tile.tileSelected + .checkmark,
+.checkmark.checkmark[aria-pressed='true'] {
+    opacity: 1;
+}
+
+/* ── List view ───────────────────────────────────────────────────────────── */
+
 .list {
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--media-sp-4);
+    margin: var(--media-sp-0);
+    padding: var(--media-sp-0);
     list-style: none;
-    margin: 0;
-    padding: 0;
-    gap: var(--space-px);
 }
 
 .rowItem {
     position: relative;
-    list-style: none;
     display: block;
+    min-width: 0;
+    list-style: none;
 }
 
-.itemActions {
-    position: absolute;
-    z-index: 1;
-    top: var(--space-s);
-    right: var(--space-s);
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-px);
-    padding: var(--space-3xs);
-    border-radius: var(--panel-radius);
-    background: var(--bg-surface-3);
-    box-shadow: var(--shadow-panel-inset-bottom);
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 120ms ease;
-}
-
-.itemActions > button {
-    /* Keep every pressed/hover surface concentric with the floating toolbar. */
-    border-radius: calc(var(--panel-radius) - var(--space-3xs));
-}
-
-.tileItem:hover > .itemActions,
-.tileItem:focus-within > .itemActions,
-.rowItem:hover > .itemActions,
-.rowItem:focus-within > .itemActions {
-    opacity: 1;
-    pointer-events: auto;
-}
-
-.rowItem[data-has-actions="true"] .row {
-    padding-right: var(--space-8xl);
-}
-
-.rowItem > .itemActions {
-    top: 50%;
-    transform: translateY(-50%);
-}
-
-.row {
-    display: flex;
-    align-items: center;
-    gap: var(--space-s);
-    padding: var(--space-3xs) var(--space-s);
+.row.row {
+    display: grid;
     width: 100%;
+    min-width: 0;
+    min-height: var(--media-row-h);
+    grid-template-columns: var(--media-list-thumb-w) minmax(0, 1fr);
+    align-items: center;
     justify-content: flex-start;
-    border-radius: var(--radius-sm);
+    gap: var(--media-sp-0);
+    overflow: hidden;
+    padding: var(--media-sp-0);
+    border: 1px solid var(--mms-border);
+    border-radius: var(--media-radius-7);
+    background: var(--mms-surface);
+    text-align: left;
 }
 
 .row.rowSelected {
-    background: var(--overlay-10);
-    box-shadow: inset 0 0 0 1px var(--canvas-selection-ring-color);
-}
-
-.folderRow {
-    cursor: pointer;
-}
-
-.parentFolderRow {
-    color: var(--text-muted);
-}
-
-.parentFolderRow .parentFolderIcon {
-    width: 20px;
-    height: 20px;
-}
-
-.parentFolderRow .parentFolderArrow {
-    right: 0;
-    bottom: 0;
+    border-color: var(--mms-action);
+    box-shadow: 0 0 0 2px var(--media-selected-halo);
 }
 
 .rowPreview {
-    display: inline-flex;
-    width: 24px;
-    height: 24px;
+    display: flex;
+    height: var(--media-list-thumb-h);
     align-items: center;
     justify-content: center;
-    background: var(--bg-surface-2);
-    border-radius: var(--radius-sm);
-    color: var(--text-subtle);
     overflow: hidden;
+    border-radius: var(--media-radius-6) 0 0 var(--media-radius-6);
+    background: var(--mms-surface-tint);
+    color: var(--mms-text-muted);
 }
 
-/* Same wrapper fill as `.tilePreview` for the list view's 24×24 thumb. */
 .rowPreview > span {
     display: block;
     width: 100%;
@@ -293,17 +591,227 @@
     object-fit: cover;
 }
 
+.rowBody {
+    display: grid;
+    min-width: 0;
+    align-content: center;
+    gap: var(--media-sp-2);
+    padding: var(--media-sp-10) var(--media-sp-12);
+}
+
+/* `.rowLabel` / `.rowMeta` are also consumed directly by the Data
+   workspace's `MediaRepeaterGallery`, which imports this module to render
+   repeater cells in the same visual language. Renaming or deleting them
+   silently breaks that grid cell — keep both. */
 .rowLabel {
-    flex: 1 1 auto;
-    text-align: start;
-    font-size: var(--text-s);
+    min-width: 0;
     overflow: hidden;
+    color: var(--mms-text);
+    font-size: var(--media-text-13);
+    font-weight: var(--media-weight-strong);
+    text-align: start;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
 .rowMeta {
-    flex: 0 0 auto;
-    font-size: var(--text-xs);
-    color: var(--text-subtle);
+    min-width: 0;
+    overflow: hidden;
+    color: var(--mms-text-muted);
+    font-size: var(--media-text-11);
+    text-align: start;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Third line of a list row — `size · date`, matching the tile's caption. */
+.rowSubMeta {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--mms-text-muted);
+    font-size: var(--media-text-10);
+    text-align: start;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ── Hover action cluster ────────────────────────────────────────────────── */
+
+.itemActions {
+    position: absolute;
+    z-index: 2;
+    top: var(--media-sp-8);
+    right: var(--media-sp-8);
+    display: inline-flex;
+    align-items: center;
+    gap: var(--media-sp-2);
+    padding: var(--media-sp-4);
+    border: 1px solid var(--mms-border);
+    border-radius: var(--media-radius-10);
+    background: var(--mms-surface-raised);
+    box-shadow: var(--media-shadow-menu);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 120ms ease;
+}
+
+.tileItem:hover > .itemActions,
+.tileItem:focus-within > .itemActions,
+.rowItem:hover > .itemActions,
+.rowItem:focus-within > .itemActions {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.rowItem > .itemActions {
+    top: 50%;
+    transform: translateY(-50%);
+}
+
+.rowItem[data-has-actions='true'] .row {
+    padding-right: var(--media-sp-80);
+}
+
+/* ── Empty state ─────────────────────────────────────────────────────────── */
+
+.emptyState {
+    display: grid;
+    min-height: var(--media-empty-min-h);
+    align-content: center;
+    justify-items: center;
+    padding: var(--media-sp-32);
+    border: 1px dashed var(--mms-border-strong);
+    border-radius: var(--media-radius-10);
+    text-align: center;
+}
+
+.emptyIcon {
+    display: grid;
+    width: var(--media-empty-icon);
+    height: var(--media-empty-icon);
+    place-items: center;
+    margin-bottom: var(--media-sp-18);
+    border-radius: var(--media-radius-16);
+    background: var(--mms-surface-green);
+    color: var(--mms-action-strong);
+}
+
+.emptyTitle {
+    margin: var(--media-sp-0) var(--media-sp-0) var(--media-sp-7);
+    color: var(--mms-text);
+    font-size: var(--media-text-18);
+    font-weight: var(--media-weight-strong);
+}
+
+.emptyBody {
+    max-width: var(--media-empty-copy-w);
+    margin: var(--media-sp-0) var(--media-sp-0) var(--media-sp-20);
+    color: var(--mms-text-muted);
+}
+
+/* ── Responsive ──────────────────────────────────────────────────────────────
+   Breakpoints are the reference's own: 1250 / 1024 / 767 / 430. There is no
+   390px breakpoint — 390 is a capture width inside the ≤430 band. */
+
+@media (max-width: 1250px) {
+    .grid {
+        --media-grid-cols: 4;
+    }
+
+    .folderTiles {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 1024px) {
+    .grid {
+        --media-grid-cols: 3;
+    }
+
+    .folderTiles {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .filterBar {
+        grid-template-columns: minmax(0, 1fr) auto;
+    }
+}
+
+@media (max-width: 767px) {
+    .canvas {
+        padding: var(--media-sp-0) var(--media-sp-14) var(--media-sp-80);
+    }
+
+    .toolbar {
+        margin: var(--media-sp-0) calc(-1 * var(--media-sp-14));
+        padding: var(--media-sp-0) var(--media-sp-10);
+    }
+
+    /* The reference drops the breadcrumb before it can wrap. */
+    .breadcrumbs {
+        display: none;
+    }
+
+    .libraryHeading {
+        align-items: flex-start;
+        padding: var(--media-sp-21) var(--media-sp-0) var(--media-sp-14);
+    }
+
+    .libraryTitle {
+        font-size: var(--media-text-21);
+    }
+
+    .selectionSummary {
+        display: none;
+    }
+
+    .folderTiles {
+        gap: var(--media-sp-8);
+    }
+
+    .folderTile.folderTile {
+        grid-template-columns: var(--media-sp-40) minmax(0, 1fr);
+    }
+
+    .folderTileChevron {
+        display: none;
+    }
+
+    .grid {
+        --media-grid-cols: 2;
+        --media-grid-min: 105px;
+
+        gap: var(--media-sp-10) var(--media-sp-8);
+    }
+
+    .tileBody {
+        padding: var(--media-sp-8);
+    }
+}
+
+@media (max-width: 430px) {
+    .grid {
+        --media-grid-cols: 2;
+        --media-grid-min: 95px;
+    }
+
+    .tilePreview {
+        aspect-ratio: 1.08;
+    }
+
+    .tileTitle {
+        font-size: var(--media-text-11);
+    }
+
+    /* Drop the third caption line before it truncates to nothing. */
+    .tileMeta {
+        display: none;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .checkmark.checkmark,
+    .itemActions {
+        transition: none;
+    }
 }

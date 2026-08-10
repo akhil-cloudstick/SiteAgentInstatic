@@ -1,49 +1,143 @@
-.body {
-  margin: 0 0 var(--space-l) 0;
-  font-size: var(--text-m);
-  color: var(--text);
-  line-height: 1.4;
+/* PHASE 9: transcribed from the MMSBUILD Media reference
+   (screens/media/src/styles.css → .replace-modal, .replacement-compare,
+   .file-drop, .irreversible-warning), with the approved replacement
+   master's AMBER warning callout placed at the TOP and its GREEN confirm
+   button (the runnable reference puts a red callout at the bottom). */
+
+.intro {
+    margin: var(--media-sp-0) var(--media-sp-0) var(--media-sp-16);
+    color: var(--mms-text-muted);
+    font-size: var(--media-text-13);
 }
 
-.current {
-  margin: 0 0 var(--space-l) 0;
-  padding: var(--space-s) var(--space-l);
-  background: var(--bg-surface-2);
-  border-radius: var(--radius);
-  font-size: var(--text-s);
-  color: var(--text-subtle);
-  display: grid;
-  grid-template-columns: max-content 1fr;
-  column-gap: var(--space-s);
-  row-gap: var(--space-4xs);
+/* `.irreversible-warning` — amber, at the top, four lines. */
+.warning {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--media-sp-12);
+    margin: var(--media-sp-0) var(--media-sp-0) var(--media-sp-20);
+    padding: var(--media-sp-13) var(--media-sp-14);
+    border: 1px solid var(--mms-warning);
+    border-radius: var(--media-radius-8);
+    background: var(--mms-surface-tint);
 }
 
-.current dt {
-  text-transform: uppercase;
-  font-size: var(--text-2xs);
-  letter-spacing: 0.06em;
-  color: var(--text-subtle);
+.warningIcon {
+    flex: 0 0 auto;
+    color: var(--mms-warning);
 }
 
-.current dd {
-  margin: 0;
-  color: var(--text);
+.warningBody {
+    display: grid;
+    min-width: 0;
+    gap: var(--media-sp-3);
+    color: var(--mms-text);
+    font-size: var(--media-text-12);
 }
 
+.warningBody strong {
+    font-weight: var(--media-weight-strong);
+}
+
+/* `.replacement-compare` — two stacked rows in the approved master, each a
+   thumbnail beside its filename and facts. */
+.compare {
+    display: grid;
+    gap: var(--media-sp-16);
+}
+
+.compareGroup {
+    display: grid;
+    min-width: 0;
+    gap: var(--media-sp-6);
+}
+
+.compareLabel {
+    color: var(--mms-text-muted);
+    font-size: var(--media-text-10);
+    font-weight: var(--media-weight-eyebrow);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.compareRow {
+    display: grid;
+    min-width: 0;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: var(--media-sp-12);
+    padding: var(--media-sp-10);
+    border: 1px solid var(--mms-border);
+    border-radius: var(--media-radius-8);
+    background: var(--mms-surface);
+}
+
+.compareThumb {
+    display: grid;
+    width: var(--media-sp-80);
+    aspect-ratio: var(--media-compare-ratio);
+    place-items: center;
+    overflow: hidden;
+    border-radius: var(--media-radius-6);
+    background: var(--mms-surface-tint);
+    color: var(--mms-text-muted);
+}
+
+.compareThumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.compareText {
+    display: grid;
+    min-width: 0;
+    gap: var(--media-sp-2);
+}
+
+.compareName,
+.compareMeta {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.compareName {
+    color: var(--mms-text);
+    font-size: var(--media-text-13);
+    font-weight: var(--media-weight-strong);
+}
+
+.compareMeta {
+    color: var(--mms-text-muted);
+    font-size: var(--media-text-11);
+}
+
+/* `.file-drop` — the empty "New file" slot. */
 .picker {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-xs);
-}
-
-.picked {
-  font-size: var(--text-s);
-  color: var(--text);
-  margin: 0;
+    display: grid;
+    min-height: var(--media-file-drop-h);
+    place-items: center;
+    padding: var(--media-sp-16);
+    border: 1px dashed var(--mms-border-strong);
+    border-radius: var(--media-radius-8);
+    background: var(--mms-surface-tint);
+    text-align: center;
 }
 
 .error {
-  margin: var(--space-s) 0 0 0;
-  font-size: var(--text-s);
-  color: var(--danger);
+    margin: var(--media-sp-12) var(--media-sp-0) var(--media-sp-0);
+    color: var(--mms-danger);
+    font-size: var(--media-text-12);
+}
+
+@media (max-width: 430px) {
+    .compareRow {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .compareThumb {
+        width: 100%;
+    }
 }

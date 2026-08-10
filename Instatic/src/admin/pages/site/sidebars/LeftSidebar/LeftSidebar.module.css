@@ -103,3 +103,69 @@
         transition: none;
     }
 }
+
+/*
+ * Data workspace, narrow viewports — the approved Data Workbench screen drops
+ * to a records-first single column below 1100px and moves the tables panel
+ * behind the bottom dock as a drawer (see DataMobileDock).
+ *
+ * Additive and scoped to an ancestor attribute only the Data workspace body
+ * carries, so the Site and Content sidebars are untouched. The drawer mounts
+ * its own instance of the same component, so nothing is lost by hiding this
+ * one — the desktop column simply has no room at this width.
+ */
+@media (max-width: 1100px) {
+    :global([data-editor-screen='data']) > .sidebar {
+        display: none;
+    }
+}
+
+/*
+ * Data workspace — declare the rail track.
+ *
+ * `.panelSlot` is absolutely positioned at `left: var(--left-sidebar-rail-width)`,
+ * and that variable defaults to 0 because Content and Media mount the panel with
+ * no leading column. The Data sidebar DOES render a rail, so without this the
+ * panel is laid out starting at x=0 and sits on top of the rail icons.
+ *
+ * The approved screen models the sidebar as `44px | panel` — two tracks that
+ * cannot overlap by construction. Declaring the rail width here reproduces that
+ * relationship through the shared component's own layout model, rather than
+ * patching the symptom with z-index or a margin.
+ */
+:global([data-editor-screen='data']) .sidebar {
+    --left-sidebar-rail-width: var(--data-rail-w);
+}
+
+/*
+ * Data workspace, collapsed — clip the panel to the shell.
+ *
+ * `.panelSlot` deliberately keeps its full saved width while closing so the
+ * text inside does not reflow mid-animation (see `--left-sidebar-panel-layout-width`).
+ * That only works if the shell clips it; with the shared `overflow: visible`
+ * the panel kept painting at full width outside a 44px sidebar, landing on top
+ * of the grid. Clipping here is the mechanism that comment already assumes.
+ */
+:global([data-editor-screen='data']) .sidebar {
+    overflow: hidden;
+}
+
+/* The approved screen closes the tables panel with a hairline on its trailing
+   edge, separating it from the grid. */
+:global([data-editor-screen='data']) .sidebar {
+    border-right: 1px solid var(--mms-border);
+}
+
+/*
+ * Data workspace — the tables panel shares the workspace tone.
+ *
+ * The approved screen paints the rail, the tables panel and the grid the SAME
+ * colour; only hairlines separate them. The generic panel sits on a distinct
+ * surface tone, which in dark mode made the sidebar read as a darker slab
+ * beside the grid.
+ */
+:global([data-editor-screen='data']) .sidebar,
+:global([data-editor-screen='data']) .panelSlot,
+:global([data-editor-screen='data']) .panelMount {
+    background: var(--mms-workspace);
+}

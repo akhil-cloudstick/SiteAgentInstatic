@@ -1,0 +1,841 @@
+/* Plugin recovery — the focused screen for a plugin the host has parked.
+ *
+ * Transcribed from the approved MMSBUILD Plugins screen's `.recovery-*` rules.
+ * Three columns: what the plugin is, what went wrong and how to restore it,
+ * and what is waiting to replace it.
+ */
+
+.wrap {
+    width: min(1284px, calc(100vw - 64px));
+    min-width: 288px;
+    margin: 0 auto;
+    padding: var(--plugins-sp-16) 0 var(--plugins-sp-14);
+}
+
+/* ── Heading ────────────────────────────────────────────────────────────── */
+.heading {
+    min-height: 135px;
+}
+
+.breadcrumbs {
+    display: flex;
+    min-height: var(--plugins-tap);
+    align-items: center;
+    gap: var(--plugins-sp-10);
+    color: var(--mms-text-muted);
+}
+
+.breadcrumbLink {
+    min-height: var(--plugins-tap);
+    padding: 0;
+    color: var(--mms-action-strong);
+}
+
+.breadcrumbs > i {
+    color: var(--mms-border-strong);
+    font-size: var(--plugins-text-9);
+}
+
+.breadcrumbCurrent {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.titleRow {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--plugins-sp-25);
+}
+
+.titleText {
+    min-width: 0;
+}
+
+.titleRow h1 {
+    margin: var(--plugins-sp-3) 0 var(--plugins-sp-5);
+    overflow-wrap: anywhere;
+    font-size: var(--plugins-text-37);
+    line-height: 1;
+    letter-spacing: -0.04em;
+}
+
+.titleLead {
+    margin: 0;
+    color: var(--mms-text-muted);
+    font-size: var(--plugins-text-15);
+}
+
+.siteContext {
+    display: flex;
+    min-height: var(--plugins-tap);
+    min-width: 0;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--plugins-sp-10);
+    color: var(--mms-text-muted);
+}
+
+.siteContextDivider {
+    width: 1px;
+    height: 18px;
+    flex-shrink: 0;
+    background: var(--mms-border-strong);
+}
+
+/* ── Grid ───────────────────────────────────────────────────────────────── */
+.grid {
+    display: grid;
+    grid-template-columns:
+        var(--plugins-recovery-left-w)
+        minmax(0, 1fr)
+        var(--plugins-recovery-right-w);
+    gap: var(--plugins-sp-24);
+}
+
+.summary,
+.serviceStopped,
+.checks,
+.uploadedUpdate,
+.removeStrip {
+    min-width: 0;
+    border: 1px solid var(--mms-border);
+    border-radius: var(--plugins-radius-9);
+    background: var(--mms-surface);
+}
+
+/* ── Summary aside ──────────────────────────────────────────────────────── */
+.summary {
+    align-self: start;
+}
+
+.summary > h2 {
+    margin: 0;
+    padding: var(--plugins-sp-14) var(--plugins-sp-17);
+    border-bottom: 1px solid var(--mms-border);
+    font-size: var(--plugins-text-15);
+}
+
+.summaryIdentity {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: var(--plugins-sp-12);
+    padding: var(--plugins-sp-18) var(--plugins-sp-16) var(--plugins-sp-8);
+}
+
+.summaryIcon {
+    display: grid;
+    width: var(--plugins-summary-icon);
+    height: var(--plugins-summary-icon);
+    flex-shrink: 0;
+    place-items: center;
+    overflow: hidden;
+    border-radius: var(--plugins-radius-10);
+    color: var(--plugins-on-solid);
+    font-size: var(--plugins-text-23);
+    box-shadow: inset 0 0 0 1px var(--plugins-icon-inner-highlight);
+}
+
+.summaryIcon[data-tone='green'] {
+    background: linear-gradient(145deg, var(--plugins-icon-green-a), var(--plugins-icon-green-b));
+}
+
+.summaryIcon[data-tone='slate'] {
+    background: linear-gradient(145deg, var(--plugins-icon-slate-a), var(--plugins-icon-slate-b));
+}
+
+.summaryIcon[data-tone='red'] {
+    background: linear-gradient(145deg, var(--plugins-icon-red-a), var(--plugins-icon-red-b));
+}
+
+.summaryIcon[data-tone='blue'] {
+    background: linear-gradient(145deg, var(--plugins-icon-blue-a), var(--plugins-icon-blue-b));
+}
+
+.summaryIconImage {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.summaryName {
+    min-width: 0;
+}
+
+.summaryName strong {
+    display: block;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.summaryVersion {
+    display: inline-flex;
+    min-height: 25px;
+    align-items: center;
+    margin-top: var(--plugins-sp-4);
+    padding: 0 var(--plugins-sp-7);
+    border: 1px solid var(--mms-border-strong);
+    border-radius: var(--plugins-radius-pill);
+    background: var(--mms-surface-raised);
+    font-family: var(--font-mono);
+    font-size: var(--plugins-text-10);
+}
+
+.summaryStatus {
+    display: inline-flex;
+    min-height: 26px;
+    align-items: center;
+    margin: 0 var(--plugins-sp-16) var(--plugins-sp-10);
+    padding: 0 var(--plugins-sp-10);
+    border-radius: var(--plugins-radius-pill);
+    font-size: var(--plugins-text-10);
+    font-weight: var(--plugins-weight-720);
+}
+
+.summaryStatus[data-status='active'] {
+    background: var(--mms-surface-green);
+    color: var(--mms-success);
+}
+
+.summaryStatus[data-status='disabled'],
+.summaryStatus[data-status='installed'] {
+    background: var(--mms-surface-tint);
+    color: var(--mms-text-muted);
+}
+
+.summaryStatus[data-status='error'] {
+    background: var(--mms-danger-bg);
+    color: var(--mms-danger);
+}
+
+.summary dl {
+    margin: 0;
+    padding: var(--plugins-sp-10) var(--plugins-sp-16);
+    border-top: 1px solid var(--mms-border);
+    border-bottom: 1px solid var(--mms-border);
+}
+
+.summary dl div {
+    display: flex;
+    min-height: 36px;
+    min-width: 0;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--plugins-sp-10);
+}
+
+.summary dt {
+    flex-shrink: 0;
+    color: var(--mms-text-muted);
+}
+
+.summary dd {
+    min-width: 0;
+    margin: 0;
+    overflow-wrap: anywhere;
+    text-align: right;
+}
+
+/* Read-only state indicator. Deliberately not a Switch: enabling or disabling
+   from here runs a lifecycle hook, which belongs on the explicit buttons
+   below, not on a control that looks like it toggles a preference. */
+.enabledPill {
+    display: inline-flex;
+    min-height: 24px;
+    align-items: center;
+    padding: 0 var(--plugins-sp-10);
+    border-radius: var(--plugins-radius-pill);
+    font-size: var(--plugins-text-10);
+    font-weight: var(--plugins-weight-720);
+}
+
+.enabledPill[data-on='true'] {
+    background: var(--mms-surface-green);
+    color: var(--mms-success);
+}
+
+.enabledPill[data-on='false'] {
+    background: var(--mms-surface-tint);
+    color: var(--mms-text-muted);
+}
+
+.summary > h3 {
+    margin: 0;
+    padding: var(--plugins-sp-13) var(--plugins-sp-16) var(--plugins-sp-7);
+    font-size: var(--plugins-text-12);
+}
+
+.permissionRow {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: var(--plugins-sp-6);
+    margin: 0;
+    padding: var(--plugins-sp-5) var(--plugins-sp-16);
+    overflow-wrap: anywhere;
+    color: var(--mms-text-muted);
+}
+
+.permissionRow i {
+    flex-shrink: 0;
+    color: var(--mms-success);
+}
+
+.summaryNav {
+    display: grid;
+    gap: var(--plugins-sp-5);
+    margin-top: var(--plugins-sp-20);
+    padding-top: var(--plugins-sp-14);
+    border-top: 1px solid var(--mms-border);
+}
+
+.summaryNavItem {
+    justify-content: flex-start;
+    min-height: 48px;
+    padding: 0 var(--plugins-sp-16);
+    border: 0;
+    border-left: 3px solid transparent;
+    border-radius: 0;
+    text-align: left;
+}
+
+.summaryNavItem[data-active='true'] {
+    border-left-color: var(--mms-warning);
+    background: var(--mms-warning-bg);
+}
+
+/* ── Centre column ──────────────────────────────────────────────────────── */
+.center {
+    display: grid;
+    align-content: start;
+    gap: var(--plugins-sp-15);
+    min-width: 0;
+}
+
+.serviceStopped {
+    padding: var(--plugins-sp-22);
+    border-color: var(--mms-danger);
+}
+
+.stoppedHeading {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: var(--plugins-sp-14);
+    padding-bottom: var(--plugins-sp-17);
+    border-bottom: 1px solid var(--mms-border);
+}
+
+.stoppedIcon {
+    display: grid;
+    width: 48px;
+    height: 48px;
+    flex-shrink: 0;
+    place-items: center;
+    border-radius: var(--plugins-radius-10);
+    background: var(--mms-danger);
+    color: var(--plugins-on-solid);
+    font-size: var(--plugins-text-22);
+}
+
+.stoppedHeading h2 {
+    margin: 0;
+    overflow-wrap: anywhere;
+    font-size: var(--plugins-text-19);
+}
+
+.stoppedHeading p {
+    margin: var(--plugins-sp-2) 0 0;
+    overflow-wrap: anywhere;
+    color: var(--mms-danger);
+}
+
+.errorGrid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--plugins-sp-22);
+    padding: var(--plugins-sp-17) 0 var(--plugins-sp-14);
+}
+
+.errorGrid dl {
+    display: grid;
+    align-content: start;
+    gap: var(--plugins-sp-17);
+    margin: 0;
+    min-width: 0;
+}
+
+.errorGrid dt {
+    font-weight: var(--plugins-weight-750);
+}
+
+.errorGrid dd {
+    min-width: 0;
+    margin: var(--plugins-sp-3) 0 0;
+    overflow-wrap: anywhere;
+    color: var(--mms-text-muted);
+}
+
+.timeline {
+    min-width: 0;
+    padding-left: var(--plugins-sp-20);
+    border-left: 1px solid var(--mms-border);
+}
+
+.timelineHeading {
+    margin: 0 0 var(--plugins-sp-8);
+    font-size: var(--plugins-text-10);
+}
+
+.timelineRow {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    min-height: 55px;
+    padding-left: var(--plugins-sp-17);
+}
+
+.timelineDot {
+    position: absolute;
+    top: 5px;
+    left: -5px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--mms-danger);
+}
+
+/* The connector between consecutive crash markers. Suppressed on the last row
+   so the line ends at the oldest event instead of trailing into nothing. */
+.timelineRow::before {
+    position: absolute;
+    top: 13px;
+    bottom: -5px;
+    left: 0;
+    width: 1px;
+    background: var(--mms-danger);
+    content: "";
+}
+
+.timelineRow:last-child::before {
+    display: none;
+}
+
+.timelineTime {
+    grid-column: 1;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.timelineDate {
+    grid-column: 1;
+    min-width: 0;
+    color: var(--mms-text-muted);
+}
+
+.timelineReason {
+    grid-column: 2;
+    grid-row: 1;
+    min-width: 0;
+    overflow-wrap: anywhere;
+    font-weight: var(--plugins-weight-500);
+    text-align: right;
+}
+
+.recoveryButtons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--plugins-sp-8);
+}
+
+.recoveryNote {
+    margin: var(--plugins-sp-9) 0 0;
+    overflow-wrap: anywhere;
+    color: var(--mms-text-muted);
+    font-size: var(--plugins-text-11);
+}
+
+/* ── Recovery checks ────────────────────────────────────────────────────── */
+.checks {
+    padding: var(--plugins-sp-17) var(--plugins-sp-20);
+}
+
+.checks h2 {
+    margin: 0 0 var(--plugins-sp-9);
+    font-size: var(--plugins-text-16);
+}
+
+.check {
+    display: flex;
+    min-height: 54px;
+    min-width: 0;
+    align-items: center;
+    gap: var(--plugins-sp-12);
+}
+
+.check > i {
+    flex-shrink: 0;
+    font-size: var(--plugins-text-19);
+}
+
+.check[data-tone='success'] > i {
+    color: var(--mms-success);
+}
+
+.check[data-tone='warning'] > i {
+    color: var(--mms-warning);
+}
+
+.check span {
+    min-width: 0;
+}
+
+.check strong,
+.check small {
+    display: block;
+    overflow-wrap: anywhere;
+}
+
+.check small {
+    color: var(--mms-text-muted);
+}
+
+/* ── Uploaded update aside ──────────────────────────────────────────────── */
+.uploadedUpdate {
+    align-self: stretch;
+    padding: var(--plugins-sp-20);
+    border-color: var(--plugins-update-border);
+}
+
+.updateHeading {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: var(--plugins-sp-12);
+}
+
+.updateIcon {
+    display: grid;
+    width: 44px;
+    height: 44px;
+    flex-shrink: 0;
+    place-items: center;
+    border: 1px solid var(--mms-warning);
+    border-radius: 50%;
+    color: var(--mms-warning);
+    font-size: var(--plugins-text-17);
+}
+
+.updateHeading h2 {
+    margin: 0;
+    overflow-wrap: anywhere;
+    font-size: var(--plugins-text-18);
+}
+
+.versionChange {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 32px minmax(0, 1fr) auto;
+    align-items: end;
+    gap: var(--plugins-sp-8);
+    margin: var(--plugins-sp-28) 0 var(--plugins-sp-20);
+}
+
+.versionColumn {
+    min-width: 0;
+}
+
+.versionColumn small {
+    display: block;
+    margin-bottom: var(--plugins-sp-7);
+    color: var(--mms-text-muted);
+}
+
+.versionColumn strong {
+    display: grid;
+    min-height: var(--plugins-tap);
+    min-width: 0;
+    place-items: center;
+    padding: 0 var(--plugins-sp-6);
+    overflow-wrap: anywhere;
+    border: 1px solid var(--mms-border-strong);
+    border-radius: var(--plugins-radius-7);
+    font-family: var(--font-mono);
+    font-size: var(--plugins-text-17);
+}
+
+.versionArrow {
+    align-self: center;
+    text-align: center;
+}
+
+.versionBadge {
+    display: grid;
+    min-height: 28px;
+    place-items: center;
+    padding: 0 var(--plugins-sp-7);
+    border-radius: var(--plugins-radius-5);
+    background: var(--mms-surface-green);
+    color: var(--mms-success);
+    font-size: var(--plugins-text-10);
+    white-space: nowrap;
+}
+
+.updateList {
+    display: grid;
+    gap: var(--plugins-sp-15);
+    margin: var(--plugins-sp-12) 0;
+    padding: var(--plugins-sp-18) 0;
+    border-top: 1px solid var(--mms-border);
+    border-bottom: 1px solid var(--mms-border);
+    list-style: none;
+}
+
+.updateList li {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: var(--plugins-sp-9);
+    overflow-wrap: anywhere;
+}
+
+.updateList li i {
+    flex-shrink: 0;
+    color: var(--mms-success);
+}
+
+.updateList li[data-tone='warning'] i {
+    color: var(--mms-warning);
+}
+
+.updateList li[data-tone='info'] i {
+    color: var(--mms-blue);
+}
+
+.updateCta {
+    width: 100%;
+}
+
+.updateNote {
+    margin: var(--plugins-sp-14) 0 0;
+    overflow-wrap: anywhere;
+    color: var(--mms-text-muted);
+}
+
+.updateEmpty {
+    margin: var(--plugins-sp-20) 0;
+    overflow-wrap: anywhere;
+    color: var(--mms-text-muted);
+}
+
+.updateActions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--plugins-sp-8);
+}
+
+/* ── Remove strip ───────────────────────────────────────────────────────── */
+.removeStrip {
+    display: flex;
+    min-height: 72px;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--plugins-sp-15);
+    margin: var(--plugins-sp-18) 0;
+    padding: var(--plugins-sp-10) var(--plugins-sp-20);
+    border-color: var(--mms-danger);
+}
+
+.removeStripText {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: var(--plugins-sp-13);
+}
+
+.removeStripText > i {
+    flex-shrink: 0;
+    color: var(--mms-danger);
+    font-size: var(--plugins-text-22);
+}
+
+.removeStripText span {
+    min-width: 0;
+}
+
+.removeStripText strong,
+.removeStripText small {
+    display: block;
+    overflow-wrap: anywhere;
+}
+
+.removeStripText small {
+    color: var(--mms-text-muted);
+}
+
+/* ── Footer ─────────────────────────────────────────────────────────────── */
+.footer {
+    display: flex;
+    min-height: 58px;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--plugins-sp-13);
+    padding: var(--plugins-sp-10) var(--plugins-sp-16);
+    border: 1px solid var(--mms-border);
+    border-radius: var(--plugins-radius-8);
+    background: var(--mms-surface);
+    font-size: var(--plugins-text-11);
+}
+
+.footerDot {
+    width: 9px;
+    height: 9px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    background: var(--mms-danger);
+}
+
+.footer[data-connected='true'] .footerDot {
+    background: var(--mms-success);
+    box-shadow: 0 0 0 4px var(--plugins-live-glow);
+}
+
+.footerDivider {
+    width: 1px;
+    height: 18px;
+    flex-shrink: 0;
+    background: var(--mms-border-strong);
+}
+
+.footerItem {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.footerAction {
+    margin-left: auto;
+}
+
+.errorSlot {
+    margin-bottom: var(--plugins-sp-16);
+}
+
+/* ── Responsive ─────────────────────────────────────────────────────────── */
+@media (max-width: 1250px) {
+    .wrap {
+        width: min(1180px, calc(100vw - 38px));
+    }
+
+    .grid {
+        grid-template-columns: 250px minmax(0, 1fr) 300px;
+        gap: var(--plugins-sp-14);
+    }
+}
+
+@media (max-width: 1024px) {
+    .grid {
+        grid-template-columns: 230px minmax(0, 1fr);
+    }
+
+    /* The update aside drops to a full-width row under both columns, and the
+       summary stretches to cover the two rows beside the centre column. */
+    .uploadedUpdate {
+        grid-column: 1 / -1;
+    }
+
+    .summary {
+        grid-row: span 2;
+    }
+}
+
+@media (max-width: 767px) {
+    .wrap {
+        width: calc(100vw - 28px);
+    }
+
+    .heading {
+        min-height: auto;
+        padding-bottom: var(--plugins-sp-14);
+    }
+
+    .titleRow {
+        display: block;
+    }
+
+    .titleRow h1 {
+        font-size: var(--plugins-text-30);
+    }
+
+    .titleLead {
+        font-size: var(--plugins-text-12);
+    }
+
+    .siteContext {
+        margin-top: var(--plugins-sp-8);
+    }
+
+    .grid {
+        grid-template-columns: 1fr;
+    }
+
+    .summary,
+    .center,
+    .uploadedUpdate {
+        grid-column: 1;
+        grid-row: auto;
+    }
+
+    .summaryNav {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .errorGrid {
+        grid-template-columns: 1fr;
+    }
+
+    /* The timeline stops being a column beside the error list and becomes a
+       section below it, so its rule moves from the left edge to the top. */
+    .timeline {
+        padding: var(--plugins-sp-15) 0 0;
+        border-top: 1px solid var(--mms-border);
+        border-left: 0;
+    }
+
+    .removeStrip {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .footer {
+        min-height: 90px;
+        flex-wrap: wrap;
+        padding: var(--plugins-sp-10);
+    }
+
+    .footerDivider {
+        display: none;
+    }
+
+    .footerAction {
+        width: 100%;
+        margin-left: 0;
+    }
+}
+
+@media (max-width: 430px) {
+    .recoveryButtons > * {
+        width: 100%;
+    }
+
+    .versionChange {
+        grid-template-columns: minmax(0, 1fr) 24px minmax(0, 1fr);
+    }
+
+    .versionBadge {
+        grid-column: 3;
+    }
+
+    .siteContext {
+        font-size: var(--plugins-text-10);
+    }
+}

@@ -1,14 +1,7 @@
 import { useState, type ReactElement } from 'react'
 import { nanoid } from 'nanoid'
 import { Button } from '@ui/components/Button'
-import { ArrowDownIcon } from 'pixel-art-icons/icons/arrow-down'
-import { ArrowUpIcon } from 'pixel-art-icons/icons/arrow-up'
-import { BulletlistSolidIcon } from 'pixel-art-icons/icons/bulletlist-solid'
-import { Grid2x22SolidIcon } from 'pixel-art-icons/icons/grid-2x2-2-solid'
-import { ImageSolidIcon } from 'pixel-art-icons/icons/image-solid'
-import { ImageXSolidIcon } from 'pixel-art-icons/icons/image-x-solid'
-import { PlusIcon } from 'pixel-art-icons/icons/plus'
-import { TrashSolidIcon } from 'pixel-art-icons/icons/trash-solid'
+import { ArrowDownIcon, ArrowUpIcon, BulletlistSolidIcon, Grid2x22SolidIcon, ImageSolidIcon, ImageXSolidIcon, PlusIcon, TrashSolidIcon } from '@admin/pages/data/icons'
 import type { CmsMediaAsset } from '@core/persistence'
 import type {
   DataField,

@@ -1,25 +1,30 @@
+/* PHASE 10: the no-thumbnail preview (fonts, documents, archives). Sits on
+   the viewer's dark well, so its ink is the on-overlay cream rather than the
+   page text colour. */
+
 .root {
-  display: flex;
-  flex: 1 1 auto;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-s);
-  padding: var(--space-5xl);
-  min-height: 0;
-  background: var(--bg-surface-2);
-  color: var(--text-subtle);
+    display: flex;
+    min-height: 0;
+    flex: 1 1 auto;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--media-sp-8);
+    padding: var(--media-sp-20);
+    background: transparent;
+    color: var(--media-on-accent);
+    text-align: center;
 }
 
 .title {
-  font-size: var(--text-m);
-  color: var(--text);
-  margin: 0;
-  word-break: break-word;
-  text-align: center;
+    margin: var(--media-sp-0);
+    font-size: var(--media-text-13);
+    font-weight: var(--media-weight-meta);
+    word-break: break-word;
 }
 
 .meta {
-  font-size: var(--text-xs);
-  margin: 0;
+    margin: var(--media-sp-0);
+    font-size: var(--media-text-11);
+    opacity: 0.75;
 }

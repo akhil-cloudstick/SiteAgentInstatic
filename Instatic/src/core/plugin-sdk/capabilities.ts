@@ -227,6 +227,15 @@ export function permissionDescription(permission: PluginPermission): string {
   return capabilityByPermission.get(permission)?.description ?? ''
 }
 
+/**
+ * Risk tier for a permission. Unknown permissions fail CLOSED at the highest
+ * tier: a permission the catalog does not recognise is the last thing that
+ * should be presented to an operator as harmless.
+ */
+export function permissionRisk(permission: PluginPermission): PluginCapabilityRisk {
+  return capabilityByPermission.get(permission)?.risk ?? 'dangerous'
+}
+
 export function permissionsForSurface(surface: PluginCapabilitySurface): PluginPermission[] {
   return PLUGIN_CAPABILITIES
     .filter((capability) => capability.surfaces.includes(surface))

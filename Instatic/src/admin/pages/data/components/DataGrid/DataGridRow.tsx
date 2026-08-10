@@ -12,12 +12,11 @@ import type { CSSProperties, ReactElement } from 'react'
 import { Button } from '@ui/components/Button'
 import { Checkbox } from '@ui/components/Checkbox'
 import { cn } from '@ui/cn'
-import { TrashSolidIcon } from 'pixel-art-icons/icons/trash-solid'
-import { EditSolidIcon } from 'pixel-art-icons/icons/edit-solid'
-import { OpenSolidIcon } from 'pixel-art-icons/icons/open-solid'
+import { FileTextSolidIcon, MoreVerticalSolidIcon } from '@admin/pages/data/icons'
 import { readStringCell } from '@core/data/cells'
 import type { DataField, DataRow, DataTable } from '@core/data/schemas'
 import { CellDisplayRenderer } from './cells/CellDisplayRenderer'
+import { formatUpdatedAt } from './dataGridRows'
 import styles from './DataGrid.module.css'
 
 // ---------------------------------------------------------------------------
@@ -51,6 +50,12 @@ interface DataGridRowProps {
   onPrimaryAction?: () => void
   /** Delete row. Omit to hide the delete button. */
   onDelete?: () => void
+  /**
+   * Opens the row actions menu at the given viewport coordinates. The approved
+   * screen exposes row actions through a visible ⋮ button, not only the native
+   * right-click menu — without it there is no way to reach them on touch.
+   */
+  onOpenMenu?: (x: number, y: number) => void
   /** Inline style for the sticky primary cell (provides `left`). */
   primaryStickyLeft: CSSProperties
   /** Inline style for the sticky checkbox cell (provides `left: 0`). */
@@ -66,25 +71,24 @@ export function DataGridRow({
   fields,
   primaryFieldId,
   subtitleFieldId,
-  table,
+  table: _table,
   tables,
   rows,
   selected,
   checked,
   readOnly: _readOnly,
-  showStatusDot,
+  showStatusDot: _showStatusDot,
   onSelect,
   onCheckedChange,
-  onPrimaryAction,
-  onDelete,
+  // `onPrimaryAction` / `onDelete` are still part of the row contract — the
+  // grid passes them straight to the ⋮ menu, which is the only place the
+  // approved screen surfaces them.
+  onPrimaryAction: _onPrimaryAction,
+  onDelete: _onDelete,
+  onOpenMenu,
   primaryStickyLeft,
   checkboxStickyLeft,
 }: DataGridRowProps): ReactElement {
-  const isPostType = table.kind === 'postType'
-
-  const primaryActionLabel = isPostType ? 'Edit in Content' : 'Open'
-  const PrimaryActionIcon = isPostType ? EditSolidIcon : OpenSolidIcon
-
   // Resolve primary title + subtitle.
   const primaryValue = readStringCell(row.cells, primaryFieldId)
   const subtitleValue = subtitleFieldId
@@ -135,13 +139,17 @@ export function DataGridRow({
               data-data-grid-row-id={row.id}
               style={primaryStickyLeft}
             >
-              {showStatusDot && (
-                <span
-                  className={styles.statusDot}
-                  data-status={row.status}
-                  aria-label={`Status: ${row.status}`}
-                />
-              )}
+              {/*
+                * The approved screen marks the primary cell with a document
+                * glyph, not a coloured status dot — status is already carried
+                * by the group header and the filter chips, so a per-row dot
+                * was both redundant and the loudest thing in the ladder.
+                */}
+              <FileTextSolidIcon
+                size={13}
+                className={styles.primaryIcon}
+                aria-hidden="true"
+              />
               <span className={styles.primaryStack}>
                 {primaryValue.length > 0 ? (
                   <span className={styles.primaryTitle}>{primaryValue}</span>
@@ -172,6 +180,17 @@ export function DataGridRow({
         )
       })}
 
+      {/* The Updated virtual column — the row's own last-modified stamp. */}
+      <div
+        role="gridcell"
+        className={styles.cell}
+        data-data-grid-row-id={row.id}
+      >
+        <time dateTime={row.updatedAt} className={styles.truncateCell}>
+          {formatUpdatedAt(row.updatedAt)}
+        </time>
+      </div>
+
       {/* Trailing actions column */}
       <div
         role="gridcell"
@@ -179,37 +198,29 @@ export function DataGridRow({
         data-data-grid-row-id={row.id}
         onClick={stopRowClick}
       >
+        {/*
+          * One ⋮ per row — the approved screen's only trailing affordance.
+          * "Open"/"Edit in Content" and "Delete row" are not dropped; they are
+          * the first and last items of the menu this opens, which is where the
+          * reference puts them.
+          */}
         <div className={styles.actions}>
-          {onPrimaryAction && (
+          {onOpenMenu && (
             <Button
               variant="ghost"
               size="xs"
               iconOnly
-              aria-label={primaryActionLabel}
-              tooltip={primaryActionLabel}
+              aria-label={`Actions for ${primaryValue || row.id}`}
+              tooltip="Row actions"
               onClick={(e) => {
                 e.stopPropagation()
-                onPrimaryAction()
+                // Anchor the menu to the button, mirroring where a right-click
+                // would have opened it. The menu itself clamps to the viewport.
+                const rect = e.currentTarget.getBoundingClientRect()
+                onOpenMenu(rect.right, rect.bottom)
               }}
             >
-              <PrimaryActionIcon size={12} aria-hidden="true" />
-            </Button>
-          )}
-          {onDelete && (
-            <Button
-              variant="ghost"
-              size="xs"
-              iconOnly
-              aria-label="Delete row"
-              tooltip="Delete row"
-              tone="danger"
-              dangerHover
-              onClick={(e) => {
-                e.stopPropagation()
-                onDelete()
-              }}
-            >
-              <TrashSolidIcon size={12} aria-hidden="true" />
+              <MoreVerticalSolidIcon size={14} aria-hidden="true" />
             </Button>
           )}
         </div>

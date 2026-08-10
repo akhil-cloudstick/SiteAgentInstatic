@@ -7,7 +7,7 @@
  * left edge of the scroll viewport during horizontal scroll.
  */
 import type { ReactElement } from 'react'
-import { ChevronDownIcon } from 'pixel-art-icons/icons/chevron-down'
+import { ChevronDownIcon } from '@admin/pages/data/icons'
 import type { DataRowStatus } from '@core/data/schemas'
 import type { RowGroup } from './dataGridRows'
 import styles from './DataGrid.module.css'

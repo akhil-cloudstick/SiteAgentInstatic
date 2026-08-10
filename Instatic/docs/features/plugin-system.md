@@ -42,6 +42,7 @@ A plugin is a zip package containing a `plugin.json` manifest and one or more bu
 | Dashboard widget registry      | `src/core/dashboard/registry.ts`          |
 | Plugin asset path containment      | `server/util/pathWithin.ts`            |
 | Plugin lifecycle (boot, install, activate, uninstall) | `server/plugins/runtime.ts`, `package.ts` |
+| Staged (uploaded, unapproved) packages | `server/handlers/cms/plugins/staged.ts`, `server/repositories/pluginStagedPackages.ts`, `server/plugins/stagedStorage.ts` |
 | Plugin scheduler               | `server/plugins/scheduler.ts`             |
 | Event broadcaster (server fan-out) | `server/plugins/eventBroadcaster.ts`  |
 | SSE event endpoint             | `server/handlers/cms/plugins/events.ts`   |
@@ -239,6 +240,29 @@ export function deactivate(api)     {}
 export function uninstall(api)      {}
 export function migrate(ctx, api)   {} // ctx = { fromVersion: '1.0.0' }
 ```
+
+### Staged packages — upload now, approve later
+
+Uploading a package and approving it are two different acts, often by two
+different people. `POST /cms/api/cms/plugins/:id/staged` records that a package
+was uploaded and passed inspection — unzipped, manifest parsed, sandbox-scanned —
+without installing it. Nothing runs and nothing is granted: the row in
+`plugin_staged_packages` plus its bytes under
+`uploads/plugins/_staged/<pluginId>/` are inert until an operator approves them
+through the normal `POST /plugins/package` path, which keeps its own
+`plugins.install` capability **and** step-up.
+
+Staging itself requires `plugins.install` but **not** step-up — the step-up
+belongs on the act that executes code, not on parking a file. One package per
+plugin: re-uploading supersedes whatever was waiting, so there is never a queue
+of stale candidates to approve by mistake.
+
+The row is swept on a completed install, an explicit
+`DELETE /cms/api/cms/plugins/:id/staged`, and on uninstall. There is deliberately
+**no** foreign key to `installed_plugins`: a package staged for a *fresh* install
+has no plugin row to reference. `pluginsPayload` returns the current set as
+`stagedPackages`, which is what lets the admin report "an update is waiting for
+this plugin" after a page reload.
 
 ### Force-uninstall
 

@@ -1,17 +1,22 @@
+/* PHASE 10: the preview body inside the Media viewer's well.
+
+   The reference fills the well edge to edge (`.viewer-preview > img`), and
+   the well itself is a fixed deep navy in both themes — media pixels are
+   never recoloured, only the surface behind them. */
+
 .root {
-  position: relative;
-  display: flex;
-  flex: 1 1 auto;
-  align-items: stretch;
-  justify-content: stretch;
-  min-height: 0;
-  padding: var(--space-l);
-  background: var(--bg-surface-2);
+    position: relative;
+    display: flex;
+    min-height: 0;
+    flex: 1 1 auto;
+    align-items: stretch;
+    justify-content: stretch;
+    background: transparent;
 }
 
 .image {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  object-position: center;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center;
 }

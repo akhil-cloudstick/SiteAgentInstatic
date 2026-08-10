@@ -46,6 +46,26 @@
     color: var(--mms-text);
 }
 
+/* Plugins lifecycle workspace — the approved MMSBUILD Plugins screen draws
+   its page directly on the workspace surface with NO layout padding and no
+   rounded lip: each of its three views (`.installed-wrap`, `.review-wrap`,
+   `.recovery-wrap`) owns its own vertical rhythm and its own
+   `min(1284px, 100vw - 64px)` column.
+
+   Zeroing the padding here is load-bearing, not cosmetic. The install-review
+   screen's action bar is `position: fixed` with
+   `padding-inline: max(5vw, calc((100vw - 1284px) / 2))` — its inset is
+   computed from the VIEWPORT, so it only lines up with the column above it
+   when that column is centred in the viewport with no extra inset. Leaving the
+   layout's side padding in place shifts the column and visibly misaligns the
+   bar's buttons against the panel they belong to. */
+.body[data-page-mode="plugins"] {
+    padding: 0;
+    background: var(--mms-workspace);
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
+}
+
 .container {
     display: grid;
     gap: var(--space-6xl);
@@ -64,6 +84,14 @@
 .container[data-page-mode="dashboard"] {
     display: block;
     width: min(1400px, calc(100% - (2 * var(--mms-dashboard-gutter))));
+}
+
+/* The Plugins views own their own column width, so the container is a plain
+   full-width block — no grid gap, no 1220px clamp. */
+.container[data-page-mode="plugins"] {
+    display: block;
+    width: 100%;
+    min-height: 100%;
 }
 
 .header {

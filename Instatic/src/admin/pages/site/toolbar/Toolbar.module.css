@@ -382,3 +382,103 @@
 /* ModulePickerDropdown's old inline panel styles moved to
  * src/editor/components/ModulePicker/ModulePicker.module.css when the picker
  * was lifted into the shared ContextMenu shell. */
+
+/* ===========================================================================
+ * Data workspace publish control — the approved screen's split button.
+ *
+ * A 44px green box: 7px radius on the leading edge only, a matching 44px
+ * square chevron closing the trailing edge, divided by a translucent white
+ * hairline. The generic toolbar draws a 28px pill.
+ *
+ * The container height is the load-bearing line. `.publishActionGroup` is
+ * 28px tall by default; sizing the buttons to 44px inside it is what made an
+ * earlier version of this block overflow and collide. Raise the group first.
+ *
+ * Tokens come from the `[data-data-publish]` island in globals.css — the
+ * toolbar sits outside the workspace scope, so `--data-*` is not defined here
+ * without it.
+ * =========================================================================== */
+[data-data-publish] .publishActionGroup {
+    height: var(--data-tap);
+    gap: var(--data-sp-11);
+}
+
+[data-data-publish] .publishPrimaryButton {
+    height: var(--data-tap);
+    min-width: 0;
+    padding: 0 var(--data-sp-13);
+    gap: var(--data-sp-7);
+    border-radius: var(--data-radius-7) 0 0 var(--data-radius-7);
+    font-size: var(--data-text-11);
+    font-weight: var(--data-weight-720);
+    white-space: nowrap;
+}
+
+[data-data-publish] .publishMenuTrigger {
+    width: var(--data-tap);
+    height: var(--data-tap);
+    flex: 0 0 var(--data-tap);
+    padding: 0;
+    border-radius: 0 var(--data-radius-7) var(--data-radius-7) 0;
+    /* The reference divides the two halves on the green face itself. */
+    border-left: 1px solid var(--data-chevron-divider);
+}
+
+[data-data-publish] .publishActionStatus {
+    max-width: none;
+    font-size: var(--data-text-10);
+    white-space: nowrap;
+}
+
+/* ===========================================================================
+ * Site workspace publish split — matched to the Content toolbar.
+ *
+ * Both workspaces render the same shared PublishActionGroup, but Content
+ * restyles it in its own stylesheet while the Site editor kept the generic
+ * 28px pill — so the same action appeared at two different sizes depending on
+ * which page you were on. Reached through the component's `data-testid`
+ * contract, the way ContentToolbar does, rather than its hashed class names.
+ * =========================================================================== */
+:global([data-editor-screen='site']) [data-testid="toolbar-publish-btn"],
+:global([data-editor-screen='site']) [data-testid="toolbar-publish-actions-trigger"] {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: var(--site-tap);
+    gap: var(--site-sp-7);
+    border: 1px solid transparent;
+    background: var(--mms-action);
+    color: var(--site-on-accent);
+    font-size: var(--text-l);
+    font-weight: 650;
+}
+
+:global([data-editor-screen='site']) [data-testid="toolbar-publish-btn"] {
+    min-width: 79px;
+    padding: 0 var(--site-sp-17);
+    border-radius: var(--site-control-radius) 0 0 var(--site-control-radius);
+    border-right-color: var(--site-split-divider);
+}
+
+:global([data-editor-screen='site']) [data-testid="toolbar-publish-actions-trigger"] {
+    width: var(--site-tap);
+    padding: 0;
+    border-radius: 0 var(--site-control-radius) var(--site-control-radius) 0;
+    border-left-color: var(--site-split-divider);
+}
+
+:global([data-editor-screen='site']) [data-testid="toolbar-publish-btn"]:hover:not(:disabled),
+:global([data-editor-screen='site']) [data-testid="toolbar-publish-actions-trigger"]:hover:not(:disabled) {
+    background: var(--mms-action-strong);
+    color: var(--site-on-accent);
+}
+
+/* Published settles on the deeper green rather than a separate success palette. */
+:global([data-editor-screen='site']) [data-testid="toolbar-publish-btn"][data-state="success"] {
+    background: var(--mms-action-strong);
+}
+
+/* The group's own 28px cap would clip the taller button. */
+:global([data-editor-screen='site']) .publishActionGroup {
+    height: var(--site-tap);
+}

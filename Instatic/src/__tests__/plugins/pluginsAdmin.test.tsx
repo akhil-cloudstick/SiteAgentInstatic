@@ -148,6 +148,10 @@ function Wrapper({ children }: { children: ReactNode }) {
 beforeEach(() => {
   localStorage.clear()
   setupEditorState()
+  // The workspace deep-links its active view through `?view=`/`?plugin=`, so a
+  // test that opened recovery would otherwise hand the next one a URL that
+  // boots straight back into it.
+  window.history.replaceState({}, '', '/')
 })
 
 afterEach(() => {
@@ -187,7 +191,61 @@ describe('PluginsPage', () => {
     expect(await screen.findByText('Map Studio')).toBeDefined()
     expect(screen.getAllByRole('link', { name: 'Map' })[0].getAttribute('href')).toBe('/cms/plugins/local.map/overview')
 
+    // The approved screen renders Disable only for an active plugin that ships
+    // a synced visual pack. This fixture ships none, so the card offers no
+    // Disable — see `showDisable` in PluginCard, which is the single condition
+    // separating this from "every active plugin can be switched off here".
+    expect(screen.queryByRole('button', { name: /^disable map studio$/i })).toBeNull()
+
+    // Remove lives in the card's overflow menu, not the action row.
+    fireEvent.click(screen.getByRole('button', { name: /more actions for map studio/i }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /remove plugin/i }))
+
+    // Removal is gated by `<PluginRemoveDialog/>` — the menu item opens the
+    // confirm dialog; the actual DELETE only fires after the user confirms
+    // inside it.
+    const confirm = await screen.findByRole('button', { name: 'Run normal removal' })
+    fireEvent.click(confirm)
+
+    await waitFor(() => {
+      expect(calls.some((call) =>
+        String(call.input) === '/cms/api/cms/plugins/local.map' &&
+        call.init?.method === 'DELETE'
+      )).toBe(true)
+    })
+  })
+
+  it('offers Disable on the card for an active plugin that ships a synced pack', async () => {
+    const calls: Array<{ input: RequestInfo | URL; init?: RequestInit }> = []
+    globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+      calls.push({ input, init })
+      const url = String(input)
+      if (url === '/cms/api/cms/plugins' && init?.method === 'GET') {
+        return json({
+          plugins: [pluginRow(true, {
+            grantedPermissions: ['visualComponents.register'],
+            manifest: { ...mapManifest, pack: { path: 'pack/site.json' } },
+          })],
+          adminPages: [],
+        })
+      }
+      if (url === '/cms/api/cms/plugins/local.map' && init?.method === 'PATCH') {
+        return json({ plugin: pluginRow(false), adminPages: [] })
+      }
+      const ambient = ambientFetchFallback(url)
+      if (ambient) return ambient
+      return json({ error: `Unhandled ${url}` }, 500)
+    }
+
+    render(
+      <Wrapper>
+        <PluginsPage />
+      </Wrapper>,
+    )
+
+    expect(await screen.findByText('Map Studio')).toBeDefined()
     fireEvent.click(screen.getByRole('button', { name: /disable map studio/i }))
+
     await waitFor(() => {
       expect(calls.some((call) =>
         String(call.input) === '/cms/api/cms/plugins/local.map' &&
@@ -195,19 +253,38 @@ describe('PluginsPage', () => {
         call.init.body === JSON.stringify({ enabled: false })
       )).toBe(true)
     })
+  })
 
-    fireEvent.click(screen.getByRole('button', { name: /remove map studio/i }))
+  it('offers Enable on the card for a disabled plugin', async () => {
+    const calls: Array<{ input: RequestInfo | URL; init?: RequestInit }> = []
+    globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+      calls.push({ input, init })
+      const url = String(input)
+      if (url === '/cms/api/cms/plugins' && init?.method === 'GET') {
+        return json({ plugins: [pluginRow(false)], adminPages: [] })
+      }
+      if (url === '/cms/api/cms/plugins/local.map' && init?.method === 'PATCH') {
+        return json({ plugin: pluginRow(true), adminPages: [] })
+      }
+      const ambient = ambientFetchFallback(url)
+      if (ambient) return ambient
+      return json({ error: `Unhandled ${url}` }, 500)
+    }
 
-    // Removal is gated by `<PluginRemoveDialog/>` — clicking Remove on the
-    // card opens the confirm dialog; the actual DELETE only fires after
-    // the user confirms inside the dialog.
-    const confirm = await screen.findByRole('button', { name: 'Remove plugin' })
-    fireEvent.click(confirm)
+    render(
+      <Wrapper>
+        <PluginsPage />
+      </Wrapper>,
+    )
+
+    expect(await screen.findByText('Map Studio')).toBeDefined()
+    fireEvent.click(screen.getByRole('button', { name: /enable map studio/i }))
 
     await waitFor(() => {
       expect(calls.some((call) =>
         String(call.input) === '/cms/api/cms/plugins/local.map' &&
-        call.init?.method === 'DELETE'
+        call.init?.method === 'PATCH' &&
+        call.init.body === JSON.stringify({ enabled: true })
       )).toBe(true)
     })
   })
@@ -234,7 +311,7 @@ describe('PluginsPage', () => {
       </Wrapper>,
     )
 
-    expect(await screen.findByText('No plugins installed yet.')).toBeDefined()
+    expect(await screen.findByText('No plugins installed yet')).toBeDefined()
 
     const input = screen.getByLabelText('Plugin file')
     fireEvent.change(input, {
@@ -245,7 +322,7 @@ describe('PluginsPage', () => {
 
     // Every install now goes through the review dialog — nothing installs
     // silently, even a near-declarative manifest.
-    expect(await screen.findByText('Review Map Studio')).toBeDefined()
+    expect(await screen.findByText('Review before installing')).toBeDefined()
     expect(calls.some((call) => String(call.input) === '/cms/api/cms/plugins' && call.init?.method === 'POST')).toBe(false)
 
     fireEvent.click(screen.getByRole('button', { name: /approve and install/i }))
@@ -293,7 +370,7 @@ describe('PluginsPage', () => {
       </Wrapper>,
     )
 
-    expect(await screen.findByText('No plugins installed yet.')).toBeDefined()
+    expect(await screen.findByText('No plugins installed yet')).toBeDefined()
 
     fireEvent.change(screen.getByLabelText('Plugin file'), {
       target: {
@@ -301,7 +378,7 @@ describe('PluginsPage', () => {
       },
     })
 
-    expect(await screen.findByText('Review Workflow Tools')).toBeDefined()
+    expect(await screen.findByText('Review before installing')).toBeDefined()
     expect(screen.getByText('Add controls to the editor toolbar')).toBeDefined()
     expect(screen.getByText('Register editor commands')).toBeDefined()
     expect(screen.getByText('Allows the plugin to mutate editor store state through a host transaction.')).toBeDefined()
@@ -351,10 +428,11 @@ describe('PluginsPage', () => {
 
     expect(await screen.findByText('Map Studio')).toBeDefined()
 
-    // Normal removal: card button → confirm dialog → DELETE fails with the
+    // Normal removal: overflow menu → confirm dialog → DELETE fails with the
     // hook error.
-    fireEvent.click(screen.getByRole('button', { name: /remove map studio/i }))
-    fireEvent.click(await screen.findByRole('button', { name: 'Remove plugin' }))
+    fireEvent.click(screen.getByRole('button', { name: /more actions for map studio/i }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /remove plugin/i }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Run normal removal' }))
 
     // Failure surfaces as an alert with the server message and a
     // "Remove anyway" escape hatch.
@@ -364,7 +442,7 @@ describe('PluginsPage', () => {
     // Force-removal is gated by its own confirmation dialog with skip-hooks
     // warning copy — the forced DELETE only fires after confirming there.
     const dialog = await screen.findByRole('alertdialog')
-    expect(within(dialog).getByText(/cleanup code will be skipped/i)).toBeDefined()
+    expect(within(dialog).getByText(/skips plugin cleanup code/i)).toBeDefined()
     expect(
       calls.some((call) => String(call.input) === '/cms/api/cms/plugins/local.map?force=true'),
     ).toBe(false)
@@ -402,7 +480,46 @@ describe('PluginsPage', () => {
     )
 
     expect(await screen.findByText('Map Studio')).toBeDefined()
-    expect(screen.getByText('Error')).toBeDefined()
+    // The card states that something is wrong; the detail lives one click away
+    // on the recovery screen, which is where the crash history and the ways out
+    // of it are. Scoped to the chip — the status filter also has an "Error"
+    // option, so a bare text query matches two nodes.
+    expect(screen.getByText('Error', { selector: '[data-status="error"]' })).toBeDefined()
+
+    fireEvent.click(screen.getByRole('button', { name: /more actions for map studio/i }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /view details/i }))
+
+    expect(await screen.findByText('Plugin recovery')).toBeDefined()
     expect(screen.getByText('install exploded')).toBeDefined()
+  })
+
+  it('routes an errored plugin to recovery and a healthy one to its settings', async () => {
+    globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input)
+      if (url === '/cms/api/cms/plugins' && init?.method === 'GET') {
+        return json({ plugins: [pluginRow(true)], adminPages: [] })
+      }
+      if (url.startsWith('/cms/api/cms/plugins/local.map/settings')) {
+        return json({ schema: [], settings: {}, secretsNeedingReentry: [] })
+      }
+      const ambient = ambientFetchFallback(url)
+      if (ambient) return ambient
+      return json({ error: `Unhandled ${url}` }, 500)
+    }
+
+    render(
+      <Wrapper>
+        <PluginsPage />
+      </Wrapper>,
+    )
+
+    expect(await screen.findByText('Map Studio')).toBeDefined()
+    fireEvent.click(screen.getByRole('button', { name: /more actions for map studio/i }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /view details/i }))
+
+    // A healthy plugin has no failure to review, so "View details" opens the
+    // thing an operator actually wants — its settings.
+    expect(await screen.findByText('Map Studio settings')).toBeDefined()
+    expect(screen.queryByText('Plugin recovery')).toBeNull()
   })
 })

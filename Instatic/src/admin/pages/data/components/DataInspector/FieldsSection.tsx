@@ -4,7 +4,7 @@
  * and one interaction language.
  */
 import type { ReactElement } from 'react'
-import { ListBoxSolidIcon } from 'pixel-art-icons/icons/list-box-solid'
+import { ListBoxSolidIcon } from '@admin/pages/data/icons'
 import { FieldSchemaComposer } from '@admin/pages/data/components/FieldSchemaComposer'
 import {
   POST_TYPE_OPTIONAL_BUILTIN_FIELD_IDS,
@@ -62,7 +62,7 @@ export function FieldsSection({
         await onUpdateTable({ fields })
       }}
       canEdit={canEdit}
-      sectionTitle={`Schema · ${table.fields.length} fields`}
+      sectionTitle={`Fields · ${table.fields.length}`}
       sectionIcon={ListBoxSolidIcon}
       primaryFieldId={primaryFieldId}
       onPrimaryFieldChange={onPrimaryFieldChange}

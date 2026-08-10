@@ -1,0 +1,255 @@
+/* Transcribed from the MMSBUILD Media reference
+   (screens/media/src/styles.css → .workspace, .context-rail, .rail-button,
+   .rail-bottom, .folder-sidebar, .sidebar-heading, .eyebrow, .sidebar-close,
+   .storage-panel, .window-titlebar, .storage-content).
+
+   Media used to borrow the Site editor's LeftSidebar + PanelRail modules.
+   It owns them now, so restyling Media cannot repaint Site.
+
+   Every metric is the reference's, delivered through the fixed `--media-*`
+   tokens in globals.css because literal px is gated in admin CSS modules. */
+
+/* The reference lays the workspace out as
+   `grid-template-columns: 50px 276px minmax(0, 1fr)`. Here the rail and the
+   folder column are one flex child, so their widths are summed on the
+   wrapper and `minmax(0, 1fr)` becomes the canvas's own `min-width: 0`. */
+.sidebar {
+    position: relative;
+    z-index: 85;
+    display: flex;
+    min-width: 0;
+    min-height: 0;
+    flex: 0 0 calc(var(--media-rail-w) + var(--media-sidebar-w));
+}
+
+.rail {
+    position: relative;
+    z-index: 32;
+    display: flex;
+    width: var(--media-rail-w);
+    min-width: var(--media-rail-w);
+    flex: 0 0 var(--media-rail-w);
+    flex-direction: column;
+    align-items: center;
+    padding: var(--media-sp-8) var(--media-sp-3);
+    border-right: 1px solid var(--mms-border);
+    background: var(--mms-surface);
+}
+
+/* `.rail-button` — 44 × 56 with a green active face and a 3px left
+   indicator. Doubled selector so it beats the Button primitive's ghost
+   hover. */
+.railButton.railButton {
+    position: relative;
+    display: grid;
+    width: var(--media-tap);
+    min-width: var(--media-tap);
+    height: var(--media-rail-btn-h);
+    min-height: var(--media-rail-btn-h);
+    place-items: center;
+    padding: var(--media-sp-0);
+    border: 0;
+    border-radius: var(--media-radius-8);
+    background: transparent;
+    color: var(--mms-text-muted);
+}
+
+.railButton.railButton:hover:not(:disabled) {
+    background: var(--mms-surface-tint);
+    color: var(--mms-text);
+}
+
+.railButton.railButton[aria-pressed='true'] {
+    background: var(--mms-surface-green);
+    color: var(--mms-action-strong);
+}
+
+/* The indicator sits in the rail's left padding, so it bleeds 3px outside
+   the button box. */
+.railButton.railButton[aria-pressed='true']::before {
+    position: absolute;
+    top: var(--media-sp-12);
+    bottom: var(--media-sp-12);
+    left: calc(-1 * var(--media-sp-3));
+    width: var(--media-sp-3);
+    border-radius: 0 var(--media-radius-4) var(--media-radius-4) 0;
+    background: var(--mms-action);
+    content: '';
+}
+
+.railBottom {
+    margin-top: auto;
+}
+
+/* `.folder-sidebar` */
+.panelBody {
+    position: relative;
+    z-index: 31;
+    display: flex;
+    width: var(--media-sidebar-w);
+    min-width: 0;
+    min-height: 0;
+    flex: 0 0 var(--media-sidebar-w);
+    flex-direction: column;
+    overflow-y: auto;
+    padding: var(--media-sp-18) var(--media-sp-15);
+    border-right: 1px solid var(--mms-border);
+    background: var(--mms-workspace);
+    scrollbar-width: thin;
+}
+
+/* `.sidebar-heading` */
+.heading {
+    display: flex;
+    min-height: var(--media-sp-52);
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--media-sp-8);
+}
+
+.headingText {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+}
+
+.eyebrow {
+    margin: var(--media-sp-0) var(--media-sp-0) var(--media-sp-5);
+    overflow: hidden;
+    color: var(--mms-text-muted);
+    font-size: var(--media-text-10);
+    font-weight: var(--media-weight-eyebrow);
+    letter-spacing: 0.1em;
+    text-overflow: ellipsis;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.title {
+    margin: var(--media-sp-0);
+    overflow: hidden;
+    color: var(--mms-text);
+    font-size: var(--media-text-21);
+    font-weight: var(--media-weight-heading);
+    letter-spacing: -0.03em;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* `.sidebar-close { display: none }` — the reference hides this on desktop
+   and only reveals it at ≤767px, where the column becomes a drawer. */
+.sidebarClose {
+    display: none;
+}
+
+/* `.storage-panel` — a FIXED panel over the canvas. Opening Storage does not
+   touch the folder column. */
+.storagePanel {
+    position: fixed;
+    z-index: 52;
+    top: calc(var(--media-sp-60) + var(--media-sp-18));
+    right: var(--media-sp-18);
+    bottom: var(--media-sp-18);
+    display: flex;
+    width: var(--media-storage-w);
+    flex-direction: column;
+    overflow: hidden;
+    border: 1px solid var(--mms-border-strong);
+    border-radius: var(--media-radius-12);
+    background: var(--mms-surface-raised);
+    box-shadow: var(--media-shadow-window);
+}
+
+.storageHeading {
+    display: flex;
+    min-height: var(--media-titlebar-h);
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--media-sp-8);
+    padding: var(--media-sp-0) var(--media-sp-8) var(--media-sp-0) var(--media-sp-17);
+    border-bottom: 1px solid var(--mms-border);
+    background: var(--mms-surface);
+}
+
+.storageHeadingText {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: var(--media-sp-9);
+    color: var(--mms-text);
+    font-size: var(--media-text-15);
+    font-weight: var(--media-weight-strong);
+}
+
+.storageHeadingText > i {
+    color: var(--mms-action-strong);
+}
+
+.storageBody {
+    min-height: 0;
+    flex: 1 1 auto;
+    overflow-y: auto;
+    padding: var(--media-sp-20);
+    scrollbar-width: thin;
+}
+
+/* ── Responsive ──────────────────────────────────────────────────────────────
+   Reference breakpoints: 1250 / 1024 / 767 / 430. */
+
+@media (max-width: 1024px) {
+    .sidebar {
+        --media-sidebar-w: 238px;
+    }
+
+    .panelBody {
+        padding-right: var(--media-sp-12);
+        padding-left: var(--media-sp-12);
+    }
+}
+
+@media (max-width: 767px) {
+    /* The column becomes a drawer over the canvas; the rail keeps its
+       column and the canvas takes the rest. */
+    .sidebar {
+        flex: 0 0 var(--media-rail-w);
+    }
+
+    .panelBody {
+        position: fixed;
+        z-index: 90;
+        top: var(--media-sp-60);
+        bottom: 0;
+        left: var(--media-rail-w);
+        width: min(310px, calc(100vw - var(--media-rail-w)));
+        border-right: 1px solid var(--mms-border-strong);
+        box-shadow: var(--media-shadow-window);
+        transform: translateX(-120%);
+        transition: transform 180ms ease;
+    }
+
+    .sidebar[data-expanded='true'] .panelBody {
+        transform: none;
+    }
+
+    /* Only now does the close button exist for the user. */
+    .sidebarClose {
+        display: grid;
+    }
+
+    .storagePanel {
+        top: auto;
+        right: 0;
+        bottom: 0;
+        left: var(--media-rail-w);
+        width: calc(100vw - var(--media-rail-w));
+        border-radius: var(--media-radius-14) var(--media-radius-14) 0 0;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .panelBody {
+        transition: none;
+    }
+}

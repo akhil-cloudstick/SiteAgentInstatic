@@ -30,6 +30,41 @@ import type {
  */
 export type StatusFilter = 'all' | 'pages' | 'templates' | DataRowStatus
 
+// ---------------------------------------------------------------------------
+// The "Updated" virtual column
+//
+// The approved screen ends every table's column ladder with the row's last-
+// modified timestamp. `updatedAt` lives on `DataRow` itself, not in
+// `row.cells`, and has no `DataField` describing it — so it cannot ride the
+// normal field pipeline. It is modelled here as an explicit virtual column:
+// a reserved id the header, the cell renderer and the comparator all special-
+// case, sized at the reference's fixed 170px.
+// ---------------------------------------------------------------------------
+
+export const UPDATED_COLUMN_ID = 'updatedAt'
+export const UPDATED_COLUMN_LABEL = 'Updated'
+export const UPDATED_COLUMN_WIDTH = 170
+
+/**
+ * The reference's timestamp format — `Intl.DateTimeFormat('en-GB', …)`,
+ * rendering as e.g. `30 Jul 2026, 15:54`. An absent value reads as an em dash,
+ * never as "Invalid Date".
+ */
+const UPDATED_FORMATTER = new Intl.DateTimeFormat('en-GB', {
+  day: '2-digit',
+  month: 'short',
+  year: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+})
+
+export function formatUpdatedAt(value: string | null | undefined): string {
+  if (!value) return '—'
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return '—'
+  return UPDATED_FORMATTER.format(parsed)
+}
+
 export interface SortState {
   fieldId: string
   dir: 'asc' | 'desc'
@@ -80,6 +115,9 @@ export function getColumnWidth(
   primaryWidth: number,
 ): string {
   if (isPrimary) return `${primaryWidth}px`
+  // Widths transcribed from the approved screen's `columnWidth()`. These are
+  // load-bearing: together with the 4-column cap in `getOrderedFields` they are
+  // what makes the ladder fit the viewport without horizontal scrolling.
   switch (field.type) {
     case 'number':
     case 'boolean':
@@ -88,18 +126,34 @@ export function getColumnWidth(
       return '140px'
     case 'media':
     case 'relation':
-      return '220px'
-    case 'select':
-      return '160px'
     case 'multiSelect':
       return '220px'
     case 'longText':
     case 'richText':
       return '260px'
     default:
-      return '200px'
+      return '190px'
   }
 }
+
+/**
+ * How many schema fields the grid shows before the Updated column.
+ *
+ * The approved screen renders four. That is not a stylistic cap — it is why
+ * the grid fits: four columns plus Updated plus the two 52px gutters lands
+ * around 1100px, inside a normal workspace width. Rendering every field (which
+ * is what this did before) pushed a Pages table past 1600px and forced the
+ * horizontal scrollbar the reference does not have.
+ *
+ * The full field set stays reachable — the inspector shows every one of them.
+ */
+const MAX_FIELD_COLUMNS = 4
+
+/** Types the approved screen never puts in the grid — they have no cell form. */
+const STRUCTURAL_FIELD_TYPES: ReadonlySet<DataField['type']> = new Set([
+  'pageTree',
+  'fieldSchema',
+])
 
 // ---------------------------------------------------------------------------
 // Field ordering
@@ -121,10 +175,16 @@ export function getOrderedFields(
   subtitleFieldId: string | null,
 ): DataField[] {
   const primary = table.fields.find((f) => f.id === table.primaryFieldId)
-  const rest = table.fields.filter(
-    (f) => f.id !== table.primaryFieldId && f.id !== subtitleFieldId,
+  const rest = table.fields.filter((f) =>
+    f.id !== table.primaryFieldId
+    && f.id !== subtitleFieldId
+    // The subtitle field is already drawn under the primary title, and
+    // structural fields (page trees, component param schemas) have no cell
+    // rendering — the approved screen omits both from the ladder.
+    && !STRUCTURAL_FIELD_TYPES.has(f.type),
   )
-  return primary == null ? rest : [primary, ...rest]
+  const ordered = primary == null ? rest : [primary, ...rest]
+  return ordered.slice(0, MAX_FIELD_COLUMNS)
 }
 
 // ---------------------------------------------------------------------------
@@ -178,8 +238,12 @@ export function filterAndSortRows({
 
   if (sort != null) {
     r = [...r].sort((a, b) => {
-      const av = a.cells[sort.fieldId]
-      const bv = b.cells[sort.fieldId]
+      // The Updated column reads the row property, not a cell. ISO-8601
+      // strings are lexicographically ordered, so the shared comparator sorts
+      // them correctly without a Date round-trip.
+      const isUpdated = sort.fieldId === UPDATED_COLUMN_ID
+      const av = isUpdated ? a.updatedAt : a.cells[sort.fieldId]
+      const bv = isUpdated ? b.updatedAt : b.cells[sort.fieldId]
       const cmp = compareCellValues(av, bv)
       return sort.dir === 'asc' ? cmp : -cmp
     })

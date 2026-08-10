@@ -94,8 +94,14 @@ interface AdminPageLayoutProps {
    * Dashboard screen), a 1400px content column inset by
    * `--mms-dashboard-gutter`, and the reference's 34px / 23px vertical
    * rhythm. Only `DashboardPage` uses it.
+   *
+   * `plugins` is the lifecycle-workspace shell: zero layout padding on the
+   * `--mms-workspace` surface, so each of the Plugins screen's three views
+   * owns its own vertical rhythm and its own centred column. Required for
+   * the install-review action bar, whose fixed inset is computed from the
+   * viewport. Only `PluginsPage` uses it.
    */
-  mode?: 'page' | 'workspace' | 'dashboard'
+  mode?: 'page' | 'workspace' | 'dashboard' | 'plugins'
   /** Page body. */
   children?: ReactNode
 }

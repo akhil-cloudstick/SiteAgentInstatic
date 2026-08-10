@@ -1,53 +1,157 @@
-/* DataWorkbenchHeader — the breadcrumb + actions row above the grid card.
- * Sits on the canvas surface (no card); horizontal padding aligns the
- * breadcrumb with the grid card's search box below. Tokens only. */
+/**
+ * `.grid-context-bar` from the approved MMSBUILD Data Workbench screen.
+ *
+ * Three fixed columns — breadcrumb | save-state | actions — at a fixed 78px
+ * band height. Values transcribed from the reference's `styles.css`.
+ */
 
 .header {
-    display: flex;
+    display: grid;
+    grid-template-columns: minmax(160px, 1fr) auto minmax(220px, 1fr);
+    flex: 0 0 var(--data-context-h);
+    min-height: var(--data-context-h);
     align-items: center;
-    gap: var(--space-m);
-    flex-shrink: 0;
-    padding: var(--space-l) var(--space-2xl) var(--space-m);
-    min-width: 0;
+    gap: var(--data-sp-12);
+    padding: 0 var(--data-sp-18) 0 var(--data-sp-26);
+    border-bottom: 1px solid var(--mms-border);
 }
 
+/* ── Breadcrumb ───────────────────────────────────────────────────────────
+   `min-width: 0` on both the track and each text child so a long table name
+   ellipsises instead of widening the column and pushing the save-state and
+   actions out of the bar. */
 .breadcrumb {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-s);
+    display: flex;
     min-width: 0;
-    overflow: hidden;
+    align-items: center;
+    gap: var(--data-sp-10);
+    white-space: nowrap;
 }
 
 .crumb {
-    font-size: var(--text-l);
-    font-weight: 500;
-    color: var(--text-subtle);
-    white-space: nowrap;
+    min-width: 0;
+    overflow: hidden;
+    color: var(--mms-text-muted);
+    text-overflow: ellipsis;
 }
 
 .crumbSep {
-    color: var(--text-disabled);
-    flex-shrink: 0;
+    flex: 0 0 auto;
+    color: var(--mms-border-strong);
+    font-weight: var(--data-weight-450);
 }
 
 .crumbCurrent {
-    font-size: var(--text-l);
-    font-weight: 700;
-    color: var(--text-bright);
-    letter-spacing: -0.01em;
+    min-width: 0;
+    overflow: hidden;
+    font-size: var(--data-text-14);
+    text-overflow: ellipsis;
+}
+
+/* ── Save state ───────────────────────────────────────────────────────── */
+.saveState {
+    display: inline-flex;
+    min-width: 0;
+    align-items: center;
+    justify-content: center;
+    gap: var(--data-sp-7);
+    color: var(--mms-text-muted);
+    font-size: var(--data-text-11);
     white-space: nowrap;
+}
+
+.saveState svg {
+    flex: 0 0 auto;
+    color: var(--mms-success);
+}
+
+.saveState[data-state='danger'] {
+    color: var(--mms-danger);
+}
+
+.saveState[data-state='danger'] svg {
+    color: var(--mms-danger);
+}
+
+.saveState[data-state='warning'] svg {
+    color: var(--mms-warning);
+}
+
+.saveStateLabel {
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
 }
 
-.spacer {
-    flex: 1;
+/* ── Actions ──────────────────────────────────────────────────────────────
+   This track carries more than the reference's (which keeps publishing in the
+   app header), so it must be allowed to compress: `min-width: 0` lets the
+   create label ellipsise rather than overflow the bar. */
+.actions {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--data-sp-5);
 }
 
-.actions {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-s);
-    flex-shrink: 0;
+.createAction {
+    min-width: 0;
+    flex: 0 1 auto;
+}
+
+.createLabel {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Compact desktop — the reference narrows the outer tracks rather than
+   letting the bar wrap. */
+@media (max-width: 1399px) and (min-width: 1101px) {
+    .header {
+        grid-template-columns: minmax(120px, 1fr) auto minmax(160px, 1fr);
+        padding-left: var(--data-sp-18);
+    }
+
+    .createAction {
+        max-width: 156px;
+    }
+}
+
+/* Tablet and below — the save-state readout drops out and the actions move to
+   the second column, exactly as the reference does. */
+@media (max-width: 1100px) {
+    .header {
+        grid-template-columns: minmax(0, 1fr) auto;
+        padding: 0 var(--data-sp-12) 0 var(--data-sp-16);
+    }
+
+    .saveState {
+        display: none;
+    }
+
+    .actions {
+        grid-column: 2;
+    }
+
+    .createAction {
+        max-width: 122px;
+    }
+}
+
+@media (max-width: 620px) {
+    .crumb,
+    .crumbSep {
+        display: none;
+    }
+
+    .crumbCurrent {
+        font-size: var(--data-text-13);
+    }
+
+    .createAction {
+        max-width: 108px;
+    }
 }

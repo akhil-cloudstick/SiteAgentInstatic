@@ -9,7 +9,7 @@
 import type { ReactElement } from 'react'
 import { Button } from '@ui/components/Button'
 import { EmptyState } from '@ui/components/EmptyState'
-import { PlusIcon } from 'pixel-art-icons/icons/plus'
+import { PlusIcon } from '@admin/pages/data/icons'
 import type { DataTable } from '@core/data/schemas'
 import styles from './DataGrid.module.css'
 

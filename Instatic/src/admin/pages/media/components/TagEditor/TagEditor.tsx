@@ -9,6 +9,7 @@
  */
 import { useRef, useState, type KeyboardEvent } from 'react'
 import { Button } from '@ui/components/Button'
+import { FaIcon } from '@ui/components/FaIcon'
 import { Input } from '@ui/components/Input'
 import { TagPill } from '@ui/components/TagPill'
 import styles from './TagEditor.module.css'
@@ -99,6 +100,22 @@ export function TagEditor({
             className={styles.input}
           />
         </li>
+        {/* The approved masters close the Tags field with a caret. It focuses
+            the input, which is what surfaces the suggestion list. */}
+        {palette.length > 0 && (
+          <li className={styles.caret}>
+            <Button
+              variant="ghost"
+              size="xs"
+              iconOnly
+              disabled={disabled}
+              aria-label="Show tag suggestions"
+              onClick={() => inputRef.current?.focus()}
+            >
+              <FaIcon name="chevron-down" size={10} />
+            </Button>
+          </li>
+        )}
       </ul>
       {suggestions.length > 0 && (
         <ul className={styles.suggestions} role="listbox" aria-label="Tag suggestions">

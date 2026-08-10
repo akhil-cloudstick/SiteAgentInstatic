@@ -4,9 +4,9 @@ import type { CmsPluginsPayload, PluginAdminPageRoute } from '@core/plugin-sdk'
 import { listCmsPlugins } from '@core/persistence'
 import { AdminPageLayout } from '@admin/layouts/AdminPageLayout'
 import { PluginPageRenderer } from './components/PluginPageRenderer/PluginPageRenderer'
-import styles from './PluginsPage.module.css'
+import styles from './PluginAdminPage.module.css'
 
-const emptyPayload: CmsPluginsPayload = { plugins: [], adminPages: [] }
+const emptyPayload: CmsPluginsPayload = { plugins: [], adminPages: [], stagedPackages: [] }
 
 function pageHeading(page: PluginAdminPageRoute): string {
   if (page.content.kind === 'map') return page.content.heading

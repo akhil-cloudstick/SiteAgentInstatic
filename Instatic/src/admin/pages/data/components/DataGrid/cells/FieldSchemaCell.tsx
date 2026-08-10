@@ -11,7 +11,7 @@
  */
 import type { ReactElement } from 'react'
 import { Button } from '@ui/components/Button'
-import { BracesIcon } from 'pixel-art-icons/icons/braces'
+import { BracesIcon } from '@admin/pages/data/icons'
 import type { CellEditorProps } from '@admin/pages/data/types'
 import type { DataField } from '@core/data/schemas'
 import { readFieldSchemaCell } from '@core/data/cells'

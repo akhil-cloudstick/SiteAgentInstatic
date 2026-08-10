@@ -30,11 +30,7 @@ import type {
 } from '@core/data/schemas'
 import { useMediaAssetMap } from '@admin/pages/data/hooks/useMediaAssetMap'
 import { Image } from '@ui/components/Image'
-import { ImageSolidIcon } from 'pixel-art-icons/icons/image-solid'
-import { ImageXSolidIcon } from 'pixel-art-icons/icons/image-x-solid'
-import { VideoSolidIcon } from 'pixel-art-icons/icons/video-solid'
-import { LinkIcon } from 'pixel-art-icons/icons/link'
-import { CheckIcon } from 'pixel-art-icons/icons/check'
+import { CheckIcon, ImageSolidIcon, ImageXSolidIcon, LinkIcon, VideoSolidIcon } from '@admin/pages/data/icons'
 import styles from './cells.module.css'
 
 // ---------------------------------------------------------------------------

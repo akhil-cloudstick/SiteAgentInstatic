@@ -17,6 +17,15 @@
 
 /* ─── Outer card wrapper ─────────────────────────────────────────────────── */
 
+/*
+ * The grid region is one continuous surface, header to footer.
+ *
+ * This used to be a rounded "card" on `--bg-surface-2`, which in dark mode read
+ * as a lighter panel floating on the workspace with a cut corner at the top.
+ * The approved screen has no card here: the toolbar, the ladder and the footer
+ * all sit directly on `--mms-workspace`, separated only by hairlines, so the
+ * region reads as part of the workspace rather than an object on top of it.
+ */
 .gridWrapper {
     display: flex;
     flex-direction: column;
@@ -24,46 +33,80 @@
     flex: 1;
     overflow: hidden;
     position: relative;
-    background: var(--bg-surface-2);
-    border-bottom: 0;
-    border-top-left-radius: 16px;
-    border-top-right-radius: 16px;
+    background: var(--mms-workspace);
+    border: 0;
+    border-radius: 0;
 }
 
 /* ─── Toolbar (two rows) ─────────────────────────────────────────────────── */
 
 .toolbar {
     display: flex;
+    min-height: var(--data-toolbar-h);
+    flex: 0 0 var(--data-toolbar-h);
     align-items: center;
-    gap: var(--space-s);
-    padding: var(--space-l) var(--space-2xl);
-    border-bottom: 1px solid var(--border);
-    flex-shrink: 0;
+    gap: var(--data-sp-16);
+    padding: 0 var(--data-sp-24);
+    border-bottom: 1px solid var(--mms-border);
 }
 
 .toolbarSpacer {
     flex: 1;
 }
 
+/*
+ * The approved screen scrolls its chip row horizontally rather than wrapping
+ * it — a wrapped second line would change the toolbar's fixed 74px height and
+ * push the grid down. The scrollbar itself is hidden; the chips just slide.
+ */
 .viewChips {
-    display: inline-flex;
+    display: flex;
+    min-width: 0;
     align-items: center;
-    gap: var(--space-3xs);
-    flex-wrap: wrap;
+    gap: var(--data-sp-8);
+    overflow-x: auto;
+    scrollbar-width: none;
 }
 
+.viewChips::-webkit-scrollbar {
+    display: none;
+}
+
+/*
+ * `.search-control` — the approved screen's exact search sizing: it takes 38%
+ * of the toolbar up to a 282px ceiling, never dropping below 210px, at the
+ * shared 44px control height.
+ */
 .searchWrap {
-    width: 320px;
-    max-width: 45%;
+    width: min(282px, 38%);
+    min-width: 210px;
+    flex: 0 0 auto;
+}
+
+.searchWrap input {
+    height: var(--data-tap);
+    font-size: var(--data-text-12);
+}
+
+@media (max-width: 620px) {
+    .searchWrap {
+        width: 100%;
+        min-width: 0;
+    }
 }
 
 /* Footer record count — sits below the scroll area at the base of the card. */
 .gridFooter {
-    flex-shrink: 0;
-    padding: var(--space-l) var(--space-2xl);
-    border-top: 1px solid var(--border);
-    font-size: var(--text-s);
-    color: var(--text-subtle);
+    display: flex;
+    min-height: var(--data-footer-h);
+    flex: 0 0 var(--data-footer-h);
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--data-sp-12);
+    padding: 0 var(--data-sp-24);
+    border-top: 1px solid var(--mms-border);
+    font-size: var(--data-text-11);
+    color: var(--mms-text-muted);
     font-variant-numeric: tabular-nums;
 }
 
@@ -90,49 +133,95 @@
  * count badge.
  */
 .pill {
-    gap: var(--space-xs);
+    min-height: var(--data-tap);
+    gap: var(--data-sp-7);
+    padding: 0 var(--data-sp-11);
+    border: 1px solid var(--mms-border);
+    border-radius: var(--data-radius-7);
+    background: var(--mms-workspace);
+    font-size: var(--data-text-11);
+    white-space: nowrap;
 }
 
+/* The approved screen marks the active chip with an inked border rather than
+   a fill — the inset shadow doubles the hairline without shifting layout. */
 .pill[aria-pressed="true"] {
-    background: var(--bg-surface);
-    color: var(--text-bright);
+    border-color: var(--mms-text);
+    background: var(--mms-surface-raised);
+    box-shadow: inset 0 0 0 1px var(--mms-text);
+    color: var(--mms-text);
 }
 
 .pillDot {
-    width: 6px;
-    height: 6px;
+    width: 8px;
+    height: 8px;
+    flex: 0 0 8px;
     border-radius: 50%;
-    flex-shrink: 0;
+    background: var(--mms-text-muted);
 }
 
 .pillDot[data-status="published"] {
-    background: var(--success);
+    background: var(--mms-action);
 }
-.pillDot[data-status="draft"] {
-    background: var(--warning);
-}
+.pillDot[data-status="draft"],
 .pillDot[data-status="scheduled"] {
-    background: var(--accent-3);
+    background: var(--data-dot-warning);
 }
 .pillDot[data-status="unpublished"] {
-    background: var(--bg-surface-4);
+    background: var(--data-dot-neutral);
 }
 
 .pillCount {
-    color: var(--text-subtle);
+    font-size: var(--data-text-11);
+    font-weight: var(--data-weight-650);
     font-variant-numeric: tabular-nums;
 }
 
-.pill[aria-pressed="true"] .pillCount {
-    color: var(--text);
+/* ─── Protected system-content band ──────────────────────────────────────── */
+
+.protectedNote {
+    display: flex;
+    min-height: var(--data-protected-h);
+    flex: 0 0 var(--data-protected-h);
+    align-items: center;
+    gap: var(--data-sp-8);
+    padding: 0 var(--data-sp-24);
+    border-bottom: 1px solid var(--mms-border);
+    background: var(--mms-surface-tint);
+    color: var(--mms-text-muted);
+    font-size: var(--data-text-10);
+}
+
+.protectedNote svg {
+    flex: 0 0 auto;
+    color: var(--mms-action-strong);
+}
+
+.protectedNoteText {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+@media (max-width: 620px) {
+    .protectedNote {
+        padding: 0 var(--data-sp-12);
+    }
 }
 
 /* ─── Scroll container ───────────────────────────────────────────────────── */
 
+/*
+ * The ONLY element on this page allowed to scroll horizontally (plan H10).
+ * Wide tables overflow inside here; the document itself must never gain a
+ * horizontal scrollbar at any viewport width.
+ */
 .scrollContainer {
     overflow: auto;
     flex: 1;
+    min-width: 0;
     min-height: 0;
+    scrollbar-color: var(--data-scrollbar-thumb) transparent;
+    scrollbar-width: thin;
     position: relative;
 }
 
@@ -151,7 +240,10 @@
 .grid {
     display: grid;
     grid-template-columns: var(--data-grid-columns);
-    min-width: 100%;
+    /* The approved screen floors the table at 760px so a narrow viewport
+       scrolls the grid rather than crushing the columns into unreadable
+       slivers. Above that it fills the scroller. */
+    min-width: max(100%, var(--data-table-min-w));
     width: max-content;
 }
 
@@ -170,12 +262,12 @@
 .headerCell {
     display: flex;
     align-items: center;
-    gap: var(--space-s);
-    padding: 0 var(--space-xl);
-    height: 36px;
-    background: var(--bg-surface);
+    gap: var(--data-sp-7);
+    padding: 0 var(--data-sp-14);
+    height: var(--data-head-h);
+    background: var(--mms-workspace);
     border: 0;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid var(--mms-border);
     border-radius: 0;
     outline: none;
     appearance: none;
@@ -183,9 +275,9 @@
     position: sticky;
     top: 0;
     z-index: 3;
-    font-size: var(--text-xs);
-    font-weight: 600;
-    color: var(--text-muted);
+    font-size: var(--data-text-11);
+    font-weight: var(--data-weight-680);
+    color: var(--mms-text);
     letter-spacing: 0;
     white-space: nowrap;
     overflow: hidden;
@@ -217,7 +309,6 @@
 
 .headerCell[data-sticky="primary"] {
     z-index: 4;
-    box-shadow: 1px 0 0 var(--border);
 }
 
 .headerLabel {
@@ -312,9 +403,9 @@
     /* Padding moves to the inner element so the inner span hugs the left
      * edge of the scroll viewport (after the inner sticky-left kicks in). */
     padding: 0;
-    background: var(--bg-surface-2);
+    background: var(--mms-surface-tint);
     border: 0;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid var(--mms-border);
     border-radius: 0;
     outline: none;
     appearance: none;
@@ -328,13 +419,20 @@
      * ancestor — both stickies resolve against `.scrollContainer`.
      */
     position: sticky;
-    top: 36px;
+    /* Sits directly below the sticky column-header row, so this offset must
+       track the header's height token exactly. */
+    top: var(--data-head-h);
     z-index: 2;
     cursor: pointer;
     user-select: none;
     text-align: left;
     font-family: inherit;
-    min-height: 36px;
+    min-height: var(--data-group-h);
+    color: var(--mms-text-muted);
+    font-size: var(--data-text-10);
+    font-weight: var(--data-weight-720);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
 }
 
 /*
@@ -346,10 +444,10 @@
 .groupHeaderInner {
     display: inline-flex;
     align-items: center;
-    gap: var(--space-m);
-    padding: var(--space-3xl) 0 var(--space-s);
+    gap: var(--data-sp-8);
+    padding: 0;
     position: sticky;
-    left: 14px;
+    left: var(--data-sp-16);
     /* Allow the inner span to shrink to its content width so sticky can
      * pin it; without an explicit width, flex children default to filling
      * the container which would defeat sticky-left. */
@@ -428,7 +526,7 @@
  * content bleed through.
  */
 .row > .cell {
-    background-color: var(--bg-surface-2);
+    background-color: var(--mms-workspace);
     background-image: none;
     transition:
         background-color 0.08s,
@@ -437,36 +535,53 @@
 }
 
 .row:hover > .cell {
-    background-image: linear-gradient(
-        var(--overlay-5),
-        var(--overlay-5)
-    );
+    background-color: var(--mms-surface);
 }
 
 .row[data-checked="true"] > .cell {
-    background-image: linear-gradient(
-        var(--overlay-5),
-        var(--overlay-5)
-    );
+    background-color: var(--mms-surface);
 }
 
-/* Selected row = warm cream tint (mock Screen 3), layered over the opaque
- * base so sticky cells still mask scrolled content correctly. */
+/*
+ * Selected row = the approved screen's warm `--mms-selected` fill plus a 3px
+ * action-green bar down the leading edge. The bar is drawn on the sticky
+ * checkbox cell (not the row, which is `display: contents` and so cannot carry
+ * a pseudo-element) so it stays pinned during horizontal scroll and stretches
+ * to the row's full computed height.
+ */
 .row[data-selected="true"] > .cell {
-    background-image: linear-gradient(var(--warning-10), var(--warning-10));
+    background-color: var(--mms-selected);
+}
+
+.row[data-selected="true"] > .cell[data-sticky="checkbox"]::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 3px;
+    background: var(--mms-action);
 }
 
 /* ─── Cells ──────────────────────────────────────────────────────────────── */
 
+/*
+ * `min-height`, not `height` — the approved screen's media cells hold a
+ * 134 × 70 thumbnail which, with the 11px vertical padding, is taller than the
+ * 78px band. Letting the grid row auto-size to its tallest cell keeps every
+ * cell in that row stretched to the same height (so the sticky columns and the
+ * selected-row bar never come up short) instead of overflowing a fixed box.
+ */
 .cell {
-    padding: 0 var(--space-xl);
-    height: 48px;
-    border-bottom: 1px solid var(--border);
+    padding: var(--data-sp-11) var(--data-sp-14);
+    min-height: var(--data-row-h);
+    border-bottom: 1px solid var(--mms-border);
     display: flex;
     align-items: center;
     min-width: 0;
-    font-size: var(--text-m);
-    color: var(--text);
+    overflow: hidden;
+    font-size: var(--data-text-12);
+    color: var(--mms-text);
     position: relative;
 }
 
@@ -474,13 +589,12 @@
     position: sticky;
     left: 0;
     z-index: 1;
-    padding: 0 0 0 var(--space-xl);
+    padding: var(--data-sp-11) 0 var(--data-sp-11) var(--data-sp-14);
 }
 
 .cell[data-sticky="primary"] {
     position: sticky;
     z-index: 1;
-    box-shadow: 1px 0 0 var(--border);
     gap: var(--space-m);
 }
 
@@ -524,12 +638,19 @@
 
 /* When horizontally scrolled, give the sticky primary cell a soft shadow
  * so it's clear it's pinned. */
+/*
+ * No shadow on the sticky primary cell.
+ *
+ * This used to cast a soft edge on hover / select as a depth cue for the
+ * pinned column. With the vertical rule gone it was the only thing left
+ * drawing a seam between Title and the next column, so it read as the border
+ * returning on hover. The approved screen separates rows with horizontal
+ * hairlines only — nothing vertical, in any state.
+ */
 .row:hover > .cell[data-sticky="primary"],
 .row[data-checked="true"] > .cell[data-sticky="primary"],
 .row[data-selected="true"] > .cell[data-sticky="primary"] {
-    box-shadow:
-        1px 0 0 var(--border),
-        8px 0 12px -8px var(--scrim-50);
+    box-shadow: none;
 }
 
 /* ─── Status dot (primary cell, postType) ────────────────────────────────── */
@@ -560,51 +681,75 @@
 /* ─── Actions cell ───────────────────────────────────────────────────────── */
 
 .actionsCell {
-    padding: 0 var(--space-s);
-    height: 48px;
-    border-bottom: 1px solid var(--border);
+    padding: var(--data-sp-11) var(--data-sp-8);
+    min-height: var(--data-row-h);
+    border-bottom: 1px solid var(--mms-border);
+    background-color: var(--mms-workspace);
     background-image: none;
     display: flex;
     align-items: center;
-    justify-content: flex-end;
-    gap: var(--space-4xs);
+    justify-content: center;
+    gap: var(--data-sp-4);
     white-space: nowrap;
-    transition:
-        background-color 0.08s,
-        background-image 0.08s;
+    transition: background-color 0.08s;
 }
 
 .row:hover > .actionsCell {
-    background-image: linear-gradient(
-        var(--overlay-5),
-        var(--overlay-5)
-    );
+    background-color: var(--mms-surface);
 }
 
 .row[data-checked="true"] > .actionsCell {
-    background-image: linear-gradient(
-        var(--overlay-5),
-        var(--overlay-5)
-    );
+    background-color: var(--mms-surface);
 }
 
 .row[data-selected="true"] > .actionsCell {
-    background-color: var(--bg-surface-2);
-    background-image: none;
+    background-color: var(--mms-selected);
 }
 
+/*
+ * Long-value guard (plan H7/H8). Any cell payload that is a single run of text
+ * clips to its own track with an ellipsis instead of widening the column or
+ * spilling into the neighbouring cell. Paired with `overflow: hidden` on
+ * `.cell`, this is what keeps the grid aligned no matter what the data holds.
+ */
+.truncateCell {
+    display: block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/*
+ * Overflow safety net for every cell payload.
+ *
+ * `.cell` clips, but clipping alone does not stop a wide child from stretching
+ * its own grid track first — and a stretched track shifts every column after
+ * it, which is how a single long value knocks the whole grid out of alignment.
+ * Making direct children shrinkable and bounded means no renderer — chip,
+ * thumbnail, relation pill, repeater summary — can widen a column or bleed
+ * into its neighbour, whatever the data holds.
+ */
+.cell > * {
+    min-width: 0;
+    max-width: 100%;
+}
+
+.cell img {
+    max-width: 100%;
+    object-fit: cover;
+}
+
+/*
+ * The approved screen shows a single always-visible ⋮ per row, not a cluster
+ * that appears on hover. Hover-revealed actions are unreachable on touch and
+ * make the trailing gutter flicker as the pointer moves down the ladder.
+ */
 .actions {
     display: flex;
     align-items: center;
-    gap: var(--space-4xs);
-    opacity: 0;
-    transition: opacity 0.1s;
-}
-
-.row:hover .actions,
-.row[data-selected="true"] .actions,
-.row[data-checked="true"] .actions {
-    opacity: 1;
+    justify-content: center;
+    gap: var(--data-sp-4);
 }
 
 /* ─── Empty / loading / error states (span all grid columns) ─────────────── */
@@ -616,9 +761,16 @@
  * during horizontal scroll. Mirrors the `.groupHeader` / `.groupHeaderInner`
  * pattern used for status group disclosures.
  */
+/* `.grid-empty` — the approved screen's 260px no-records band. */
 .emptyStateSpan {
     grid-column: 1 / -1;
-    padding: var(--space-7xl) 0;
+    display: grid;
+    min-height: 260px;
+    place-items: center;
+    align-content: center;
+    padding: 0;
+    color: var(--mms-text-muted);
+    text-align: center;
 }
 
 .emptyStateInner {
@@ -681,4 +833,10 @@
 
 .bulkBarBtn:hover {
     background: var(--bg-surface-2);
+}
+
+/* `.primary-cell > span svg` — the document glyph beside the row title. */
+.primaryIcon {
+    flex: 0 0 auto;
+    color: var(--mms-text-muted);
 }

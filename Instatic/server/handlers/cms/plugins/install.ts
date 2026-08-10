@@ -65,6 +65,7 @@ import {
 } from './shared'
 import { runPluginLifecycleHook } from './lifecycle'
 import { maybeAutoInstallPluginPack, type PluginPackSummary } from './pack'
+import { sweepStagedPackage } from './staged'
 
 // ---------------------------------------------------------------------------
 // GET / POST /admin/api/cms/plugins  (list + JSON install)
@@ -250,6 +251,11 @@ async function installFreshFromPackage(ctx: InstallContext): Promise<Response> {
     version: activateLifecycle.plugin.version,
     occurredAt: new Date().toISOString(),
   })
+  // The package that was waiting has been approved and is now installed —
+  // nothing is pending any more.
+  if (options.uploadsDir) {
+    await sweepStagedPackage(db, options.uploadsDir, activateLifecycle.plugin.id)
+  }
   return jsonResponse(
     {
       plugin: await presentPluginSecrets(db, activateLifecycle.plugin),
@@ -380,6 +386,11 @@ async function installUpgradeFromPackage(ctx: UpgradeContext): Promise<Response>
     toVersion: newVersion,
     occurredAt: new Date().toISOString(),
   })
+  // The staged update has landed — clear the "waiting" state so the recovery
+  // screen stops offering to review a version that is now installed.
+  if (options.uploadsDir) {
+    await sweepStagedPackage(db, options.uploadsDir, pluginId)
+  }
   return jsonResponse(
     {
       plugin: await presentPluginSecrets(db, finalRow),

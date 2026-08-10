@@ -9,10 +9,12 @@
  * FORM: A dense blueprint list with modal detail editing.
  */
 import { useState, type DragEvent, type ReactElement } from 'react'
+import { createPortal } from 'react-dom'
+import { ContextMenu, ContextMenuItem } from '@ui/components/ContextMenu'
 import type { IconComponent } from 'pixel-art-icons/types'
 import { Button } from '@ui/components/Button'
 import { Section } from '@ui/components/Section'
-import { PlusIcon } from 'pixel-art-icons/icons/plus'
+import { PlusIcon } from '@admin/pages/data/icons'
 import { NewFieldDialog } from '@admin/pages/data/components/NewFieldDialog/NewFieldDialog'
 import { useConfirmDelete } from '@admin/shared/dialogs/ConfirmDeleteDialog'
 import type { DataField, DataTable } from '@core/data/schemas'
@@ -70,6 +72,8 @@ export function FieldSchemaComposer({
   const confirmDelete = useConfirmDelete()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingField, setEditingField] = useState<DataField | null>(null)
+  // Row options menu — the ⋮ on each field row opens this at its own corner.
+  const [fieldMenu, setFieldMenu] = useState<{ x: number; y: number; id: string; index: number } | null>(null)
   const [draggingId, setDraggingId] = useState<string | null>(null)
   const [dragOverId, setDragOverId] = useState<string | null>(null)
 
@@ -149,6 +153,28 @@ export function FieldSchemaComposer({
     void persistInBackground(nextFields)
   }
 
+  /**
+   * Whether a row has any action at all.
+   *
+   * A fully locked built-in (Title on a system table) can't be reordered,
+   * renamed, deleted or made primary — every menu item filters out and the
+   * menu opened as an empty highlighted bar. Rows with nothing to offer simply
+   * don't get a ⋮.
+   */
+  function hasRowActions(field: DataField, index: number): boolean {
+    const locked = lockedFieldIds.includes(field.id)
+    const canSetPrimary = primaryFieldId !== undefined
+      && onPrimaryFieldChange !== undefined
+      && isPrimaryFieldCandidate(field)
+      && field.id !== primaryFieldId
+    const canMoveUp = canEdit && !locked && index > 0
+      && !lockedFieldIds.includes(fields[index - 1]!.id)
+    const canMoveDown = canEdit && !locked && index < fields.length - 1
+      && !lockedFieldIds.includes(fields[index + 1]!.id)
+    const canDelete = canEdit && !locked && !undeletableFieldIds.includes(field.id)
+    return canSetPrimary || canMoveUp || canMoveDown || (canEdit && !locked) || canDelete
+  }
+
   function moveField(index: number, offset: -1 | 1) {
     const target = index + offset
     if (target < 0 || target >= fields.length) return
@@ -160,13 +186,6 @@ export function FieldSchemaComposer({
     void persistInBackground(nextFields)
   }
 
-  const addAction = canEdit ? (
-    <Button variant="primary" size="sm" type="button" onClick={openNewField}>
-      <PlusIcon size={12} aria-hidden="true" />
-      {addLabel}
-    </Button>
-  ) : null
-
   const composer = (
     <section className={styles.composer} aria-label={sectionTitle ?? title}>
       {!sectionTitle && <div className={styles.heading}>
@@ -177,7 +196,6 @@ export function FieldSchemaComposer({
           </div>
           {description && <p>{description}</p>}
         </div>
-        {addAction}
       </div>}
 
       {fields.length > 0 ? (
@@ -198,6 +216,9 @@ export function FieldSchemaComposer({
               && !lockedFieldIds.includes(fields[index + 1]!.id)
             return (
               <FieldRow
+                position={index + 1}
+                onOpenMenu={(x, y) => setFieldMenu({ x, y, id: field.id, index })}
+                menuDisabled={!hasRowActions(field, index)}
                 key={field.id}
                 field={field}
                 canDrag={canEdit && !locked}
@@ -232,7 +253,29 @@ export function FieldSchemaComposer({
             )
           })}
         </div>
-      ) : (
+      ) : null}
+
+      {/*
+        * `+ New field` sits at the FOOT of the list, full width and outlined —
+        * the approved screen's placement. In the header it read as a heading
+        * ornament; below the list it reads as "add one more", which is what it
+        * does, and it stays put as the list grows.
+        */}
+      {fields.length > 0 && canEdit && (
+        <Button
+          variant="secondary"
+          size="sm"
+          type="button"
+          fullWidth
+          className={styles.newFieldAction}
+          onClick={openNewField}
+        >
+          <PlusIcon size={13} aria-hidden="true" />
+          {addLabel}
+        </Button>
+      )}
+
+      {fields.length === 0 && (
         <div className={styles.empty}>
           <span className={styles.emptyTitle}>Start with the record structure</span>
           <span>{emptyMessage}</span>
@@ -244,6 +287,65 @@ export function FieldSchemaComposer({
           )}
         </div>
       )}
+
+      {/*
+        * Field options menu. Portalled through the shared ContextMenu so it
+        * escapes the schema list's clipping and gets viewport collision
+        * handling for free — the approved screen's own menu is clipped by its
+        * container, which is a bug we deliberately do not reproduce.
+        */}
+      {fieldMenu !== null && (() => {
+        const field = fields.find((item) => item.id === fieldMenu.id)
+        if (!field) return null
+        const locked = lockedFieldIds.includes(field.id)
+        const close = () => setFieldMenu(null)
+        const run = (action: () => void) => { action(); close() }
+        const canSetPrimary = primaryFieldId !== undefined
+          && onPrimaryFieldChange !== undefined
+          && isPrimaryFieldCandidate(field)
+          && field.id !== primaryFieldId
+        const canMoveUp = canEdit && !locked && fieldMenu.index > 0
+          && !lockedFieldIds.includes(fields[fieldMenu.index - 1]!.id)
+        const canMoveDown = canEdit && !locked && fieldMenu.index < fields.length - 1
+          && !lockedFieldIds.includes(fields[fieldMenu.index + 1]!.id)
+        const deletable = !locked && !undeletableFieldIds.includes(field.id)
+
+        return createPortal(
+          <ContextMenu
+            x={fieldMenu.x}
+            y={fieldMenu.y}
+            ariaLabel={`Options for ${field.label}`}
+            onClose={close}
+          >
+            {canSetPrimary && (
+              <ContextMenuItem onClick={() => run(() => { void onPrimaryFieldChange?.(field.id) })}>
+                Set as primary
+              </ContextMenuItem>
+            )}
+            {canMoveUp && (
+              <ContextMenuItem onClick={() => run(() => moveField(fieldMenu.index, -1))}>
+                Move up
+              </ContextMenuItem>
+            )}
+            {canMoveDown && (
+              <ContextMenuItem onClick={() => run(() => moveField(fieldMenu.index, 1))}>
+                Move down
+              </ContextMenuItem>
+            )}
+            {canEdit && !locked && (
+              <ContextMenuItem onClick={() => run(() => openField(field))}>
+                Edit field
+              </ContextMenuItem>
+            )}
+            {canEdit && deletable && (
+              <ContextMenuItem danger onClick={() => run(() => requestDelete(field))}>
+                Delete field
+              </ContextMenuItem>
+            )}
+          </ContextMenu>,
+          document.body,
+        )
+      })()}
 
       {dialogOpen && (
         <NewFieldDialog
@@ -277,7 +379,6 @@ export function FieldSchemaComposer({
       <Section
         title={sectionTitle}
         icon={sectionIcon}
-        headerAction={addAction}
         defaultOpen
         flush
       >
