@@ -1,0 +1,443 @@
+/* People panel — the approved `.people-controls` / `.people-table` roster.
+ *
+ * The reference draws its table as a CSS-Grid div tree with ARIA roles. We
+ * keep a real `<table>` and apply the grid to the rows instead: the fractional
+ * column ladder is identical, but row/cell semantics stay native, so screen
+ * readers, `getByRole('table')` and column headers all work without a
+ * hand-maintained ARIA grid.
+ *
+ * LONG-CONTENT RULE: every text container in a constrained column carries
+ * `min-width: 0` plus an explicit decision — ellipsis for single-line identity
+ * values, wrap for chips and notes. This is what keeps the ladder aligned no
+ * matter how long a name, email or role is.
+ */
+
+/* Filter band and trust note are fixed; the roster between them takes the
+   remaining height and scrolls. */
+.panel {
+    display: flex;
+    min-height: 0;
+    flex-direction: column;
+}
+
+.controls,
+.trustNote {
+    flex: 0 0 auto;
+}
+
+.srOnly {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: calc(var(--users-sp-1) * -1);
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* ── Filter band ─────────────────────────────────────────────────────────
+   Fused to the table below it: bottom border removed, bottom corners square. */
+.controls {
+    display: grid;
+    grid-template-columns:
+        minmax(var(--users-search-min-w), var(--users-search-max-w))
+        repeat(3, minmax(var(--users-filter-min-w), var(--users-filter-max-w)));
+    min-height: var(--users-controls-min-h);
+    align-items: center;
+    gap: var(--users-sp-16);
+    padding: var(--users-sp-20) var(--users-sp-18);
+    border: 1px solid var(--mms-border);
+    border-bottom: 0;
+    border-radius: var(--users-radius-10) var(--users-radius-10) 0 0;
+    background: var(--mms-surface);
+}
+
+/* One bordered shell holding the glyph and a borderless input, per
+   `.search-control`. The Input primitive keeps its own focus behaviour; the
+   shell only owns the box. */
+.searchControl {
+    display: flex;
+    min-width: 0;
+    min-height: var(--users-search-h);
+    align-items: center;
+    border: 1px solid var(--mms-border-strong);
+    border-radius: var(--users-radius-7);
+    background: var(--mms-surface-raised);
+}
+
+.searchGlyph {
+    width: var(--users-search-icon-w);
+    flex: 0 0 var(--users-search-icon-w);
+    color: var(--mms-text-muted);
+    text-align: center;
+}
+
+.searchControl input {
+    min-width: 0;
+    min-height: var(--users-search-inner-h);
+    padding-left: 0;
+    border: 0;
+    background: transparent;
+}
+
+/* Every control in the band is exactly the search shell's height. `Select`'s
+   own box carries the border and vertical padding, so the height has to land
+   on that root — setting it on the inner combobox leaves the outer box sized
+   by its `size-md` padding and the filters end up taller than the search
+   field beside them. */
+.filterSelect {
+    min-height: var(--users-field-h);
+    height: var(--users-field-h);
+    padding-top: 0;
+    padding-bottom: 0;
+    border-color: var(--mms-border-strong);
+    background: var(--mms-surface-raised);
+}
+
+/* Portalled Select menus land outside `data-editor-screen="users"`, so the
+   scope's surfaces AND its typeface have to be restated here — otherwise the
+   open menu renders in Nunito Sans over an Inter page. */
+.selectMenu {
+    background: var(--mms-surface-raised);
+    border-color: var(--mms-border);
+    font-family: var(--font-mms);
+    font-size: var(--users-text-13);
+}
+
+/* Shown only on the phone tier — see the 780px block. */
+.createMobile {
+    display: none;
+    min-height: var(--users-tap);
+    border-radius: var(--users-radius-7);
+    font-weight: var(--users-weight-chip);
+}
+
+/* ── Table ───────────────────────────────────────────────────────────────── */
+
+.tableCard {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    border: 1px solid var(--mms-border);
+    border-radius: 0 0 var(--users-radius-10) var(--users-radius-10);
+    background: var(--mms-surface);
+}
+
+/* Column headers stay put while the rows move under them. */
+.head {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--mms-surface);
+}
+
+.table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+}
+
+.headRow,
+.row {
+    display: grid;
+    grid-template-columns: 1.55fr 1.2fr 0.8fr 0.78fr 1.18fr;
+    align-items: center;
+    gap: var(--users-sp-20);
+    padding: 0 var(--users-sp-26);
+}
+
+.headRow {
+    min-height: var(--users-head-h);
+    color: var(--mms-text-muted);
+    font-weight: var(--users-weight-label);
+}
+
+.headRow th {
+    min-width: 0;
+    overflow: hidden;
+    font-weight: inherit;
+    text-align: left;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.row {
+    min-height: var(--users-row-h);
+    border-top: 1px solid var(--mms-border);
+}
+
+.row td {
+    min-width: 0;
+    padding: 0;
+}
+
+.identityCell {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: var(--users-sp-20);
+}
+
+.identity {
+    display: block;
+    min-width: 0;
+}
+
+.identity strong,
+.identity small {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.identity strong {
+    color: var(--mms-text);
+    font-size: var(--users-text-17);
+}
+
+.identity small {
+    margin-top: var(--users-sp-4);
+    color: var(--mms-text-muted);
+    font-size: var(--users-text-13);
+}
+
+/* Avatar tints — the initials fallback's disc. An uploaded avatar or Gravatar
+   covers the disc entirely, so the tint only shows where there is no image. */
+.avatarGreen,
+.avatarBlue,
+.avatarViolet,
+.avatarOrange {
+    border-color: transparent;
+}
+
+.avatarGreen { background: var(--users-avatar-green); }
+.avatarBlue { background: var(--users-avatar-blue); }
+.avatarViolet { background: var(--users-avatar-violet); }
+.avatarOrange { background: var(--users-avatar-orange); }
+
+/* Chips wrap rather than stretch the row — a long role name pushes the second
+   chip onto its own line instead of blowing out the column. */
+.chipCell {
+    display: flex;
+    min-width: 0;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--users-sp-10);
+}
+
+.securityGlyph {
+    color: var(--mms-action-strong);
+}
+
+.lastLogin {
+    overflow: hidden;
+    color: var(--mms-text-muted);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.actionsCell {
+    display: flex;
+    min-width: 0;
+    justify-content: flex-start;
+}
+
+/* ── Owner protection ────────────────────────────────────────────────────── */
+
+.ownerProtected {
+    display: grid;
+    grid-template-columns: var(--users-sp-22) minmax(0, 1fr);
+    align-items: center;
+    gap: var(--users-sp-3) var(--users-sp-7);
+}
+
+.ownerGlyph {
+    grid-row: 1 / 3;
+    color: var(--mms-warning);
+}
+
+.ownerProtected strong {
+    display: inline-flex;
+    width: max-content;
+    max-width: 100%;
+    align-items: center;
+    padding: var(--users-sp-6) var(--users-sp-9);
+    border-radius: var(--users-radius-7);
+    background: var(--mms-warning-bg);
+    color: var(--mms-warning);
+}
+
+.ownerProtected small {
+    color: var(--mms-text-muted);
+    line-height: 1.55;
+    overflow-wrap: anywhere;
+}
+
+/* ── Row menu ────────────────────────────────────────────────────────────── */
+
+.rowMenuTrigger {
+    width: var(--users-menu-trigger);
+    height: var(--users-menu-trigger);
+    border: 1px solid var(--mms-border-strong);
+    border-radius: var(--users-radius-8);
+    background: var(--mms-surface-raised);
+    color: var(--mms-text);
+}
+
+.rowMenuTrigger:hover:not(:disabled) {
+    background: var(--mms-surface-tint);
+}
+
+.rowMenu {
+    background: var(--mms-surface-raised);
+    border-color: var(--mms-border);
+    box-shadow: var(--users-shadow-menu);
+    font-family: var(--font-mms);
+    font-size: var(--users-text-13);
+}
+
+/* ── Empty state ─────────────────────────────────────────────────────────── */
+
+.emptyRow {
+    display: grid;
+    min-height: var(--users-empty-min-h);
+    align-content: center;
+    justify-items: center;
+    border-top: 1px solid var(--mms-border);
+    color: var(--mms-text-muted);
+    text-align: center;
+}
+
+.emptyGlyph {
+    margin-bottom: var(--users-sp-10);
+    color: var(--mms-action-strong);
+}
+
+.emptyRow strong {
+    color: var(--mms-text);
+    font-size: var(--users-text-16);
+}
+
+.emptyRow p {
+    margin: var(--users-sp-4) 0 0;
+    max-width: 44ch;
+}
+
+/* ── Trust note ──────────────────────────────────────────────────────────── */
+
+.trustNote {
+    display: flex;
+    min-height: var(--users-trust-h);
+    align-items: center;
+    gap: var(--users-sp-12);
+    margin: 0;
+    padding: 0 var(--users-sp-8);
+    color: var(--mms-text-muted);
+}
+
+.trustGlyph {
+    color: var(--mms-text);
+}
+
+/* ── Responsive ──────────────────────────────────────────────────────────── */
+
+@media (max-width: 780px) {
+    /* The page scrolls at this tier, so the roster grows rather than
+       scrolling inside itself — two nested scrollers on a phone is worse
+       than one long list. */
+    .panel {
+        display: block;
+    }
+
+    .tableCard {
+        overflow-y: visible;
+    }
+
+    .controls {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: var(--users-sp-9);
+        padding: var(--users-sp-13);
+    }
+
+    .searchControl {
+        grid-column: 1 / -1;
+    }
+
+    /* The security filter and the mobile create button each take a full row. */
+    .controls > :nth-child(4),
+    .createMobile {
+        grid-column: 1 / -1;
+    }
+
+    .createMobile {
+        display: inline-flex;
+    }
+
+    /* Column headers disappear; each row becomes a card with the kebab pinned
+       to its top-right corner. */
+    .head {
+        display: none;
+    }
+
+    .row {
+        position: relative;
+        min-height: var(--users-row-h-mobile);
+        grid-template-columns: 1fr var(--users-menu-trigger);
+        align-content: center;
+        gap: var(--users-sp-13);
+        padding: var(--users-sp-16);
+    }
+
+    .identityCell,
+    .chipCell,
+    .lastLogin {
+        grid-column: 1;
+    }
+
+    .identityCell {
+        gap: var(--users-sp-13);
+    }
+
+    .identity strong {
+        font-size: var(--users-text-15);
+    }
+
+    .actionsCell {
+        position: absolute;
+        top: var(--users-sp-18);
+        right: var(--users-sp-14);
+    }
+
+    /* The owner notice keeps its place in the flow rather than being pinned —
+       it is a two-line block, not a 48px control. */
+    .ownerProtected {
+        position: static;
+        grid-column: 1 / -1;
+    }
+
+    .ownerProtected small {
+        display: none;
+    }
+
+    .trustNote {
+        min-height: var(--users-trust-h-mobile);
+        padding: 0 var(--users-sp-14);
+        font-size: var(--users-text-11);
+    }
+}
+
+@media (max-width: 430px) {
+    .controls {
+        grid-template-columns: 1fr;
+    }
+
+    .searchControl,
+    .controls > :nth-child(4),
+    .createMobile {
+        grid-column: 1;
+    }
+}

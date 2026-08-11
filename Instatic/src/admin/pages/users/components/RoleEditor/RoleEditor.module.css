@@ -1,0 +1,212 @@
+/* RoleEditor — the reference's `.role-editor`. */
+
+/* `min-height: 0` — see RoleRail: without it this grid item cannot shrink and
+   its own `overflow-y` never engages. */
+.editor {
+    min-width: 0;
+    min-height: 0;
+    overflow-y: auto;
+    padding: var(--users-sp-22) var(--users-sp-26) var(--users-sp-28);
+}
+
+.header {
+    display: flex;
+    min-height: var(--users-role-editor-head-h);
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--users-sp-20);
+}
+
+.identity {
+    min-width: 0;
+}
+
+.identity h2 {
+    margin: 0 0 var(--users-sp-8);
+    color: var(--mms-text);
+    font-size: var(--users-text-24);
+    overflow-wrap: anywhere;
+}
+
+.meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--users-sp-17);
+    margin: 0;
+    color: var(--mms-text-muted);
+    font-size: var(--users-text-11);
+}
+
+.meta > span {
+    display: inline-flex;
+    min-width: 0;
+    align-items: center;
+    gap: var(--users-sp-7);
+}
+
+.headerActions {
+    display: flex;
+    flex: 0 0 auto;
+    gap: var(--users-sp-9);
+}
+
+/* Matches `.createButton` in the rail — one primary-action size on this
+   screen, per the approved `.primary-button`. */
+.primaryAction {
+    min-width: var(--users-tap);
+    min-height: var(--users-tap);
+    padding: 0 var(--users-sp-18);
+    border-radius: var(--users-radius-7);
+    font-size: var(--users-text-13);
+    font-weight: var(--users-weight-chip);
+}
+
+.actionsTrigger {
+    width: var(--users-menu-trigger);
+    height: var(--users-menu-trigger);
+    border: 1px solid var(--mms-border-strong);
+    border-radius: var(--users-radius-8);
+    background: var(--mms-surface-raised);
+    color: var(--mms-text);
+}
+
+.actionsMenu {
+    background: var(--mms-surface-raised);
+    border-color: var(--mms-border);
+    box-shadow: var(--users-shadow-menu);
+    font-family: var(--font-mms);
+    font-size: var(--users-text-13);
+}
+
+/* ── Name + description ──────────────────────────────────────────────────── */
+
+/* `align-items: start` keeps the two labels on one baseline; the controls
+   below them then share a height so the pair reads as one aligned row rather
+   than a short box beside a tall one. */
+.fields {
+    display: grid;
+    grid-template-columns: 0.85fr 1.15fr;
+    align-items: start;
+    gap: var(--users-sp-18);
+    padding-bottom: var(--users-sp-14);
+    border-bottom: 1px solid var(--mms-border);
+}
+
+.field {
+    display: grid;
+    grid-template-rows: auto 1fr;
+    gap: var(--users-sp-7);
+    min-width: 0;
+}
+
+/* Both controls stand at the textarea's height so their tops AND bottoms
+   line up across the two columns. */
+.field input,
+.descriptionShell,
+.descriptionShell textarea {
+    min-height: var(--users-role-textarea-h);
+}
+
+.label {
+    font-size: var(--users-text-11);
+    font-weight: var(--users-weight-strong);
+}
+
+.descriptionShell {
+    position: relative;
+    min-width: 0;
+}
+
+.descriptionShell textarea {
+    min-height: var(--users-role-textarea-h);
+    /* Room for the counter so a full 150 characters never runs under it. */
+    padding-bottom: var(--users-sp-20);
+    resize: vertical;
+}
+
+.counter {
+    position: absolute;
+    right: var(--users-sp-8);
+    bottom: var(--users-sp-7);
+    color: var(--mms-text-muted);
+    font-weight: var(--users-weight-body);
+    pointer-events: none;
+}
+
+/* ── Capability toolbar ──────────────────────────────────────────────────── */
+
+.toolbar {
+    display: grid;
+    grid-template-columns: minmax(var(--users-cap-search-min-w), var(--users-cap-search-max-w)) auto auto;
+    align-items: center;
+    gap: var(--users-sp-12);
+    padding: var(--users-sp-13) 0;
+}
+
+.searchControl {
+    display: flex;
+    min-width: 0;
+    min-height: var(--users-search-h);
+    align-items: center;
+    border: 1px solid var(--mms-border-strong);
+    border-radius: var(--users-radius-7);
+    background: var(--mms-surface-raised);
+}
+
+.searchGlyph {
+    width: var(--users-search-icon-w);
+    flex: 0 0 var(--users-search-icon-w);
+    color: var(--mms-text-muted);
+    text-align: center;
+}
+
+.searchControl input {
+    min-width: 0;
+    min-height: var(--users-search-inner-h);
+    padding-left: 0;
+    border: 0;
+    background: transparent;
+}
+
+.expandToggle {
+    justify-self: end;
+    padding: 0;
+    color: var(--mms-action-strong);
+}
+
+.groupCount {
+    justify-self: end;
+    color: var(--mms-text-muted);
+    font-size: var(--users-text-11);
+    white-space: nowrap;
+}
+
+.error {
+    margin: var(--users-sp-14) 0 0;
+    color: var(--mms-danger);
+    font-size: var(--users-text-11);
+    overflow-wrap: anywhere;
+}
+
+@media (max-width: 780px) {
+    .editor {
+        padding: var(--users-sp-19) var(--users-sp-14) var(--users-sp-22);
+    }
+
+    .header {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .fields {
+        grid-template-columns: 1fr;
+    }
+
+    .toolbar {
+        grid-template-columns: 1fr auto;
+    }
+
+    .groupCount {
+        display: none;
+    }
+}

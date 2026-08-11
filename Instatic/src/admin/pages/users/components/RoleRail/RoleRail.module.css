@@ -1,0 +1,208 @@
+/* RoleRail — the reference's `.role-list`. */
+
+/* `min-height: 0` is load-bearing: a grid item defaults to `min-height: auto`
+   and refuses to shrink below its content, so without it the rail grows with
+   the role list and `.list`'s own overflow never engages — which is why a long
+   list stopped scrolling and pushed the card instead. */
+.rail {
+    display: flex;
+    min-width: 0;
+    min-height: 0;
+    flex-direction: column;
+    border-right: 1px solid var(--mms-border);
+}
+
+.header,
+.searchControl {
+    flex: 0 0 auto;
+}
+
+.header {
+    display: flex;
+    min-height: var(--users-role-row-h);
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--users-sp-12);
+    padding: 0 var(--users-sp-19);
+}
+
+.header h2 {
+    margin: 0;
+    color: var(--mms-text);
+    font-size: var(--users-text-16);
+}
+
+/* The approved screen's shared `.primary-button` metrics — 44px tall, 18px
+   side padding, 7px radius. The same block sizes "Save role" in the editor so
+   the two primary actions on this screen match. */
+.createButton {
+    min-width: var(--users-tap);
+    min-height: var(--users-tap);
+    gap: var(--users-sp-9);
+    padding: 0 var(--users-sp-18);
+    border-radius: var(--users-radius-7);
+    font-size: var(--users-text-13);
+    font-weight: var(--users-weight-chip);
+}
+
+.searchControl {
+    display: flex;
+    min-width: 0;
+    min-height: var(--users-search-h);
+    align-items: center;
+    margin: 0 var(--users-sp-19) var(--users-sp-13);
+    border: 1px solid var(--mms-border-strong);
+    border-radius: var(--users-radius-7);
+    background: var(--mms-surface-raised);
+}
+
+.searchGlyph {
+    width: var(--users-search-icon-w);
+    flex: 0 0 var(--users-search-icon-w);
+    color: var(--mms-text-muted);
+    text-align: center;
+}
+
+.searchControl input {
+    min-width: 0;
+    min-height: var(--users-search-inner-h);
+    padding-left: 0;
+    border: 0;
+    background: transparent;
+}
+
+/* The list scrolls on its own so a long custom-role set never stretches the
+   workbench past its 705px floor or pushes the editor out of view. */
+.list {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    border-top: 1px solid var(--mms-border);
+}
+
+.row {
+    display: grid;
+    width: 100%;
+    min-height: var(--users-role-row-h);
+    grid-template-columns: var(--users-sp-45) minmax(0, 1fr) var(--users-sp-24);
+    align-items: center;
+    gap: var(--users-sp-11);
+    padding: 0 var(--users-sp-18);
+    border-bottom: 1px solid var(--mms-border);
+    border-radius: 0;
+    color: var(--mms-text);
+    text-align: left;
+}
+
+.row:hover:not(:disabled) {
+    background: var(--mms-surface-tint);
+}
+
+.rowSelected,
+.rowSelected:hover:not(:disabled) {
+    background: var(--mms-warning-bg);
+}
+
+.mark {
+    display: grid;
+    width: var(--users-role-mark);
+    height: var(--users-role-mark);
+    place-items: center;
+    border-radius: 50%;
+    background: var(--mms-surface-green);
+    color: var(--mms-action-strong);
+}
+
+.markAdmin {
+    background: var(--users-mark-blue-bg);
+    color: var(--mms-blue);
+}
+
+.markClient {
+    background: var(--users-mark-violet-bg);
+    color: var(--mms-violet);
+}
+
+.markCustom {
+    background: var(--mms-warning-bg);
+    color: var(--mms-warning);
+}
+
+.rowText {
+    display: block;
+    min-width: 0;
+}
+
+.rowText strong,
+.rowText small {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.rowText strong {
+    font-size: var(--users-text-15);
+}
+
+.rowText small {
+    margin-top: var(--users-sp-3);
+    color: var(--mms-text-muted);
+    font-weight: var(--users-weight-body);
+}
+
+.rowTrail {
+    justify-self: center;
+    color: var(--mms-action-strong);
+}
+
+.empty {
+    margin: 0;
+    padding: var(--users-sp-20) var(--users-sp-18);
+    color: var(--mms-text-muted);
+}
+
+@media (max-width: 1100px) {
+    .rail {
+        border-right: 1px solid var(--mms-border);
+    }
+}
+
+@media (max-width: 780px) {
+    .rail {
+        border-right: 0;
+        border-bottom: 1px solid var(--mms-border);
+    }
+
+    /* Two-up on tablets/phones so the rail does not eat the whole first
+       screen before the editor appears. */
+    .list {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        overflow-y: visible;
+    }
+
+    .row {
+        min-height: var(--users-role-row-h-compact);
+        border-right: 1px solid var(--mms-border);
+    }
+
+    .header {
+        padding: 0 var(--users-sp-13);
+    }
+
+    .searchControl {
+        margin-right: var(--users-sp-13);
+        margin-left: var(--users-sp-13);
+    }
+}
+
+@media (max-width: 430px) {
+    .list {
+        grid-template-columns: 1fr;
+    }
+
+    .row {
+        border-right: 0;
+    }
+}

@@ -98,6 +98,13 @@ const ALLOWLIST = new Set([
   // Content workspace's Write / Live mode switch — mirrors the canvas
   // mode toggle's segmented pill pattern and shares the same constraints.
   'admin/pages/content/components/ContentModeToggle/ContentModeToggle.tsx',
+  // Team Access People / Roles / Activity switch. The approved MMSBUILD Users
+  // screen draws one bordered track with fused cells: hairline dividers
+  // between segments, a full-bleed 3px underbar on the active cell, and a
+  // roving tabindex across the three. Button owns its own radius, padding and
+  // focus box and cannot carry `tabIndex={-1}` semantics or a bleed-to-edge
+  // pseudo-element without overriding nearly every rule it sets.
+  'admin/pages/users/components/WorkspaceTabs/WorkspaceTabs.tsx',
 
   // ── §8.7 Full-width row disclosure / listbox option custom layouts ──────
   // ColorTokenCard row toggle is a full-width structured row (title + meta,

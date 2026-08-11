@@ -1,0 +1,172 @@
+/* AccessSummary — the reference's `.role-summary-panel`. */
+
+/* `min-height: 0` — see RoleRail: without it this grid item cannot shrink and
+   its own `overflow-y` never engages. */
+.summary {
+    min-width: 0;
+    min-height: 0;
+    padding: var(--users-sp-21) var(--users-sp-20);
+    border-left: 1px solid var(--mms-border);
+    overflow-y: auto;
+}
+
+.summary h2 {
+    margin: 0;
+    color: var(--mms-text);
+    font-size: var(--users-text-16);
+}
+
+.summary h3 {
+    margin: 0;
+    padding: var(--users-sp-18) 0 var(--users-sp-12);
+    border-top: 1px solid var(--mms-border);
+    color: var(--mms-text);
+    font-size: var(--users-text-12);
+}
+
+.card {
+    display: grid;
+    grid-template-columns: var(--users-sp-43-track) minmax(0, 1fr);
+    gap: var(--users-sp-10);
+    margin: var(--users-sp-15) 0 var(--users-sp-27);
+    padding: var(--users-sp-15) var(--users-sp-12);
+    border: 1px solid var(--mms-border);
+    border-radius: var(--users-radius-8);
+    background: var(--mms-warning-bg);
+}
+
+.shield {
+    display: grid;
+    width: var(--users-summary-shield);
+    height: var(--users-summary-shield);
+    place-items: center;
+    border-radius: 50%;
+    background: var(--mms-surface-green);
+    color: var(--mms-action-strong);
+}
+
+.cardBody {
+    min-width: 0;
+}
+
+.cardBody strong {
+    color: var(--mms-text);
+    font-size: var(--users-text-13);
+    overflow-wrap: anywhere;
+}
+
+.cardBody p {
+    margin: var(--users-sp-7) 0 0;
+    color: var(--mms-text-muted);
+    font-size: var(--users-text-11);
+    overflow-wrap: anywhere;
+}
+
+/* ── About this role ─────────────────────────────────────────────────────── */
+
+.meta {
+    margin: 0 0 var(--users-sp-18);
+}
+
+.meta > div {
+    display: grid;
+    grid-template-columns: var(--users-sp-90) minmax(0, 1fr);
+    gap: var(--users-sp-7);
+    margin: 0 0 var(--users-sp-13);
+}
+
+.meta dt {
+    display: flex;
+    align-items: center;
+    gap: var(--users-sp-6);
+    color: var(--mms-text-muted);
+    font-size: var(--users-text-10);
+}
+
+.metaGlyph {
+    color: var(--mms-blue);
+}
+
+.meta dd {
+    margin: 0;
+    font-size: var(--users-text-10);
+    overflow-wrap: anywhere;
+}
+
+/* ── Security & audit ────────────────────────────────────────────────────── */
+
+.note {
+    display: flex;
+    gap: var(--users-sp-9);
+    margin: 0;
+    color: var(--mms-text-muted);
+    font-size: var(--users-text-10);
+}
+
+.note span {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.noteGlyph {
+    margin-top: var(--users-sp-2);
+    color: var(--mms-action-strong);
+}
+
+.auditLink {
+    min-height: var(--users-row-menu-item-h);
+    padding: 0;
+    color: var(--mms-text);
+}
+
+.auditLinkLabel {
+    display: inline-flex;
+    min-width: 0;
+    align-items: center;
+    gap: var(--users-sp-9);
+}
+
+/* ── Role rules ──────────────────────────────────────────────────────────── */
+
+.rules {
+    margin: 0;
+    padding-left: var(--users-sp-16);
+    color: var(--mms-text-muted);
+    font-size: var(--users-text-9);
+    line-height: 1.7;
+}
+
+.rules li {
+    overflow-wrap: anywhere;
+}
+
+/* At the 1100px tier the pane moves below the workbench and becomes a
+   three-column strip, so each block gets its own column instead of stacking
+   into a very tall footer. */
+@media (max-width: 1100px) {
+    .summary {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: var(--users-sp-18);
+        border-top: 1px solid var(--mms-border);
+        border-left: 0;
+    }
+
+    .summary > * {
+        margin: 0;
+    }
+}
+
+@media (max-width: 780px) {
+    .summary {
+        display: block;
+    }
+
+    .card {
+        margin: var(--users-sp-15) 0 var(--users-sp-24);
+    }
+
+    .summary h3 {
+        margin-top: var(--users-sp-10);
+    }
+}

@@ -30,5 +30,34 @@ export function formatCapabilitySummary(capabilities: string[]): string {
 }
 
 export function tabLabel(tab: Tab): string {
-  return tab === 'users' ? 'Users' : tab === 'roles' ? 'Roles' : 'Audit'
+  return tab === 'people' ? 'People' : tab === 'roles' ? 'Roles' : 'Activity'
+}
+
+/**
+ * Account count line under the roster heading. The approved screen writes
+ * "4 accounts with CMS access." and singularises at one.
+ */
+export function formatAccountSummary(count: number): string {
+  return `${count} account${count === 1 ? '' : 's'} with CMS access.`
+}
+
+/**
+ * "Used by 1 account" / "Used by 3 accounts" — the role editor's meta line.
+ */
+export function formatRoleUsage(count: number): string {
+  return `Used by ${count} ${count === 1 ? 'account' : 'accounts'}`
+}
+
+/**
+ * Rail subtitle: "System · Locked" for the immutable Owner role, otherwise
+ * "System · 37 capabilities" / "Custom · 7 capabilities".
+ */
+export function formatRoleRailMeta(role: {
+  isSystem: boolean
+  slug: string
+  capabilities: string[]
+}): string {
+  const kind = role.isSystem ? 'System' : 'Custom'
+  if (role.slug === 'owner') return `${kind} · Locked`
+  return `${kind} · ${formatCapabilitySummary(role.capabilities)}`
 }

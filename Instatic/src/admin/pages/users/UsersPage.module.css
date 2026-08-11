@@ -1,139 +1,199 @@
-/* Users page body — sits inside AdminPageLayout, which provides the
-   scroll container, max-width, and page header. We just stack the
-   per-section blocks (Users / Roles / Audit). User and role edits are
-   shown via the shared <Dialog/> primitive (portaled to body). */
-.body {
-    display: grid;
-    gap: var(--space-6xl);
-}
+/* Team Access workspace shell — the approved screen's `.team-access-main`
+ * and `.team-access-heading`.
+ *
+ * `AdminPageLayout mode="users"` gives us a zero-padding `--mms-workspace`
+ * surface, so this file owns the column width and the heading band exactly as
+ * the reference does. Every value is a `--users-*` token from globals.css.
+ */
 
-.sectionHeader {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: center;
-    gap: var(--space-3xl);
-}
+/* Carries `data-editor-screen="users"`. Kept as its own element so the scope
+   wraps the create-account sheet too (it renders inside the panel, below).
 
-/* Roster header trailing cluster: search + Create (redesign Screen 6). */
-.sectionHeaderActions {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-m);
-    justify-self: end;
-}
-
-.sectionHeader h2 {
-    margin: 0;
-    color: var(--text-bright);
-    letter-spacing: 0;
-    font-size: var(--text-2xl);
-    line-height: 1.25;
-}
-
-.sectionHeader p,
-.identity span,
-.identity small,
-.secondaryText {
-    margin: 0;
-    color: var(--text-subtle);
-    font-size: var(--text-s);
-    line-height: 1.45;
-}
-
-.tabsRow,
-.badges,
-.auditDetails,
-.groupActions {
+   `flex: 1` (with the layout container as a flex column) makes this element
+   fill the viewport even when the roster is short — it paints the workspace
+   colour, and anything it does not cover falls through to the layout's own
+   background, which is a different value and read as a hard split down the
+   page. */
+/* Flex column all the way down to the active panel, so the panel receives the
+   height left over after the heading band and can scroll inside it. This is
+   what keeps the bottom gutter on a laptop instead of pushing it below the
+   fold — a `vh` cap cannot know how tall the two header rows and the heading
+   band actually are at a given width. */
+.workspaceScope {
     display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-s);
+    flex: 1;
+    min-height: 0;
+    flex-direction: column;
+    background: var(--mms-workspace);
+    color: var(--mms-text);
 }
 
-.section {
-    display: grid;
-    gap: var(--space-2xl);
-}
-
-.actionsHeader,
-.actionsCell {
-    text-align: right;
-}
-
-.actionsCell {
-    justify-content: flex-end;
-}
-
-.identityRow {
+.workspace {
     display: flex;
+    width: min(var(--users-wrap-w), calc(100vw - var(--users-wrap-gutter)));
+    flex: 1;
+    min-height: 0;
+    flex-direction: column;
+    margin: 0 auto;
+    padding: 0 0 var(--users-sp-40);
+}
+
+/* Title block · tab track · trailing action, on one baseline. */
+.heading {
+    display: grid;
+    grid-template-columns: minmax(270px, 1fr) auto minmax(250px, 1fr);
+    flex: 0 0 auto;
+    min-height: var(--users-heading-min-h);
     align-items: center;
-    gap: var(--space-l);
+    gap: var(--users-sp-24);
+}
+
+/* Whichever panel is active takes the rest of the column. Sizing only — each
+   panel owns its own `display`, so this rule must not impose one. */
+.workspace > section {
+    flex: 1;
+    min-height: 0;
+}
+
+.headingCopy {
     min-width: 0;
 }
 
-.identity {
-    display: grid;
-    gap: var(--space-2xs);
-    min-width: 0;
+.eyebrow {
+    margin: 0 0 var(--users-sp-7);
+    color: var(--mms-action-strong);
+    font-size: var(--users-text-9);
+    font-weight: var(--users-weight-eyebrow);
+    letter-spacing: 0.11em;
 }
 
-.identity strong,
-.tableTitle,
-.auditTitle {
-    color: var(--text-bright);
-    font-size: var(--text-l);
-    font-weight: 800;
-    line-height: 1.2;
-}
-
-.identity strong,
-.identity span,
-.identity small {
+.headingCopy h1 {
+    margin: 0 0 var(--users-sp-7);
+    color: var(--mms-text);
+    font-size: var(--users-text-44);
+    line-height: 1;
+    letter-spacing: -0.045em;
     overflow-wrap: anywhere;
 }
 
-/* Role dialog identity row (Name + Slug). The capability picker itself now
-   lives in the shared `@admin/shared/CapabilityPicker`. */
-.roleIdentityGrid {
-    display: grid;
-    grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
-    gap: var(--space-l);
+.headingLede {
+    margin: 0;
+    color: var(--mms-text-muted);
+    font-size: var(--users-text-16);
 }
 
-.emptyState,
-.error {
+.headingTabs {
+    min-width: 0;
+}
+
+/* The reference's shared `.primary-button` weight. */
+.primaryAction {
+    min-height: var(--users-tap);
+    padding: 0 var(--users-sp-18);
+    border-radius: var(--users-radius-7);
+    font-weight: var(--users-weight-chip);
+}
+
+.headingAction {
+    display: flex;
+    justify-content: flex-end;
+    min-width: 0;
+}
+
+.headingNote {
+    display: flex;
+    align-items: center;
+    gap: var(--users-sp-8);
     margin: 0;
-    font-size: var(--text-s);
-    font-weight: 700;
+    color: var(--mms-text-muted);
+    font-size: var(--users-text-11);
+}
+
+.headingNote span {
+    overflow-wrap: anywhere;
+}
+
+.error {
+    margin: 0 0 var(--users-sp-16);
+    color: var(--mms-danger);
+    font-size: var(--users-text-12);
+    font-weight: var(--users-weight-strong);
     line-height: 1.45;
 }
 
-.emptyState {
-    color: var(--text-subtle);
+/* ── Responsive ───────────────────────────────────────────────────────────
+   The reference's four tiers, reproduced. */
+
+@media (max-width: 1300px) {
+    .workspace {
+        width: calc(100vw - var(--users-sp-38));
+    }
 }
 
-.error {
-    color: var(--danger);
+@media (max-width: 1100px) {
+    /* Tabs drop to their own full-width row beneath the title; the trailing
+       action stays on the title's baseline. */
+    .heading {
+        grid-template-columns: 1fr auto;
+        min-height: var(--users-heading-min-h-compact);
+    }
+
+    .headingTabs {
+        grid-column: 1 / -1;
+        grid-row: 2;
+    }
+
+    .headingAction {
+        grid-column: 2;
+        grid-row: 1;
+    }
 }
 
-@media (max-width: 960px) {
-    .sectionHeader {
-        grid-template-columns: 1fr;
-        align-items: start;
+@media (max-width: 780px) {
+    /* Page scrolling is back (see AdminPageLayout), so the column and its
+       panel grow with their content instead of competing for a fixed height. */
+    .workspaceScope,
+    .workspace {
+        display: block;
+        min-height: 0;
     }
 
-    .actionsHeader,
-    .actionsCell {
-        text-align: left;
+    .workspace {
+        width: calc(100vw - var(--users-sp-28));
     }
 
-    .actionsCell {
+    .heading {
+        display: flex;
+        min-height: var(--users-heading-min-h-mobile);
+        flex-direction: column;
+        align-items: stretch;
+        justify-content: center;
+        gap: var(--users-sp-16);
+    }
+
+    .headingCopy h1 {
+        font-size: var(--users-text-35);
+    }
+
+    .headingLede {
+        font-size: var(--users-text-13);
+    }
+
+    /* Order: title → tabs → action, so the primary action sits under the
+       control it applies to rather than above the fold on its own. */
+    .headingTabs {
+        order: 2;
+        flex: 0 0 var(--users-tabs-h-mobile);
+    }
+
+    .headingAction {
+        order: 3;
         justify-content: flex-start;
     }
-}
 
-
-@media (max-width: 620px) {
-    .roleIdentityGrid {
-        grid-template-columns: 1fr;
+    /* On phones the roster's own full-width "Create account" button takes
+       over — see PeoplePanel.module.css. */
+    .headingAction > button {
+        display: none;
     }
 }

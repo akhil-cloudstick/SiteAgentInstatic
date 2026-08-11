@@ -101,8 +101,15 @@ interface AdminPageLayoutProps {
    * owns its own vertical rhythm and its own centred column. Required for
    * the install-review action bar, whose fixed inset is computed from the
    * viewport. Only `PluginsPage` uses it.
+   *
+   * `users` is the team-access shell: same zero-padding `--mms-workspace`
+   * surface as `plugins`, because the approved Team Access screen owns its
+   * own `min(1385px, 100vw - 64px)` column and its own 150px heading band.
+   * The create-account side sheet is `position: fixed` and measures its top
+   * inset from the viewport, so the layout must not add an inset of its own.
+   * Only `UsersPage` uses it.
    */
-  mode?: 'page' | 'workspace' | 'dashboard' | 'plugins'
+  mode?: 'page' | 'workspace' | 'dashboard' | 'plugins' | 'users'
   /** Page body. */
   children?: ReactNode
 }

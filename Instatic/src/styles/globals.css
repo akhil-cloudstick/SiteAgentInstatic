@@ -1884,6 +1884,417 @@
     --media-shadow-window: 0 28px 80px rgba(0, 0, 0, 0.52);
 }
 
+/* ===========================================================================
+ * MMS USERS SCREEN — `[data-editor-screen='users']`
+ *
+ * Same arrangement as the Site / Content / Data / Plugins / Media blocks
+ * above, for the sixth pixel-matched screen in the MMSBUILD library: the
+ * Adaptive Team Access Workspace (People roster / Create account sheet /
+ * Role-access workbench / Access activity).
+ *
+ * Every value below is transcribed VERBATIM from that screen's
+ * `src/styles.css`; nothing here is interpreted, rounded, or re-derived.
+ * `usersScreenFidelity.test.ts` reads the reference directly and fails on any
+ * drift.
+ *
+ * The palette equals the Site / Plugins / Media screens' (all descend from the
+ * locked MMSBUILD shell contract) but is restated rather than inherited, so a
+ * future change to one screen cannot silently drift the others. Four tokens
+ * are NEW to this screen and marked as such.
+ *
+ * The attribute is set on the workspace BODY, not the shell, so the two shared
+ * header rows keep their own palette — this re-skin is scoped to the page body
+ * and declares no `--toolbar-*` token.
+ *
+ * GEOMETRY IS FIXED, NOT FLUID — the reference specifies exact pixels (122px
+ * roster rows, 68px tab track, 58px avatars, 645px sheet, 340/1fr/285 panes,
+ * 44px tap targets). Routing them through the fluid `--space-*` / `--text-*`
+ * ramps would drift every metric off the approved screen. The numeric
+ * `--users-sp-*` / `--users-text-*` scales exist because
+ * `admin-spacing-token-policy` and `admin-typography-token-policy` forbid
+ * literal px in margin/padding/gap and font-size — the token is the delivery
+ * mechanism, the value is the reference's.
+ * =========================================================================== */
+[data-editor-screen='users'] {
+    /* ── Type (reference `:root` / `body`) ─────────────────────────────────
+       The approved screen sets Inter on the root and draws its body copy at
+       13px / 1.45. The rest of the admin keeps Nunito Sans, so this is
+       scoped to the workspace body. */
+    font-family: var(--font-mms);
+    font-size: var(--users-text-13);
+    line-height: 1.45;
+    /* The reference sets both on `body`; without them Inter renders heavier
+       and rougher than the approved screen at these sizes. */
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+
+    /* Shared primitives hardcode `--font-sans` (Input, Select) or inherit it,
+       so re-pointing the family tokens is what puts EVERY control on Inter —
+       without editing a single primitive. Without this the fields and menus
+       render in Nunito Sans beside Inter body copy, which is the single
+       biggest source of "this does not match the mock". */
+    --font-sans: var(--font-mms);
+    --font-display: var(--font-mms);
+
+    /* The admin's `--text-*` ramp is fluid (clamped between two sizes); the
+       approved screen specifies exact pixels. Every shared primitive sizes
+       itself from this ramp — Button `--text-s`, Input `--text-xs`, Dialog
+       `--text-xl` — so pinning the ramp inside the scope is what makes the
+       PRIMITIVES match the reference too, not just our own markup. Same
+       treatment the Site screen block applies. */
+    --text-3xs: var(--users-text-9);
+    --text-2xs: var(--users-text-10);
+    --text-xs: var(--users-text-11);
+    --text-s: var(--users-text-12);
+    --text-m: var(--users-text-13);
+    --text-l: var(--users-text-13);
+    --text-xl: var(--users-text-15);
+    --text-2xl: var(--users-text-16);
+    --text-3xl: var(--users-text-18);
+    --text-4xl: var(--users-text-20);
+    --text-5xl: var(--users-text-24);
+    --text-6xl: var(--users-text-32);
+    --text-7xl: var(--users-text-44);
+
+    /* ── Palette (reference `:root`) ───────────────────────────────────── */
+    --mms-bg: #fbf7ea;
+    --mms-workspace: #fffdf8;
+    --mms-surface: #fffef9;
+    --mms-surface-raised: #ffffff;
+    --mms-surface-tint: #f4f5ed;
+    --mms-surface-green: #eef6ef;
+    --mms-border: #e8ddbd;
+    --mms-border-strong: #d9d1ba;
+    --mms-text: #082a38;
+    --mms-text-muted: #5a6a70;
+    --mms-action: #15964e;
+    --mms-action-strong: #087b3d;
+    --mms-yellow: #f3c94f;
+    --mms-success: #137d43;
+    /* NEW — the tinted face behind an "Active" / "MFA on" status chip. The
+       generic set has a `--success` ink but no success WASH. */
+    --mms-success-bg: #e8f6e9;
+    --mms-danger: #c64539;
+    --mms-danger-bg: #fff0ec;
+    /* NEW here in the sense that Plugins introduced `--mms-blue` for one
+       metric; Users uses it as a ROLE identity tone (Owner / Admin chips,
+       the "About this role" glyphs, the step-up note). */
+    --mms-blue: #315f9e;
+    /* NEW — the second role identity tone (custom-role chips, the Client
+       role mark, the create-sheet's role medallion). No other screen has it. */
+    --mms-violet: #6d42c6;
+    /* Users runs a slightly deeper amber than Site (#b06a0b) / Plugins. */
+    --mms-warning: #a56a08;
+    /* NEW — the amber wash behind "Owner protected", the selected role row,
+       an open capability group, and the access-summary card. */
+    --mms-warning-bg: #fff7df;
+    --mms-focus: 0 0 0 3px rgba(243, 201, 79, 0.78);
+    /* Retuned rather than layered — same reasoning as the Plugins block: the
+       reference declares its focus ring as a document-level rule on every
+       control, and stacking that on the admin's own `--focus-ring` gives
+       keyboard users two concentric rings. Pointing the existing token at the
+       reference's value makes every primitive draw the right one, once. */
+    --focus-ring: var(--mms-focus);
+    --users-shadow-menu: 0 18px 48px rgba(8, 39, 49, 0.16);
+    /* NEW — the create-account side sheet's leading-edge elevation. */
+    --users-shadow-sheet: -14px 0 36px rgba(8, 39, 49, 0.11);
+
+    /* Literals the reference hardcodes on `.person-avatar.<tone>` rather than
+       tokenizing. Transcribed as tokens because module CSS may not carry hex.
+       Named for the TONE, assigned deterministically per user id. */
+    --users-avatar-green: #e1f1e4;
+    --users-avatar-blue: #e3eff8;
+    --users-avatar-violet: #eee8fb;
+    --users-avatar-orange: #f9e9df;
+
+    /* Chip faces the reference builds with `color-mix` against the surface,
+       so they follow the theme without a second declaration. */
+    --users-chip-blue-bg: color-mix(in srgb, var(--mms-blue) 12%, var(--mms-surface));
+    --users-chip-violet-bg: color-mix(in srgb, var(--mms-violet) 12%, var(--mms-surface));
+    --users-mark-blue-bg: color-mix(in srgb, var(--mms-blue) 15%, var(--mms-surface));
+    --users-mark-violet-bg: color-mix(in srgb, var(--mms-violet) 15%, var(--mms-surface));
+    --users-active-border: color-mix(in srgb, var(--mms-success) 30%, var(--mms-border));
+    --users-note-border: color-mix(in srgb, var(--mms-blue) 25%, var(--mms-border));
+    --users-note-bg: color-mix(in srgb, var(--mms-blue) 6%, var(--mms-surface));
+    --users-sheet-scrim: rgba(1, 30, 45, 0.08);
+    --users-modal-scrim: rgba(0, 24, 35, 0.62);
+
+    /* Generic tokens the SHARED primitives (Button, Input, Select, Checkbox,
+       Dialog, ContextMenu, SearchBar) read. Overridden here so a primitive
+       rendered inside the Users workspace picks up the reference's faces
+       instead of the Dashboard ramp — WITHOUT editing any shared component.
+       Scoped to this subtree, so no other workspace is affected. */
+    --bg-body: var(--mms-workspace);
+    --bg-surface: var(--mms-surface);
+    --bg-surface-2: var(--mms-surface-raised);
+    --bg-surface-3: var(--mms-surface-tint);
+    --border-subtle: var(--mms-border);
+    --border-muted: var(--mms-border);
+    --border: var(--mms-border);
+    --border-strong: var(--mms-border-strong);
+    --text-bright: var(--mms-text);
+    --text: var(--mms-text);
+    --text-muted: var(--mms-text-muted);
+    --text-subtle: var(--mms-text-muted);
+    --danger: var(--mms-danger);
+    --success: var(--mms-success);
+    --warning: var(--mms-warning);
+    /* The reference draws every control as a 7px box, never the admin's
+       pill (`1em`). Retuning the token catches Select's visible wrapper too. */
+    --input-radius: var(--users-radius-7);
+
+    /* ── Structural geometry (reference `:root` + measured blocks) ──────── */
+    --users-wrap-w: 1385px;
+    --users-wrap-gutter: 64px;
+    --users-heading-min-h: 150px;
+    /* The heading band grows as it reflows: tabs move to their own row at the
+       1100px tier, then everything stacks at 780px. */
+    --users-heading-min-h-compact: 178px;
+    --users-heading-min-h-mobile: 232px;
+
+    /* Workspace tab track — `.workspace-tabs`. */
+    --users-tabs-h: 68px;
+    --users-tabs-h-compact: 58px;
+    --users-tabs-h-mobile: 56px;
+    --users-tabs-min-w: 480px;
+    --users-tab-min-w: 160px;
+    --users-tab-underbar: 3px;
+
+    /* Roster filter band — `.people-controls`. */
+    --users-controls-min-h: 102px;
+    --users-search-min-w: 300px;
+    --users-search-max-w: 450px;
+    --users-filter-min-w: 130px;
+    --users-filter-max-w: 190px;
+
+    /* Roster table — `.people-table-head` / `.person-row`. */
+    --users-head-h: 60px;
+    --users-row-h: 122px;
+    /* Below 780px the row stops being a row and becomes a card. */
+    --users-row-h-mobile: 188px;
+    --users-avatar: 58px;
+    --users-avatar-compact: 48px;
+    --users-chip-h: 29px;
+    --users-menu-trigger: 48px;
+    --users-menu-w: 190px;
+    --users-menu-offset: 52px;
+    --users-trust-h: 62px;
+    --users-trust-h-mobile: 74px;
+    --users-empty-min-h: 260px;
+    --users-row-menu-item-h: 42px;
+
+    /* Create-account sheet — `.create-sheet`.
+
+       The reference insets its backdrop by `--primary-height +
+       --specialist-height` so the two header rows stay reachable while the
+       sheet is open. Ours derives from the live row tokens instead of a
+       transcribed constant, so the sheet follows the header as it shrinks at
+       the 1100px and 620px tiers rather than leaving a gap. */
+    --users-shell-h: calc(var(--hub-shell-height) + var(--product-row-height));
+    --users-sheet-w: 645px;
+    --users-sheet-close: 44px;
+    --users-field-h: 48px;
+    --users-field-inner-h: 46px;
+    --users-field-icon-w: 46px;
+    --users-search-h: 48px;
+    --users-search-inner-h: 46px;
+    --users-search-icon-w: 47px;
+    --users-role-summary-icon: 66px;
+    --users-role-summary-icon-compact: 48px;
+    --users-role-caps-max-h: 105px;
+    --users-starts-active-h: 38px;
+    --users-stepup-note-h: 48px;
+    --users-form-error-h: 42px;
+
+    /* Roles workbench — `.roles-panel`. */
+    --users-rail-w: 340px;
+    --users-rail-w-compact: 290px;
+    --users-editor-min-w: 500px;
+    --users-editor-min-w-compact: 470px;
+    --users-summary-w: 285px;
+    --users-summary-w-compact: 260px;
+    --users-panel-min-h: 705px;
+    --users-role-row-h: 76px;
+    --users-role-row-h-compact: 74px;
+    --users-role-mark: 40px;
+    --users-role-editor-head-h: 70px;
+    --users-role-textarea-h: 58px;
+    --users-cap-search-min-w: 220px;
+    --users-cap-search-max-w: 330px;
+    --users-cap-head-h: 39px;
+    --users-cap-row-h: 38px;
+    --users-cap-row-h-compact: 57px;
+    /* Fixed tracks in the capability group header (count / shortcut / chevron
+       columns), which narrow at each tier. */
+    --users-sp-30: 30px;
+    --users-sp-48: 48px;
+    --users-sp-55: 55px;
+    --users-sp-78: 78px;
+    --users-sp-92: 92px;
+    --users-summary-shield: 38px;
+    --users-summary-dt-w: 90px;
+
+    /* Access activity — `.activity-panel`. */
+    --users-activity-head-h: 85px;
+    --users-activity-col-head-h: 52px;
+    --users-activity-row-h: 88px;
+    --users-activity-row-h-compact: 150px;
+    --users-activity-icon: 38px;
+    --users-activity-search-max-w: 520px;
+
+    /* Step-up confirmation — `.stepup-dialog`. */
+    --users-stepup-w: 460px;
+    --users-stepup-icon: 58px;
+
+    /* Minimum tap target the reference holds on every control. */
+    --users-tap: 44px;
+
+    /* ── Radii (reference, verbatim; name = value in px) ────────────────── */
+    --users-radius-5: 5px;
+    --users-radius-6: 6px;
+    --users-radius-7: 7px;
+    --users-radius-8: 8px;
+    --users-radius-9: 9px;
+    --users-radius-10: 10px;
+    --users-radius-12: 12px;
+
+    /* ── Spacing (reference, verbatim; name = value in px) ──────────────── */
+    --users-sp-1: 1px;
+    --users-sp-2: 2px;
+    --users-sp-3: 3px;
+    --users-sp-4: 4px;
+    --users-sp-6: 6px;
+    --users-sp-7: 7px;
+    --users-sp-8: 8px;
+    --users-sp-9: 9px;
+    --users-sp-10: 10px;
+    --users-sp-11: 11px;
+    --users-sp-12: 12px;
+    --users-sp-13: 13px;
+    --users-sp-14: 14px;
+    --users-sp-15: 15px;
+    --users-sp-16: 16px;
+    --users-sp-17: 17px;
+    --users-sp-18: 18px;
+    --users-sp-19: 19px;
+    --users-sp-20: 20px;
+    --users-sp-21: 21px;
+    --users-sp-22: 22px;
+    --users-sp-23: 23px;
+    --users-sp-24: 24px;
+    --users-sp-25: 25px;
+    --users-sp-26: 26px;
+    --users-sp-27: 27px;
+    --users-sp-28: 28px;
+    --users-sp-32: 32px;
+    /* Grid tracks for the medallion cards (role outcome, access summary), the
+       role-rail mark column, and their phone-tier equivalents. */
+    --users-sp-43-track: 43px;
+    --users-sp-45: 45px;
+    --users-sp-54: 54px;
+    --users-sp-76: 76px;
+    --users-sp-90: 90px;
+    --users-sp-34: 34px;
+    /* The 1300px tier's page gutter (the reference's `100vw - 38px`). */
+    --users-sp-38: 38px;
+    --users-sp-40: 40px;
+    --users-sp-42: 42px;
+    --users-sp-43: 43px;
+
+    /* ── Type sizes (reference, verbatim; name = value in px) ───────────── */
+    --users-text-9: 9px;
+    --users-text-10: 10px;
+    --users-text-11: 11px;
+    --users-text-12: 12px;
+    --users-text-13: 13px;
+    --users-text-15: 15px;
+    --users-text-16: 16px;
+    --users-text-17: 17px;
+    --users-text-18: 18px;
+    --users-text-20: 20px;
+    --users-text-23: 23px;
+    --users-text-24: 24px;
+    --users-text-27: 27px;
+    --users-text-28: 28px;
+    --users-text-32: 32px;
+    --users-text-35: 35px;
+    --users-text-40: 40px;
+    --users-text-44: 44px;
+
+    /* ── Type weights (reference, verbatim) ─────────────────────────────── */
+    --users-weight-body: 500;
+    --users-weight-nav: 610;
+    --users-weight-meta: 650;
+    --users-weight-chip: 680;
+    --users-weight-strong: 700;
+    --users-weight-label: 720;
+    --users-weight-tab: 730;
+    --users-weight-heading: 760;
+    --users-weight-title: 780;
+    --users-weight-eyebrow: 800;
+}
+
+/* Controls inherit the body, exactly as the reference draws them.
+ *
+ * The admin's `Button` sizes its label from a size ramp (`size-sm` →
+ * `--text-xs` = 11px) and sets `font-weight: 700` on every variant. The
+ * approved screen does neither: its buttons declare no font-size and no
+ * weight, so they inherit the 13px / 400 body and let a nested `<strong>`
+ * carry the emphasis. Left alone, every control on the page renders two
+ * pixels small and one step heavy — which is the whole "small and bold"
+ * mismatch, and it is not fixable element by element.
+ *
+ * `:where()` keeps this at element specificity (0,0,1) so any component class
+ * still wins — the 16px workspace tabs, the 10px group shortcut and the 680
+ * primary buttons all override it from their own modules. */
+:where([data-editor-screen='users']) button,
+:where([data-editor-screen='users']) input,
+:where([data-editor-screen='users']) select,
+:where([data-editor-screen='users']) textarea {
+    font-size: var(--users-text-13);
+}
+
+:where([data-editor-screen='users']) button {
+    font-weight: var(--users-weight-body);
+}
+
+/* Dark mirror — transcribed from the reference's `html[data-theme="dark"]`
+   block. Yellow and the identity tones brighten on navy; the surface ladder
+   stays shallow and separates by hairline, as everywhere else in dark. */
+[data-editor-theme='dark'] [data-editor-screen='users'],
+[data-editor-screen='users'][data-editor-theme='dark'] {
+    --mms-bg: #001e2d;
+    --mms-workspace: #062936;
+    --mms-surface: #082f3b;
+    --mms-surface-raised: #103a46;
+    --mms-surface-tint: #173f49;
+    --mms-surface-green: #123f30;
+    /* Alpha, not hex — the reference's dark hairline. */
+    --mms-border: rgba(248, 241, 223, 0.14);
+    --mms-border-strong: #31505a;
+    --mms-text: #f8f1df;
+    --mms-text-muted: #b4c1be;
+    --mms-action: #27ba66;
+    --mms-action-strong: #34cb73;
+    --mms-success: #32c772;
+    --mms-success-bg: #123f30;
+    --mms-danger: #ff8d7f;
+    --mms-danger-bg: #402825;
+    --mms-blue: #8bb7ff;
+    --mms-violet: #c496ff;
+    /* Warning flips to the identity yellow on navy (the burnt amber dies). */
+    --mms-warning: #f3c94f;
+    --mms-warning-bg: #493f20;
+    --users-shadow-menu: 0 22px 56px rgba(0, 0, 0, 0.38);
+    --users-shadow-sheet: -16px 0 44px rgba(0, 0, 0, 0.28);
+
+    /* Avatar tones — deeper, desaturated faces so white initials stay legible. */
+    --users-avatar-green: #164737;
+    --users-avatar-blue: #153f58;
+    --users-avatar-violet: #3c345f;
+    --users-avatar-orange: #62412e;
+}
+
 :root[data-editor-text-scale='small'],
 [data-editor-text-scale='small'] {
     --text-3xs: calc(var(--text-3xs-base) - 1px);

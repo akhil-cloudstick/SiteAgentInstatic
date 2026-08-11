@@ -19,8 +19,7 @@ import { Button } from '@ui/components/Button'
 import { Dialog } from '@ui/components/Dialog'
 import { Input } from '@ui/components/Input'
 import { Select } from '@ui/components/Select'
-import { PlusIcon } from 'pixel-art-icons/icons/plus'
-import { SaveSolidIcon } from 'pixel-art-icons/icons/save-solid'
+import { FaIcon } from '@ui/components/FaIcon'
 import dialogStyles from '../../../shared/dialogs/SiteCreateDialog/SiteCreateDialog.module.css'
 import type { CmsCurrentUser } from '@core/persistence'
 import type { UserDialogMode, UserFormState } from '../types'
@@ -69,7 +68,7 @@ export function UserDialog({
             <span>Cancel</span>
           </Button>
           <Button type="submit" form={USER_FORM_ID} variant="primary" size="sm" disabled={busy}>
-            {mode === 'create' ? <PlusIcon size={14} aria-hidden="true" /> : <SaveSolidIcon size={14} aria-hidden="true" />}
+            <FaIcon name={mode === 'create' ? 'plus' : 'floppy-disk'} size={14} />
             <span>{submitLabel}</span>
           </Button>
         </>

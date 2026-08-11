@@ -1,0 +1,326 @@
+/* CreateAccountSheet — the approved `.sheet-backdrop` / `.create-sheet`.
+ *
+ * The backdrop starts below the two shared header rows so the navigation stays
+ * reachable while the sheet is open, exactly as the reference does with its own
+ * two-row shell. `--users-shell-h` is that combined height.
+ */
+
+.backdrop {
+    position: fixed;
+    z-index: 150;
+    inset: var(--users-shell-h) 0 0 0;
+    background: var(--users-sheet-scrim);
+}
+
+.sheet {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    width: min(var(--users-sheet-w), 100vw);
+    flex-direction: column;
+    overflow-y: auto;
+    padding: var(--users-sp-43) var(--users-sp-42) var(--users-sp-24);
+    border-left: 1px solid var(--mms-border);
+    background: var(--mms-surface-raised);
+    box-shadow: var(--users-shadow-sheet);
+}
+
+/* Absolutely placed rather than floated into the header row: the header's
+   heading wraps on narrow sheets and a floated close control would ride down
+   with it, away from the corner the user reaches for. */
+.close {
+    position: absolute;
+    top: var(--users-sp-23);
+    right: var(--users-sp-25);
+    width: var(--users-sheet-close);
+    height: var(--users-sheet-close);
+}
+
+.header {
+    padding-right: var(--users-sp-42);
+}
+
+.header h2 {
+    margin: 0 0 var(--users-sp-4);
+    color: var(--mms-text);
+    font-size: var(--users-text-40);
+    line-height: 1.05;
+    letter-spacing: -0.035em;
+    overflow-wrap: anywhere;
+}
+
+.header p {
+    margin: 0 0 var(--users-sp-28);
+    color: var(--mms-text-muted);
+    font-size: var(--users-text-15);
+}
+
+.form {
+    display: grid;
+    gap: var(--users-sp-17);
+    /* Lets the sticky footer sit at the bottom of a short form as well as a
+       tall one, without the fields stretching. */
+    align-content: start;
+    flex: 1;
+}
+
+.field {
+    display: grid;
+    gap: var(--users-sp-8);
+    min-width: 0;
+}
+
+.label {
+    font-weight: var(--users-weight-strong);
+}
+
+.hint {
+    color: var(--mms-text-muted);
+    font-size: var(--users-text-11);
+    font-weight: var(--users-weight-body);
+}
+
+/* Bordered shell holding a leading glyph, a borderless control, and an
+   optional trailing button — the reference's `.field-shell`. */
+.shell {
+    display: flex;
+    min-width: 0;
+    min-height: var(--users-field-h);
+    align-items: center;
+    border: 1px solid var(--mms-border-strong);
+    border-radius: var(--users-radius-7);
+    background: var(--mms-surface);
+}
+
+.shellGlyph {
+    width: var(--users-field-icon-w);
+    flex: 0 0 var(--users-field-icon-w);
+    color: var(--mms-text-muted);
+    text-align: center;
+}
+
+.shell input,
+.shell select {
+    min-width: 0;
+    min-height: var(--users-field-inner-h);
+    border: 0;
+    background: transparent;
+}
+
+.shell > :not(.shellGlyph):not(.reveal) {
+    min-width: 0;
+    flex: 1;
+}
+
+.reveal {
+    width: var(--users-field-icon-w);
+    height: var(--users-field-icon-w);
+    flex: 0 0 var(--users-field-icon-w);
+}
+
+.selectMenu {
+    background: var(--mms-surface-raised);
+    border-color: var(--mms-border);
+}
+
+/* ── Role outcome card ───────────────────────────────────────────────────── */
+
+.outcome {
+    display: grid;
+    grid-template-columns: var(--users-sp-76) minmax(0, 1fr);
+    gap: var(--users-sp-15);
+    padding: var(--users-sp-21) var(--users-sp-20);
+    border: 1px solid var(--mms-border);
+    border-radius: var(--users-radius-9);
+    background: var(--mms-warning-bg);
+}
+
+.outcomeMark {
+    display: grid;
+    width: var(--users-role-summary-icon);
+    height: var(--users-role-summary-icon);
+    place-items: center;
+    border-radius: 50%;
+    background: var(--users-mark-violet-bg);
+    color: var(--mms-violet);
+}
+
+.outcomeBody {
+    min-width: 0;
+}
+
+.outcomeBody h3 {
+    margin: 0 0 var(--users-sp-9);
+    color: var(--mms-text);
+    font-size: var(--users-text-18);
+}
+
+.allow,
+.deny {
+    display: flex;
+    gap: var(--users-sp-8);
+    margin: var(--users-sp-6) 0;
+    color: var(--mms-text-muted);
+    font-size: var(--users-text-12);
+}
+
+.allow span,
+.deny span {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.allow > i {
+    margin-top: var(--users-sp-2);
+    color: var(--mms-success);
+}
+
+.deny > i {
+    margin-top: var(--users-sp-2);
+    color: var(--mms-danger);
+}
+
+.outcomeToggle {
+    padding: 0;
+    color: var(--mms-text);
+    font-weight: var(--users-weight-strong);
+}
+
+/* Capped and scrollable: a 38-capability Admin role would otherwise push the
+   footer off the sheet. */
+.outcomeList {
+    max-height: var(--users-role-caps-max-h);
+    margin: var(--users-sp-4) 0 0;
+    overflow-y: auto;
+    padding-left: var(--users-sp-18);
+    color: var(--mms-text-muted);
+    font-size: var(--users-text-10);
+}
+
+.outcomeList li {
+    overflow-wrap: anywhere;
+}
+
+/* ── Notices ─────────────────────────────────────────────────────────────── */
+
+.startsActive {
+    display: inline-flex;
+    width: max-content;
+    max-width: 100%;
+    min-height: var(--users-starts-active-h);
+    align-items: center;
+    gap: var(--users-sp-10);
+    margin: 0;
+    padding: 0 var(--users-sp-14);
+    border: 1px solid var(--users-active-border);
+    border-radius: var(--users-radius-7);
+    background: var(--mms-success-bg);
+    color: var(--mms-success);
+    font-size: var(--users-text-11);
+    font-weight: var(--users-weight-meta);
+}
+
+.startsActiveDot {
+    width: var(--users-sp-7);
+    height: var(--users-sp-7);
+    flex: 0 0 auto;
+    border-radius: 50%;
+    background: var(--mms-success);
+}
+
+.stepUpNote {
+    display: flex;
+    min-height: var(--users-stepup-note-h);
+    align-items: center;
+    gap: var(--users-sp-12);
+    margin: 0;
+    padding: var(--users-sp-8) var(--users-sp-14);
+    border: 1px solid var(--users-note-border);
+    border-radius: var(--users-radius-7);
+    background: var(--users-note-bg);
+    color: var(--mms-blue);
+}
+
+.stepUpNote span {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.error {
+    display: flex;
+    min-height: var(--users-form-error-h);
+    align-items: center;
+    gap: var(--users-sp-9);
+    margin: 0;
+    padding: var(--users-sp-8) var(--users-sp-11);
+    border-radius: var(--users-radius-6);
+    background: var(--mms-danger-bg);
+    color: var(--mms-danger);
+    font-size: var(--users-text-11);
+}
+
+.error span {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+/* Sticky so the primary action stays reachable however long the capability
+   list grows. Negative margins bleed it to the sheet's edges. */
+.footer button {
+    min-height: var(--users-tap);
+    padding: 0 var(--users-sp-18);
+    border-radius: var(--users-radius-7);
+    font-weight: var(--users-weight-chip);
+}
+
+.footer {
+    position: sticky;
+    bottom: calc(var(--users-sp-24) * -1);
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--users-sp-12);
+    margin: 0 calc(var(--users-sp-42) * -1) calc(var(--users-sp-24) * -1);
+    padding: var(--users-sp-18) var(--users-sp-42) var(--users-sp-24);
+    border-top: 1px solid var(--mms-border);
+    background: var(--mms-surface-raised);
+}
+
+@media (max-width: 780px) {
+    .sheet {
+        width: 100%;
+        padding: var(--users-sp-34) var(--users-sp-18) var(--users-sp-18);
+    }
+
+    .header {
+        padding-right: var(--users-sp-40);
+    }
+
+    .header h2 {
+        font-size: var(--users-text-32);
+    }
+
+    .outcome {
+        grid-template-columns: var(--users-sp-54) minmax(0, 1fr);
+        padding: var(--users-sp-15);
+    }
+
+    .outcomeMark {
+        width: var(--users-role-summary-icon-compact);
+        height: var(--users-role-summary-icon-compact);
+    }
+
+    .footer {
+        bottom: calc(var(--users-sp-18) * -1);
+        margin: 0 calc(var(--users-sp-18) * -1) calc(var(--users-sp-18) * -1);
+        padding: var(--users-sp-14) var(--users-sp-18) var(--users-sp-18);
+    }
+}
+
+@media (max-width: 430px) {
+    .footer > button {
+        flex: 1;
+        padding: 0 var(--users-sp-10);
+    }
+}

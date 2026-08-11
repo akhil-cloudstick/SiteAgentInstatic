@@ -39,6 +39,12 @@ interface UserAvatarProps {
    * rather than a photo so the avatar reads as the account anchor.
    */
   initialsOnly?: boolean
+  /**
+   * How many initials the fallback draws. Defaults to 2 ("Akhil Joshy" → "AK").
+   * The approved Team Access roster draws a single letter on a tinted disc, so
+   * that screen passes 1.
+   */
+  maxInitials?: 1 | 2
 }
 
 /**
@@ -46,9 +52,13 @@ interface UserAvatarProps {
  * (e.g. "Akhil Joshy" → "AK"), or the first two characters of a single-word
  * name / email local-part (e.g. "admin@…" → "AD"). Always uppercased.
  */
-function deriveInitials(user: { displayName: string; email: string }): string {
+function deriveInitials(
+  user: { displayName: string; email: string },
+  maxInitials: 1 | 2,
+): string {
   const source = (user.displayName.trim() || user.email).trim()
   if (!source) return '?'
+  if (maxInitials === 1) return source.charAt(0).toUpperCase()
   const words = source.split(/\s+/).filter(Boolean)
   if (words.length >= 2) {
     const first = words[0]?.charAt(0) ?? ''
@@ -58,7 +68,14 @@ function deriveInitials(user: { displayName: string; email: string }): string {
   return source.slice(0, 2).toUpperCase()
 }
 
-export function UserAvatar({ user, size, alt, className, initialsOnly = false }: UserAvatarProps): ReactNode {
+export function UserAvatar({
+  user,
+  size,
+  alt,
+  className,
+  initialsOnly = false,
+  maxInitials = 2,
+}: UserAvatarProps): ReactNode {
   const [imageFailed, setImageFailed] = useState(false)
   const url = resolveAvatarUrl(user, { size })
   const showImage = url !== null && !imageFailed && !initialsOnly
@@ -82,7 +99,7 @@ export function UserAvatar({ user, size, alt, className, initialsOnly = false }:
           onError={() => setImageFailed(true)}
         />
       ) : (
-        <span className={styles.initials}>{deriveInitials(user)}</span>
+        <span className={styles.initials}>{deriveInitials(user, maxInitials)}</span>
       )}
     </span>
   )

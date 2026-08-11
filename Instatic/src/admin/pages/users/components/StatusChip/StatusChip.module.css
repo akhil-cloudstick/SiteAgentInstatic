@@ -1,0 +1,47 @@
+/* StatusChip — the reference's `.status-chip` and its six tones.
+ *
+ * The blue / violet faces are `color-mix`ed against `--mms-surface` in
+ * globals.css, so both tones follow the theme from one declaration.
+ */
+
+.chip {
+    display: inline-flex;
+    min-height: var(--users-chip-h);
+    align-items: center;
+    gap: var(--users-sp-6);
+    padding: 0 var(--users-sp-12);
+    border-radius: var(--users-radius-7);
+    font-size: var(--users-text-12);
+    font-weight: var(--users-weight-chip);
+    /* A long role name must not stretch the row; the chip clips instead. */
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.success {
+    background: var(--mms-success-bg);
+    color: var(--mms-success);
+}
+
+.danger {
+    background: var(--mms-danger-bg);
+    color: var(--mms-danger);
+}
+
+.owner,
+.admin {
+    background: var(--users-chip-blue-bg);
+    color: var(--mms-blue);
+}
+
+.role {
+    background: var(--users-chip-violet-bg);
+    color: var(--mms-violet);
+}
+
+.neutral {
+    background: var(--mms-surface-tint);
+    color: var(--mms-text-muted);
+}

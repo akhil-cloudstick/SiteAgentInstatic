@@ -15,6 +15,7 @@ import { useContext } from 'react'
 import { Button } from '@ui/components/Button'
 import { FaIcon } from '@ui/components/FaIcon'
 import { SpotlightContext } from '@admin/spotlight/spotlightContext'
+import styles from './ProductHubHeader.module.css'
 
 const HELP_SCOPE_ID = 'help'
 
@@ -22,14 +23,14 @@ export function HelpButton() {
   const spotlight = useContext(SpotlightContext)
 
   return (
-    // Round 44px header button — the shared trailer spec, see ThemeToggleButton.
+    // The approved header draws Help as a labelled pill, not a bare glyph — it
+    // is the only utility in the row that carries its name, because it is the
+    // one users hunt for rather than recognise.
     <Button
       variant="ghost"
       size="lg"
-      shape="pill"
-      iconOnly
+      className={styles.helpButton}
       aria-label="Help"
-      tooltip="Help"
       data-testid="hub-header-help"
       disabled={spotlight === null}
       onClick={() => {
@@ -38,6 +39,7 @@ export function HelpButton() {
       }}
     >
       <FaIcon name="circle-question" size={17} />
+      <span>Help</span>
     </Button>
   )
 }

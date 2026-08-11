@@ -182,9 +182,16 @@ function HubBrandLockup({ hubBaseUrl }: { hubBaseUrl: string | null }) {
 function HubContextControl({ hubBaseUrl }: { hubBaseUrl: string | null }) {
   const content = (
     <>
-      <span className={styles.contextPrimary}>{HUB_LABEL}</span>
-      <FaIcon name="chevron-right" size={10} className={styles.contextCaret} />
-      <span className={styles.contextSecondary}>{BRAND_NAME}</span>
+      {/* The approved header leads this control with a tinted product mark, so
+          the Hub lockup reads as an identity rather than as breadcrumb text. */}
+      <span className={styles.contextMark} aria-hidden="true">
+        <FaIcon name="diagram-project" size={15} />
+      </span>
+      <span className={styles.contextCopy}>
+        <span className={styles.contextPrimary}>{HUB_LABEL}</span>
+        <span className={styles.contextSecondary}>{BRAND_NAME}</span>
+      </span>
+      <FaIcon name="chevron-down" size={9} className={styles.contextCaret} />
     </>
   )
 

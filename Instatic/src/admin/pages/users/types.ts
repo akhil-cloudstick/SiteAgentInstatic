@@ -9,9 +9,26 @@ import type { ReactNode } from 'react'
 import type { CmsCurrentUser } from '@core/persistence'
 import type { CoreCapability } from '@core/capabilities'
 
-export type Tab = 'users' | 'roles' | 'audit'
+/**
+ * The three states of the one Team Access workspace, named as the approved
+ * MMSBUILD screen names them. They are states of a single workspace rather
+ * than three pages — the reference's contract test asserts exactly this
+ * (`VALID_TABS = new Set(["people", "roles", "activity"])`).
+ */
+export type Tab = 'people' | 'roles' | 'activity'
+
+/**
+ * `create` is served by the side sheet; `edit` and `reset` by `UserDialog`.
+ * The approved screen has no edit sheet — editing an existing account is a
+ * small, focused change and stays a centred dialog.
+ */
 export type UserDialogMode = 'create' | 'edit' | 'reset'
-export type RoleDialogMode = 'create' | 'edit' | 'view'
+
+/** Status-chip tones, per the approved roster. */
+export type ChipTone = 'success' | 'danger' | 'owner' | 'admin' | 'role' | 'neutral'
+
+/** Deterministic avatar tints, per `.person-avatar.<tone>` in the reference. */
+export type AvatarTone = 'green' | 'blue' | 'violet' | 'orange'
 
 export interface UserFormState {
   email: string

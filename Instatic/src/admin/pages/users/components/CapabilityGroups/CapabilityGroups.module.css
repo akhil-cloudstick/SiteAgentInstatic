@@ -1,0 +1,155 @@
+/* CapabilityGroups — the reference's `.capability-groups` accordion. */
+
+.groups {
+    overflow: hidden;
+    border: 1px solid var(--mms-border);
+    border-radius: var(--users-radius-7);
+}
+
+.group {
+    border-bottom: 1px solid var(--mms-border);
+}
+
+.group:last-child {
+    border-bottom: 0;
+}
+
+.groupHeader {
+    display: grid;
+    min-height: var(--users-cap-head-h);
+    grid-template-columns: minmax(180px, 1fr) var(--users-sp-55) var(--users-sp-92) var(--users-sp-30);
+    align-items: center;
+    gap: var(--users-sp-7);
+    padding: 0 var(--users-sp-9);
+    background: var(--mms-surface);
+}
+
+.groupOpen > .groupHeader {
+    background: var(--mms-warning-bg);
+}
+
+.groupToggle {
+    min-width: 0;
+    gap: var(--users-sp-10);
+    padding: 0;
+    color: var(--mms-text);
+}
+
+.groupToggle strong {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.groupCount {
+    color: var(--mms-text-muted);
+    font-size: var(--users-text-10);
+    text-align: right;
+    white-space: nowrap;
+}
+
+/* Button's base is 700; the reference draws these two as ordinary-weight text,
+   so the weight is restated rather than inherited. */
+.groupShortcut {
+    justify-content: flex-end;
+    padding: 0;
+    color: var(--mms-action-strong);
+    font-size: var(--users-text-10);
+    font-weight: var(--users-weight-body);
+}
+
+.groupChevron {
+    justify-self: center;
+    color: var(--mms-text-muted);
+}
+
+/* ── Capability rows ─────────────────────────────────────────────────────── */
+
+.row {
+    display: grid;
+    min-height: var(--users-cap-row-h);
+    grid-template-columns: var(--users-sp-22) minmax(135px, 0.7fr) 1.3fr;
+    align-items: center;
+    gap: var(--users-sp-8);
+    padding: 0 var(--users-sp-14) 0 var(--users-sp-18);
+    border-top: 1px solid var(--mms-border);
+    cursor: pointer;
+}
+
+.row:hover {
+    background: var(--mms-surface-tint);
+}
+
+/* The whole row is a label, so focus lands on the checkbox inside it — ring
+   the row instead so the affordance is visible at this density. */
+.row:has(input:focus-visible) {
+    outline: 2px solid var(--mms-action);
+    outline-offset: -2px;
+}
+
+.row strong {
+    min-width: 0;
+    color: var(--mms-text);
+    font-size: var(--users-text-10);
+    overflow-wrap: anywhere;
+}
+
+.row small {
+    min-width: 0;
+    color: var(--mms-text-muted);
+    font-size: var(--users-text-10);
+    overflow-wrap: anywhere;
+}
+
+.noMatches {
+    display: grid;
+    min-height: var(--users-empty-min-h);
+    align-content: center;
+    justify-items: center;
+    border: 1px solid var(--mms-border);
+    border-radius: var(--users-radius-7);
+    color: var(--mms-text-muted);
+    text-align: center;
+}
+
+.noMatches strong {
+    color: var(--mms-text);
+    font-size: var(--users-text-16);
+}
+
+.noMatches p {
+    margin: var(--users-sp-4) 0 0;
+}
+
+@media (max-width: 780px) {
+    .groupHeader {
+        grid-template-columns: minmax(140px, 1fr) var(--users-sp-48) var(--users-sp-78) var(--users-sp-28);
+    }
+
+    /* Label above description instead of beside it — 135px of label and a
+       1.3fr description do not both fit on a phone. */
+    .row {
+        min-height: var(--users-cap-row-h-compact);
+        grid-template-columns: var(--users-sp-22) minmax(0, 1fr);
+        align-items: start;
+        padding-top: var(--users-sp-8);
+        padding-bottom: var(--users-sp-8);
+    }
+
+    .row small {
+        grid-column: 2;
+        margin-top: var(--users-sp-3);
+    }
+}
+
+@media (max-width: 430px) {
+    .groupHeader {
+        grid-template-columns: minmax(128px, 1fr) var(--users-sp-42) var(--users-sp-27);
+    }
+
+    /* The Select/Clear shortcut folds away; the row checkboxes still work. */
+    .groupShortcut {
+        display: none;
+    }
+}

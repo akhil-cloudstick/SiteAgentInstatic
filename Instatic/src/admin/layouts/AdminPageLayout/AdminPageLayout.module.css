@@ -66,6 +66,28 @@
     border-top-right-radius: 0;
 }
 
+/* Team-access workspace — the approved MMSBUILD Users screen draws its page
+   directly on the workspace surface with NO layout padding and no rounded lip:
+   `.team-access-main` owns its own `min(1385px, 100vw - 64px)` column and its
+   own 150px heading band.
+
+   As with Plugins, zeroing the padding is load-bearing rather than cosmetic:
+   the create-account side sheet is `position: fixed` with its top inset
+   measured from the VIEWPORT (it must sit directly under the two shared header
+   rows), so it only lines up with the workspace beneath it when that workspace
+   is centred in the viewport with no extra inset. */
+.body[data-page-mode="users"] {
+    padding: 0;
+    background: var(--mms-workspace);
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
+    /* The Team Access workspace fits the viewport and scrolls its lists
+       internally, so the PAGE must not scroll — otherwise a laptop gets both a
+       document scrollbar and a list scrollbar, and the bottom gutter the
+       design keeps below each card disappears off-screen. */
+    overflow: hidden;
+}
+
 .container {
     display: grid;
     gap: var(--space-6xl);
@@ -92,6 +114,23 @@
     display: block;
     width: 100%;
     min-height: 100%;
+}
+
+/* Same for Team Access — `.workspace` in UsersPage.module.css is the column.
+   Flex column rather than a plain block so the page's own scope element can
+   stretch to fill the viewport: it paints the screen-scoped workspace colour,
+   and a `min-height: 100%` child of a `min-height` parent does not resolve,
+   which left the bottom of a short roster showing the layout's colour instead. */
+.container[data-page-mode="users"] {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    /* `height`, not `min-height`: the page owns exactly the viewport and hands
+       the leftover space to whichever list is on screen. `min-height: 0` lets
+       that child actually shrink — without it a flex item refuses to go below
+       its content size and the overflow escapes the container. */
+    height: 100%;
+    min-height: 0;
 }
 
 .header {
@@ -168,6 +207,20 @@
 
     .container[data-page-mode="dashboard"] {
         width: calc(100% - 32px);
+    }
+}
+
+/* Phone tier: a viewport-fit workspace leaves almost nothing for the list once
+   the stacked heading band and the two header rows have taken their share, so
+   the page scrolls normally again and the lists grow. */
+@media (max-width: 780px) {
+    .body[data-page-mode="users"] {
+        overflow: auto;
+    }
+
+    .container[data-page-mode="users"] {
+        height: auto;
+        min-height: 100%;
     }
 }
 

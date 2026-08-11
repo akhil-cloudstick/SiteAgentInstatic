@@ -452,6 +452,65 @@ if (userHasAnyCapability(user, SITE_WRITE_CAPABILITIES)) { /* … */ }
 
 ---
 
+## Visual contract — the approved MMSBUILD Users screen
+
+`/cms/users` is a pixel-match reproduction of the client-approved **MMSBUILD
+Adaptive Team Access Workspace**, the sixth screen in the MMSBUILD library
+after Dashboard, Site, Content, Data, Plugins and Media. Treat that screen as
+the specification.
+
+**Token scope.** `UsersPage` renders `AdminPageLayout mode="users"` and stamps
+`data-editor-screen="users"` on the workspace body. `src/styles/globals.css`
+carries a matching `[data-editor-screen='users']` block that transcribes the
+reference's `:root` verbatim — palette, dark mirror, and the numeric
+`--users-sp-*` / `--users-text-*` / `--users-radius-*` scales. The attribute
+sits on the **body**, not the shell, so the two shared header rows
+(`ProductHubHeader` + `Toolbar`) keep the Dashboard palette. The block also
+re-points the generic tokens the shared primitives read (`--bg-surface`,
+`--border`, `--input-radius`, `--focus-ring`, …), which is how `Button` /
+`Input` / `Select` / `Dialog` pick up the reference's faces **without any
+shared component being modified**.
+
+**Fixed geometry, not fluid.** The reference specifies exact pixels — 122px
+roster rows, 68px tab track, 58px avatars, a 645px sheet, 340/1fr/285 workbench
+panes, 44px tap targets. The admin's fluid `--space-*` / `--text-*` ramps cannot
+express those, so this screen uses the numeric `--users-*` scales instead. The
+token is the delivery mechanism (the spacing/typography policies forbid literal
+px in modules); the value is the reference's.
+
+**Icons.** Font Awesome Solid via `<FaIcon>`, matching the reference's own
+family (FA Free 6.7.2). Users components must not import `pixel-art-icons/*`.
+
+**States.** People, Roles and Activity are three states of ONE workspace with
+one data load and one tablist — not three pages.
+
+**Deliberate deviations from the reference** (each is a correctness or policy
+requirement, not drift — `src/__tests__/architecture/usersScreenFidelity.test.ts`
+documents and guards them):
+
+| Reference behaviour | What we do instead | Why |
+|---|---|---|
+| `?demo=1` context gate + Product Hub chooser | Real auth + the capability gates below | The mock's guard is standalone-reference scaffolding; there is no Hub in front of a self-hosted install |
+| Step-up dialog accepts any value | Real `stepUpCms` re-auth | The mock has no server |
+| `window.confirm()` for discard / delete | `useConfirmDelete` with `alwaysConfirm` | `no-native-browser-dialogs`; and losing unsaved capability edits silently is not acceptable |
+| Capability labels "Browse media", "Upload media" | This CMS's real labels ("Browse media library", "Upload and edit media") | The mock describes a fictional capability set; ours describe the permission actually granted. Mislabelling a permission is a correctness bug |
+| Role "Created … **by Akhil**" | Date only, no actor | `role.createdAt`/`updatedAt` are real; there is **no** `created_by` column and the audit log is capped at 100 events, so the actor cannot be resolved reliably |
+| No Slug field on the role form | Slug retained (auto-derived from the name, editable) | Removing it would drop existing functionality |
+| Single-letter avatar initials, no images | `UserAvatar` (uploaded → Gravatar → up to two initials) | The mock has no avatar support; removing real avatars would be a regression |
+| Session-only in-memory mutations | Real endpoints + audit events | The mock has no server |
+| Its own two-row app header | The existing shared `ProductHubHeader` + `Toolbar` | Already implemented and contract-compliant; the re-skin is body-scoped |
+| Its own step-up dialog styling | Shared `StepUpDialog` left as-is | It is shared by seven workspaces; restyling it to one screen's spec would drift the others |
+
+**Long-content rule.** Every text container in a constrained track carries
+`min-width: 0` plus an explicit decision — `text-overflow: ellipsis` for
+single-line identity values (name, email, role rail rows, column headers) or
+`overflow-wrap: anywhere` for wrapping ones (capability descriptions, audit
+titles, outcome sentences). Chip cells `flex-wrap` so a long role name stacks
+rather than stretching the row. This is what keeps the ladder aligned
+regardless of the data, and the fidelity gate asserts it.
+
+---
+
 ## Forbidden patterns
 
 | Pattern                                                          | Use instead                                                |

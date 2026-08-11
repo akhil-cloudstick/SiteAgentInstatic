@@ -1,0 +1,101 @@
+/* WorkspaceTabs — the approved `.workspace-tabs` segmented track.
+ *
+ * Geometry is the reference's, delivered through the `--users-*` tokens in
+ * globals.css (literal px is gated in admin module CSS).
+ */
+
+.track {
+    display: flex;
+    min-width: var(--users-tabs-min-w);
+    height: var(--users-tabs-h);
+    overflow: hidden;
+    border: 1px solid var(--mms-border);
+    border-radius: var(--users-radius-9);
+    background: var(--mms-surface);
+}
+
+.cell {
+    position: relative;
+    display: inline-flex;
+    min-width: var(--users-tab-min-w);
+    align-items: center;
+    justify-content: center;
+    gap: var(--users-sp-11);
+    padding: 0 var(--users-sp-12);
+    border: 0;
+    border-right: 1px solid var(--mms-border);
+    background: transparent;
+    color: var(--mms-text);
+    font-family: inherit;
+    font-size: var(--users-text-16);
+    /* Long labels must not push the track wider than its column — the label
+       ellipsises, the cell keeps its share. */
+    min-width: 0;
+    flex: 1;
+    cursor: pointer;
+}
+
+.cell:last-child {
+    border-right: 0;
+}
+
+.cell > span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.cell:hover {
+    background: var(--mms-surface-tint);
+}
+
+.cell:focus-visible {
+    z-index: 1;
+    outline: 0;
+    box-shadow: var(--mms-focus);
+}
+
+.cellActive {
+    background: var(--mms-surface-green);
+    color: var(--mms-action-strong);
+    font-weight: var(--users-weight-tab);
+}
+
+/* Full-bleed bar along the active cell's bottom edge. Reserved on every cell
+   (transparent) so selecting one never shifts the row by 3px. */
+.cell::after {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    height: var(--users-tab-underbar);
+    background: transparent;
+    content: "";
+}
+
+.cellActive::after {
+    background: var(--mms-action);
+}
+
+/* The reference drops the track to a full-width row under the title at the
+   1100px tier, and shrinks it again on phones. */
+@media (max-width: 1100px) {
+    .track {
+        width: 100%;
+        min-width: 0;
+        height: var(--users-tabs-h-compact);
+    }
+}
+
+@media (max-width: 780px) {
+    .cell {
+        gap: var(--users-sp-7);
+        font-size: var(--users-text-13);
+    }
+}
+
+@media (max-width: 430px) {
+    .cell > span {
+        font-size: var(--users-text-11);
+    }
+}

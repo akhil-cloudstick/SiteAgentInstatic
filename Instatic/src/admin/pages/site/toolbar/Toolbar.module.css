@@ -29,14 +29,24 @@
  * `MMS-CMS · <client> · <project> · <site>`. The product name carries the
  * weight; the scope trail is subordinate and truncates first, because the
  * name is the part that has to stay readable at every width. */
+/* Product identity — the approved header stacks the product name over its
+ * client · project · site scope and closes the block with a full-height
+ * hairline, so the identity reads as its own region rather than as the first
+ * item of the navigation. */
 .productIdentity {
-    display: inline-flex;
+    display: grid;
     flex: 0 1 auto;
-    align-items: baseline;
-    gap: var(--space-2xs);
-    min-width: 0;
-    min-height: 44px;
+    align-content: center;
+    gap: var(--space-px);
+    min-width: 245px;
+    max-width: 330px;
+    /* Centred at its own content height, NOT stretched: the approved header
+       leaves the separator short of the row's top and bottom edges so it reads
+       as a divider between two labels rather than as a full-height column
+       rule. Stretching it makes it collide with both hairlines. */
     align-self: center;
+    padding-right: var(--space-4xl);
+    border-right: 1px solid var(--toolbar-border);
     color: var(--toolbar-text);
     font-family: var(--font-nav);
     text-decoration: none;
@@ -44,16 +54,15 @@
 }
 
 .productName {
-    flex: 0 0 auto;
     font-size: var(--toolbar-tab-size);
-    font-weight: 760;
+    font-weight: 780;
 }
 
 .productScope {
     min-width: 0;
     overflow: hidden;
     color: var(--text-muted);
-    font-size: var(--text-xs);
+    font-size: var(--text-2xs);
     font-weight: 560;
     text-overflow: ellipsis;
 }
@@ -61,6 +70,22 @@
 .productScopeSep {
     padding: 0 var(--space-3xs);
     color: var(--text-subtle);
+}
+
+@media (max-width: 1300px) {
+    .productIdentity {
+        min-width: 205px;
+        max-width: 230px;
+    }
+}
+
+@media (max-width: 760px) {
+    .productIdentity {
+        min-width: 0;
+        max-width: calc(100vw - 145px);
+        padding-right: 0;
+        border-right: 0;
+    }
 }
 
 /* ── Specialist navigation ────────────────────────────────────────────────

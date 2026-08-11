@@ -1,0 +1,113 @@
+/* Roles workbench — the reference's `.roles-panel`.
+ *
+ * Three panes on one card. The centre pane is the only one that grows, so a
+ * long capability list scrolls inside the editor rather than stretching the
+ * rail and the summary alongside it.
+ */
+
+/* The workbench fills the height the page hands it and each pane scrolls on
+   its own, so a 38-capability role never pushes the card past the fold.
+   `min-height` is the reference's floor for a tall screen; `max-height: 100%`
+   keeps it inside the viewport on a laptop. */
+.panel {
+    display: grid;
+    grid-template-columns: var(--users-rail-w) minmax(var(--users-editor-min-w), 1fr) var(--users-summary-w);
+    min-height: min(var(--users-panel-min-h), 100%);
+    max-height: 100%;
+    overflow: hidden;
+    border: 1px solid var(--mms-border);
+    border-radius: var(--users-radius-10);
+    background: var(--mms-surface);
+}
+
+/* ── Loading ─────────────────────────────────────────────────────────────── */
+
+.railSkeleton,
+.editorSkeleton,
+.summarySkeleton {
+    display: grid;
+    align-content: start;
+    gap: var(--users-sp-12);
+    padding: var(--users-sp-20);
+}
+
+.railSkeleton {
+    border-right: 1px solid var(--mms-border);
+}
+
+.summarySkeleton {
+    border-left: 1px solid var(--mms-border);
+}
+
+/* ── Empty ───────────────────────────────────────────────────────────────── */
+
+.emptyPanel {
+    display: grid;
+    min-height: var(--users-empty-min-h);
+    max-height: 100%;
+    align-content: center;
+    justify-items: center;
+    border: 1px solid var(--mms-border);
+    border-radius: var(--users-radius-10);
+    background: var(--mms-surface);
+    color: var(--mms-text-muted);
+    text-align: center;
+}
+
+.emptyGlyph {
+    margin-bottom: var(--users-sp-10);
+    color: var(--mms-action-strong);
+}
+
+.emptyPanel strong {
+    color: var(--mms-text);
+    font-size: var(--users-text-16);
+}
+
+.emptyPanel p {
+    margin: var(--users-sp-4) 0 0;
+    max-width: 46ch;
+}
+
+/* ── Responsive ──────────────────────────────────────────────────────────── */
+
+@media (max-width: 1300px) {
+    .panel {
+        grid-template-columns:
+            var(--users-rail-w-compact)
+            minmax(var(--users-editor-min-w-compact), 1fr)
+            var(--users-summary-w-compact);
+    }
+}
+
+@media (max-width: 1100px) {
+    /* The summary rail drops below the two working panes rather than being
+       squeezed — it is reference material, not a control surface. */
+    .panel {
+        grid-template-columns: var(--users-rail-w-compact) minmax(0, 1fr);
+    }
+
+    .panel > :last-child {
+        grid-column: 1 / -1;
+    }
+
+    .summarySkeleton {
+        grid-column: 1 / -1;
+        border-top: 1px solid var(--mms-border);
+        border-left: 0;
+    }
+}
+
+@media (max-width: 780px) {
+    .panel {
+        display: block;
+        min-height: 0;
+        max-height: none;
+        overflow: visible;
+    }
+
+    .railSkeleton {
+        border-right: 0;
+        border-bottom: 1px solid var(--mms-border);
+    }
+}

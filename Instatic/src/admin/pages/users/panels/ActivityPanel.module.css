@@ -1,0 +1,264 @@
+/* Activity panel — the reference's `.activity-panel`. */
+
+.panel {
+    display: flex;
+    min-height: 0;
+    max-height: 100%;
+    flex-direction: column;
+    overflow: hidden;
+    border: 1px solid var(--mms-border);
+    border-radius: var(--users-radius-10);
+    background: var(--mms-surface);
+}
+
+.header,
+.searchControl {
+    flex: 0 0 auto;
+}
+
+.header {
+    display: flex;
+    min-height: var(--users-activity-head-h);
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--users-sp-16);
+    padding: 0 var(--users-sp-25);
+    border-bottom: 1px solid var(--mms-border);
+}
+
+.headerCopy {
+    min-width: 0;
+}
+
+.headerCopy h2 {
+    margin: 0 0 var(--users-sp-4);
+    color: var(--mms-text);
+    font-size: var(--users-text-20);
+}
+
+.headerCopy p {
+    margin: 0;
+    color: var(--mms-text-muted);
+    overflow-wrap: anywhere;
+}
+
+.searchControl {
+    display: flex;
+    max-width: var(--users-activity-search-max-w);
+    min-width: 0;
+    min-height: var(--users-search-h);
+    align-items: center;
+    margin: var(--users-sp-18) var(--users-sp-25);
+    border: 1px solid var(--mms-border-strong);
+    border-radius: var(--users-radius-7);
+    background: var(--mms-surface-raised);
+}
+
+.searchGlyph {
+    width: var(--users-search-icon-w);
+    flex: 0 0 var(--users-search-icon-w);
+    color: var(--mms-text-muted);
+    text-align: center;
+}
+
+.searchControl input {
+    min-width: 0;
+    min-height: var(--users-search-inner-h);
+    padding-left: 0;
+    border: 0;
+    background: transparent;
+}
+
+/* ── Table ─────────────────────────────────────────────────────────────────
+ * The log is capped at the newest 100 events, which on a busy install is a
+ * very long page. The list gets a fixed viewport height and scrolls inside
+ * itself instead, so the page keeps its shape and the header, search and the
+ * rest of the workspace stay on screen while the reader works down the log. */
+
+/* Takes the height left after the header and search rather than a `vh` cap:
+   a viewport unit does not know how tall the two header rows and the heading
+   band are at a given width, so it under- or over-shoots on every laptop. */
+.scroller {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+
+/* Column headers stay put while the rows move under them. */
+.head {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--mms-surface);
+}
+
+.moreHint {
+    margin: 0;
+    padding: var(--users-sp-14) var(--users-sp-25);
+    border-top: 1px solid var(--mms-border);
+    color: var(--mms-text-muted);
+    font-size: var(--users-text-11);
+    text-align: center;
+}
+
+.table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+}
+
+.headRow,
+.row {
+    display: grid;
+    grid-template-columns: 1.1fr 0.55fr 1.45fr 0.8fr;
+    align-items: center;
+    gap: var(--users-sp-22);
+    padding: 0 var(--users-sp-25);
+}
+
+.headRow {
+    min-height: var(--users-activity-col-head-h);
+    border-top: 1px solid var(--mms-border);
+    border-bottom: 1px solid var(--mms-border);
+    color: var(--mms-text-muted);
+    font-weight: var(--users-weight-label);
+}
+
+.headRow th {
+    min-width: 0;
+    overflow: hidden;
+    font-weight: inherit;
+    text-align: left;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.row {
+    min-height: var(--users-activity-row-h);
+    border-bottom: 1px solid var(--mms-border);
+}
+
+.row:last-child {
+    border-bottom: 0;
+}
+
+.row td {
+    min-width: 0;
+    padding: 0;
+}
+
+.eventCell {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: var(--users-sp-12);
+}
+
+.mark {
+    display: grid;
+    width: var(--users-activity-icon);
+    height: var(--users-activity-icon);
+    flex: 0 0 var(--users-activity-icon);
+    place-items: center;
+    border-radius: 50%;
+    background: var(--mms-surface-green);
+    color: var(--mms-action-strong);
+}
+
+/* Titles are generated sentences and can be long — wrap rather than clip, and
+   let the row grow past its 88px floor. */
+.eventCell strong {
+    min-width: 0;
+    color: var(--mms-text);
+    overflow-wrap: anywhere;
+}
+
+.actor,
+.time {
+    overflow: hidden;
+    color: var(--mms-text-muted);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.details {
+    display: flex;
+    min-width: 0;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--users-sp-8);
+}
+
+/* ── Empty ───────────────────────────────────────────────────────────────── */
+
+.emptyRow {
+    display: grid;
+    min-height: var(--users-empty-min-h);
+    align-content: center;
+    justify-items: center;
+    border-top: 1px solid var(--mms-border);
+    color: var(--mms-text-muted);
+    text-align: center;
+}
+
+.emptyGlyph {
+    margin-bottom: var(--users-sp-10);
+    color: var(--mms-action-strong);
+}
+
+.emptyRow strong {
+    color: var(--mms-text);
+    font-size: var(--users-text-16);
+}
+
+.emptyRow p {
+    margin: var(--users-sp-4) 0 0;
+    max-width: 46ch;
+}
+
+/* ── Responsive ──────────────────────────────────────────────────────────── */
+
+@media (max-width: 780px) {
+    .panel {
+        display: block;
+        max-height: none;
+    }
+
+    .scroller {
+        overflow-y: visible;
+    }
+
+    .header {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: var(--users-sp-10);
+        padding: var(--users-sp-17);
+    }
+
+    .searchControl {
+        margin: var(--users-sp-13);
+    }
+
+    /* Column headers go away; each row stacks and labels itself. */
+    .head {
+        display: none;
+    }
+
+    .row {
+        min-height: var(--users-activity-row-h-compact);
+        grid-template-columns: 1fr;
+        gap: var(--users-sp-7);
+        padding: var(--users-sp-16);
+    }
+
+    .actor::before {
+        color: var(--mms-text-muted);
+        content: "Actor · ";
+    }
+
+    .time::before {
+        color: var(--mms-text-muted);
+        content: "Time · ";
+    }
+}
