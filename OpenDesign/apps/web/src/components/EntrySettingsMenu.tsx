@@ -76,6 +76,23 @@ interface Props {
   // The popover is mounted both on the home header and the in-project
   // artifact header; defaults to 'home' so existing call sites stay correct.
   trackingPageName?: 'home' | 'artifact';
+  /**
+   * How the trigger draws itself.
+   *
+   * `gear` is the in-project artifact header's control. `account` is row 1 of
+   * the shared MMSBUILD shell, where this menu IS the account menu: the
+   * approved header ends the utility run with a green-ringed initials disc, and
+   * a second gear beside the shell's own Settings gear would be two glyphs for
+   * two different things. Only the trigger changes — the popover, its contents
+   * and every behaviour below are identical.
+   */
+  triggerVariant?: 'gear' | 'account';
+  /**
+   * Signed-in user, from the Product Hub hand-off. `null` initials is a real
+   * answer — nobody is identified — and the disc falls back to a person glyph
+   * rather than borrowing letters from the tenant.
+   */
+  account?: { name: string | null; initials: string | null };
 }
 
 export function EntrySettingsMenu({
@@ -84,10 +101,19 @@ export function EntrySettingsMenu({
   onOpenSettings,
   onTrackTriggerClick,
   trackingPageName,
+  triggerVariant = 'gear',
+  account,
 }: Props) {
   const pageName = trackingPageName ?? 'home';
+  const isAccount = triggerVariant === 'account';
+  const accountInitials = account?.initials?.trim() || '';
   const analytics = useAnalytics();
   const t = useT();
+  // The accessible name says who, when the Hub told us who. Otherwise it names
+  // the destination rather than claiming an identity we do not have.
+  const accountTitle = account?.name
+    ? t('entry.accountMenuNamedAria', { name: account.name })
+    : t('entry.accountMenuAria');
   const { locale, setLocale } = useI18n();
   const discordPresence = useDiscordPresence();
   const [open, setOpen] = useState(false);
@@ -185,20 +211,36 @@ export function EntrySettingsMenu({
       <button
         ref={triggerRef}
         type="button"
-        className="settings-icon-btn od-tooltip"
+        // `mms-shell-avatar` is the shared shell's global contract class for a
+        // product-rendered account control, exactly like `mms-new-project` in
+        // row 2 — the shell owns the disc's every metric so it cannot drift
+        // between MMS Design and MMS-CMS.
+        className={
+          isAccount ? 'mms-shell-avatar od-tooltip' : 'settings-icon-btn od-tooltip'
+        }
         onClick={() => {
           onTrackTriggerClick?.();
           setOpen((value) => !value);
         }}
-        title={t('entry.openSettingsTitle')}
-        data-tooltip={t('entry.openSettingsTitle')}
+        title={isAccount ? accountTitle : t('entry.openSettingsTitle')}
+        data-tooltip={isAccount ? accountTitle : t('entry.openSettingsTitle')}
         data-tooltip-placement="bottom"
-        aria-label={t('entry.openSettingsAria')}
+        aria-label={isAccount ? accountTitle : t('entry.openSettingsAria')}
         aria-haspopup="menu"
         aria-expanded={open}
         data-testid="entry-settings-menu-trigger"
       >
-        <Icon name="settings" size={17} />
+        {isAccount ? (
+          accountInitials ? (
+            <span aria-hidden="true">{accountInitials}</span>
+          ) : (
+            // No identified user: a person glyph rather than initials invented
+            // from a tenant slug. The control still opens the same menu.
+            <i className="fa-solid fa-user" aria-hidden="true" />
+          )
+        ) : (
+          <Icon name="settings" size={17} />
+        )}
       </button>
       {open ? (
         <div

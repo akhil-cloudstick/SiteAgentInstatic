@@ -11,7 +11,7 @@
  * would be an open redirect.
  */
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
-import { hubNavigationLinks, hubLinkHref } from '@admin/shared/ProductHubHeader/hubNavigation'
+import { hubNavigationLinks, hubLinkHref } from '@admin/shared/ProductHubHeader'
 import { parseHubContextFromSso, readStoredHubContext } from '../../../server/auth/hubContext'
 
 const HUB = 'https://hub.example.com'

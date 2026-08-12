@@ -432,7 +432,7 @@ function statusLabel(
   return t(STATUS_LABEL_KEYS[status]);
 }
 
-function relativeTime(ts: number, t: ReturnType<typeof useT>): string {
+export function relativeTime(ts: number, t: ReturnType<typeof useT>): string {
   const diff = Date.now() - ts;
   const min = 60_000;
   const hr = 60 * min;
@@ -444,7 +444,7 @@ function relativeTime(ts: number, t: ReturnType<typeof useT>): string {
   return new Date(ts).toLocaleDateString();
 }
 
-function projectCover(
+export function projectCover(
   project: Project,
   override: ProjectCoverOverride | null,
 ): {
@@ -485,9 +485,9 @@ function projectCover(
   return { kind: 'fallback', style, initial };
 }
 
-type ProjectCategory = 'prototype' | 'live-artifact' | 'slide' | 'media' | 'brand';
+export type ProjectCategory = 'prototype' | 'live-artifact' | 'slide' | 'media' | 'brand';
 
-function projectCategory(project: Project): ProjectCategory {
+export function projectCategory(project: Project): ProjectCategory {
   const meta = project.metadata;
   if (meta?.intent === 'live-artifact' || project.skillId === 'live-artifact') {
     return 'live-artifact';

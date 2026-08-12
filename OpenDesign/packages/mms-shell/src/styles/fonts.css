@@ -1,0 +1,41 @@
+/* MMS Design System fonts — SHARED across every MMS product.
+ * Source of truth: this file. Every product @imports it; do not re-declare
+ * these faces in an app stylesheet.
+ *
+ * Self-hosted (MMS bans external font CDNs) and VENDORED INTO THIS PACKAGE
+ * rather than pulled from `@fontsource*` in a consumer's node_modules. A bare
+ * npm specifier in this file would resolve against whichever app is compiling
+ * it, so every consumer would need the same font packages installed and in the
+ * same versions — a dependency the shell has no business imposing. Relative
+ * URLs make the package self-contained: each bundler fingerprints and emits the
+ * woff2 itself, which is also what makes it work under MMS Design's `/design`
+ * base path.
+ *
+ * Inter Variable is the MMS Design System's UI face and the one the approved
+ * MMSBUILD screens are drawn in. It carries the full 100–900 axis because the
+ * approved type ramp uses non-standard weights (560, 610, 720, 780 …) that a
+ * static face cannot render — and `font-synthesis: none` in tokens.css means
+ * nothing will fake them.
+ */
+@font-face {
+    font-family: "Inter Variable";
+    font-style: normal;
+    font-display: swap;
+    font-weight: 100 900;
+    src: url("./fonts/inter-latin-wght-normal.woff2") format("woff2-variations");
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+        U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191,
+        U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+    font-family: "Inter Variable";
+    font-style: normal;
+    font-display: swap;
+    font-weight: 100 900;
+    src: url("./fonts/inter-latin-ext-wght-normal.woff2") format("woff2-variations");
+    unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7,
+        U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F,
+        U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F,
+        U+A720-A7FF;
+}

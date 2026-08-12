@@ -14,7 +14,20 @@
       "@site/*": ["./src/admin/pages/site/*"],
       "@content/*": ["./src/admin/pages/content/*"],
       "@plugins/*": ["./src/admin/pages/plugins/*"],
-      "@users/*": ["./src/admin/pages/users/*"]
+      "@users/*": ["./src/admin/pages/users/*"],
+      "@mms/shell": ["../OpenDesign/packages/mms-shell/src/index.ts"],
+      "@mms/shell/*": ["../OpenDesign/packages/mms-shell/src/*"],
+      /* `shared/mms-shell` sits outside this project root and has no
+         `node_modules` above it, so a bare `react` import inside it resolves
+         nowhere. Bun's test runner reads these paths, which is what lets the
+         shell's components run under `bun test`. Vite has the equivalent alias;
+         `tsconfig.app.json` maps the same two specifiers to the @types
+         packages, because the typechecker wants declarations where the runtime
+         wants JavaScript. */
+      "react": ["./node_modules/react"],
+      "react/*": ["./node_modules/react/*"],
+      "react-dom": ["./node_modules/react-dom"],
+      "react-dom/*": ["./node_modules/react-dom/*"]
     }
   }
 }

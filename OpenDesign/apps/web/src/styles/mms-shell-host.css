@@ -1,0 +1,107 @@
+/* Host styles for the shared MMSBUILD shell inside MMS Design.
+ *
+ * The two rows bring their own chrome from `@mms/shell`; this file only covers
+ * what is MMS-Design-local — the layout the rows replaced, the surfaces the old
+ * chrome left behind, and the one local action the specialist row renders into
+ * its right slot.
+ */
+
+/* ── Shell layout ─────────────────────────────────────────────────────────
+ * The grid itself lives in `home/entry-layout.css`, which owns
+ * `.entry-shell--no-header` and is imported AFTER this file — anything set for
+ * that selector here loses on source order. Only the body surface belongs here.
+ */
+.entry-shell--no-header .entry-main {
+    width: 100%;
+    margin-left: 0;
+}
+
+/* ── Surfaces the old chrome left behind ──────────────────────────────────
+ * Two strips are now dead weight above the content:
+ *
+ * 1. The workspace tab bar (open-projects tabs + search) — an editor affordance
+ *    from upstream. The approved MMSBUILD chrome is exactly two rows, so a
+ *    third bar above them contradicts the shared-header contract.
+ * 2. What is left of `entry-main__topbar` after navigation, theme, settings and
+ *    the account menu moved up into the shared rows. Its remaining children are
+ *    popups (updater / what's-new / message centre) that render nothing until
+ *    opened, so hiding the strip costs no behaviour — but it was still
+ *    reserving a row of height and showing two orphaned icons. */
+.workspace-tabs-chrome,
+.entry-shell--no-header .entry-main__topbar {
+    display: none;
+}
+
+/* Hiding the tab strip is not enough on its own. `.workspace-shell` is a grid
+   whose FIRST track (36px) belonged to that strip; `display: none` stops the
+   strip generating a box, so `.workspace-shell__body` becomes grid item 1 and
+   lands in the 36px track — with `overflow: hidden` clipping the entire app to
+   36px of header. Collapse the vacated track AND pin the body to row 2, so the
+   placement holds no matter how many items precede it. */
+.workspace-shell {
+    grid-template-rows: 0 minmax(0, 1fr);
+}
+
+.workspace-shell__body {
+    grid-row: 2;
+}
+
+/* ── Page canvas ──────────────────────────────────────────────────────────
+ * The approved screen is full-bleed on the workspace tone: the content runs to
+ * the window edge with its own internal padding, and there is no cream gutter
+ * framing a floating card. Upstream's entry body centred a max-width column on
+ * `--bg-app`, which is what produced the border of cream on all four sides. */
+.entry-shell--no-header .entry-main,
+.entry-shell--no-header .entry-main__inner,
+.entry-shell--no-header .home-view {
+    max-width: none;
+    margin: 0;
+    padding: 0;
+    background: var(--mms-workspace);
+}
+
+/* ── `New project` ────────────────────────────────────────────────────────
+ * The specialist row's right-side local action. Matches the approved header's
+ * button metrics; the row owns everything around it. */
+.mms-new-project {
+    display: inline-flex;
+    min-height: 38px;
+    align-items: center;
+    gap: 8px;
+    padding: 0 16px;
+    /* The row's palette, not the product body's: this control sits INSIDE the
+       shared header, so it has to track the header's greens or it reads as a
+       second, slightly-off accent next to the active tab's underline. */
+    border: 1px solid var(--toolbar-accent);
+    border-radius: 6px;
+    background: transparent;
+    color: var(--toolbar-accent-strong);
+    font-family: var(--font-nav);
+    font-size: 13px;
+    font-weight: 640;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.mms-new-project:hover:not(:disabled) {
+    background: var(--toolbar-icon-tint);
+}
+
+.mms-new-project:disabled {
+    cursor: not-allowed;
+    opacity: 0.46;
+}
+
+/* Icon-only below the specialist tier — the label is dead weight next to the
+   glyph, but the target must not shrink with it. */
+@media (max-width: 760px) {
+    .mms-new-project {
+        min-width: 42px;
+        justify-content: center;
+        padding: 0;
+    }
+
+    .mms-new-project span {
+        display: none;
+    }
+}

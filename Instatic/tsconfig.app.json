@@ -30,10 +30,24 @@
       "@site/*": ["./src/admin/pages/site/*"],
       "@content/*": ["./src/admin/pages/content/*"],
       "@plugins/*": ["./src/admin/pages/plugins/*"],
-      "@users/*": ["./src/admin/pages/users/*"]
+      "@users/*": ["./src/admin/pages/users/*"],
+      "@mms/shell": ["../OpenDesign/packages/mms-shell/src/index.ts"],
+      "@mms/shell/*": ["../OpenDesign/packages/mms-shell/src/*"],
+      /* `shared/mms-shell` sits OUTSIDE this project root, and TypeScript
+         resolves a bare specifier by walking up from the importing file — so
+         the shell's own `import ... from 'react'` finds no `node_modules` and
+         every one of its components degrades to `any`, which then strips
+         contextual typing from ~130 call sites in this app. Pinning the two
+         React specifiers to this project's copies keeps one React in play and
+         keeps those call sites typed. Vite already resolves them correctly at
+         build time via the alias; this is the typechecker's half. */
+      "react": ["./node_modules/@types/react", "./node_modules/react"],
+      "react/*": ["./node_modules/@types/react/*", "./node_modules/react/*"],
+      "react-dom": ["./node_modules/@types/react-dom", "./node_modules/react-dom"],
+      "react-dom/*": ["./node_modules/@types/react-dom/*", "./node_modules/react-dom/*"]
     }
   },
-  "include": ["src"],
+  "include": ["src", "../OpenDesign/packages/mms-shell/src"],
   "exclude": [
     "src/__tests__",
     "**/*.test.ts",

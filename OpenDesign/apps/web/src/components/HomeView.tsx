@@ -46,6 +46,7 @@ import {
   resolvePluginQueryFallback,
 } from '../state/projects';
 import { FigmaImportModal } from './FigmaImportModal';
+import { ProjectReferenceModal } from './ProjectReferenceModal';
 import { fetchMcpServers } from '../state/mcp';
 import { takeHomeComposerAssetSeed } from '../state/libraryHandoff';
 import { useI18n, useT } from '../i18n';
@@ -77,6 +78,16 @@ import { inlineMentionToken, mentionTokenPresent } from '../utils/inlineMentions
 import { smoothScrollToTop } from '../utils/smoothScrollToTop';
 import { missingRequiredInputs, pluginInputsAreValid } from '../utils/pluginRequiredInputs';
 import { HomeHero, type ExamplePromptInfo, type HomeHeroHandle } from './HomeHero';
+import {
+  StartDesk,
+  type ContextOptionId,
+  type StartDeskMode,
+  type StartDeskRuntime,
+  type StartId,
+} from './start-desk/StartDesk';
+import { StartDeskRecentProjects } from './start-desk/StartDeskRecentProjects';
+import { StartDeskToast } from './start-desk/StartDeskToast';
+import { useHubContext } from '../state/hubContext';
 import { findChip, HOME_HERO_CHIPS, type HomeHeroChip } from './home-hero/chips';
 import { homeHeroChipLabel } from './home-hero/chip-labels';
 import type { PlaceholderScenario } from './home-hero/placeholderScenarios';
@@ -100,18 +111,39 @@ import {
 } from './home-hero/plugin-authoring';
 import { PluginDetailsModal } from './PluginDetailsModal';
 import { SkillDetailsModal } from './SkillDetailsModal';
-import { HomeTemplatesReveal } from './HomeTemplatesReveal';
-import { PluginsHomeSection } from './PluginsHomeSection';
 import type { PluginLoopSubmit } from './PluginLoopHome';
 import { localizePluginTitle } from './plugins-home/localization';
 import type { PluginUseAction } from './plugins-home/useActions';
 import { examplePresetSeedPrompt } from './plugins-home/presetSeedPrompt';
 import { localizePluginDescription } from './plugins-home/localization';
-import { RecentProjectsStrip } from './RecentProjectsStrip';
 import { RecommendedStartRegion } from './RecommendedStartRegion';
 import type { Recommendation } from '../onboarding/recommendation';
 import type { OnboardingEntry } from '../onboarding/onboarding-entry';
 import { AnimatePresence } from 'motion/react';
+
+/**
+ * The approved Start Desk's six starts, mapped onto the scenario chips this app
+ * already ships. This is the whole integration: the new screen renames and
+ * re-scopes the entry points, it does not introduce a new creation path.
+ *
+ * `blank-project` has no chip on purpose — an empty canvas binds no scenario
+ * plugin, so it goes through the plain submit path.
+ */
+const START_TO_CHIP: Partial<Record<StartId, string>> = {
+  'website-clone': 'web-clone',
+  prototype: 'prototype',
+  wireframe: 'wireframe',
+};
+
+/**
+ * Confirmation shown after an Add-context entry has actually done something —
+ * the surface it opened is the answer, and this is the receipt. Entries that
+ * open a modal or a view say nothing here, because the thing that opened is
+ * the feedback.
+ */
+const CONTEXT_DONE: Partial<Record<ContextOptionId, string>> = {
+  'local-code': 'Linked as read-only context for the next run.',
+};
 
 export interface ActivePlugin {
   record: InstalledPluginRecord;
@@ -348,7 +380,6 @@ export function HomeView({
   const [pluginsLoading, setPluginsLoading] = useState(true);
   // MMS: the Community catalog (hundreds of preview-loading cards) is revealed
   // on request instead of auto-loading, so it doesn't slow down the workspace.
-  const [communityRevealed, setCommunityRevealed] = useState(false);
   const [pendingApplyId, setPendingApplyId] = useState<string | null>(null);
   const [pendingDuplicatePluginId, setPendingDuplicatePluginId] = useState<string | null>(null);
   const [pendingChipId, setPendingChipId] = useState<string | null>(null);
@@ -371,6 +402,13 @@ export function HomeView({
     chipId: string | null;
   } | null>(null);
   const [sessionMode, setSessionMode] = useState<ChatSessionMode>('design');
+  /**
+   * Execution runtime for the next run. `local-cli` is the only runtime that
+   * can write project files, and every website start produces them — so the
+   * Start Desk blocks Send on `byok` rather than letting the run fail at its
+   * first write. Kept here, beside the rest of the submit payload's state.
+   */
+  const [startDeskRuntime, setStartDeskRuntime] = useState<StartDeskRuntime>('local-cli');
   const [activeSkill, setActiveSkill] = useState<SkillSummary | null>(null);
   const [selectedPluginContexts, setSelectedPluginContexts] = useState<SelectedPluginContext[]>([]);
   const [selectedMcpContexts, setSelectedMcpContexts] = useState<SelectedMcpContext[]>([]);
@@ -448,11 +486,30 @@ export function HomeView({
     writeHomeComposerDraft(HOME_COMPOSER_DESIGN_SYSTEM_KEY, designSystemId);
   }, [designSystemId]);
   const [figmaModalOpen, setFigmaModalOpen] = useState(false);
+  const [projectReferenceOpen, setProjectReferenceOpen] = useState(false);
+  // The Product Hub scope this session was opened with. Read here so the Start
+  // Desk's handoff band, chips and drawer all describe the same hand-off the
+  // shell rows do.
+  const hubContext = useHubContext();
   const examplePromptInfoRef = useRef<ExamplePromptInfo | null>(null);
   const handleExamplePromptStatusChange = useCallback((info: ExamplePromptInfo | null) => {
     examplePromptInfoRef.current = info;
   }, []);
-  const [error, setError] = useState<string | null>(null);
+  /**
+   * The screen's single notice, and how it reads.
+   *
+   * The Start Desk answers every non-navigating action here, so the surface
+   * carries both failures ("the daemon is unreachable") and acknowledgements
+   * ("3 files attached"). They must not look alike — a red-flag message under a
+   * green check is worse than no feedback. `setError` keeps its name and its
+   * ~30 call sites and always means the former; `notify` is the latter.
+   */
+  const [notice, setNotice] = useState<{ text: string; tone: 'success' | 'error' } | null>(null);
+  const setError = useCallback(
+    (text: string | null) => setNotice(text ? { text, tone: 'error' } : null),
+    [],
+  );
+  const notify = useCallback((text: string) => setNotice({ text, tone: 'success' }), []);
   // Composer in-flight guard: disables the send button, shows Sending…, and
   // swallows repeat clicks across the whole async create tail.
   const [sending, setSending] = useState(false);
@@ -790,6 +847,22 @@ export function HomeView({
   // Title of the globally-selected design system (or the "No design system"
   // label). Seeds the active plugin's `designSystem` input — the apply-template
   // hint the rendered brief references — so it mirrors the persistent picker.
+  /**
+   * Real state per Add-context entry, in the reference's badge slot. Says what
+   * a source currently has rather than what it is — "3 connected" answers the
+   * question the user is actually asking before they open it.
+   */
+  const contextBadges = useMemo<Partial<Record<ContextOptionId, string>>>(() => {
+    const badges: Partial<Record<ContextOptionId, string>> = {};
+    if (stagedFiles.length > 0) badges.attach = `${stagedFiles.length} staged`;
+    if (contextWorkspaceItems.length > 0) {
+      badges['local-code'] = `${contextWorkspaceItems.length} linked`;
+    }
+    if (plugins.length > 0) badges.plugins = `${plugins.length} installed`;
+    if (connectors.length > 0) badges.connectors = `${connectors.length} configured`;
+    return badges;
+  }, [stagedFiles.length, contextWorkspaceItems.length, plugins.length, connectors.length]);
+
   const selectedDesignSystemTitle = useMemo(
     () =>
       designSystemId
@@ -1346,6 +1419,51 @@ export function HomeView({
 
   function removeStagedFile(index: number) {
     setStagedFiles((current) => current.filter((_, i) => i !== index));
+  }
+
+  /**
+   * Add context → the surface that entry names.
+   *
+   * Every entry lands on something the app already has: the file picker the
+   * composer owns, the Figma import modal, the project-reference modal, the
+   * Plugins destination, or the Integrations tab that lists connectors and MCP
+   * servers. None of them prints a description of itself — an entry that could
+   * only do that was removed rather than left looking operable.
+   */
+  async function openContextSource(optionId: ContextOptionId): Promise<void> {
+    switch (optionId) {
+      case 'attach':
+        // Serviced inside the composer, which owns the picker.
+        return;
+      case 'project':
+        setProjectReferenceOpen(true);
+        return;
+      case 'local-code': {
+        const dir = await handlePickLocalCodeDir();
+        if (!dir) return;
+        addWorkspaceContext({
+          id: `local-code:${dir}`,
+          kind: 'local-code',
+          label: dir,
+          path: dir,
+          absolutePath: dir,
+        });
+        notify(CONTEXT_DONE['local-code'] ?? '');
+        return;
+      }
+      case 'plugins':
+        onBrowseRegistry?.();
+        return;
+      case 'figma':
+        setFigmaModalOpen(true);
+        return;
+      case 'connectors':
+        onOpenIntegrations?.();
+        return;
+      case 'mcp':
+        onOpenMcp?.();
+        return;
+    }
   }
 
   function addWorkspaceContext(item: WorkspaceContextItem) {
@@ -2073,208 +2191,113 @@ export function HomeView({
 
   return (
     <div className="home-view" data-testid="home-view" ref={homeViewRef}>
-      <HomeHero
-        ref={inputRef}
-        active={isActive}
-        firstRunGuide={projectsLoading ? undefined : projects.length === 0}
+      {/* The client-approved Website Start Desk replaces the upstream hero.
+          Everything beneath the surface is unchanged: same prompt state, same
+          submit path, same project-creation calls — only the screen the user
+          sees is different. */}
+      <StartDesk
         prompt={prompt}
         onPromptChange={handlePromptChange}
-        onSubmit={submit}
-        onSubmitScenario={submitScenario}
-        sessionMode={sessionMode}
-        onSessionModeChange={setSessionMode}
-        submitting={sending}
-        activePluginTitle={activeBadgeTitle}
-        activePluginIsExplicit={activePluginIsExplicit}
-        activePluginRecord={active?.record ?? null}
-        activeSkillId={activeSkill?.id ?? null}
-        activeSkillTitle={activeSkill ? localizeSkillName(locale, activeSkill) : null}
-        activeSkillRecord={activeSkill}
-        activeChipId={active?.chipId ?? null}
-        showActivePluginChip={showActivePluginChip}
-        onClearActivePlugin={clearActivePlugin}
-        onClearActiveChip={clearActiveChipSelection}
-        onClearActiveSkill={() => setActiveSkill(null)}
-        selectedPluginContexts={selectedPluginContexts.map((item) => item.record)}
-        selectedMcpContexts={selectedMcpContexts.map((item) => item.server)}
-        selectedConnectorContexts={selectedConnectorContexts.map((item) => item.connector)}
-        contextOnlyPlugins={selectedPluginContexts.filter((item) => !item.inlineBacked).map((item) => item.record)}
-        contextOnlyMcpServers={selectedMcpContexts.filter((item) => !item.inlineBacked).map((item) => item.server)}
-        contextOnlyConnectors={selectedConnectorContexts.filter((item) => !item.inlineBacked).map((item) => item.connector)}
-        contextWorkspaceItems={contextWorkspaceItems}
-        onRemovePluginContext={removePluginContext}
-        onRemoveMcpContext={removeMcpContext}
-        onRemoveConnectorContext={removeConnectorContext}
-        onAddWorkspaceContext={addWorkspaceContext}
-        onRemoveWorkspaceContext={removeWorkspaceContext}
-        onAddPlugin={onBrowseRegistry}
-        onAddConnector={onOpenIntegrations}
-        onAddMcp={onOpenMcp}
-        onOpenPluginDetails={setDetailsRecord}
-        onOpenSkillDetails={setDetailsSkill}
-        pluginInputFields={(active?.inputFields ?? []).filter(
-          (field) => !ARTIFACT_FOOTER_FIELD_NAMES.has(field.name),
-        )}
-        pluginInputValues={active?.inputs ?? {}}
-        pluginInputTemplate={active?.queryTemplate ?? null}
-        onPluginInputValuesChange={updateActiveInputs}
-        inlineEditableInputNames={active?.editableInputNames ?? []}
-        footerInputNames={footerInputNamesForChip(active?.chipId ?? null)}
-        designSystems={designSystemPickerSystems}
-        selectedDesignSystemId={designSystemId}
-        onDesignSystemChange={handleDesignSystemChange}
-        stagedFiles={stagedFiles}
-        onAddFiles={stageFiles}
-        onRemoveFile={removeStagedFile}
-        onImportFigma={() => setFigmaModalOpen(true)}
-        pluginOptions={plugins}
-        pluginsLoading={pluginsLoading}
-        skillOptions={selectableSkills}
-        skillsLoading={skillsLoading}
-        mcpOptions={enabledMcpServers}
-        mcpLoading={mcpLoading}
-        connectorOptions={connectors.filter((connector) => connector.status === 'connected')}
-        pendingPluginId={pendingApplyId}
-        pendingChipId={pendingChipId}
-        submitDisabled={
-          Boolean(pendingApplyId) ||
-          Boolean(pendingAuthoringChipId) ||
-          Boolean(active && !active.inputsValid)
+        onStart={(start) => {
+          const chipId = START_TO_CHIP[start];
+          const chip = chipId ? findChip(chipId) : undefined;
+          // Binds the scenario plugin exactly as the old chip rail did, then
+          // leaves the run to the unchanged submit path.
+          if (chip) pickChip(chip);
+          else void submit();
+        }}
+        onBlankProject={() => { void submit(); }}
+        onOpenTemplates={() => onOpenNewProject?.('template')}
+        onCreateDesignSystem={() => {
+          setPendingDesignSystemCreateEntry('home_card');
+          navigate({ kind: 'design-system-create' });
+        }}
+        onAddContext={(optionId) => void openContextSource(optionId)}
+        contextBadges={contextBadges}
+        onNotice={(message) => setError(message)}
+        onViewAllProjects={onViewAllProjects}
+        // Conversation mode and runtime are the HOST's state, not the view's:
+        // `sessionMode` is what the created run is given as its
+        // `conversationMode`, so a mode picked here has to reach submit().
+        mode={sessionMode as StartDeskMode}
+        onModeChange={(next) => setSessionMode(next as ChatSessionMode)}
+        runtime={startDeskRuntime}
+        onRuntimeChange={setStartDeskRuntime}
+        templateLabel={active?.record.title ?? null}
+        {...(promptTemplates.length > 0
+          ? { onOpenOutline: () => onOpenNewProject?.('template') }
+          : {})}
+        designSystemName={designSystemId ? selectedDesignSystemTitle : null}
+        designSystemSlot={
+          <select
+            value={designSystemId ?? ''}
+            aria-label={t('designSystemPicker.label')}
+            onChange={(event) => handleDesignSystemChange(event.target.value || null)}
+          >
+            <option value="">{t('designSystemPicker.noneTitle')}</option>
+            {designSystemPickerSystems.map((system) => (
+              <option key={system.id} value={system.id}>
+                {system.title}
+              </option>
+            ))}
+          </select>
         }
-        onPickPlugin={(record, nextPrompt) => addPluginContext(record, nextPrompt)}
-        onPickExamplePlugin={useExamplePlugin}
-        onDuplicateExamplePlugin={duplicateExamplePlugin}
-        pendingDuplicatePluginId={pendingDuplicatePluginId}
-        onPickSkill={useSkill}
-        onPickMcp={useMcpServer}
-        onPickConnector={useConnector}
-        onPickChip={pickChip}
-        contextItemCount={contextItemCount}
-        error={error}
-        workingDir={workingDir}
-        recentDirs={recentDirs}
-        onPickWorkingDir={handlePickWorkingDir}
-        onPickLocalCodeDir={handlePickLocalCodeDir}
-        onSelectRecentWorkingDir={(dir) => {
-          setWorkingDir(dir);
-          // Recents come from the browser-side picker only; they carry no
-          // desktop trust token (and linkedDirs don't need one).
-          setWorkingDirToken(null);
-          void rememberRecentDir(dir);
-        }}
-        onClearWorkingDir={() => {
-          setWorkingDir(null);
-          setWorkingDirToken(null);
-        }}
-        onExamplePromptStatusChange={handleExamplePromptStatusChange}
-        onStartBlankProject={() => {
-          void startBlankProject();
-        }}
-        executionSwitcher={executionSwitcher}
-        recommendationSlot={
-          recommendation && onRecommendationStart && onRecommendationDismiss ? (
-            <RecommendedStartRegion
-              recommendation={recommendation}
-              onStart={async (input) => {
-                // Route recommendation-start failures into the same Home error
-                // channel every other entry action uses, so a failed "Start
-                // creating" surfaces a visible, retryable message instead of a
-                // silent no-op. `onRecommendationStart` returns `false` for a
-                // clean no-project result and throws on real create failures;
-                // both land here as the localized error, and returning `false`
-                // lets RecommendedStartRegion drop its pending state for retry.
-                setError(null);
-                try {
-                  const ok = await onRecommendationStart(input);
-                  if (ok === false) {
-                    setError(t('home.recommendation.startFailed'));
-                    return false;
-                  }
-                  return true;
-                } catch {
-                  setError(t('home.recommendation.startFailed'));
-                  return false;
-                }
-              }}
-              onDismiss={() => {
-                onRecommendationDismiss();
-                // "浏览全部类型" must land the user somewhere concrete — open
-                // the template picker (the "all types" catalogue) instead of
-                // the strip silently vanishing (spec §7.4: 放弃推荐, 进入通用选择).
-                onOpenNewProject?.('template');
-              }}
-            />
-          ) : artifactUpgradeSlot
+        workingDirSlot={
+          <button type="button" onClick={() => void handlePickWorkingDir()}>
+            <i className="fa-solid fa-folder-open" aria-hidden="true" />
+            <span>{t('startDesk.workingDirLabel')}</span>
+            <strong>{workingDir ?? t('startDesk.workingDirNone')}</strong>
+            {!workingDir && (
+              <span className="start-desk__badge">{t('startDesk.workingDirNeeded')}</span>
+            )}
+            <i className="fa-solid fa-chevron-down" aria-hidden="true" />
+          </button>
+        }
+        attachments={stagedFiles.map((file, index) => ({
+          id: `${index}:${file.name}`,
+          name: file.name,
+        }))}
+        onRemoveAttachment={(id) => removeStagedFile(Number(id.split(':')[0]))}
+        onAttachFiles={stageFiles}
+        hubContext={hubContext}
+        recentProjectsSlot={
+        <StartDeskRecentProjects
+          projects={projects}
+          designSystems={designSystems}
+          {...(projectsLoading !== undefined ? { loading: projectsLoading } : {})}
+          onStartFirstProject={focusPromptAtEnd}
+          onOpen={(id) => {
+            // P0 ui_click area=recent_projects element=project_card — emit
+            // before navigation so the event isn't lost when the host
+            // re-renders into the project view.
+            const project = projects.find((p) => p.id === id);
+            const projectKind = projectKindFromMetadataToTracking(project?.metadata);
+            trackRecentProjectsClick(analytics.track, {
+              page_name: 'home',
+              area: 'recent_projects',
+              element: 'project_card',
+              project_id: id,
+              ...(projectKind ? { project_kind: projectKind } : {}),
+            });
+            onOpenProject(id);
+          }}
+          {...(onDeleteProject ? { onDelete: onDeleteProject } : {})}
+          {...(onDuplicateProject ? { onDuplicate: onDuplicateProject } : {})}
+          {...(onRenameProject ? { onRename: onRenameProject } : {})}
+        />
         }
       />
 
-      <RecentProjectsStrip
-        projects={projects}
-        designSystems={designSystems}
-        {...(projectsLoading !== undefined ? { loading: projectsLoading } : {})}
-        onOpen={(id) => {
-          // P0 ui_click area=recent_projects element=project_card — emit
-          // before navigation so the event isn't lost when the host
-          // re-renders into the project view.
-          const project = projects.find((p) => p.id === id);
-          const projectKind = projectKindFromMetadataToTracking(project?.metadata);
-          trackRecentProjectsClick(analytics.track, {
-            page_name: 'home',
-            area: 'recent_projects',
-            element: 'project_card',
-            project_id: id,
-            ...(projectKind ? { project_kind: projectKind } : {}),
-          });
-          onOpenProject(id);
-        }}
-        onViewAll={() => {
-          trackRecentProjectsClick(analytics.track, {
-            page_name: 'home',
-            area: 'recent_projects',
-            element: 'view_all',
-          });
-          onViewAllProjects();
-        }}
-        {...(onDeleteProject ? { onDelete: onDeleteProject } : {})}
-        {...(onDuplicateProject ? { onDuplicate: onDuplicateProject } : {})}
-        {...(onRenameProject ? { onRename: onRenameProject } : {})}
-      />
+      {/* The screen's one notice surface. Before this, `onNotice` fed a state
+          field nothing rendered, so Send-without-a-URL looked like a dead
+          button. */}
+      <StartDeskToast notice={notice} onDismiss={() => setNotice(null)} />
 
-      {communityRevealed ? (
-        <HomeTemplatesReveal
-          enabled={!projectsLoading && projects.length === 0}
-        >
-          <PluginsHomeSection
-            plugins={plugins}
-            loading={pluginsLoading}
-            activePluginId={active?.record.id ?? null}
-            pendingApplyId={pendingApplyId}
-            pendingDuplicateId={pendingDuplicatePluginId}
-            onUse={(record, action) => void routePluginUse(record, action)}
-            onDuplicate={(record) => void duplicateExamplePlugin(record)}
-            onOpenDetails={handleCommunityOpenDetails}
-            onBrowseRegistry={onBrowseRegistry}
-            preferDefaultFacet
-            cardLayout="gallery"
-          />
-        </HomeTemplatesReveal>
-      ) : (
-        <section className="community-reveal-gate">
-          <div className="community-reveal-gate__row">
-            <h2 className="community-reveal-gate__title">Community</h2>
-            <button
-              type="button"
-              className="community-reveal-gate__btn"
-              onClick={() => setCommunityRevealed(true)}
-            >
-              Show community plugins
-            </button>
-          </div>
-          <p className="community-reveal-gate__hint">
-            Hidden by default to keep the workspace fast. Click to browse the community catalog.
-          </p>
-        </section>
-      )}
+      {/* The community gallery is NOT part of the approved Start Desk: the
+          screen ends at Recent projects. The catalogue is unchanged and still
+          reachable — the Plugins destination in row 2 opens the same
+          `PluginsHomeSection`, with Add context → Plugins as a second door — so
+          removing the section here costs no capability. */}
 
       <AnimatePresence>
         {detailsRecord ? (
@@ -2325,6 +2348,33 @@ export function HomeView({
             skillId={detailsSkill.id}
             summary={detailsSkill}
             onClose={() => setDetailsSkill(null)}
+          />
+        ) : null}
+        {projectReferenceOpen ? (
+          <ProjectReferenceModal
+            onClose={() => setProjectReferenceOpen(false)}
+            onSelect={(items) => {
+              setProjectReferenceOpen(false);
+              if (items.length === 0) return;
+              // Referenced projects join the same workspace-context list the
+              // composer already sends as `initialRunContext.workspaceItems`,
+              // in the same shape the chat composer builds.
+              for (const selection of items) {
+                const resolved = selection.resolvedDir.trim();
+                const label = selection.project.name || selection.project.id;
+                addWorkspaceContext({
+                  id: `project:${selection.project.id}`,
+                  kind: 'project',
+                  label,
+                  title: label,
+                  path: selection.project.id,
+                  ...(resolved ? { absolutePath: resolved } : {}),
+                });
+              }
+              notify(
+                `${items.length} project${items.length === 1 ? '' : 's'} added as read-only context.`,
+              );
+            }}
           />
         ) : null}
         {figmaModalOpen ? (

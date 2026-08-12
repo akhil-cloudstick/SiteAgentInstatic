@@ -2156,6 +2156,17 @@ export interface Dict {
   'designs.menuRename': string;
   'designs.menuDuplicate': string;
   'designs.menuDelete': string;
+  'designs.menuOpen': string;
+  'designs.tagBrand': string;
+  'designSystemPicker.label': string;
+  'entry.accountMenuAria': string;
+  'entry.accountMenuNamedAria': string;
+  'startDesk.recentsEmpty': string;
+  'startDesk.recentsEmptyAction': string;
+  'startDesk.typeDesignSystem': string;
+  'startDesk.workingDirLabel': string;
+  'startDesk.workingDirNone': string;
+  'startDesk.workingDirNeeded': string;
   'designs.renamePrompt': string;
   'designs.selectMode': string;
   'designs.cancelSelect': string;

@@ -56,7 +56,7 @@ import { cmsAdapter } from '@core/persistence/cms'
 import { useAdminUi } from '@admin/state/adminUi'
 import { useInstalledEditorPlugins } from '@admin/pages/plugins/hooks/useInstalledEditorPlugins'
 import { usePluginEventBridge } from '@admin/pages/plugins/hooks/usePluginEventBridge'
-import { AdminSectionNavigation } from '@admin/shared/AdminSectionNavigation'
+import { useAdminSectionDestinations } from '@admin/shared/AdminSectionNavigation'
 import { ProductHubHeader } from '@admin/shared/ProductHubHeader'
 import {
   CanvasFrameSkeletonFrame,
@@ -217,6 +217,14 @@ export function AdminCanvasLayout() {
     await persistence.saveSite()
   }
 
+  // Leaving the canvas for another workspace flushes the draft first, so a
+  // half-typed page is never lost to a nav click.
+  const destinations = useAdminSectionDestinations({
+    section: 'site',
+    currentUser,
+    onWorkspaceNavigateStart: canSaveSite ? saveBeforeWorkspaceNavigation : undefined,
+  })
+
   return (
     <EditorPermissionsProvider value={permissions}>
       <div
@@ -251,14 +259,7 @@ export function AdminCanvasLayout() {
             sync / preview / publish). The lazy mount gates on `previewOpen` so
             the chunk loads only when the user actually opens preview. */}
         <Toolbar
-          section="site"
-          adminNavigationSlot={(
-            <AdminSectionNavigation
-              section="site"
-              currentUser={currentUser}
-              onWorkspaceNavigateStart={canSaveSite ? saveBeforeWorkspaceNavigation : undefined}
-            />
-          )}
+          destinations={destinations}
           overlay={previewOpen && (
             <Suspense fallback={null}>
               <PreviewOverlay />

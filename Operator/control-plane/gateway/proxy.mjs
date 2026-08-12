@@ -46,6 +46,78 @@ function sessionSlug(req) {
   return null;
 }
 
+// ---- Product Hub context hand-off ---------------------------------------
+//
+// The MMSBUILD shared-header contract requires every route into a specialist
+// product to carry the authorized scope, so the product can render it in row 2
+// and return to the exact Hub view on "Back to Product Hub". Instatic receives
+// it as query params on its SSO URL (see hub.mjs `hubContextParams`); the
+// OpenDesign SPA has no such entry point — it is a client-rendered document —
+// so the gateway writes the same scope into the document as `window.__mmsHub`,
+// which `apps/web/src/state/hubContext.ts` validates and consumes.
+//
+// The scope is derived from the SIGNED session only, never from the URL: a
+// hand-edited address cannot widen it. The registry is infrastructure-only
+// (slug, ports, tier, owner) and holds no project record, so `project` is sent
+// as null rather than invented — the contract forbids substituting a default,
+// and the header renders the narrower scope cleanly.
+// "harbour-suites" -> "Harbour Suites"; "acme_co" -> "Acme Co".
+function titleFromSlug(slug) {
+  return String(slug || '')
+    .split(/[-_.\s]+/)
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+}
+
+// The signed-in person, from the only identity the registry holds. Initials feed
+// the shared header's account avatar; two letters at most, like the reference.
+function userFromTenant(tenant) {
+  const local = String(tenant?.owner_email || '').split('@')[0];
+  const name = titleFromSlug(local) || titleFromSlug(tenant?.slug) || null;
+  if (!name) return null;
+  const initials = name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((word) => word.charAt(0).toUpperCase())
+    .join('');
+  return { name, initials: initials || name.slice(0, 2).toUpperCase() };
+}
+
+function hubContextFor(tenant) {
+  const client = titleFromSlug(tenant?.slug) || null;
+  return {
+    hubBaseUrl: `${config.gatewayOrigin}/hub`,
+    role: 'operator',
+    user: userFromTenant(tenant),
+    client,
+    // No project record exists in the control-plane registry yet. Absent, not
+    // guessed — MMS Design shows the client scope and its own project chooser.
+    project: null,
+    site: tenant?.slug || null,
+    origin: 'hub',
+    returnUrl: `${config.gatewayOrigin}/hub`,
+  };
+}
+
+// Serialized into a <script> block. Only `<` needs escaping: an unescaped
+// `</script>` inside a JSON string would close the element early. U+2028/9
+// are legal inside JS string literals since ES2019, so they need no handling.
+function hubContextScript(context) {
+  const json = JSON.stringify(context).replace(/</g, "\\u003c");
+  return `<script>window.__mmsHub=${json}</script>`;
+}
+
+// Is this a top-level document navigation (as opposed to a sub-resource)? Only
+// documents carry the injected scope; `_next` assets and API calls must stream
+// through untouched.
+function isDocumentRequest(req) {
+  const dest = req.headers['sec-fetch-dest'];
+  if (dest) return dest === 'document';
+  return (req.headers.accept || '').includes('text/html');
+}
+
 // A backend served behind a path prefix (OpenDesign under /design) may issue a
 // ROOT-relative redirect — e.g. the OD daemon's SSO handler does `res.redirect('/')`
 // and Next.js proxies that Location through untouched. Left as-is it lands on the
@@ -104,18 +176,45 @@ function isDaemonPath(p) {
 // scheme/host so it can build correct absolute URLs and set Secure cookies.
 // `rewritePath` overrides the upstream path (used to restore the OD basePath).
 function forward(req, res, target) {
-  const { port, prefix, rewritePath } = target;
+  const { port, prefix, rewritePath, injectHead } = target;
   const headers = { ...req.headers };
   headers.host = `127.0.0.1:${port}`;
   headers['x-forwarded-proto'] = 'https';
   headers['x-forwarded-host'] = req.headers.host || '';
   headers['x-forwarded-for'] = req.socket?.remoteAddress || '';
+  // Rewriting the body means reading it, so ask the upstream for identity
+  // encoding rather than teaching this proxy to gunzip. Only the (small,
+  // single) SPA document takes this path; every asset still streams compressed.
+  if (injectHead) delete headers['accept-encoding'];
 
   const upstream = http.request(
     { host: '127.0.0.1', port, method: req.method, path: rewritePath || req.url, headers },
     (up) => {
-      res.writeHead(up.statusCode || 502, rewriteLocation(up.headers, prefix));
-      up.pipe(res);
+      const outHeaders = rewriteLocation(up.headers, prefix);
+      const isHtml = (up.headers['content-type'] || '').includes('text/html');
+      if (!injectHead || !isHtml) {
+        res.writeHead(up.statusCode || 502, outHeaders);
+        up.pipe(res);
+        return;
+      }
+      // Buffer the document so the scope can be written into <head> BEFORE the
+      // app's own scripts run — the shell reads `window.__mmsHub` during its
+      // first render, so a tag appended after the bundle would arrive too late.
+      const chunks = [];
+      up.on('data', (chunk) => chunks.push(chunk));
+      up.on('end', () => {
+        let html = Buffer.concat(chunks).toString('utf8');
+        const at = html.indexOf('<head>');
+        html = at >= 0
+          ? html.slice(0, at + 6) + injectHead + html.slice(at + 6)
+          : injectHead + html;
+        const body = Buffer.from(html, 'utf8');
+        const finalHeaders = { ...outHeaders, 'content-length': String(body.length) };
+        delete finalHeaders['transfer-encoding'];
+        res.writeHead(up.statusCode || 502, finalHeaders);
+        res.end(body);
+      });
+      up.on('error', () => { if (!res.writableEnded) res.end(); });
     },
   );
   upstream.on('error', (err) => {
@@ -161,7 +260,20 @@ async function resolveBackend(req, path) {
         rewritePath: req.url.slice(OD_PREFIX.length) || '/',
       };
     }
-    return { port: odRuntime.sharedWebPort(), kind: 'od', prefix: OD_PREFIX };
+    // The SPA document itself. Carry the authorized Product Hub scope into it
+    // so row 2 can show the real client, `Back to Product Hub` has a
+    // destination, and the account avatar shows the signed-in user — the
+    // shared-header contract's "context and return" requirement. Assets and
+    // client-side route changes never reach here, so this runs once per load.
+    const target = { port: odRuntime.sharedWebPort(), kind: 'od', prefix: OD_PREFIX };
+    if (isDocumentRequest(req)) {
+      const slug = sessionSlug(req);
+      const tenant = slug ? await getTenant(slug) : null;
+      // No session, or a session whose tenant is gone: inject nothing. The app
+      // then renders its no-Hub shape rather than a stale or borrowed scope.
+      if (tenant) target.injectHead = hubContextScript(hubContextFor(tenant));
+    }
+    return target;
   }
   // Base-less SUB-RESOURCE request FROM an OD page (an absolute /api, /artifacts
   // or asset URL that escaped the client-side basePath shim). Recognise it by the

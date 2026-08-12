@@ -28,6 +28,30 @@
     "paths": {
       "@/*": [
         "./*"
+      ],
+      "@mms/shell": [
+        "../../packages/mms-shell/src/index.ts"
+      ],
+      "@mms/shell/*": [
+        "../../packages/mms-shell/src/*"
+      ],
+      /* `shared/mms-shell` sits outside this workspace and has no node_modules
+         above it, so its own `import ... from 'react'` resolves nowhere and
+         every component in it degrades to `any`. Pin both specifiers to the
+         workspace copies — exactly ONE target each: Next's SWC tsconfig
+         resolver panics on a non-wildcard `paths` key with more than one
+         entry, which fails the build before it starts. */
+      "react": [
+        "../../node_modules/@types/react"
+      ],
+      "react/*": [
+        "../../node_modules/@types/react/*"
+      ],
+      "react-dom": [
+        "../../node_modules/@types/react-dom"
+      ],
+      "react-dom/*": [
+        "../../node_modules/@types/react-dom/*"
       ]
     }
   },

@@ -7,9 +7,12 @@ import { AdminContextMenuGuard } from './shared/AdminContextMenuGuard'
 import { AdminZoomGuard } from './shared/AdminZoomGuard'
 import { ErrorBoundary, flattenErrorChain, logErrorChain } from '@ui/components/ErrorBoundary'
 import { ToastProvider, pushToast } from '@ui/components/Toast'
+// globals.css now @imports the shared font faces, token layer and Font Awesome
+// from `@mms/shell` — see the note at the top of that file. Remix Icon stays a
+// CMS-local vendor: the shared shell draws in Font Awesome Solid, this product
+// draws everything else in Remix.
 import '../styles/globals.css'
 import '../styles/remixicon/remixicon.css'
-import '../styles/fontawesome/fontawesome-solid.css'
 
 // `installPluginRuntime()` used to be called here, eagerly. That dragged
 // the whole plugin-host-hooks module (which imports `useEditorStore` from

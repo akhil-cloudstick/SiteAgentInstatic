@@ -32,7 +32,7 @@ const SCAN_ROOTS = [
   join(SRC_ROOT, 'editor'),
   join(SRC_ROOT, 'ui'),
 ]
-const GLOBALS_CSS = join(SRC_ROOT, 'styles/globals.css')
+import { TOKEN_LAYER_FILES } from './tokenLayer'
 
 /**
  * Match `var(--name` followed by a comma at the same paren depth. We can't use
@@ -108,7 +108,7 @@ describe('CSS var() fallback policy — no `var(--name, fallback)`', () => {
     for (const root of SCAN_ROOTS) {
       cssFiles.push(...collectFiles(root, ['.css']))
     }
-    if (existsSync(GLOBALS_CSS)) cssFiles.push(GLOBALS_CSS)
+    for (const file of TOKEN_LAYER_FILES) if (existsSync(file)) cssFiles.push(file)
 
     for (const filePath of cssFiles) {
       const stripped = stripComments(readFileSync(filePath, 'utf8'))

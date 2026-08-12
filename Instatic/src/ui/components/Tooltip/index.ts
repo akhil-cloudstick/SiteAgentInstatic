@@ -1,4 +1,3 @@
-export { Tooltip } from './Tooltip'
-export { CursorTooltip } from './CursorTooltip'
-export type { TooltipSide } from './Tooltip'
-export type { CursorTooltipPoint } from './CursorTooltip'
+/** Tooltip — now owned by `@mms/shell` (Button renders it). */
+export { Tooltip, CursorTooltip } from '@mms/shell'
+export type { TooltipSide, CursorTooltipPoint } from '@mms/shell'

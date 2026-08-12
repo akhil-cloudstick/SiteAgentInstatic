@@ -76,6 +76,7 @@ function resolveWorkspaceRoot(): string {
 }
 
 const WORKSPACE_ROOT = resolveWorkspaceRoot();
+
 const toPosixPath = (value: string) => value.replaceAll('\\', '/');
 
 function resolveDistDir(defaultValue: string) {
@@ -171,7 +172,12 @@ const nextConfig: NextConfig = {
   // to inject chunk IDs, upload to PostHog, and ALWAYS delete the .map files
   // before packaging so source never ships inside an installer.
   productionBrowserSourceMaps: true,
-  transpilePackages: ['@open-design/components'],
+  // `@mms/shell` is the MMSBUILD two-row shell, shared verbatim with MMS-CMS.
+  // It is a workspace package rather than a folder outside the repo's app roots
+  // because Turbopack will not read source or assets from outside the app's
+  // package — see `pending.md` at the repo root for that constraint and the
+  // structure change it implies.
+  transpilePackages: ['@open-design/components', '@mms/shell'],
   turbopack: {
     root: WORKSPACE_ROOT,
   },

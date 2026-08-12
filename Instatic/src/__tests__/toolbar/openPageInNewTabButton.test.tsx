@@ -85,7 +85,7 @@ describe('Toolbar — Open live page icon button', () => {
       // rightSlot here — the icon must still appear.
       render(
         <Wrapper>
-          <Toolbar />
+          <Toolbar destinations={[]} />
         </Wrapper>,
       )
 
@@ -112,7 +112,7 @@ describe('Toolbar — Open live page icon button', () => {
     try {
       render(
         <Wrapper>
-          <Toolbar />
+          <Toolbar destinations={[]} />
         </Wrapper>,
       )
 
@@ -142,7 +142,7 @@ describe('Toolbar — Open live page icon button', () => {
     try {
       render(
         <Wrapper>
-          <Toolbar />
+          <Toolbar destinations={[]} />
         </Wrapper>,
       )
 
@@ -171,7 +171,7 @@ describe('Toolbar — Open live page icon button', () => {
     try {
       render(
         <Wrapper>
-          <Toolbar />
+          <Toolbar destinations={[]} />
         </Wrapper>,
       )
 

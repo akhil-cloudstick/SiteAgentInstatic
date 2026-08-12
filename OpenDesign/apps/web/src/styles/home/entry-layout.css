@@ -8,9 +8,15 @@
 /* Header-less shell variant. The rail's logo replaces the chrome
    brand and a floating top-right control replaces the chrome
    actions, so the entry view does not render `AppChromeHeader`. */
+/* THREE stacked tracks, not one: the MMSBUILD shared shell puts row 1
+   (Product Hub) and row 2 (MMS Design specialist navigation) above the body.
+   The old single `1fr` track dates from when the rail was the only chrome —
+   leaving it collapses all three children into one overlapping row.
+   `minmax(0, 1fr)` on the body is what gives its `overflow-y: auto` a bounded
+   track to scroll inside. */
 .entry-shell--no-header {
-  grid-template-rows: 1fr;
-  --entry-rail-width: 56px;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  --entry-rail-width: 0px;
 }
 
 .entry-shell--onboarding {
@@ -36,12 +42,11 @@
    column animates between 0 and the rail width. Collapsed = clean full-width
    entry for new users; expanded = the rail docks and pushes the main content
    to the right (it stays docked until the user collapses it again). */
+/* Single column: the rail's destinations moved into the shared shell's row 2,
+   so the body no longer reserves a track for it. */
 .entry-shell--no-header .entry {
-  grid-template-columns: 0 minmax(0, 1fr);
-  transition: grid-template-columns 200ms cubic-bezier(0.23, 1, 0.32, 1);
-}
-.entry-shell--no-header .entry.entry--rail-open {
-  grid-template-columns: var(--entry-rail-width, 56px) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
+  min-height: 0;
 }
 
 /* Left rail — docked column. Lives in the grid's first track; collapsed the

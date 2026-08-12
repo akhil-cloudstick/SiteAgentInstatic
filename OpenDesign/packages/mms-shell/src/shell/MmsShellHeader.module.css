@@ -1,0 +1,330 @@
+/* ProductHubHeader — row 1 of the MMSBUILD shared shell.
+ *
+ * Geometry and palette are inherited wholesale from the approved header track
+ * (`--toolbar-*`) rather than re-derived, because this row IS that header — the
+ * shared shell took ownership of the brand lockup, the hairline, and the round
+ * utility buttons when the CMS navigation moved down to row 2. Keeping one
+ * token group means the two rows can never drift apart.
+ */
+
+.header {
+    display: flex;
+    /* `stretch`, not `center`: the brand, the context control and the Hub nav
+       each own the full track height in the approved header, which is what
+       makes their hover tints read as full-height columns rather than pills. */
+    align-items: stretch;
+    height: var(--hub-shell-height);
+    padding: 0 var(--toolbar-pad-end) 0 var(--toolbar-pad-start);
+    gap: 0;
+    flex-shrink: 0;
+    position: sticky;
+    top: 0;
+    /* Above row 2 (z 50) so the utility dropdowns and the compact menu render
+       over the specialist navigation rather than under it. */
+    z-index: 60;
+    user-select: none;
+    background: var(--toolbar-bg);
+    border-bottom: 1px solid var(--toolbar-border);
+}
+
+/* The approved screen's single focus treatment: a three-pixel gold halo, the
+   same in both themes. Scoped to the row so it does not restyle either product
+   below it, each of which has its own ring. */
+.header :is(a, button, input, select):focus-visible {
+    outline: none;
+    box-shadow: var(--toolbar-focus-ring);
+}
+
+/* ── Brand lockup ─────────────────────────────────────────────────────────
+ * One artwork per theme (mascot + wordmark baked into a single PNG); the dark
+ * asset is drawn slightly larger per the reference, hence two box metrics. */
+.brand {
+    display: grid;
+    flex: 0 0 auto;
+    min-width: 174px;
+    height: 100%;
+    padding: 0 18px 0 0;
+    place-items: center start;
+    text-decoration: none;
+}
+
+/* One box for both themes. The approved header sizes the lockup identically in
+   light and dark — the artwork differs, the frame does not — so a per-theme
+   width would shift everything to its right by 7px on a theme toggle. */
+.brandMark {
+    display: block;
+    width: 145px;
+    height: 30px;
+    max-width: 100%;
+    object-fit: contain;
+    object-position: left center;
+    user-select: none;
+}
+
+/* ── Product Hub context control ──────────────────────────────────────────
+ * `Product Hub › <product>`. Reads as one lockup: the primary label carries
+ * the weight, the caret is subordinate, the secondary label names where you
+ * currently are. Not a nav item — it never takes an active state. */
+.context {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-start;
+    align-self: stretch;
+    gap: 9px;
+    flex-shrink: 0;
+    min-width: 150px;
+    /* The approved header separates the lockup from the brand with a hairline
+       rather than whitespace, so the control owns a full-height left rule and
+       carries no left margin of its own. */
+    padding: 0 20px;
+    border-left: 1px solid var(--toolbar-border);
+    color: var(--toolbar-text);
+    font-family: var(--font-nav);
+    font-weight: 650;
+    text-align: left;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+/* Only the linked form is interactive; without a Hub this renders as a span
+   and correctly gets no hover affordance. */
+a.context:hover {
+    background: var(--toolbar-hover-bg);
+    color: var(--toolbar-text);
+}
+
+.contextMark {
+    display: grid;
+    width: 32px;
+    height: 32px;
+    flex: 0 0 32px;
+    place-items: center;
+    border-radius: 7px;
+    background: var(--toolbar-icon-tint);
+    color: var(--toolbar-accent);
+}
+
+.contextCopy {
+    display: grid;
+    gap: var(--space-px);
+    min-width: 0;
+}
+
+.contextPrimary {
+    font-size: 13px;
+    font-weight: 760;
+}
+
+.contextCaret {
+    margin-left: auto;
+    color: var(--text-subtle);
+}
+
+.contextSecondary {
+    color: var(--toolbar-text-muted);
+    font-size: 10px;
+    font-weight: 500;
+}
+
+/* ── Help ─────────────────────────────────────────────────────────────────
+ * Labelled pill rather than a round glyph — see HelpButton. */
+.helpButton {
+    gap: 8px;
+    height: 44px;
+    padding: 0 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 620;
+}
+
+/* ── Role-scoped Hub navigation ───────────────────────────────────────────
+ * Same tab metrics as the specialist row so the two navigations read as one
+ * system. No active treatment: inside the CMS, no Hub destination is current
+ * (contract §"Active state"). */
+/* Role-scoped Hub links. Text-only and un-gapped: they are the WIDEST tier of
+   navigation on the page, so the approved header gives them plain labels and
+   lets their own padding do the spacing, keeping the visual weight on row 2's
+   specialist rail where the user actually is. */
+.hubNav {
+    display: flex;
+    align-items: stretch;
+    align-self: stretch;
+    min-width: 0;
+    margin-left: var(--toolbar-hub-nav-offset);
+    overflow: hidden;
+}
+
+.hubLink {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    align-self: stretch;
+    padding: 0 var(--toolbar-hub-tab-pad);
+    color: var(--toolbar-text-muted);
+    font-family: var(--font-nav);
+    font-size: 12px;
+    font-weight: 610;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.hubLink:hover {
+    background: var(--toolbar-hover-bg);
+    color: var(--toolbar-text);
+}
+
+/* No Hub behind this install: the links render for parity with the approved
+   chrome but must not offer an affordance they cannot honour. */
+.hubLink[aria-disabled="true"] {
+    cursor: default;
+}
+
+.hubLink[aria-disabled="true"]:hover {
+    background: transparent;
+    color: var(--toolbar-text-muted);
+}
+
+.spacer {
+    flex: 1;
+    min-width: var(--space-s);
+}
+
+/* ── Utilities: Help → Notifications → Theme → Settings → Account ─────────
+ * Round 44px buttons, 4px apart, warm tint on hover — the reference's
+ * `.icon-button` cluster. `[type]` is always emitted by the Button primitive;
+ * including it lifts this rule above `.variant-ghost:hover` in
+ * Button.module.css without depending on stylesheet order. */
+.utilities {
+    display: flex;
+    align-items: center;
+    /* 2px, not the nav gap: these are 44px round buttons whose own padding
+       already separates the glyphs, so the approved header packs them tight. */
+    gap: 2px;
+    flex-shrink: 0;
+}
+
+.utilities button[type]:hover {
+    background: var(--toolbar-hover-bg);
+}
+
+/* ── Account avatar ───────────────────────────────────────────────────────
+ * The identity anchor at the end of the row: a 40px green-ringed disc holding
+ * the signed-in user's initials.
+ *
+ * Exposed as a GLOBAL class rather than a module class because the control
+ * itself is rendered by the product (through `accountSlot`) — its menu is the
+ * product's, its chrome is the shell's. This is the same contract
+ * `.mms-new-project` uses for row 2's local action. Products opt in by putting
+ * `mms-shell-avatar` on their account trigger; the shell owns every value here
+ * so the disc cannot drift between MMS Design and MMS-CMS. */
+:global(.mms-shell-avatar) {
+    display: grid;
+    width: 40px;
+    height: 40px;
+    flex: 0 0 40px;
+    margin-left: 5px;
+    place-items: center;
+    border: 1px solid var(--toolbar-accent);
+    border-radius: 50%;
+    background: var(--toolbar-icon-tint);
+    color: var(--toolbar-accent-strong);
+    font-family: var(--font-nav);
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+}
+
+:global(.mms-shell-avatar):hover {
+    background: var(--toolbar-hover-bg);
+    color: var(--toolbar-text);
+}
+
+@media (max-width: 360px) {
+    :global(.mms-shell-avatar) {
+        width: 36px;
+        height: 36px;
+        flex-basis: 36px;
+    }
+}
+
+/* ── Compact behaviour ────────────────────────────────────────────────────
+ * Below the 1100px tier the row keeps its identity (brand, context) plus the
+ * two controls that must stay legible at a glance — the unread count and who
+ * you are signed in as. Help, Theme and Settings, and the Hub navigation,
+ * move into the compact menu. Row 2 has its own, separate overflow: the
+ * contract forbids merging the specialist navigation into this menu. */
+.wideOnly {
+    display: contents;
+}
+
+.compactOnly {
+    display: none;
+}
+
+@media (max-width: 1100px) {
+    .hubNav,
+    .wideOnly {
+        display: none;
+    }
+
+    .compactOnly {
+        display: inline-flex;
+    }
+
+    .context {
+        margin-left: 2px;
+    }
+}
+
+@media (max-width: 760px) {
+    .brand {
+        min-width: 128px;
+    }
+
+    .brandMark {
+        width: 118px;
+        height: 27px;
+    }
+
+    .context {
+        min-width: 132px;
+        padding: 0 8px;
+    }
+
+    /* Below the specialist tier the tinted mark is the first thing to go: the
+       label carries the same meaning in a third of the width. */
+    .contextMark {
+        display: none;
+    }
+
+    .contextPrimary {
+        font-size: 12px;
+    }
+}
+
+@media (max-width: 360px) {
+    /* The round utilities shed 8px each so the identity keeps its label at the
+       narrowest supported width. */
+    .utilities > * button[type],
+    .utilities > button[type] {
+        width: 36px;
+        min-width: 36px;
+    }
+
+    .brand {
+        min-width: 96px;
+    }
+
+    .brandMark {
+        width: 88px;
+    }
+
+    .context {
+        min-width: 126px;
+        max-width: none;
+        gap: 5px;
+        padding: 0 4px;
+    }
+}

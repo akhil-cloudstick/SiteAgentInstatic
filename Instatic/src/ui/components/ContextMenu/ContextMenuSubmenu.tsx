@@ -16,8 +16,8 @@ import {
   computeFloatingPosition,
   type ResolvedFloatingSide,
 } from '@ui/lib/floatingPosition'
-import { useContextMenuPanelRegistry } from './contextMenuPanels'
-import styles from './ContextMenu.module.css'
+import { useContextMenuPanelRegistry } from '@mms/shell'
+import styles from '@mms/shell/primitives/ContextMenu/ContextMenu.module.css'
 
 interface ContextMenuSubmenuProps {
   /** Trigger label — displayed on the submenu row */

@@ -58,9 +58,22 @@ export function applyAppearanceToDocument({
     root.removeAttribute('data-theme');
   }
 
-  const normalized = resolveAccentColor(accentColor);
-  const vars = accentVars(normalized);
+  // Inline style on <html> outranks every stylesheet, so writing the accent
+  // unconditionally would sever `--accent`'s alias to the shared `--mms-action`
+  // token and leave the shared header's green a few hex points off the page's.
+  // Only a genuine user choice may override the design system; otherwise clear
+  // any previously-written override and let the token layer decide.
+  const chosen = normalizeAccentColor(accentColor);
+  if (!chosen || chosen === LEGACY_DEFAULT_ACCENT) {
+    for (const name of ACCENT_VARS) root.style.removeProperty(name);
+    root.style.removeProperty('--mms-action');
+    return;
+  }
+
+  const vars = accentVars(chosen);
   for (const name of ACCENT_VARS) {
     root.style.setProperty(name, vars[name]);
   }
+  // Keep the shared token in step so shell chrome follows a custom accent too.
+  root.style.setProperty('--mms-action', chosen);
 }

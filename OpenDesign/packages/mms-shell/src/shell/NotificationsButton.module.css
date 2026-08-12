@@ -1,0 +1,97 @@
+/* NotificationsButton — bell trigger, unread badge, and the dropdown list. */
+
+/* The badge is absolutely positioned against the 44px round button, so the
+   trigger has to establish the containing block. */
+.trigger {
+    position: relative;
+    overflow: visible;
+}
+
+/* Unread pill on the bell's upper-right, at the approved header's exact
+   metrics. The 2px ring is the row's own background, not a border colour: it
+   punches the pill out of the bell so a two-digit count stays readable where it
+   overlaps the glyph. */
+.badge {
+    position: absolute;
+    top: 2px;
+    right: 1px;
+    display: grid;
+    min-width: 17px;
+    height: 17px;
+    padding: 0 4px;
+    place-items: center;
+    border: 2px solid var(--toolbar-bg);
+    border-radius: 9px;
+    background: var(--toolbar-danger);
+    color: #fff;
+    font-family: var(--font-nav);
+    font-size: 9px;
+    font-weight: 800;
+    line-height: 13px;
+    pointer-events: none;
+}
+
+/* ── Dropdown ─────────────────────────────────────────────────────────────── */
+
+.header {
+    padding: var(--space-s) var(--space-m) var(--space-2xs);
+    color: var(--text-subtle);
+    font-size: var(--text-2xs);
+    font-weight: 600;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+}
+
+.empty {
+    margin: 0;
+    padding: var(--space-s) var(--space-m) var(--space-m);
+    color: var(--text-muted);
+    font-size: var(--text-s);
+}
+
+.list {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 0 0 var(--space-2xs);
+    list-style: none;
+}
+
+.item {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4xs);
+    padding: var(--space-2xs) var(--space-m) var(--space-s);
+    border-left: 2px solid transparent;
+}
+
+/* Kind is an identity stripe, not a fill — the panel stays achromatic so a
+   long list doesn't read as a wall of alarm. */
+.item[data-kind='error'] {
+    border-left-color: var(--danger);
+}
+
+.item[data-kind='warning'] {
+    border-left-color: var(--warning);
+}
+
+.item[data-kind='info'] {
+    border-left-color: var(--accent-3);
+}
+
+.itemTitle {
+    color: var(--text-bright);
+    font-size: var(--text-s);
+    font-weight: 600;
+}
+
+.itemBody {
+    color: var(--text-muted);
+    font-size: var(--text-xs);
+    line-height: 1.45;
+}
+
+.itemAge {
+    color: var(--text-subtle);
+    font-size: var(--text-3xs);
+}

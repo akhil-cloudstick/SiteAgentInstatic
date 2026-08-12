@@ -93,7 +93,8 @@ import { CenteredLoader } from './Loading';
 import { DesignsTab } from './DesignsTab';
 import { DesignSystemsTab } from './DesignSystemsTab';
 import { BrandsTab } from './BrandsTab';
-import { EntryNavRail, type EntryView as EntryViewKind } from './EntryNavRail';
+import type { EntryView as EntryViewKind } from './EntryNavRail';
+import { DesignShellRows } from './shell/DesignShellRows';
 import { LibrarySection } from './LibrarySection';
 import { UpdaterPopup } from './UpdaterPopup';
 // MMS rebrand: GithubStarBadge is deliberately NOT imported or rendered in the
@@ -161,6 +162,7 @@ import {
 } from '../state/config';
 import type { KnownProvider } from '../state/config';
 import { saveOnboardingProfile } from '../state/onboarding-profile';
+import { useHubContext } from '../state/hubContext';
 import { testAgent, testApiProvider } from '../providers/connection-test';
 import { fetchProviderModels } from '../providers/provider-models';
 import {
@@ -898,11 +900,38 @@ export function EntryShell({
     return ok;
   }
 
+  // The Product Hub scope this session was opened with — read once here so the
+  // shell rows and the Start Desk's inherited-context surfaces all describe the
+  // same hand-off rather than each resolving it separately.
+  const hubContext = useHubContext();
+
+  // The shared shell's theme toggle is a two-state control, so `system` has to
+  // resolve to what the user is actually looking at before it can be shown.
+  const shellTheme: 'light' | 'dark' =
+    (config.theme ?? 'system') === 'dark'
+      ? 'dark'
+      : (config.theme ?? 'system') === 'light'
+        ? 'light'
+        : typeof window !== 'undefined' &&
+            window.matchMedia?.('(prefers-color-scheme: dark)').matches
+          ? 'dark'
+          : 'light';
+
+  // Row 1's account control. The shared shell ends its utility run with the
+  // signed-in user's initials, so this menu wears the avatar rather than a
+  // second gear beside the shell's own Settings gear. The initials come from
+  // the Product Hub hand-off — the only place that authenticates anyone — and
+  // are absent, not invented, when no Hub identified a user.
   const avatarMenu = (
     <EntrySettingsMenu
       config={config}
       onThemeChange={onThemeChange}
       onOpenSettings={onOpenSettings}
+      triggerVariant="account"
+      account={{
+        name: hubContext?.user?.name ?? null,
+        initials: hubContext?.user?.initials ?? null,
+      }}
       onTrackTriggerClick={() => {
         trackHomeToolbarClick(analytics.track, {
           page_name: 'home',
@@ -979,33 +1008,43 @@ export function EntryShell({
 
   return (
     <div className="entry-shell entry-shell--no-header">
-      <div className={`entry${railOpen ? ' entry--rail-open' : ''}`}>
-        <EntryNavRail
-          view={view}
-          onViewChange={changeView}
-          onNewProject={() => {
-            trackHomeNavClick(analytics.track, {
-              page_name: 'home',
-              area: 'nav',
-              element: 'new_project_plus',
-            });
-            openNewProject();
-          }}
-          open={railOpen}
-          onClose={() => setRailOpen(false)}
-        />
+      {/* The MMSBUILD shared shell — row 1 (Product Hub) and row 2 (MMS Design
+          specialist navigation), both rendered from `@mms/shell` so the CMS and
+          this product can never drift. It replaces the left icon rail: the six
+          destinations are the same views the rail routed to, driven by the same
+          `changeView`, so nothing about routing changed. */}
+      <DesignShellRows
+        view={view}
+        onSelectView={changeView}
+        theme={shellTheme}
+        onToggleTheme={() => onThemeChange(shellTheme === 'dark' ? 'light' : 'dark')}
+        // Help and Notifications keep their existing surfaces: the help menu
+        // that used to sit in the rail footer, and the message centre that used
+        // to sit in the topbar. Both still live in this shell — the shared row
+        // only owns their trigger, per the contract's "each utility exactly
+        // once" rule.
+        onOpenHelp={() => onOpenSettings('language')}
+        onOpenSettings={() => onOpenSettings('appearance')}
+        onOpenNotifications={() => onOpenSettings('notifications')}
+        notificationCount={0}
+        onNewProject={() => {
+          trackHomeNavClick(analytics.track, {
+            page_name: 'home',
+            area: 'nav',
+            element: 'new_project_plus',
+          });
+          openNewProject();
+        }}
+        accountSlot={avatarMenu}
+      />
+      <div className="entry">
         <main className="entry-main entry-main--scroll" ref={entryMainScrollRef}>
+          {/* What survives of the old topbar. Navigation, theme, settings and
+              the account menu all moved up into the shared shell rows; the
+              rail-expand toggle went with the rail it opened. The popups below
+              stay because they are MMS Design's own runtime surfaces, not
+              shared-shell utilities. */}
           <div className="entry-main__topbar">
-            <button
-              type="button"
-              className="entry-rail-toggle"
-              onClick={() => setRailOpen((prev) => !prev)}
-              aria-label={t('entry.navExpand')}
-              aria-expanded={railOpen}
-              data-testid="entry-rail-toggle"
-            >
-              <Icon name="panel-left" size={20} />
-            </button>
             <div className="entry-main__topbar-chips entry-main__topbar-chips--icon-only">
               {/* MMS rebrand: GitHub-star badge and Teams chip removed. */}
               <a
@@ -1066,7 +1105,7 @@ export function EntryShell({
             <MessageCenter
               onOpenNotificationSettings={() => onOpenSettings('notifications')}
             />
-            {avatarMenu}
+            {/* The account control now lives in row 1 of the shared shell. */}
             {amrBalanceGateBlock ? (
               <AmrBalanceDialog
                 reason={amrBalanceGateBlock.reason}

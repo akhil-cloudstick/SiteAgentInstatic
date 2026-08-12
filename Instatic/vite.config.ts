@@ -180,6 +180,20 @@ export default defineConfig({
       '@content': path.resolve(__dirname, 'src/admin/pages/content'),
       '@plugins': path.resolve(__dirname, 'src/admin/pages/plugins'),
       '@users': path.resolve(__dirname, 'src/admin/pages/users'),
+      // The MMSBUILD two-row shell and the primitives it renders with, shared
+      // as SOURCE with MMS Design so one edit lands in both products. Aliased
+      // rather than installed as a dependency precisely so there is no build
+      // step between editing it and seeing it here.
+      '@mms/shell': path.resolve(__dirname, '../OpenDesign/packages/mms-shell/src'),
+      '@mms': path.resolve(__dirname, '../OpenDesign/packages/mms-shell/src'),
+      // The shell's own `import ... from 'react'` resolves by walking up from
+      // ITS directory, which is outside this project and has no node_modules.
+      // Pinning both specifiers here guarantees the shared components compile
+      // against exactly the React this app ships — never a second copy, which
+      // would give the header its own hook dispatcher and break every state
+      // update inside it.
+      react: path.resolve(__dirname, 'node_modules/react'),
+      'react-dom': path.resolve(__dirname, 'node_modules/react-dom'),
       // pixel-art-icons resolves through node_modules (link: dep during local
       // dev, registry version once published). No alias needed.
     },
@@ -222,6 +236,12 @@ export default defineConfig({
     },
   },
   server: {
+    fs: {
+      // `../shared/mms-shell` lives outside this project root, so the dev
+      // server has to be allowed to serve it. Build is unaffected — Rolldown
+      // bundles aliased source regardless of where it sits.
+      allow: [path.resolve(__dirname), path.resolve(__dirname, '../OpenDesign/packages/mms-shell')],
+    },
     watch: {
       // Runtime-written paths: the publish pipeline bakes HTML into the uploads
       // dir, the SQLite DB and E2E artefacts live under .tmp, and dist holds the

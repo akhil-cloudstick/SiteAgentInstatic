@@ -114,6 +114,18 @@ const UNDO_REDO_HOOK = new URL(
   import.meta.url,
 )
 
+// Both shell rows moved to `@mms/shell` when the MMSBUILD header became one
+// component shared with MMS Design. The markup contracts below are asserted
+// against that source, because that is where a regression would now land.
+const SHARED_SHELL_HEADER = new URL(
+  '../../../../OpenDesign/packages/mms-shell/src/shell/MmsShellHeader.tsx',
+  import.meta.url,
+)
+const SHARED_SPECIALIST_ROW = new URL(
+  '../../../../OpenDesign/packages/mms-shell/src/shell/MmsSpecialistRow.tsx',
+  import.meta.url,
+)
+
 describe('useUndoRedoShortcuts — keyboard-only editor history', () => {
   it('no Undo/Redo buttons survive anywhere in the editor chrome', () => {
     // The buttons were removed from the canvas notch; the shortcuts are the
@@ -392,29 +404,23 @@ describe('Toolbar — structural requirements', () => {
     // the shared utilities. `Toolbar` (row 2) sits beneath it and holds only
     // this product's navigation, so a second <header> there would announce two
     // banner landmarks on one page.
+    // Both rows now live in `@mms/shell` and are rendered verbatim by MMS
+    // Design too, so the landmark contract is asserted against the shared
+    // source — this product's `ProductHubHeader` / `Toolbar` are adapters that
+    // supply contents, not markup.
     const { readFileSync } = require('fs')
-    const hubRow = readFileSync(
-      new URL('../../admin/shared/ProductHubHeader/ProductHubHeader.tsx', import.meta.url),
-      'utf-8',
-    )
+    const hubRow = readFileSync(SHARED_SHELL_HEADER, 'utf-8')
     expect(hubRow).toContain('<header')
     expect(hubRow).not.toContain('role="banner"')
 
-    const productRow = readFileSync(
-      new URL('../../admin/pages/site/toolbar/Toolbar.tsx', import.meta.url),
-      'utf-8',
-    )
+    const productRow = readFileSync(SHARED_SPECIALIST_ROW, 'utf-8')
     expect(productRow).not.toContain('<header')
     expect(productRow).toContain('role="navigation"')
   })
 
   it('source has data-testid="toolbar" for Playwright targeting', () => {
     const { readFileSync } = require('fs')
-    const src = readFileSync(
-      new URL('../../admin/pages/site/toolbar/Toolbar.tsx', import.meta.url),
-      'utf-8',
-    )
-    expect(src).toContain('data-testid="toolbar"')
+    expect(readFileSync(SHARED_SPECIALIST_ROW, 'utf-8')).toContain('data-testid="toolbar"')
   })
 
   it('Toolbar is a prop-driven shell — EDITOR-only buttons live in AdminCanvasLayout, global trailer lives in the shell', () => {
@@ -441,9 +447,12 @@ describe('Toolbar — structural requirements', () => {
     expect(toolbarSrc).not.toContain("from './ZoomControls'")
     expect(toolbarSrc).not.toContain("from './PublishButton'")
     expect(toolbarSrc).not.toContain('saveStatus={saveStatus}')
-    // Row 2's own trailer: the live-page link and the Hub return.
+    // Row 2's own trailer: this product supplies the live-page link; the Hub
+    // return is the shared row's, configured by side because MMS Design puts
+    // it leftmost and the CMS keeps it right (DECISIONS 2026-08-10).
     expect(toolbarSrc).toContain('<OpenLivePageButton />')
-    expect(toolbarSrc).toContain('<BackToProductHubButton />')
+    expect(toolbarSrc).toContain("position: 'right'")
+    expect(readFileSync(SHARED_SPECIALIST_ROW, 'utf-8')).toContain('BackToProductHubButton')
     // None of the five shared utilities may reappear here.
     expect(toolbarSrc).not.toContain('<SettingsButton />')
     expect(toolbarSrc).not.toContain('<ThemeToggleButton />')
@@ -634,9 +643,21 @@ describe('Toolbar — structural requirements', () => {
       'PublishActionGroup.tsx',
     ]
     const { readFileSync, existsSync } = require('fs')
-    // Read the shared Toolbar.module.css once — all Toolbar sub-components use it
-    const cssUrl = new URL('../../admin/pages/site/toolbar/Toolbar.module.css', import.meta.url)
-    const sharedCss = existsSync(cssUrl.pathname) ? readFileSync(cssUrl, 'utf-8') : ''
+    // The row's chrome now lives in `@mms/shell`; this product's own slot
+    // styling stayed behind in Toolbar.module.css. A sub-component's height can
+    // be declared in either, so both count as "the shared CSS" here.
+    // `existsSync` takes the URL object, not `.pathname` — on Windows the
+    // latter is `/S:/…`, which never exists and silently blanked this check.
+    const cssUrls = [
+      new URL('../../admin/pages/site/toolbar/Toolbar.module.css', import.meta.url),
+      new URL(
+        '../../../../OpenDesign/packages/mms-shell/src/shell/MmsSpecialistRow.module.css',
+        import.meta.url,
+      ),
+    ]
+    const sharedCss = cssUrls
+      .map((url) => (existsSync(url) ? readFileSync(url, 'utf-8') : ''))
+      .join('\n')
     for (const file of files) {
       const tsx = readFileSync(
         new URL(`../../admin/pages/site/toolbar/${file}`, import.meta.url),
@@ -785,11 +806,13 @@ describe('SettingsModal — WCAG 2.4.3 focus-return on close (Guideline #225)', 
 describe('SettingsButton — section ID matches a valid SectionId', () => {
   it("dispatches 'general' (a valid SectionId after dropping the Pages section)", () => {
     const { readFileSync } = require('fs')
-    // SettingsButton moved to row 1 when the shared header reclaimed the gear.
+    // The gear itself is the shared row's; WHICH settings section it opens is
+    // this product's decision, passed in as the `settings.onOpen` callback —
+    // so the section id is asserted against the adapter, not the shell.
     // Reading the URL object directly (not `.pathname`) keeps this resolvable
     // on Windows, where a file: pathname is `/S:/…`.
     const src = readFileSync(
-      new URL('../../admin/shared/ProductHubHeader/SettingsButton.tsx', import.meta.url),
+      new URL('../../admin/shared/ProductHubHeader/ProductHubHeader.tsx', import.meta.url),
       'utf-8',
     ) as string
     // 'pages' / 'breakpoints' / 'conditions' were dropped from the modal —

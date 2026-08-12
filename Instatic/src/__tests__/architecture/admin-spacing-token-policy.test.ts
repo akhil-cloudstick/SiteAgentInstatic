@@ -12,7 +12,7 @@ import { extname, join, relative } from 'path'
 
 const SRC_ROOT = join(import.meta.dir, '../..')
 const SCAN_ROOTS = [join(SRC_ROOT, 'admin'), join(SRC_ROOT, 'ui')]
-const GLOBALS_CSS = join(SRC_ROOT, 'styles/globals.css')
+import { readTokenLayer } from './tokenLayer'
 const EDITOR_CHROME_INJECTOR = join(SRC_ROOT, 'admin/pages/site/canvas/EditorChromeInjector.tsx')
 
 const ADMIN_SPACE_FLUID_TOKENS = [
@@ -118,7 +118,7 @@ function findSvgDimensions(filePath: string, source: string): string[] {
 
 describe('admin spacing tokens', () => {
   it('declares the admin fluid spacing scale in globals.css', () => {
-    const globals = readFileSync(GLOBALS_CSS, 'utf8')
+    const globals = readTokenLayer()
 
     expect(globals).toContain('--space-px: 1px;')
     for (const token of ADMIN_SPACE_FLUID_TOKENS) {

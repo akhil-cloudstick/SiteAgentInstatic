@@ -1,15 +1,9 @@
 /**
- * Class composition helper for the instatic.
+ * Class composition helper — now owned by `@mms/shell`.
  *
- * Joins truthy strings into a single space-separated className.
- * Falsy values (false / null / undefined) are dropped so callers can
- * use boolean short-circuits: cn(styles.foo, isActive && styles.active)
- *
- * In-house: NO external dependency. This codebase uses CSS Modules,
- * not Tailwind — there is no need for clsx, tailwind-merge, or cva.
+ * It moved there with the shared two-row shell: the shell's own CSS Modules
+ * compose classes with it, and a second copy in this app would be a second
+ * implementation of a one-line contract. Re-exported at the original specifier
+ * so no call site had to change.
  */
-type ClassName = string | false | null | undefined
-
-export function cn(...inputs: ClassName[]): string {
-  return inputs.filter(Boolean).join(' ')
-}
+export { cn } from '@mms/shell'

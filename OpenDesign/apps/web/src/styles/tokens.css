@@ -1,42 +1,44 @@
 /* ============================================================
    MMS Design — Map My Shops brand workspace
-   Palette: cream + navy default, Approval-Green accent, charcoal dark.
+   Now an ALIAS layer over the shared MMS token set in `@mms/shell/styles/tokens.css`,
+   which MMS-CMS reads too — one edit re-themes both products. Add new values there,
+   not here; this file only maps open-design's vocabulary onto it.
    Source of truth: C:\Users\itsinfra\Downloads\MMS Design System
    ============================================================ */
 :root {
   color-scheme: light;
   /* Surface palette — MMS "cream is the canvas, white cards" model. */
-  --bg: #f8f1df;
-  --bg-app: #f8f1df;
-  --bg-panel: #ffffff;
-  --bg-subtle: #f2ead3;
-  --bg-muted: #ede3cb;
+  --bg: var(--mms-bg);
+  --bg-app: var(--mms-bg);
+  --bg-panel: var(--mms-surface-raised);
+  --bg-subtle: var(--mms-surface);
+  --bg-muted: var(--mms-surface-tint);
   /* Subtle fills — WARM tan-alpha (not navy) so hovers/skeletons/pills blend
      with the cream canvas instead of reading as a cool grey "ink" tint. */
   --bg-fill-tertiary: rgba(122, 98, 56, 0.06);
   --bg-fill-secondary: rgba(122, 98, 56, 0.10);
   --bg-fill: rgba(122, 98, 56, 0.16);
-  --bg-elevated: #ffffff;
-  --border: rgba(8, 42, 56, 0.16);
-  --border-strong: rgba(8, 42, 56, 0.28);
+  --bg-elevated: var(--mms-surface-raised);
+  --border: var(--mms-border);
+  --border-strong: var(--mms-border-strong);
   --border-soft: rgba(8, 42, 56, 0.10);
 
   /* Text — MMS navy primary, slate secondary. */
-  --text: #082a38;
-  --text-strong: #082a38;
-  --text-muted: #44515a;
+  --text: var(--mms-text);
+  --text-strong: var(--mms-text);
+  --text-muted: var(--mms-text-muted);
   --text-soft: rgba(8, 42, 56, 0.55);
   --text-faint: rgba(8, 42, 56, 0.40);
 
   /* Accent — MMS Approval Green, the signature CTA. */
-  --accent: #1ba957;
-  --accent-strong: #0e8c45;
-  --accent-soft: #d3f0de;
-  --accent-tint: #eaf7ef;
-  --accent-hover: #0e8c45;
+  --accent: var(--mms-action);
+  --accent-strong: var(--mms-action-strong);
+  --accent-soft: var(--mms-surface-green);
+  --accent-tint: var(--mms-surface-green);
+  --accent-hover: var(--mms-action-strong);
 
   /* Semantic accent tints used by tool / status pills (MMS cue colors). */
-  --green: #1ba957;
+  --green: var(--mms-action);
   --green-bg: #e6f6ec;
   --green-border: #c2e9cf;
   --blue: #1b5f77;          /* MMS "info" navy-teal */
@@ -78,8 +80,8 @@
   --selected-soft: rgba(255, 107, 26, 0.16);
 
   /* Type — MMS families: Nunito (display), Nunito Sans (UI), Roboto Mono. */
-  --serif: 'Nunito', 'Nunito Sans', 'Outfit', system-ui, sans-serif;
-  --sans: 'Nunito Sans', 'Segoe UI', Roboto, 'Noto Sans', 'Helvetica Neue', Arial, sans-serif;
+  --serif: 'Inter Variable', Inter, system-ui, sans-serif;
+  --sans: 'Inter Variable', Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
   --mono: 'Roboto Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
 
   --prose-font-size: 15px;
@@ -94,32 +96,32 @@
    Shared between explicit [data-theme="dark"] and the OS media query. */
 [data-theme="dark"] {
   color-scheme: dark;
-  --bg: #172026;
-  --bg-app: #172026;
-  --bg-panel: #1e2a31;
-  --bg-subtle: #1b262d;
-  --bg-muted: #22303a;
+  --bg: var(--mms-bg);
+  --bg-app: var(--mms-bg);
+  --bg-panel: var(--mms-surface-raised);
+  --bg-subtle: var(--mms-surface);
+  --bg-muted: var(--mms-surface-tint);
   --bg-fill-tertiary: rgba(248, 241, 223, 0.06);
   --bg-fill-secondary: rgba(248, 241, 223, 0.10);
   --bg-fill: rgba(248, 241, 223, 0.16);
-  --bg-elevated: #22303a;
-  --border: rgba(248, 241, 223, 0.14);
-  --border-strong: rgba(248, 241, 223, 0.24);
+  --bg-elevated: var(--mms-surface-raised);
+  --border: var(--mms-border);
+  --border-strong: var(--mms-border-strong);
   --border-soft: rgba(248, 241, 223, 0.10);
 
-  --text: #f8f1df;
-  --text-strong: #ffffff;
-  --text-muted: #b8b0a0;
+  --text: var(--mms-text);
+  --text-strong: var(--mms-text);
+  --text-muted: var(--mms-text-muted);
   --text-soft: rgba(248, 241, 223, 0.55);
   --text-faint: rgba(248, 241, 223, 0.38);
 
-  --accent: #3fd98a;
-  --accent-strong: #4fe89a;
-  --accent-soft: #0f2a18;
-  --accent-tint: #0b1f14;
-  --accent-hover: #4fe89a;
+  --accent: var(--mms-action);
+  --accent-strong: var(--mms-action-strong);
+  --accent-soft: var(--mms-surface-green);
+  --accent-tint: var(--mms-surface-green);
+  --accent-hover: var(--mms-action-strong);
 
-  --green: #3fd98a;
+  --green: var(--mms-action);
   --green-bg: #0f2a18;
   --green-border: #1a4028;
   --blue: #4a9bb8;
@@ -150,32 +152,32 @@
 @media (prefers-color-scheme: dark) {
   html:not([data-theme]) {
     color-scheme: dark;
-    --bg: #172026;
-    --bg-app: #172026;
-    --bg-panel: #1e2a31;
-    --bg-subtle: #1b262d;
-    --bg-muted: #22303a;
+    --bg: var(--mms-bg);
+    --bg-app: var(--mms-bg);
+    --bg-panel: var(--mms-surface-raised);
+    --bg-subtle: var(--mms-surface);
+    --bg-muted: var(--mms-surface-tint);
     --bg-fill-tertiary: rgba(248, 241, 223, 0.06);
     --bg-fill-secondary: rgba(248, 241, 223, 0.10);
     --bg-fill: rgba(248, 241, 223, 0.16);
-    --bg-elevated: #22303a;
-    --border: rgba(248, 241, 223, 0.14);
-    --border-strong: rgba(248, 241, 223, 0.24);
+    --bg-elevated: var(--mms-surface-raised);
+    --border: var(--mms-border);
+    --border-strong: var(--mms-border-strong);
     --border-soft: rgba(248, 241, 223, 0.10);
 
-    --text: #f8f1df;
-    --text-strong: #ffffff;
-    --text-muted: #b8b0a0;
+    --text: var(--mms-text);
+    --text-strong: var(--mms-text);
+    --text-muted: var(--mms-text-muted);
     --text-soft: rgba(248, 241, 223, 0.55);
     --text-faint: rgba(248, 241, 223, 0.38);
 
-    --accent: #3fd98a;
-    --accent-strong: #4fe89a;
-    --accent-soft: #0f2a18;
-    --accent-tint: #0b1f14;
-    --accent-hover: #4fe89a;
+    --accent: var(--mms-action);
+    --accent-strong: var(--mms-action-strong);
+    --accent-soft: var(--mms-surface-green);
+    --accent-tint: var(--mms-surface-green);
+    --accent-hover: var(--mms-action-strong);
 
-    --green: #3fd98a;
+    --green: var(--mms-action);
     --green-bg: #0f2a18;
     --green-border: #1a4028;
     --blue: #4a9bb8;

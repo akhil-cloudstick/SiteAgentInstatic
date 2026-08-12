@@ -29,7 +29,7 @@
 import { lazy, Suspense, type ReactNode } from 'react'
 import { Toolbar } from '@site/toolbar/Toolbar'
 import { ProductHubHeader } from '@admin/shared/ProductHubHeader'
-import { AdminSectionNavigation } from '@admin/shared/AdminSectionNavigation'
+import { useAdminSectionDestinations } from '@admin/shared/AdminSectionNavigation'
 import { SkeletonCards } from '@ui/components/Skeleton'
 import { useEditorAppearancePreferences } from '@site/preferences/editorPreferences'
 import { useInstalledEditorPlugins } from '@admin/pages/plugins/hooks/useInstalledEditorPlugins'
@@ -143,6 +143,7 @@ export function AdminPageLayout({
 
   const appearance = useEditorAppearancePreferences()
   const settingsOpen = useAdminUi((s) => s.settingsOpen)
+  const destinations = useAdminSectionDestinations({ section: workspace, currentUser })
 
   return (
     <div
@@ -155,16 +156,7 @@ export function AdminPageLayout({
           Design and here. Row 2 (`Toolbar`) carries only this product's own
           navigation. See `@admin/shared/ProductHubHeader`. */}
       <ProductHubHeader />
-      <Toolbar
-        section={workspace}
-        adminNavigationSlot={(
-          <AdminSectionNavigation
-            section={workspace}
-            currentUser={currentUser}
-          />
-        )}
-        rightSlot={toolbarRightSlot}
-      />
+      <Toolbar destinations={destinations} rightSlot={toolbarRightSlot} />
 
       <main className={styles.body} data-page-mode={mode} aria-busy={loading || undefined}>
         <div className={styles.container} data-page-mode={mode}>

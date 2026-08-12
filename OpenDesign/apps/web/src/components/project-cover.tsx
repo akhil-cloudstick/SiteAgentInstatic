@@ -112,6 +112,14 @@ export function HtmlProjectCoverFrame({
       loading="lazy"
       sandbox="allow-scripts"
       tabIndex={-1}
+      // A cover is a PICTURE of the page, and a picture has no scrollbar. Any
+      // page taller than the frame would otherwise paint one down the right
+      // edge of every card — visible, unusable, and not part of the design.
+      // `scrolling` is the only lever available: the frame is sandboxed without
+      // `allow-same-origin`, so its document cannot be reached to style. It is
+      // deprecated in HTML5 but still the mapped way to set the frame
+      // viewport's `overflow: hidden`, and is honoured by every engine.
+      scrolling="no"
       onError={() => {
         console.warn('[project-cover] failed to load HTML cover:', diagnostic);
         setFailed(true);

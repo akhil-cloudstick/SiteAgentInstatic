@@ -11,7 +11,7 @@
 import { lazy, Suspense, useRef, type CSSProperties, type ReactNode, type SyntheticEvent } from 'react'
 import { Toolbar } from '@site/toolbar/Toolbar'
 import { ProductHubHeader } from '@admin/shared/ProductHubHeader'
-import { AdminSectionNavigation } from '@admin/shared/AdminSectionNavigation'
+import { useAdminSectionDestinations } from '@admin/shared/AdminSectionNavigation'
 import { ConfirmDeleteProvider } from '@admin/shared/dialogs/ConfirmDeleteDialog'
 import { SidebarResizeHandle } from '@admin/shared/SidebarResizeHandle'
 import { useEditorAppearancePreferences } from '@site/preferences/editorPreferences'
@@ -71,6 +71,7 @@ export function AdminWorkspaceCanvasLayout({
   const rightPanelAvailable = workspace !== 'media' && Boolean(contentRightPanel)
   const hasRightSidebar = rightPanelAvailable && !rightPanelCollapsed
   const hasReopenableRightPanel = rightPanelAvailable && !hasRightSidebar
+  const destinations = useAdminSectionDestinations({ section: workspace, currentUser })
 
   return (
     <div
@@ -84,16 +85,7 @@ export function AdminWorkspaceCanvasLayout({
           every product and every workspace, so it keeps the Dashboard palette
           while each workspace re-skins only its sidebar, canvas and panel. */}
       <ProductHubHeader />
-      <Toolbar
-        section={workspace}
-        adminNavigationSlot={(
-          <AdminSectionNavigation
-            section={workspace}
-            currentUser={currentUser}
-          />
-        )}
-        rightSlot={toolbarRightSlot}
-      />
+      <Toolbar destinations={destinations} rightSlot={toolbarRightSlot} />
 
       <ConfirmDeleteProvider>
         <div

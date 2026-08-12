@@ -1,19 +1,27 @@
 /**
- * AdminSectionNavigation — the row of section links shown inside the
- * editor toolbar (Site · Content · Plugins · Users · …plugin pages).
+ * useAdminSectionDestinations — the CMS's row-2 destinations, as data.
  *
- * Lives next to the toolbar styles it consumes so both the heavy
- * AdminCanvasLayout (Site), AdminWorkspaceCanvasLayout (Content / Data /
- * Media), and the lightweight AdminPageLayout (Plugins / Users / Account /
- * plugin pages) can share it without one layout pulling another layout's
- * module graph in.
+ * Row 2 itself is `MmsSpecialistRow` in `@mms/shell`, shared verbatim with MMS
+ * Design: it owns the tab chrome (metrics, underline, hover ink, active weight,
+ * 44px targets) so the two products' navigations cannot drift. What each
+ * product owns is WHICH destinations exist, resolved behind its own capability
+ * gates — that is this hook.
+ *
+ * It used to render the tabs itself. Returning data instead is what let the
+ * chrome move into the shared package without the shared package learning what
+ * a page tree or a media asset is.
+ *
+ * The destinations are fixed by the shared-header contract: Dashboard, Site,
+ * Content, Data, Media, Plugins, Users, plus any plugin-contributed admin
+ * pages. AI settings are reachable from Settings and by direct URL; adding
+ * another first-party link here would put this row out of step with the other
+ * products' specialist rows.
  */
-import { useEffect, useState, useSyncExternalStore, type MouseEvent, type ReactNode } from 'react'
-import { FaIcon } from '@ui/components/FaIcon'
+import { useEffect, useState, useSyncExternalStore } from 'react'
+import type { ShellDestination } from '@mms/shell'
 import { listCmsPlugins } from '@core/persistence/cmsPlugins'
 import type { CmsCurrentUser } from '@core/persistence'
 import type { PluginAdminPageRoute } from '@core/plugin-sdk'
-import { Link, useLocation } from '@admin/lib/routing'
 import { useAdminNavigate } from '@admin/lib/useAdminNavigate'
 import { useCurrentAdminUser } from '@admin/sessionContext'
 import { canAccessWorkspace } from '@admin/access'
@@ -23,30 +31,14 @@ import {
 } from '@admin/pages/plugins/utils/pluginIssuesStore'
 import { CMS_PLUGINS_CHANGED_EVENT } from '@admin/pages/plugins/utils/pluginEvents'
 import type { AdminWorkspace } from '@admin/workspace'
-import toolbarStyles from '@site/toolbar/Toolbar.module.css'
 
-/**
- * Icon used inside an admin nav link. 17px is the reference dashboard
- * screen's `.nav-item i { font-size: 17px }` — a touch larger than the
- * `--text-l` label so the icon + label lockup stays balanced on the 60px
- * header track.
- */
-const NAV_ICON_SIZE = 17
-
-interface AdminSectionNavigationProps {
-  section: AdminWorkspace
-  currentUser?: CmsCurrentUser | null
-  onWorkspaceNavigateStart?: () => unknown
-}
-
-// Session-scoped cache of the plugin admin pages list. Without it the
-// nav re-fetched (and briefly emptied) every time `AdminSectionNavigation`
-// re-mounted — typical case: navigating between admin layout families
-// unmounts the previous Toolbar, which drops this state and reseeds from
-// `[]` while the next fetch lands.
-// Caching at module scope means the existing pages render immediately
-// on remount; the SSE / CMS_PLUGINS_CHANGED_EVENT path still refreshes
-// when plugins genuinely change.
+// Session-scoped cache of the plugin admin pages list. Without it the nav
+// re-fetched (and briefly emptied) every time the consumer re-mounted —
+// typical case: navigating between admin layout families unmounts the previous
+// Toolbar, which drops this state and reseeds from `[]` while the next fetch
+// lands. Caching at module scope means the existing pages render immediately on
+// remount; the CMS_PLUGINS_CHANGED_EVENT path still refreshes when plugins
+// genuinely change.
 let cachedPluginPages: PluginAdminPageRoute[] = []
 const cachedPluginPagesListeners = new Set<() => void>()
 function setCachedPluginPages(next: PluginAdminPageRoute[]): void {
@@ -58,28 +50,50 @@ function setCachedPluginPages(next: PluginAdminPageRoute[]): void {
   for (const listener of cachedPluginPagesListeners) listener()
 }
 
-export function AdminSectionNavigation({
+interface AdminSectionDestinationsOptions {
+  section: AdminWorkspace
+  currentUser?: CmsCurrentUser | null
+  onWorkspaceNavigateStart?: () => unknown
+}
+
+/** First-party destinations, in the order the contract fixes them. */
+const FIRST_PARTY: Array<{ id: AdminWorkspace; label: string; icon: string; to: string }> = [
+  { id: 'dashboard', label: 'Dashboard', icon: 'table-cells-large', to: '/cms/dashboard' },
+  { id: 'site', label: 'Site', icon: 'window-maximize', to: '/cms/site' },
+  { id: 'content', label: 'Content', icon: 'file-lines', to: '/cms/content' },
+  { id: 'data', label: 'Data', icon: 'database', to: '/cms/data' },
+  { id: 'media', label: 'Media', icon: 'image', to: '/cms/media' },
+  { id: 'plugins', label: 'Plugins', icon: 'cube', to: '/cms/plugins' },
+  { id: 'users', label: 'Users', icon: 'user', to: '/cms/users' },
+]
+
+export function useAdminSectionDestinations({
   section,
   currentUser,
   onWorkspaceNavigateStart,
-}: AdminSectionNavigationProps) {
-  // Hydrate from the session cache so the nav links don't flash empty
-  // on every re-mount.
-  const [pluginPages, setPluginPages] = useState<PluginAdminPageRoute[]>(
-    () => cachedPluginPages,
-  )
+}: AdminSectionDestinationsOptions): ShellDestination[] {
+  // Hydrate from the session cache so the nav doesn't flash empty on remount.
+  const [pluginPages, setPluginPages] = useState<PluginAdminPageRoute[]>(() => cachedPluginPages)
   const sessionUser = useCurrentAdminUser()
+  const navigate = useAdminNavigate()
   const effectiveUser = currentUser ?? sessionUser ?? null
   const unrestricted = !effectiveUser
-  const canAccess = (workspace: AdminWorkspace) => unrestricted || canAccessWorkspace(effectiveUser, workspace)
+  const canAccess = (workspace: AdminWorkspace) =>
+    unrestricted || canAccessWorkspace(effectiveUser, workspace)
   const canAccessPlugins = canAccess('plugins')
+
+  const pluginIssues = useSyncExternalStore(
+    subscribePluginIssues,
+    getPluginsInErrorCount,
+    getPluginsInErrorCount,
+  )
 
   useEffect(() => {
     let cancelled = false
 
     // Subscribe to the module-level cache so other mounts (or the
-    // CMS_PLUGINS_CHANGED refresh below) update every visible
-    // navigation in lockstep.
+    // CMS_PLUGINS_CHANGED refresh below) update every visible navigation in
+    // lockstep.
     function onCacheChange(): void {
       if (!cancelled) setPluginPages(cachedPluginPages)
     }
@@ -92,9 +106,7 @@ export function AdminSectionNavigation({
       }
       try {
         const payload = await listCmsPlugins()
-        if (!cancelled) {
-          setCachedPluginPages(payload.adminPages)
-        }
+        if (!cancelled) setCachedPluginPages(payload.adminPages)
       } catch {
         // Navigation remains usable when plugins cannot be loaded.
       }
@@ -104,12 +116,10 @@ export function AdminSectionNavigation({
       void loadPluginPages()
     }
 
-    // Only fetch when the cache is empty (first session mount or after
-    // a sign-out clear) or on CMS_PLUGINS_CHANGED. Subsequent
-    // navigations hit the cached list instantly.
-    if (cachedPluginPages.length === 0) {
-      refreshPluginPages()
-    }
+    // Only fetch when the cache is empty (first session mount or after a
+    // sign-out clear) or on CMS_PLUGINS_CHANGED. Subsequent navigations hit the
+    // cached list instantly.
+    if (cachedPluginPages.length === 0) refreshPluginPages()
     window.addEventListener(CMS_PLUGINS_CHANGED_EVENT, refreshPluginPages)
     return () => {
       cancelled = true
@@ -118,201 +128,9 @@ export function AdminSectionNavigation({
     }
   }, [canAccessPlugins])
 
-  return (
-    <>
-      {canAccess('dashboard') && (
-        <NavItem
-          to="/cms/dashboard"
-          icon={<FaIcon name="table-cells-large" size={NAV_ICON_SIZE} />}
-          label="Dashboard"
-          active={section === 'dashboard'}
-          onNavigateStart={onWorkspaceNavigateStart}
-        />
-      )}
-      {canAccess('site') && (
-        <NavItem
-          to="/cms/site"
-          icon={<FaIcon name="window-maximize" size={NAV_ICON_SIZE} />}
-          label="Site"
-          active={section === 'site'}
-          onNavigateStart={onWorkspaceNavigateStart}
-        />
-      )}
-      {canAccess('content') && (
-        <NavItem
-          to="/cms/content"
-          icon={<FaIcon name="file-lines" size={NAV_ICON_SIZE} />}
-          label="Content"
-          active={section === 'content'}
-          onNavigateStart={onWorkspaceNavigateStart}
-        />
-      )}
-      {canAccess('data') && (
-        <NavItem
-          to="/cms/data"
-          icon={<FaIcon name="database" size={NAV_ICON_SIZE} />}
-          label="Data"
-          active={section === 'data'}
-          onNavigateStart={onWorkspaceNavigateStart}
-        />
-      )}
-      {canAccess('media') && (
-        <NavItem
-          to="/cms/media"
-          icon={<FaIcon name="image" size={NAV_ICON_SIZE} />}
-          label="Media"
-          active={section === 'media'}
-          onNavigateStart={onWorkspaceNavigateStart}
-        />
-      )}
-      {canAccess('plugins') && (
-        <PluginsNavLink
-          active={section === 'plugins'}
-          onNavigateStart={onWorkspaceNavigateStart}
-        />
-      )}
-      {canAccess('users') && (
-        <NavItem
-          to="/cms/users"
-          icon={<FaIcon name="user" size={NAV_ICON_SIZE} />}
-          label="Users"
-          active={section === 'users'}
-          onNavigateStart={onWorkspaceNavigateStart}
-        />
-      )}
-      {canAccessPlugins && pluginPages.map((page) => (
-        <AdminRouteLink
-          key={`${page.pluginId}:${page.id}`}
-          to={page.route}
-          onNavigateStart={onWorkspaceNavigateStart}
-        >
-          <FaIcon name="cube" size={NAV_ICON_SIZE} />
-          <span>{page.navLabel ?? page.title}</span>
-        </AdminRouteLink>
-      ))}
-    </>
-  )
-}
-
-/**
- * Single first-party admin nav slot. Renders the icon + label as the
- * non-clickable `activeSection` span when the user is already on that
- * workspace, otherwise as a soft-navigating `AdminRouteLink`.
- */
-function NavItem({
-  to,
-  icon,
-  label,
-  active,
-  onNavigateStart,
-}: {
-  to: string
-  icon: ReactNode
-  label: string
-  active: boolean
-  onNavigateStart?: () => unknown
-}) {
-  if (active) {
-    return (
-      // aria-current marks the ONE current destination in the shell. It never
-      // appears on a Product Hub link in row 1: inside this product, the active
-      // destination is always a row-2 one.
-      <span className={toolbarStyles.activeSection} aria-current="page">
-        {icon}
-        <span>{label}</span>
-      </span>
-    )
-  }
-  return (
-    <AdminRouteLink to={to} onNavigateStart={onNavigateStart}>
-      {icon}
-      <span>{label}</span>
-    </AdminRouteLink>
-  )
-}
-
-/**
- * Plugins nav link — renders a tiny red dot next to the label when any
- * plugin is currently in `error` lifecycle state. The dot is fed by the
- * live SSE-driven `pluginIssuesStore`, so a plugin crashing while the
- * user is on (say) the Content page lights up the badge in real time.
- */
-function PluginsNavLink({
-  active,
-  onNavigateStart,
-}: {
-  active: boolean
-  onNavigateStart?: () => unknown
-}) {
-  const issuesCount = useSyncExternalStore(
-    subscribePluginIssues,
-    getPluginsInErrorCount,
-    getPluginsInErrorCount,
-  )
-  const dot = issuesCount > 0 ? (
-    <output
-      className={toolbarStyles.pluginsErrorDot}
-      aria-label={`${issuesCount} plugin${issuesCount === 1 ? '' : 's'} in error state`}
-      title={`${issuesCount} plugin${issuesCount === 1 ? '' : 's'} need${issuesCount === 1 ? 's' : ''} attention`}
-    />
-  ) : null
-
-  if (active) {
-    return (
-      <span className={toolbarStyles.activeSection} aria-current="page">
-        <FaIcon name="cube" size={NAV_ICON_SIZE} />
-        <span>Plugins</span>
-        {dot}
-      </span>
-    )
-  }
-  return (
-    <AdminRouteLink to="/cms/plugins" onNavigateStart={onNavigateStart}>
-      <FaIcon name="cube" size={NAV_ICON_SIZE} />
-      <span>Plugins</span>
-      {dot}
-    </AdminRouteLink>
-  )
-}
-
-/**
- * Soft-navigating admin nav link. Always rendered inside the admin Router
- * (the admin shell unconditionally mounts one), so we don't fork into a
- * router-vs-static branch — calling `useAdminNavigate` here is always safe.
- */
-function AdminRouteLink({
-  to,
-  children,
-  onNavigateStart,
-}: {
-  to: string
-  children: ReactNode
-  onNavigateStart?: () => unknown
-}) {
-  const navigate = useAdminNavigate()
-  const location = useLocation()
-
-  async function navigateToAdminRoute(event: MouseEvent<HTMLAnchorElement>) {
-    // Modifier keys / non-primary buttons / target=_blank → let the native
-    // <a> behaviour run (open-in-new-tab, etc.). Same-page clicks are a
-    // no-op so the soft transition doesn't replay needlessly.
-    if (
-      event.defaultPrevented ||
-      event.button !== 0 ||
-      event.metaKey ||
-      event.altKey ||
-      event.ctrlKey ||
-      event.shiftKey ||
-      event.currentTarget.target
-    ) {
-      return
-    }
-
-    if (location.pathname === to) return
-
-    event.preventDefault()
+  async function select(to: string): Promise<void> {
     try {
-      const result = onNavigateStart?.()
+      const result = onWorkspaceNavigateStart?.()
       if (isPromiseLike(result)) await result
       navigate(to)
     } catch (err) {
@@ -320,11 +138,41 @@ function AdminRouteLink({
     }
   }
 
-  return (
-    <Link className={toolbarStyles.adminLink} to={to} onClick={navigateToAdminRoute}>
-      {children}
-    </Link>
-  )
+  const destinations: ShellDestination[] = []
+
+  for (const item of FIRST_PARTY) {
+    if (!canAccess(item.id)) continue
+    destinations.push({
+      id: item.id,
+      label: item.label,
+      icon: item.icon,
+      href: item.to,
+      active: section === item.id,
+      // A red dot beside Plugins whenever any plugin is in `error` lifecycle
+      // state, fed by the live SSE-driven store so it lights up the moment a
+      // plugin's worker exhausts its crash budget — even from another page.
+      badgeLabel:
+        item.id === 'plugins' && pluginIssues > 0
+          ? `${pluginIssues} plugin${pluginIssues === 1 ? '' : 's'} in error state`
+          : undefined,
+      onSelect: () => void select(item.to),
+    })
+  }
+
+  if (canAccessPlugins) {
+    for (const page of pluginPages) {
+      destinations.push({
+        id: `${page.pluginId}:${page.id}`,
+        label: page.navLabel ?? page.title,
+        icon: 'cube',
+        href: page.route,
+        active: false,
+        onSelect: () => void select(page.route),
+      })
+    }
+  }
+
+  return destinations
 }
 
 function isPromiseLike(value: unknown): value is PromiseLike<unknown> {

@@ -1,6 +1,6 @@
 import { type KeyboardEvent, type Ref } from 'react'
 import { SearchBar } from '@ui/components/SearchBar'
-import styles from './ContextMenu.module.css'
+import styles from '@mms/shell/primitives/ContextMenu/ContextMenu.module.css'
 
 interface MenuSearchHeaderProps {
   value: string

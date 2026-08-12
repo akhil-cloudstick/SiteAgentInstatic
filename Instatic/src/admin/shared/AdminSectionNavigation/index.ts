@@ -1,1 +1,1 @@
-export { AdminSectionNavigation } from './AdminSectionNavigation'
+export { useAdminSectionDestinations } from './AdminSectionNavigation'

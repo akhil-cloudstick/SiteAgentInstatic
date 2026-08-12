@@ -12,7 +12,7 @@ import { extname, join, relative } from 'path'
 
 const SRC_ROOT = join(import.meta.dir, '../..')
 const SCAN_ROOTS = [join(SRC_ROOT, 'admin'), join(SRC_ROOT, 'ui')]
-const GLOBALS_CSS = join(SRC_ROOT, 'styles/globals.css')
+import { readTokenLayer } from './tokenLayer'
 const EDITOR_CHROME_INJECTOR = join(SRC_ROOT, 'admin/pages/site/canvas/EditorChromeInjector.tsx')
 
 const ADMIN_TEXT_SIZE_TOKENS = [
@@ -73,7 +73,7 @@ function findHardcodedFontSizes(filePath: string, source: string): string[] {
 
 describe('admin typography tokens', () => {
   it('declares the full admin fluid text scale in globals.css', () => {
-    const globals = readFileSync(GLOBALS_CSS, 'utf8')
+    const globals = readTokenLayer()
 
     for (const token of ADMIN_TEXT_SIZE_TOKENS) {
       expect(globals).toContain(`${token}: clamp(`)
