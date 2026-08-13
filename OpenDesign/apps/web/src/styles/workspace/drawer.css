@@ -11,8 +11,7 @@
   align-items: flex-end;
   padding: 24px 24px 12px;
   animation: connector-drawer-fade 180ms cubic-bezier(0.23, 1, 0.32, 1);
-}
-@keyframes connector-drawer-fade {
+}@keyframes connector-drawer-fade {
   from { opacity: 0; }
   to { opacity: 1; }
 }
@@ -29,8 +28,7 @@
   box-shadow: 0 24px 64px -34px rgba(15, 23, 42, 0.5);
   overflow: hidden;
   animation: connector-drawer-slide 220ms cubic-bezier(0.23, 1, 0.32, 1);
-}
-@keyframes connector-drawer-slide {
+}@keyframes connector-drawer-slide {
   from { transform: translateX(18px); opacity: 0; }
   to { transform: translateX(0); opacity: 1; }
 }
@@ -314,8 +312,7 @@
 .connector-drawer-foot button.connector-action {
   padding: 7px 18px;
   font-size: 13px;
-}
-@media (max-width: 520px) {
+}@media (max-width: 520px) {
   .connector-drawer-backdrop {
     align-items: stretch;
     padding: 0;
@@ -348,7 +345,6 @@
   }
 }
 
-
 /* Keep the connector details drawer inside the embedded connectors panel.
    The shared drawer remains full-viewport elsewhere, but embedded usage
    needs an in-panel overlay so it does not stack above the settings modal. */
@@ -372,8 +368,7 @@
   max-height: none;
   border-radius: var(--radius);
   box-shadow: 0 20px 48px -28px rgba(15, 23, 42, 0.55);
-}
-@media (max-width: 720px) {
+}@media (max-width: 720px) {
   .connectors-panel-embedded:has(.connector-drawer-backdrop) {
     min-height: clamp(520px, 70vh, 640px);
   }
@@ -522,57 +517,11 @@
 .design-card-meta .ds {
   color: var(--accent);
 }
-.design-card-status {
-  font-weight: 500;
-}
-.design-card-status-running {
-  color: var(--accent);
-}
-.design-card-status-awaiting_input,
-.design-card-status-incomplete {
-  color: var(--amber);
-}
-.design-card-status-queued,
-.design-card-status-not_started,
-.design-card-status-canceled {
-  color: var(--text-muted);
-}
-.design-card-status-succeeded {
-  color: var(--green);
-}
-.design-card-status-failed {
-  color: var(--red);
-}
-.design-card-status-published {
-  color: var(--green);
-}
-.design-card-close {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  width: 22px;
-  height: 22px;
-  padding: 0;
-  border-radius: 50%;
-  font-size: 14px;
-  line-height: 1;
-  background: var(--bg-panel);
-  opacity: 0;
-  transition: opacity 0.15s;
-  border-color: var(--border);
-  z-index: 2;
-  /* Keep button interactive for keyboard/AT users even while visually hidden. */
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-muted);
-}
 .design-card:hover .design-card-close,
 .design-card:focus-within .design-card-close,
 .design-kanban-card:hover .design-card-close,
 .design-kanban-card:focus-within .design-card-close,
 .design-card-close:focus-visible { opacity: 1; }
-.design-card-close:hover { color: var(--text-strong); border-color: var(--border-strong); }
 
 /* Overflow menu trigger and dropdown on project cards */
 .design-card-menu-anchor {
@@ -581,59 +530,12 @@
   right: 8px;
   z-index: 3;
 }
-.design-card-more {
-  width: 26px;
-  height: 26px;
-  padding: 0;
-  border-radius: var(--radius-sm);
-  background: var(--bg-panel);
-  border: 1px solid var(--border);
-  color: var(--text-muted);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  opacity: 0;
-  transition: opacity 0.15s, color 0.15s, border-color 0.15s;
-}
 .design-card:hover .design-card-more,
 .design-card:focus-within .design-card-more,
 .design-card-more[aria-expanded="true"],
-.design-card-more:focus-visible { opacity: 1; }
-.design-card-more:hover { color: var(--text-strong); border-color: var(--border-strong); }
-@media (hover: none) {
+.design-card-more:focus-visible { opacity: 1; }@media (hover: none) {
   .design-card .design-card-more { opacity: 1; }
 }
-.design-card-menu {
-  position: absolute;
-  top: calc(100% + 6px);
-  right: 0;
-  min-width: 144px;
-  background: var(--bg-panel);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
-  padding: 4px;
-  display: flex;
-  flex-direction: column;
-  z-index: 50;
-}
-.design-card-menu button {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 7px 10px;
-  border: 0;
-  background: transparent;
-  border-radius: var(--radius-sm);
-  color: var(--text-strong);
-  font-size: 12.5px;
-  text-align: left;
-  cursor: pointer;
-}
-.design-card-menu button:hover { background: var(--bg-subtle); }
-.design-card-menu button.danger { color: var(--red); }
-.design-card-menu button.danger:hover { background: color-mix(in srgb, var(--red) 12%, transparent); }
 
 /* Multi-select checkbox + selected state */
 .design-card-checkbox {
@@ -650,11 +552,6 @@
   justify-content: center;
   color: var(--bg-panel);
   z-index: 3;
-}
-.design-card-checkbox.checked {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
 }
 .design-card.is-selected {
   border-color: var(--accent);
@@ -675,67 +572,6 @@
   font-size: 12.5px;
   cursor: pointer;
 }
-.designs-select-toggle:hover { border-color: var(--border-strong); }
-.designs-new-project-button,
-.designs-refresh-button {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 10px;
-  min-height: 31px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-pill);
-  background: var(--bg-panel);
-  color: var(--text-strong);
-  font-size: 12.5px;
-  cursor: pointer;
-  transition: border-color 120ms var(--ease-out), opacity 120ms var(--ease-out);
-}
-.designs-new-project-button {
-  border-color: color-mix(in srgb, var(--accent) 28%, var(--border));
-  color: var(--accent);
-}
-.designs-new-project-button:hover,
-.designs-refresh-button:hover:not(:disabled) {
-  border-color: var(--border-strong);
-}
-.designs-refresh-button:disabled {
-  cursor: progress;
-  opacity: 0.72;
-}
-.designs-select-bar {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 6px 4px 12px;
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-pill);
-  background: var(--bg-panel);
-}
-.designs-select-count {
-  font-size: 12.5px;
-  color: var(--text-strong);
-}
-.designs-select-delete {
-  padding: 5px 10px;
-  border-radius: var(--radius-pill);
-  border: 0;
-  background: var(--red);
-  color: #fff;
-  font-size: 12px;
-  cursor: pointer;
-}
-.designs-select-delete:disabled { opacity: 0.5; cursor: not-allowed; }
-.designs-select-cancel {
-  padding: 5px 10px;
-  border-radius: var(--radius-pill);
-  border: 1px solid var(--border);
-  background: transparent;
-  color: var(--text-muted);
-  font-size: 12px;
-  cursor: pointer;
-}
-.designs-select-cancel:hover { color: var(--text-strong); border-color: var(--border-strong); }
 /* Larger comfortable touch target on coarse pointers (tablets/touch laptops).
    On touch the hover reveal never fires, so keep the close button visible. */
 @media (hover: none) {
@@ -752,13 +588,6 @@
   border-color: rgba(35, 72, 184, 0.18);
 }
 .design-card.featured .design-card-thumb::after { display: none; }
-
-.live-artifact-card {
-  border-color: color-mix(in srgb, var(--accent) 28%, var(--border));
-}
-.live-artifact-card:hover {
-  border-color: color-mix(in srgb, var(--accent) 48%, var(--border-strong));
-}
 .project-thumb::before,
 .project-thumb::after {
   display: none;
@@ -913,14 +742,6 @@
   font-size: 9px;
   line-height: 1.25;
 }
-.design-live-count {
-  position: absolute;
-  right: 10px;
-  bottom: 10px;
-  color: var(--accent);
-  border-color: color-mix(in srgb, var(--accent) 26%, var(--border));
-  box-shadow: var(--shadow-xs);
-}
 
 /* Grid card keyboard focus (cards carry role="button" on a div). */
 .design-card:focus-visible {
@@ -936,140 +757,6 @@
   flex: 1 1 auto;
   min-height: 0;
   height: 100%;
-}
-.design-kanban-board {
-  display: flex;
-  gap: 14px;
-  overflow-x: auto;
-  /* Let columns grow to fill the remaining vertical space inside
-     .tab-panel.design-kanban-view. */
-  flex: 1 1 auto;
-  min-height: 0;
-  padding-bottom: 8px;
-  /* Hint that horizontal content may overflow on narrow viewports. */
-  scroll-snap-type: x proximity;
-  scrollbar-gutter: stable;
-}
-.design-kanban-col {
-  width: 280px;
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  background: var(--bg-subtle);
-  border-radius: var(--radius);
-  padding: 12px;
-  gap: 12px;
-  min-height: 0;
-  scroll-snap-align: start;
-}
-.design-kanban-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text-strong);
-  padding-left: 2px;
-  /* Prevent long status labels from pushing the count chip out of the column. */
-  min-width: 0;
-}
-.design-kanban-header > span:first-child {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  min-width: 0;
-}
-.design-kanban-count {
-  background: var(--bg-panel);
-  border: 1px solid var(--border-soft);
-  color: var(--text-muted);
-  font-size: 11px;
-  padding: 2px 8px;
-  border-radius: var(--radius-pill);
-  flex-shrink: 0;
-}
-.design-kanban-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  overflow-y: auto;
-  /* Keep the scrollbar gutter from shifting the list when content grows. */
-  padding-right: 4px;
-  margin-right: -4px;
-  flex: 1 1 auto;
-  min-height: 0;
-}
-.design-kanban-empty {
-  color: var(--text-faint);
-  font-size: 13px;
-  text-align: center;
-  padding: 20px 0;
-}
-.design-kanban-card {
-  position: relative;
-  background: var(--bg-panel);
-  border: 1px solid var(--border-soft);
-  border-radius: var(--radius);
-  padding: 12px 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  cursor: pointer;
-  transition: border-color 0.15s var(--ease-out), box-shadow 0.15s var(--ease-out), transform 0.15s var(--ease-out);
-  box-shadow: var(--shadow-xs);
-}
-.design-kanban-card:hover {
-  border-color: var(--border-strong);
-  box-shadow: var(--shadow-sm);
-  transform: translateY(-1px);
-}
-.design-kanban-card:active {
-  transform: none;
-}
-.design-kanban-card:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-  border-color: var(--border-strong);
-}
-.design-kanban-card::before {
-  content: '';
-  position: absolute;
-  left: -1px;
-  top: -1px;
-  bottom: -1px;
-  width: 3px;
-  border-radius: var(--radius) 0 0 var(--radius);
-  background: var(--text-muted);
-}
-.design-kanban-card.status-running::before { background: var(--accent); }
-.design-kanban-card.status-awaiting_input::before { background: var(--amber); }
-.design-kanban-card.status-succeeded::before { background: var(--green); }
-.design-kanban-card.status-failed::before { background: var(--red); }
-.design-kanban-card.status-not_started::before,
-.design-kanban-card.status-queued::before,
-.design-kanban-card.status-canceled::before { background: var(--text-muted); }
-
-.design-kanban-card-name {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text-strong);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  /* Reserve room for the absolutely-positioned close button. */
-  padding-right: 20px;
-}
-.design-kanban-card-meta {
-  font-size: 12px;
-  color: var(--text-muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.design-kanban-card-meta .ds {
-  color: var(--text-strong);
-  font-weight: 500;
 }
 
 /* Honor user motion preferences for the new hover transform / transitions
@@ -1342,9 +1029,7 @@
   width: 16px;
   height: 100%;
 }
-.ds-row-swatch + .ds-row-swatch { border-left: 1px solid rgba(0, 0, 0, 0.05); }
-
-@media (max-width: 900px) {
+.ds-row-swatch + .ds-row-swatch { border-left: 1px solid rgba(0, 0, 0, 0.05); }@media (max-width: 900px) {
   .entry {
     grid-template-columns: 56px 1fr !important;
     height: 100%;
@@ -2001,8 +1686,7 @@
      holds the start frame before paint and reverts to base after, so the
      :hover lift keeps working. */
   animation: page-creator-card-in 240ms var(--ease-out) backwards;
-}
-@keyframes page-creator-card-in {
+}@keyframes page-creator-card-in {
   from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: translateY(0); }
 }
@@ -2392,16 +2076,13 @@
   padding: 12px 16px;
   border-top: 1px solid var(--border);
   background: var(--bg-panel);
-}
-@keyframes page-creator-fade {
+}@keyframes page-creator-fade {
   from { opacity: 0; }
   to { opacity: 1; }
-}
-@keyframes page-creator-in {
+}@keyframes page-creator-in {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
-}
-@media (max-width: 980px) {
+}@media (max-width: 980px) {
   .page-creator-body {
     grid-template-columns: 156px minmax(0, 1fr);
   }
@@ -2414,8 +2095,7 @@
     justify-self: stretch;
     width: auto;
   }
-}
-@media (max-width: 680px) {
+}@media (max-width: 680px) {
   .page-creator-backdrop {
     padding: 10px;
   }
@@ -2563,50 +2243,4 @@
   pointer-events: auto;
   visibility: visible;
   z-index: 1;
-}
-
-.designs-empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 64px 24px;
-  text-align: center;
-  max-width: 420px;
-  margin: 0 auto;
-}
-
-.designs-empty-title {
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--text-strong);
-  margin: 0 0 24px 0;
-  letter-spacing: -0.01em;
-}
-
-
-.designs-empty-cta {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 18px;
-  font-size: 13px;
-  font-weight: 500;
-  border-radius: var(--radius-pill);
-  cursor: pointer;
-  box-shadow: 
-    0 4px 12px -3px color-mix(in srgb, var(--accent) 25%, transparent),
-    var(--shadow-sm);
-  transition: transform 120ms cubic-bezier(0.23, 1, 0.32, 1), box-shadow 120ms cubic-bezier(0.23, 1, 0.32, 1), background-color 120ms cubic-bezier(0.23, 1, 0.32, 1);
-}
-
-.designs-empty-cta:hover {
-  transform: scale(1.02);
-  box-shadow: 
-    0 6px 16px -4px color-mix(in srgb, var(--accent) 35%, transparent),
-    var(--shadow-md);
-}
-
-.designs-empty-cta:active {
-  transform: scale(0.98);
 }

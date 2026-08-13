@@ -61,7 +61,7 @@ type EntryCreateProjectInput = Omit<CreateInput, 'metadata'> & {
 
 interface Props {
   // Union of functional skills + design templates — used for id-based
-  // lookups (DesignsTab project chips, NewProjectPanel skill picker).
+  // lookups (Projects row chips, NewProjectPanel skill picker).
   // The Templates gallery itself reads `designTemplates` instead so it
   // doesn't accidentally show functional skills as renderable cards.
   skills: SkillSummary[];

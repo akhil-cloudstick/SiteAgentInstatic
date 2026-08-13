@@ -89,8 +89,7 @@ import type {
   ProviderModelsResponse,
   SkillSummary,
 } from '../types';
-import { CenteredLoader } from './Loading';
-import { DesignsTab } from './DesignsTab';
+import { ProjectsScreen } from './ProjectsScreen';
 import { DesignSystemsTab } from './DesignSystemsTab';
 import { BrandsTab } from './BrandsTab';
 import type { EntryView as EntryViewKind } from './EntryNavRail';
@@ -1167,30 +1166,20 @@ export function EntryShell({
               />
             </div>
             <div data-testid="entry-view-projects" data-active={view === 'projects' ? 'true' : 'false'} {...inactiveViewProps(view === 'projects')}>
-              {projectsLoading || skillsLoading || designSystemsLoading ? (
-                <CenteredLoader label={t('common.loading')} />
-              ) : (
-                <div className="entry-section">
-                  <header className="entry-section__head">
-                    <h1 className="entry-section__title">{t('entry.navProjects')}</h1>
-                  </header>
-                  <DesignsTab
-                    projects={projects}
-                    skills={skills}
-                    designSystems={designSystems}
-                    onOpen={onOpenProject}
-                    onOpenLiveArtifact={onOpenLiveArtifact}
-                    onDelete={onDeleteProject}
-                    onDuplicate={onDuplicateProject}
-                    onRename={onRenameProject}
-                    onRefresh={onProjectsRefresh}
-                    isActive={view === 'projects'}
-                    onNewProject={() => {
-                      openNewProject();
-                    }}
-                  />
-                </div>
-              )}
+              {/* No whole-page gate: the screen paints its head, handoff band
+                  and panel frame straight away and shows the wait inside the
+                  list, the way the Design systems view already does. `skills`
+                  is not read by this screen, so it no longer blocks it. */}
+              <ProjectsScreen
+                projects={projects}
+                designSystems={designSystems}
+                onOpen={onOpenProject}
+                onDelete={onDeleteProject}
+                onDuplicate={onDuplicateProject}
+                onRename={onRenameProject}
+                isActive={view === 'projects'}
+                loading={projectsLoading || designSystemsLoading}
+              />
             </div>
             <div data-testid="entry-view-tasks" data-active={view === 'tasks' ? 'true' : 'false'} {...inactiveViewProps(view === 'tasks')}>
               <TasksView

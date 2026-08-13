@@ -43,10 +43,10 @@ export async function openNewProjectModal(page: Page): Promise<void> {
   }
   const projectsView = page.getByTestId('entry-view-projects');
   await expect(projectsView).toBeVisible();
-  const createButton = projectsView
-    .getByTestId('designs-new-project')
-    .or(projectsView.getByTestId('designs-empty-new-project'))
-    .first();
+  // The Projects screen no longer carries its own create button: the approved
+  // MMS Design reference puts `New project` in the specialist row above the
+  // page, and `MmsSpecialistRow` renders it on every destination.
+  const createButton = page.locator('.mms-new-project').first();
   await expect(createButton).toBeVisible();
   await createButton.click();
   await expect(page.getByTestId('new-project-modal')).toBeVisible();

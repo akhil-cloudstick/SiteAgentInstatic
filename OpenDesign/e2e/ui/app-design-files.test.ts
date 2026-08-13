@@ -2,7 +2,7 @@ import { expect, test } from '@/playwright/suite';
 import { openNewProjectModal as openNewProjectModalFromProjects } from '@/playwright/rail';
 import { routeAgents } from '@/playwright/mock-factory';
 import { expectAllProjectFilesActive, openAllProjectFiles } from '@/playwright/workspace';
-import type { Locator, Page, Request, Response } from '@playwright/test';
+import type { Page, Request, Response } from '@playwright/test';
 import { automatedUiScenarios } from '@/playwright/resources';
 import type { UiScenario } from '@/playwright/resources';
 import { T } from '@/timeouts';
@@ -940,12 +940,6 @@ async function runDesignFilesTabPersistenceFlow(page: Page) {
   await expect(restoredSecondTab).toHaveAttribute('aria-selected', 'true');
   await expect(restoredFirstTab).toHaveAttribute('aria-selected', 'false');
   await expectProjectFilesToIncludeSuffixes(page, projectId, ['first-tab.png', 'second-tab.png']);
-}
-
-function homeDesignCard(page: Page, name: string): Locator {
-  return page.locator('.design-card', {
-    has: page.locator('.design-card-name', { hasText: name }),
-  });
 }
 
 function designFileScenarioPriority(entry: UiScenario): 'P0' | 'P1' {

@@ -22,19 +22,22 @@ test('[P2] captures the projects page surface', async ({ page }) => {
   await captureVisual(page, 'visual-projects');
 });
 
-test('[P2] captures the projects kanban surface', async ({ page }) => {
+// The kanban board was removed with the Projects rebuild — the approved MMS
+// Design reference screen has one linked-projects list and no view toggle. What
+// is still worth a visual baseline is the handoff band above that list, which
+// the plain `visual-projects` capture above crops at the fold.
+test('[P2] captures the projects handoff band surface', async ({ page }) => {
   await configureVisualPage(page);
   await gotoVisualHome(page);
 
   await ensureRailOpen(page);
   await page.getByTestId('entry-nav-projects').click();
   const projects = page.getByTestId('entry-view-projects');
-  await projects.getByTestId('designs-view-kanban').click();
-  await expect(projects.getByTestId('designs-view-kanban')).toHaveAttribute('aria-pressed', 'true');
+  await expect(projects.locator('.sd-handoff')).toBeVisible();
   await expect(projects.getByText('Launchpad dashboard').first()).toBeVisible();
   await waitForVisualFonts(page);
 
-  await captureVisual(page, 'visual-projects-kanban');
+  await captureVisual(page, 'visual-projects-handoff');
 });
 
 test('[P2] captures the design systems page surface', async ({ page }) => {

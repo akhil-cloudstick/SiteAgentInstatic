@@ -13,7 +13,7 @@ import { useT } from '../i18n';
 import { fetchProjectFiles, fetchProjectFileText } from '../providers/registry';
 import type { DesignSystemSummary, Project, ProjectDisplayStatus, ProjectFile } from '../types';
 import { Icon } from './Icon';
-import { STATUS_LABEL_KEYS } from './DesignsTab';
+import { STATUS_LABEL_KEYS } from './projectStatus';
 import { isDesignSystemProject, isPublishedDesignSystemProject } from './design-system-project';
 import {
   HtmlProjectCoverFrame,

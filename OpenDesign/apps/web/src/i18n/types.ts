@@ -2183,6 +2183,58 @@ export interface Dict {
   'designs.renameSave': string;
   'designs.renameCancel': string;
 
+  // Projects screen (MMS Design reference rebuild)
+  'projects.kicker': string;
+  'projects.subtitle': string;
+  'projects.listTitle': string;
+  'projects.listSubtitle': string;
+  'projects.countOne': string;
+  'projects.countOther': string;
+  'projects.kindWebsite': string;
+  'projects.kindPrototype': string;
+  'projects.kindDeck': string;
+  'projects.kindMedia': string;
+  'projects.kindBrand': string;
+  'projects.kindDesignSystem': string;
+  'projects.kindLiveArtifact': string;
+  'projects.kindProject': string;
+  'projects.rowLinked': string;
+  'projects.rowDescriptionWebsite': string;
+  'projects.rowDescription': string;
+  'projects.openStudio': string;
+  'projects.openStudioAria': string;
+  'projects.rowMenuAria': string;
+  'projects.emptyBody': string;
+  'projects.handoffAria': string;
+  'projects.handoffEyebrow': string;
+  'projects.handoffSummary': string;
+  'projects.handoffFactsAria': string;
+  'projects.handoffOpen': string;
+  'projects.factClient': string;
+  'projects.factProject': string;
+  'projects.factSite': string;
+  'projects.factDesignSystem': string;
+  'projects.factRole': string;
+  'projects.factScopeInherited': string;
+  'projects.factProjectOwned': string;
+  'projects.drawerEyebrow': string;
+  'projects.drawerTitle': string;
+  'projects.drawerClose': string;
+  'projects.drawerScopeTitle': string;
+  'projects.drawerBindingTitle': string;
+  'projects.drawerReleaseState': string;
+  'projects.drawerReleaseBody': string;
+  'projects.drawerOwnerNoteLead': string;
+  'projects.drawerOwnerNoteBody': string;
+  'projects.noScopeTitle': string;
+  'projects.noScopeBody': string;
+  'projects.noScopeAction': string;
+  'projects.metaUpdated': string;
+  'projects.metaHubInherited': string;
+  'projects.metaHubMissing': string;
+  'projects.dsDraft': string;
+  'projects.loadingList': string;
+
   // Examples tab
   'examples.typeLabel': string;
   'examples.surfaceLabel': string;

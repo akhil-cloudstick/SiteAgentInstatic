@@ -287,7 +287,13 @@
     /* The header reads the `--mms-*` set directly. Those ARE the approved
        palette now, so aliasing keeps one source of truth: re-toning the system
        moves the header with it instead of leaving it a shade behind. */
-    --toolbar-bg: var(--mms-surface);
+    /* Both rows sit on the DEEPEST tone, not the card surface: `--mms-bg`
+       (#001e2d dark / #fbf7ea light) rather than `--mms-surface` (#082f3b /
+       #fffef9). MMS-CMS already rendered its header at #001e2d while MMS
+       Design rendered #082f3b, so the one "shared" surface was the one place
+       the two products visibly disagreed. Pinning it here is what actually
+       makes them identical — a per-product override would have re-split it. */
+    --toolbar-bg: var(--mms-bg);
     --toolbar-text: var(--mms-text);
     --toolbar-text-muted: var(--mms-text-muted);
     --toolbar-border: var(--mms-border);

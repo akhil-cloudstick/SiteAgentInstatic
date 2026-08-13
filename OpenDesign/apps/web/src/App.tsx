@@ -2348,7 +2348,7 @@ function AppInner() {
     void refreshDesignSystems();
   }, [route.kind, refreshTemplates, refreshDesignSystems]);
 
-  // Existing card grids (DesignsTab, ProjectView), pickers (NewProjectPanel,
+  // Existing card grids (ProjectView), pickers (NewProjectPanel,
   // ChatComposer mention) all look skills up by id without caring whether
   // the id resolves to a functional skill or a design template. Pass them
   // the union so the post-split refactor stays invisible to those callers.

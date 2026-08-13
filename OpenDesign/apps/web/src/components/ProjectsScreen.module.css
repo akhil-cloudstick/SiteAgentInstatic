@@ -1,0 +1,679 @@
+/* Projects screen — a reproduction of the approved MMSBUILD reference
+ * `/projects` screen (`prototype-reference/src/ProjectsScreen.jsx`).
+ *
+ * Every declaration below is copied from the reference stylesheets at the line
+ * ranges noted per block; only the selector names changed (global class ->
+ * CSS Module, per this repo's `Web CSS ownership` rule). Values are NOT
+ * approximations — if a number here disagrees with the reference, the reference
+ * wins and this file is the bug.
+ *
+ * NOT here, deliberately: the handoff band and the inherited-context drawer.
+ * Both were already transcribed from the same reference for the Start Desk
+ * (`start-desk/context-surfaces.css`, `.sd-handoff` / `.sd-drawer`) and are
+ * unscoped, so this screen renders those components rather than owning a second
+ * copy of their geometry.
+ *
+ * Sources:
+ *   styles.css  4841-4906  .catalog-screen / -page-head / -kicker / -primary-action
+ *   styles.css  5215-5227  .icon-button
+ *   styles.css  5275-5335  .catalog-menu-wrap / .catalog-popover
+ *   styles.css  5519-5551  .catalog-empty
+ *   styles.css  6675-6952  responsive tiers
+ *   project-context.css 560-652  .projects-list / .linked-project-*
+ *   project-context.css 708-795  responsive tiers
+ */
+
+/* ── Screen ───────────────────────────────────────────────────────────────
+ * The reference sets `font-size: 13px` on :root, and several elements here
+ * (the primary action, the panel count, popover items) declare no size of
+ * their own and inherit it. This app's body is 13.5px, so the reference's
+ * root size is re-established on the screen root rather than globally —
+ * changing base.css would move every other page in the product.
+ * `--shell-height`/`--context-height` in the reference are this app's
+ * `--hub-shell-height` (61px) / `--product-row-height` (54px).
+ */
+/* The screen owns the viewport it was given and never grows past it: the page
+ * head and handoff band stay put while the linked-projects list scrolls inside
+ * its own card. Same shape as MMS-CMS's People/Roles panels — a flex column
+ * whose scrolling child carries `min-height: 0` so it can shrink below its
+ * content instead of pushing the page. */
+.screen {
+    display: flex;
+    height: calc(100vh - var(--hub-shell-height) - var(--product-row-height));
+    flex-direction: column;
+    overflow: hidden;
+    padding: 34px 48px 40px;
+    background: var(--mms-workspace);
+    font-family: var(--font-mms);
+    font-size: 13px;
+}
+
+/* ── Page head — styles.css 4847-4882 ─────────────────────────────────── */
+.pageHead {
+    display: flex;
+    width: 100%;
+    max-width: 1440px;
+    flex: 0 0 auto;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 28px;
+    margin: 0 auto 24px;
+}
+
+.kicker {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    margin: 0;
+    color: var(--mms-action-strong);
+    font-size: 10px;
+    font-weight: 820;
+    letter-spacing: 0.14em;
+}
+
+.pageHead h1 {
+    margin: 5px 0 7px;
+    color: var(--mms-text);
+    font-size: clamp(28px, 3vw, 38px);
+    font-weight: 780;
+    letter-spacing: -0.04em;
+}
+
+.pageHeadSub {
+    margin: 0;
+    color: var(--mms-text-muted);
+    font-size: 14px;
+}
+
+/* The reference's `.context-handoff-band.compact` bottom margin (20px) rather
+   than the Start Desk's 18px. One declaration, so the band component stays
+   shared instead of forking. */
+/* `width: 100%` is required, not cosmetic. `.sd-handoff` centres itself with
+   `margin: 0 auto`, and on a FLEX item auto side-margins absorb the cross-axis
+   free space instead of stretching — so inside this flex column the band
+   collapsed to its content width and sat narrower than the list below it. The
+   page head and list carry the same declaration for the same reason. */
+.handoffCompact {
+    width: 100%;
+    flex: 0 0 auto;
+    margin-bottom: 20px;
+}
+
+/* ── Linked-projects panel — project-context.css 560-593 ──────────────── */
+/* `min-height: 0` is what lets this shrink inside the flex column instead of
+   overflowing it — without it the rows would push the page into a scroll. */
+.list {
+    display: flex;
+    width: 100%;
+    max-width: 1440px;
+    min-height: 0;
+    flex: 1 1 auto;
+    flex-direction: column;
+    margin: 0 auto;
+    overflow: hidden;
+    border: 1px solid var(--mms-border);
+    border-radius: 9px;
+    background: var(--mms-surface);
+}
+
+.listHead {
+    display: flex;
+    min-height: 64px;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 12px 18px;
+    border-bottom: 1px solid var(--mms-border);
+}
+
+/* The rows scroll, the panel header does not. `overscroll-behavior: contain`
+   stops a flick at the end of the list from chaining into the page.
+   The bar is painted in the screen's own palette — the browser default is a
+   grey slab that reads as foreign on both the cream and the navy canvas. */
+.listBody {
+    min-height: 0;
+    flex: 1 1 auto;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: var(--mms-border-strong) transparent;
+}
+
+.listBody::-webkit-scrollbar {
+    width: 10px;
+}
+
+.listBody::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.listBody::-webkit-scrollbar-thumb {
+    border: 3px solid transparent;
+    border-radius: 999px;
+    /* `background-clip: content-box` keeps the transparent border as breathing
+       room, so the thumb reads as a slim pill inset from the panel edge. */
+    background-clip: content-box;
+    background-color: var(--mms-border-strong);
+}
+
+.listBody::-webkit-scrollbar-thumb:hover {
+    background-color: var(--mms-action);
+}
+
+.listHead h2 {
+    margin: 0;
+    font-size: 15px;
+}
+
+.listHead p,
+.listCount {
+    margin: 0;
+    margin-top: 3px;
+    color: var(--mms-text-muted);
+    font-size: 10px;
+}
+
+/* ── Row — project-context.css 595-652 ────────────────────────────────── */
+/* `position: relative` anchors the row's overflow menu to its top-right
+   corner; the reference has no such control, so its placement is ours.
+ *
+ * `min-height` is a FLOOR, not the height. The row's real height comes from
+ * its content exactly as in the reference (~111px), and this never binds — it
+ * exists so the vertically-centred action button can never rise far enough to
+ * meet the absolutely-positioned menu above it. Below 100px the two would
+ * collide; the content guarantees more than that, and this guarantees it in
+ * the cases the content does not. */
+.row {
+    position: relative;
+    display: grid;
+    min-height: 100px;
+    grid-template-columns: 48px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 14px;
+    padding: 20px 18px;
+}
+
+/* Rows after the first get a separating hairline. The reference only ever
+ * renders one row, so it declares no divider; without this, a real list of
+ * projects would read as one undifferentiated block. */
+.row + .row {
+    border-top: 1px solid var(--mms-border);
+}
+
+.rowIcon {
+    display: grid;
+    width: 46px;
+    height: 46px;
+    place-items: center;
+    border-radius: 8px;
+    background: var(--mms-surface-green);
+    color: var(--mms-action-strong);
+    font-size: 17px;
+}
+
+.rowMain {
+    min-width: 0;
+}
+
+.rowMain > small {
+    color: var(--mms-action-strong);
+    font-size: 8px;
+    font-weight: 800;
+    letter-spacing: 0.09em;
+}
+
+.rowMain h3 {
+    /* `overflow-wrap` is this file's own: the reference never sees a name long
+     * enough to overflow. Without it a long unbroken name would push the
+     * action button out of the row. */
+    overflow-wrap: anywhere;
+    margin: 4px 0 3px;
+    font-size: 16px;
+}
+
+.rowMain > p {
+    overflow-wrap: anywhere;
+    margin: 0;
+    color: var(--mms-text-muted);
+    font-size: 10px;
+}
+
+.rowMeta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px 14px;
+    margin-top: 12px;
+}
+
+.rowMeta span {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--mms-text-muted);
+    font-size: 9px;
+}
+
+.metaReady {
+    color: var(--mms-action-strong);
+}
+
+.metaPending {
+    color: #a87710;
+}
+
+/* Only the action lives in this column. Stacking the menu above it made the
+   column 78px tall and pushed every row ~7px past the reference height, so the
+   menu is taken out of flow instead and the row measures exactly as the
+   reference does. `.row`'s `min-height` is what keeps them apart. */
+.rowActions {
+    display: flex;
+    align-items: center;
+}
+
+/* NOTE: `.rowMenuAnchor` is declared AFTER `.menuWrap` further down, not here.
+   Both classes land on the same element, and `.menuWrap` sets
+   `position: relative` for the popover — declared later it won the cascade and
+   dragged the menu back into flow, inline beside the action button. Source
+   order is the whole fix; see the block below `.menuWrap`. */
+
+/* ── Primary action — styles.css 4884-4906 ────────────────────────────── */
+.primaryAction {
+    display: inline-flex;
+    min-height: 42px;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
+    padding: 0 17px;
+    border: 1px solid var(--mms-action);
+    border-radius: 7px;
+    background: var(--mms-action);
+    color: #fff;
+    font-weight: 720;
+}
+
+:global(html[data-theme='dark']) .primaryAction {
+    color: #001e2d;
+}
+
+/* `:not(:disabled)` is load-bearing, not decoration.
+ *
+ * `primitives.css` carries a global `button:hover:not(:disabled) { background:
+ * var(--bg-subtle); border-color: var(--border-strong) }` at specificity
+ * (0,2,1). A plain `.primaryAction:hover` is (0,2,0) and LOSES it, which is why
+ * this button turned page-coloured on hover and swallowed its own white label.
+ * Adding `:not(:disabled)` takes it to (0,3,0), which wins. `border-color` is
+ * restated for the same reason.
+ *
+ * The tone flips direction per theme by design: light hovers DARKER
+ * (#15964e -> #087b3d, white label), dark hovers LIGHTER (#27ba66 -> #34cb73,
+ * navy label). Both keep the label at full contrast against the fill. */
+.primaryAction:hover:not(:disabled),
+.primaryAction:focus-visible:not(:disabled) {
+    border-color: var(--mms-action-strong);
+    background: var(--mms-action-strong);
+    color: #fff;
+}
+
+:global(html[data-theme='dark']) .primaryAction:hover:not(:disabled),
+:global(html[data-theme='dark']) .primaryAction:focus-visible:not(:disabled) {
+    color: #001e2d;
+}
+
+/* ── Kebab — styles.css 5215-5227, 5275-5335 ──────────────────────────── */
+.menuWrap {
+    position: relative;
+    display: inline-flex;
+}
+
+/* Pinned to the row's top-right corner, above the action button and out of
+   flow — so it adds nothing to the row height and does not move the button.
+   Must stay AFTER `.menuWrap`: the two classes share an element and this
+   `position` has to win. */
+.rowMenuAnchor {
+    position: absolute;
+    top: 10px;
+    right: 12px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 200ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+/* Quiet by default, revealed on hover — and on keyboard focus, which is why
+   this fades rather than unmounting. `pointer-events` follows the fade so an
+   invisible control is never clickable. Kept visible while its menu is open,
+   or the trigger would vanish from under the pointer. */
+.row:hover .rowMenuAnchor,
+.row:focus-within .rowMenuAnchor,
+.rowMenuAnchor[data-open='true'] {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+/* Coarse pointers have no hover, so the control stays put rather than
+   becoming unreachable. */
+@media (hover: none) {
+    .rowMenuAnchor {
+        opacity: 1;
+        pointer-events: auto;
+    }
+}
+
+/* Glyph, not a button: no border, no fill, until it is hovered or focused.
+   The row's corner is a quiet place, so the control has to be quiet too.
+   24px keeps it clear of the action button below (see `.row`'s min-height). */
+.iconButton {
+    display: grid;
+    width: 24px;
+    height: 24px;
+    place-items: center;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--mms-text-muted);
+    font-size: 13px;
+}
+
+/* Same specificity fight as `.primaryAction` above — the global
+   `button:hover:not(:disabled)` would otherwise repaint this. */
+.iconButton:hover:not(:disabled),
+.iconButton[aria-expanded='true'] {
+    border: 0;
+    background: var(--mms-surface-tint);
+    color: var(--mms-text);
+}
+
+.popover {
+    position: absolute;
+    z-index: 50;
+    top: calc(100% + 7px);
+    right: 0;
+    display: grid;
+    width: 240px;
+    max-height: min(440px, 60vh);
+    overflow: auto;
+    padding: 6px;
+    border: 1px solid var(--mms-border-strong);
+    border-radius: 9px;
+    background: var(--mms-surface-raised);
+    box-shadow: var(--mms-shadow-menu);
+}
+
+.popover button {
+    display: flex;
+    width: 100%;
+    min-height: 40px;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 9px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--mms-text);
+    text-align: left;
+}
+
+.popover button:hover:not(:disabled) {
+    border: 0;
+    background: var(--mms-surface-tint);
+}
+
+.danger {
+    color: var(--mms-danger);
+}
+
+/* ── Loading skeleton ─────────────────────────────────────────────────── */
+/* Skeleton rows rather than a spinner. A 2s `fa-spin` on a small glyph barely
+   reads as motion and the page looked hung; rows in the shape of the real ones
+   move continuously and show what is arriving. Geometry mirrors `.row` exactly
+   so nothing shifts when the data lands. */
+.skeletonRow {
+    display: grid;
+    min-height: 100px;
+    grid-template-columns: 48px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 14px;
+    padding: 20px 18px;
+}
+
+.skeletonRow + .skeletonRow {
+    border-top: 1px solid var(--mms-border);
+}
+
+.skeletonMark {
+    width: 46px;
+    height: 46px;
+    border-radius: 8px;
+}
+
+.skeletonLines {
+    display: grid;
+    min-width: 0;
+    gap: 7px;
+}
+
+.skeletonAction {
+    width: 132px;
+    height: 42px;
+    border-radius: 7px;
+}
+
+/* The sheen is derived from `--mms-text` rather than read from
+   `--skeleton-fill` / `--skeleton-sheen`. Those tokens are tuned for small
+   inline loaders and sit at 0.06 -> 0.13 alpha on dark: a 7-point alpha step
+   over navy, which animates perfectly well and is still invisible to the eye —
+   the bars looked frozen. Deriving from the text colour gives a real 9-point
+   step that inverts correctly on its own (navy on cream, cream on navy). */
+.skeletonMark,
+.skeletonAction,
+.skeletonLines > span {
+    background-color: color-mix(in srgb, var(--mms-text) 8%, transparent);
+    background-image: linear-gradient(
+        90deg,
+        color-mix(in srgb, var(--mms-text) 8%, transparent) 0%,
+        color-mix(in srgb, var(--mms-text) 20%, transparent) 50%,
+        color-mix(in srgb, var(--mms-text) 8%, transparent) 100%
+    );
+    background-repeat: no-repeat;
+    background-size: 60% 100%;
+    /* Paced with the bar above so the two read as one calm rhythm rather than
+       two loops beating against each other. */
+    animation: projects-skeleton-shimmer 1.9s linear infinite;
+}
+
+.skeletonLines > span {
+    height: 10px;
+    border-radius: 4px;
+}
+
+.skeletonLines > span:nth-child(1) {
+    width: 64px;
+    height: 8px;
+}
+
+.skeletonLines > span:nth-child(2) {
+    width: min(42%, 260px);
+    height: 15px;
+}
+
+.skeletonLines > span:nth-child(3) {
+    width: min(64%, 380px);
+}
+
+.skeletonLines > span:nth-child(4) {
+    width: min(52%, 320px);
+    height: 9px;
+}
+
+/* Percentage positions with a 60%-wide sheen sweep the whole bar regardless of
+   how wide it renders — the old fixed 800px band barely crossed a short bar. */
+@keyframes projects-skeleton-shimmer {
+    from {
+        background-position: -150% 0;
+    }
+    to {
+        background-position: 250% 0;
+    }
+}
+
+/* ── Indeterminate progress bar ───────────────────────────────────────────
+ * Under the panel header while rows load. The skeleton alone was read as a
+ * stalled page; a sweeping bar is unambiguous motion at a size that survives
+ * a glance. */
+.progressTrack {
+    position: relative;
+    height: 4px;
+    flex: 0 0 auto;
+    overflow: hidden;
+    background: color-mix(in srgb, var(--mms-text) 12%, transparent);
+}
+
+/* Three things make this read as a smooth glide rather than a flicker:
+ *
+ *  - `transform`, not `left`. Animating `left` relayouts the track every
+ *    frame; a transform is composited, so the motion is even under load.
+ *  - `linear`, not an ease. An accelerating curve on a 1.15s sweep crawled at
+ *    the edges and shot across the middle, which is what read as a flick.
+ *  - Feathered ENDS only. A gradient that ran transparent -> green ->
+ *    transparent across the whole segment left just a sliver of colour at the
+ *    centre of a 3px bar and read as nothing at all; the colour now holds
+ *    solid across the middle 56% and only the outer fifths fade.
+ *
+ * 1.9s is slow enough to track with the eye and still feel active.
+ */
+.progressTrack::after {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 45%;
+    border-radius: 999px;
+    background: linear-gradient(
+        90deg,
+        transparent 0%,
+        var(--mms-action) 22%,
+        var(--mms-action) 78%,
+        transparent 100%
+    );
+    animation: projects-progress-sweep 1.9s linear infinite;
+    content: '';
+    will-change: transform;
+}
+
+/* Translation is a percentage of the segment's own width (45% of the track),
+   so -100% parks it fully off the left edge and 223% clears the right. */
+@keyframes projects-progress-sweep {
+    from {
+        transform: translateX(-100%);
+    }
+    to {
+        transform: translateX(223%);
+    }
+}
+
+/* `entrance.css` carries a blanket
+ *   @media (prefers-reduced-motion: reduce) { *, *::before, *::after {
+ *       animation-duration: 0.01ms !important } }
+ * which is why this bar appeared not to run at all: at 0.01ms the sweep
+ * finishes instantly and parks at its end state, off the right edge of the
+ * track. The skeleton froze for the same reason, as does `fa-spin` everywhere
+ * else in the app.
+ *
+ * A blanket rule is the right default for decorative motion and the wrong one
+ * for a loading indicator: with it applied the panel reads as hung, which is
+ * the failure this whole element exists to prevent. So the bar keeps moving —
+ * slower, and it is the only thing that does. `!important` is required to beat
+ * the universal rule; the class selector wins the specificity tie.
+ *
+ * The skeleton sheen stays still: once the bar is moving, the rows do not need
+ * to, and holding them still keeps the amount of motion honest.
+ */
+@media (prefers-reduced-motion: reduce) {
+    .skeletonMark,
+    .skeletonAction,
+    .skeletonLines > span {
+        animation: none;
+    }
+
+    .progressTrack::after {
+        animation-duration: 3.2s !important;
+    }
+}
+
+/* ── Empty state — styles.css 5519-5551 ───────────────────────────────── */
+.empty {
+    display: grid;
+    min-height: 190px;
+    place-items: center;
+    align-content: center;
+    gap: 8px;
+    padding: 24px;
+    color: var(--mms-text-muted);
+    text-align: center;
+}
+
+.empty > i {
+    color: var(--mms-action-strong);
+    font-size: 20px;
+}
+
+.empty strong {
+    color: var(--mms-text);
+}
+
+.empty span {
+    font-size: 11px;
+}
+
+/* ── Responsive — styles.css 6675-6952, project-context.css 708-795 ───── */
+@media (max-width: 1180px) {
+    .screen {
+        padding-right: 28px;
+        padding-left: 28px;
+    }
+}
+
+@media (max-width: 760px) {
+    /* Below this tier the viewport is too short to be worth splitting into a
+       fixed frame plus an inner scroller — the list gets its natural height and
+       the page scrolls as one, the same concession MMS-CMS's panels make. */
+    .screen {
+        height: auto;
+        min-height: calc(100vh - var(--hub-shell-height) - var(--product-row-height));
+        overflow: visible;
+        padding: 24px 16px 48px;
+    }
+
+    .listBody {
+        overflow-y: visible;
+    }
+
+    .pageHead {
+        align-items: stretch;
+        flex-direction: column;
+        margin-bottom: 20px;
+    }
+
+    /* project-context.css:753-759 — the icon track narrows to 42px (the mark
+       itself stays 46px, as in the reference) and the action drops to its own
+       full-width line. */
+    .row {
+        grid-template-columns: 42px minmax(0, 1fr);
+    }
+
+    .rowActions {
+        grid-column: 1 / -1;
+    }
+
+    .primaryAction {
+        align-self: stretch;
+        flex: 1 1 auto;
+    }
+}
+
+@media (max-width: 520px) {
+    .pageHead h1 {
+        font-size: 29px;
+    }
+}

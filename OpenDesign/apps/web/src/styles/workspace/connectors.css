@@ -132,8 +132,7 @@
   box-shadow: var(--shadow-lg);
   overflow: hidden;
   animation: ds-pop-in 140ms cubic-bezier(0.2, 0, 0.2, 1);
-}
-@keyframes ds-pop-in {
+}@keyframes ds-pop-in {
   from { opacity: 0; transform: translateY(-4px); }
   to { opacity: 1; transform: translateY(0); }
 }
@@ -643,9 +642,6 @@
   opacity: 0.6;
   cursor: not-allowed;
 }
-.tab-panel-toolbar.designs-toolbar {
-  background: transparent;
-}
 .tab-panel-toolbar .toolbar-search .toolbar-search-clear {
   position: absolute;
   right: 6px;
@@ -958,8 +954,7 @@
     );
   background-size: 200% 100%;
   animation: connector-logo-shimmer 1400ms ease-in-out infinite;
-}
-@keyframes connector-logo-shimmer {
+}@keyframes connector-logo-shimmer {
   from { background-position: 100% 0; }
   to   { background-position: -100% 0; }
 }
@@ -1019,8 +1014,7 @@
 .connector-logo.is-fallback {
   border-color: var(--border-soft, var(--border));
   box-shadow: none;
-}
-@media (prefers-reduced-motion: reduce) {
+}@media (prefers-reduced-motion: reduce) {
   .connector-logo-img {
     transition: none;
     transform: none;
@@ -1088,8 +1082,7 @@
 .connector-tools-badge.is-ready svg {
   animation: connector-tools-badge-icon-in 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
   animation-delay: 120ms;
-}
-@keyframes connector-tools-badge-in {
+}@keyframes connector-tools-badge-in {
   0% {
     opacity: 0;
     transform: translateY(3px) scale(0.92);
@@ -1106,8 +1099,7 @@
     border-color: var(--border);
     background: var(--bg-subtle);
   }
-}
-@keyframes connector-tools-badge-icon-in {
+}@keyframes connector-tools-badge-icon-in {
   0% {
     opacity: 0;
     transform: rotate(-12deg) scale(0.8);
@@ -1116,15 +1108,13 @@
     opacity: 0.65;
     transform: rotate(0) scale(1);
   }
-}
-@media (prefers-reduced-motion: reduce) {
+}@media (prefers-reduced-motion: reduce) {
   .connector-tools-badge.is-ready {
     animation: connector-tools-badge-fade 180ms ease-out both;
   }
   .connector-tools-badge.is-ready svg {
     animation: none;
-  }
-  @keyframes connector-tools-badge-fade {
+  }@keyframes connector-tools-badge-fade {
     from { opacity: 0; }
     to { opacity: 1; }
   }
@@ -1650,8 +1640,7 @@ button.connector-action.is-loading {
 .connectors-panel-embedded button.connector-action.icon-only:disabled {
   opacity: 0.4;
   cursor: not-allowed;
-}
-@media (prefers-reduced-motion: reduce) {
+}@media (prefers-reduced-motion: reduce) {
   .connectors-panel-embedded button.connector-action.icon-only {
     transition: background 80ms linear, color 80ms linear;
   }
@@ -1767,8 +1756,7 @@ button.connector-action.is-loading {
   border-radius: var(--radius);
   animation: connector-gate-fade 220ms ease-out;
   pointer-events: auto;
-}
-@keyframes connector-gate-fade {
+}@keyframes connector-gate-fade {
   from { opacity: 0; transform: translateY(4px); }
   to { opacity: 1; transform: translateY(0); }
 }

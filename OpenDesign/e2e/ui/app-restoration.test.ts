@@ -4304,8 +4304,16 @@ async function runConversationDeleteRecoveryFlow(
   await expect(page.getByTestId('conversation-list').locator('.chat-conv-item')).toHaveCount(1);
 }
 
+/**
+ * The Projects screen's opener for a named project.
+ *
+ * The card grid was replaced by the approved MMS Design reference's
+ * linked-projects list, whose rows are deliberately not click targets — the
+ * row's `Open Studio` button is the only affordance, as on the reference.
+ */
 function homeDesignCard(page: Page, name: string): Locator {
-  return page.locator('.design-card', {
-    has: page.locator('.design-card-name', { hasText: name }),
-  });
+  return page
+    .getByTestId('linked-project-row')
+    .filter({ has: page.getByRole('heading', { level: 3, name }) })
+    .getByTestId('open-studio');
 }

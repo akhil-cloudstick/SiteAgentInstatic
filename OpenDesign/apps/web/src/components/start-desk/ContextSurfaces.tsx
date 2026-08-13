@@ -20,15 +20,29 @@ function stateIcon(item: InheritedItem): string {
 export interface ContextHandoffBandProps {
   context: InheritedContext;
   onOpenContext: () => void;
+  /**
+   * Extra class for surfaces that place the band differently. The Projects
+   * screen uses the reference's `.context-handoff-band.compact` bottom margin
+   * (20px) where the Start Desk uses 18px; one modifier keeps the band a single
+   * shared component instead of two near-identical copies.
+   */
+  className?: string;
 }
 
 /**
  * The band above the composer: where this session's context came from, what
  * arrived with it, and a way into the full record.
  */
-export function ContextHandoffBand({ context, onOpenContext }: ContextHandoffBandProps) {
+export function ContextHandoffBand({
+  context,
+  onOpenContext,
+  className,
+}: ContextHandoffBandProps) {
   return (
-    <section className="sd-handoff" aria-label="Product Hub handoff status">
+    <section
+      className={className ? `sd-handoff ${className}` : 'sd-handoff'}
+      aria-label="Product Hub handoff status"
+    >
       <div className="sd-handoff__source">
         <span className="sd-handoff__icon" aria-hidden="true">
           <i className="fa-solid fa-diagram-project" />
