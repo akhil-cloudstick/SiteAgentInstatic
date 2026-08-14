@@ -379,7 +379,9 @@ async function openIntegrationsConnectors(page: Page): Promise<Locator> {
     'aria-selected',
     'true',
   );
-  const panel = page.locator('.integrations-view__panel');
+  // The screen was rebuilt on the approved MMSBUILD reference, so its styling
+  // hooks are CSS Module classes now. Scope on the panel's stable test id.
+  const panel = page.getByTestId('integrations-panel-connectors');
   await expect(panel.getByTestId('connector-grid-wrap')).toBeVisible();
   return panel;
 }

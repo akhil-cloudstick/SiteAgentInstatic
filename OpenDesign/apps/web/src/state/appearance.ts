@@ -44,6 +44,29 @@ function accentVars(accentColor: string): Record<(typeof ACCENT_VARS)[number], s
   };
 }
 
+/**
+ * Mark the document as mid-theme-swap so `base.css` can kill every transition,
+ * then clear the mark once the new colours have painted. The forced reflow is
+ * the point: it commits the "transitions off" state before the attribute that
+ * changes the colours, so nothing has a chance to start animating.
+ */
+let themeSwapTimer: number | undefined;
+function suppressThemeTransitions(root: HTMLElement): void {
+  root.setAttribute('data-theme-swapping', '');
+  // Read a layout property to flush the style change synchronously.
+  void root.offsetHeight;
+  if (themeSwapTimer !== undefined) window.clearTimeout(themeSwapTimer);
+  const clear = () => {
+    root.removeAttribute('data-theme-swapping');
+    themeSwapTimer = undefined;
+  };
+  // Two frames: one for the attribute swap to paint, one before transitions are
+  // allowed back, so a slow frame cannot re-introduce the crossfade.
+  window.requestAnimationFrame(() => window.requestAnimationFrame(clear));
+  // Belt and braces for a backgrounded tab, where rAF does not fire.
+  themeSwapTimer = window.setTimeout(clear, 250);
+}
+
 export function applyAppearanceToDocument({
   theme,
   accentColor,
@@ -52,8 +75,19 @@ export function applyAppearanceToDocument({
   accentColor?: string;
 }): void {
   const root = document.documentElement;
-  if (theme === 'light' || theme === 'dark') {
-    root.setAttribute('data-theme', theme);
+  const nextTheme = theme === 'light' || theme === 'dark' ? theme : null;
+  const themeChanged = (root.getAttribute('data-theme') ?? null) !== nextTheme;
+
+  // Flipping the theme repaints every surface at once, but each surface
+  // animates on its OWN `transition` — different durations and easings — so the
+  // page crossfades block by block and spends a moment half-light, half-dark.
+  // Suppressing transitions for the duration of the swap makes it a single
+  // instantaneous change everywhere, which is what "the theme switched" should
+  // look like. `base.css` owns the suppression rule.
+  if (themeChanged) suppressThemeTransitions(root);
+
+  if (nextTheme) {
+    root.setAttribute('data-theme', nextTheme);
   } else {
     root.removeAttribute('data-theme');
   }

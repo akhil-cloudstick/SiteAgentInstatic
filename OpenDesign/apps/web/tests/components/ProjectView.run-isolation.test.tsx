@@ -1079,6 +1079,10 @@ describe('ProjectView conversation run isolation', () => {
   });
 
   it('returns to chat after sending board comments from the comment surface', async () => {
+    // The Studio workbench stacks at <=1100px, where collapse is disabled and
+    // the mobile dock takes over. jsdom defaults to 1024, so widen the window
+    // before mounting or the desktop collapse under test never applies.
+    Object.defineProperty(window, 'innerWidth', { value: 1600, configurable: true });
     renderProjectView();
 
     await waitFor(() => expect(screen.getByTestId('active-conversation').textContent).toBe('conv-a'));
@@ -1088,15 +1092,22 @@ describe('ProjectView conversation run isolation', () => {
     resolveConversationBMessages([]);
     await waitFor(() => expect(screen.getByTestId('send-message')).toHaveProperty('disabled', false));
 
+    // Focus mode is the Studio's chat collapse now: the workbench folds the
+    // panel to its 44px rail (`.studio-grid.chat-collapsed`) instead of
+    // hiding a `.split-chat-slot`.
     fireEvent.click(screen.getByTestId('workspace-focus-mode'));
     await waitFor(() =>
-      expect(screen.getByTestId('active-conversation').closest('.split-chat-slot')?.hasAttribute('hidden')).toBe(true),
+      expect(
+        screen.getByTestId('active-conversation').closest('.studio-grid')?.classList.contains('chat-collapsed'),
+      ).toBe(true),
     );
     fireEvent.click(screen.getByTestId('workspace-open-comments'));
     fireEvent.click(screen.getByTestId('workspace-send-comment'));
 
     await waitFor(() => expect(screen.getByTestId('active-conversation').textContent).toBe('conv-b'));
-    expect(screen.getByTestId('active-conversation').closest('.split-chat-slot')?.hasAttribute('hidden')).toBe(false);
+    expect(
+      screen.getByTestId('active-conversation').closest('.studio-grid')?.classList.contains('chat-collapsed'),
+    ).toBe(false);
     expect(streamViaDaemon).toHaveBeenCalledWith(expect.objectContaining({
       conversationId: 'conv-b',
       projectId: 'project-1',

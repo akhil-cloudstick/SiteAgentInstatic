@@ -53,6 +53,17 @@
   --amber: #c24a0e;         /* MMS Action Orange (darkened for text) */
   --amber-bg: #fff0e6;
 
+  /* The approved MMSBUILD screen library's own two shadows, verbatim from the
+     reference `:root` (`prototype-reference/src/styles.css:26-27`). They were
+     previously re-declared inside `DesignSystemsScreen.module.css` and
+     `CreateDesignSystemDialog.module.css` because no global home existed; the
+     values here are identical, so those surfaces are unchanged and every
+     screen now reads one definition. `--shadow-menu` is the floating-surface
+     cast (menus, popovers, dialogs, toasts); `--shadow-frame` is the shallow
+     lift under a framed preview or a raised button. */
+  --shadow-menu: 0 18px 48px rgb(8 39 49 / 16%);
+  --shadow-frame: 0 4px 16px rgb(8 39 49 / 8%);
+
   /* Warm navy-cast shadows (MMS never uses black shadows). */
   --shadow-xs: 0 1px 0 rgba(8, 42, 56, 0.04);
   --shadow-sm: 0 1px 2px rgba(8, 42, 56, 0.05), 0 1px 3px rgba(8, 42, 56, 0.04);
@@ -136,6 +147,9 @@
   --amber: #ff8a4d;
   --amber-bg: #2e1a0a;
 
+  --shadow-menu: 0 20px 52px rgb(0 8 12 / 38%);
+  --shadow-frame: 0 6px 20px rgb(0 8 12 / 24%);
+
   --shadow-xs: 0 1px 0 rgba(0, 0, 0, 0.2);
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3), 0 1px 3px rgba(0, 0, 0, 0.2);
   --shadow-md: 0 6px 24px rgba(0, 0, 0, 0.4), 0 2px 6px rgba(0, 0, 0, 0.25);
@@ -191,6 +205,9 @@
     --red-border: #4a1d14;
     --amber: #ff8a4d;
     --amber-bg: #2e1a0a;
+
+    --shadow-menu: 0 20px 52px rgb(0 8 12 / 38%);
+    --shadow-frame: 0 6px 20px rgb(0 8 12 / 24%);
 
     --shadow-xs: 0 1px 0 rgba(0, 0, 0, 0.2);
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3), 0 1px 3px rgba(0, 0, 0, 0.2);

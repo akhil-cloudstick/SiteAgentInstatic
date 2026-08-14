@@ -133,8 +133,8 @@ interface Props {
   onDuplicateProject?: (id: string) => Promise<void> | void;
   onRenameProject: (id: string, name: string) => void;
   onProjectsRefresh?: () => Promise<void> | void;
-  onChangeDefaultDesignSystem: (id: string) => void;
-  onCreateDesignSystem?: () => void;
+  // `null` clears the default — see the matching note in EntryShell.
+  onChangeDefaultDesignSystem: (id: string | null) => void;
   onOpenDesignSystem?: (id: string) => void;
   onDesignSystemsRefresh?: () => Promise<void> | void;
   onPersistComposioKey: (composio: AppConfig['composio']) => Promise<void> | void;
@@ -281,7 +281,6 @@ export function EntryView({
   onRenameProject,
   onProjectsRefresh,
   onChangeDefaultDesignSystem,
-  onCreateDesignSystem,
   onOpenDesignSystem,
   onDesignSystemsRefresh,
   onPersistComposioKey,
@@ -401,7 +400,6 @@ export function EntryView({
       onRenameProject={onRenameProject}
       onProjectsRefresh={onProjectsRefresh}
       onChangeDefaultDesignSystem={onChangeDefaultDesignSystem}
-      onCreateDesignSystem={onCreateDesignSystem}
       onOpenDesignSystem={onOpenDesignSystem}
       onDesignSystemsRefresh={onDesignSystemsRefresh}
       onPersistComposioKey={onPersistComposioKey}

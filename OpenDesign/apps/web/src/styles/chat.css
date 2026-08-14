@@ -1072,6 +1072,19 @@
   --chat-composer-inline-inset: 12px;
 }
 
+/* Wraps the transcript + composer in one element so the Studio can fold both
+   away in a single move when its chat panel collapses to a rail (the approved
+   screen's `.chat-content`, `prototype-reference/src/styles.css:1314-1318`).
+   Outside the Studio it is a transparent flex passthrough: the pane is a flex
+   column and the log still has to be the part that grows. */
+.pane > .chat-content {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
 .composer {
   padding: 10px 16px;
   display: flex;

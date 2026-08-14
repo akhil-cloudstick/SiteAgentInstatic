@@ -166,7 +166,7 @@ test('[P1] keyboard chat panel resize persists after reload', async ({ page }) =
   await page.reload();
   await expectWorkspaceReady(page);
 
-  const handle = page.locator('.split-resize-handle');
+  const handle = page.locator('.chat-resize-handle');
   await expect(handle).toBeVisible();
 
   const initialWidth = await readChatPanelWidth(handle);

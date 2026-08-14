@@ -4,13 +4,13 @@ import type { Locator, Page } from '@playwright/test';
 import { applyStandardMocks } from '@/playwright/mock-factory';
 
 // Red spec for issue #548 (Plane): the split resize handle's extended hitbox
-// (`.split-resize-handle::before`) must never cross the handle's inline-start
+// (`.chat-resize-handle::before`) must never cross the handle's inline-start
 // edge, because the chat panel's scrollbar gutter sits flush against it. When
 // it does, clicks aimed at the scrollbar start a panel resize instead, and
 // hovering the scrollbar shows the col-resize posture.
 //
 // Hit-testing note: pseudo-element hit areas are attributed to their host
-// element, so `document.elementFromPoint` returns `.split-resize-handle`
+// element, so `document.elementFromPoint` returns `.chat-resize-handle`
 // whenever a point falls inside the ::before overhang.
 
 test.beforeEach(async ({ page }) => {
@@ -48,7 +48,7 @@ test('[P1] hovering and dragging on the scrollbar gutter does not enter resize p
   await expectWorkspaceReady(page);
 
   const chatLog = page.locator('.chat-log');
-  const handle = page.locator('.split-resize-handle');
+  const handle = page.locator('.chat-resize-handle');
   const box = await requireBoundingBox(chatLog);
   const x = box.x + box.width - 1;
   const y = box.y + box.height / 2;
@@ -74,7 +74,7 @@ test('[P1] resize handle body still drags the chat panel width', async ({ page }
   await createProject(page, 'Handle drag regression guard');
   await expectWorkspaceReady(page);
 
-  const handle = page.locator('.split-resize-handle');
+  const handle = page.locator('.chat-resize-handle');
   const handleBox = await requireBoundingBox(handle);
   const x = handleBox.x + handleBox.width / 2;
   const y = handleBox.y + handleBox.height / 2;
@@ -135,7 +135,7 @@ async function probeHit(page: Page, x: number, y: number): Promise<HitProbe> {
   return page.evaluate(([px, py]) => {
     const el = document.elementFromPoint(px, py) as HTMLElement | null;
     return {
-      hitHandle: !!el?.closest('.split-resize-handle'),
+      hitHandle: !!el?.closest('.chat-resize-handle'),
       insideChatLog: !!el?.closest('.chat-log'),
       tag: el?.tagName ?? '<none>',
       className: typeof el?.className === 'string' ? el.className : '',

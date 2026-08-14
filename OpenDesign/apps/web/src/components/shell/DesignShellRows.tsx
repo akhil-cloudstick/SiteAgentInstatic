@@ -59,6 +59,11 @@ export interface DesignShellRowsProps {
   notificationCount: number;
   onNewProject: () => void;
   newProjectDisabled?: boolean;
+  /**
+   * The reference renders `+ New project` on Home only (`ui.jsx:211`); the
+   * Studio's specialist row carries no local action.
+   */
+  showNewProject?: boolean;
   /** MMS Design's own account control, rendered into row 1's account slot. */
   accountSlot?: ReactNode;
   /** The project name shown beside the product identity, when one is open. */
@@ -76,6 +81,7 @@ export function DesignShellRows({
   notificationCount,
   onNewProject,
   newProjectDisabled,
+  showNewProject = true,
   accountSlot,
   projectName,
 }: DesignShellRowsProps) {
@@ -123,15 +129,17 @@ export function DesignShellRows({
         // so the row matches the approved chrome.
         backToHub={{ position: 'left', href: hubContext?.returnUrl ?? '' }}
         rightSlot={
-          <button
-            type="button"
-            className="mms-new-project"
-            onClick={onNewProject}
-            disabled={newProjectDisabled}
-          >
-            <i className="fa-solid fa-plus" aria-hidden="true" />
-            <span>{t('entry.navNewProject')}</span>
-          </button>
+          showNewProject ? (
+            <button
+              type="button"
+              className="mms-new-project"
+              onClick={onNewProject}
+              disabled={newProjectDisabled}
+            >
+              <i className="fa-solid fa-plus" aria-hidden="true" />
+              <span>{t('entry.navNewProject')}</span>
+            </button>
+          ) : null
         }
       />
     </>

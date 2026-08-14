@@ -90,7 +90,7 @@ import type {
   SkillSummary,
 } from '../types';
 import { ProjectsScreen } from './ProjectsScreen';
-import { DesignSystemsTab } from './DesignSystemsTab';
+import { DesignSystemsScreen } from './DesignSystemsScreen';
 import { BrandsTab } from './BrandsTab';
 import type { EntryView as EntryViewKind } from './EntryNavRail';
 import { DesignShellRows } from './shell/DesignShellRows';
@@ -111,6 +111,8 @@ import { HomeView } from './HomeView';
 import {
   createPluginAuthoringHandoff,
   createPluginUseHandoff,
+  createSkillAuthoringHandoff,
+  createSkillUseHandoff,
   type HomePromptHandoff,
 } from './home-hero/plugin-authoring';
 import {
@@ -141,7 +143,7 @@ import {
 } from './EntrySettingsMenu';
 import { MessageCenter } from './MessageCenter';
 import { NewProjectModal } from './NewProjectModal';
-import { PluginsView } from './PluginsView';
+import { PluginsScreen } from './PluginsScreen';
 import type { CreateInput, CreateTab, ImportClaudeDesignOutcome } from './NewProjectPanel';
 import type { PluginLoopSubmit } from './PluginLoopHome';
 import {
@@ -149,7 +151,7 @@ import {
   type PluginShareAction,
   type PluginShareProjectOutcome,
 } from '../state/projects';
-import { TasksView } from './TasksView';
+import { AutomationsScreen } from './AutomationsScreen';
 import {
   API_KEY_PLACEHOLDERS,
   API_PROTOCOL_TABS,
@@ -407,6 +409,13 @@ interface Props {
   // dialog. App owns persistence; this component just calls the callback.
   onThemeChange: (theme: AppTheme) => void;
   onCreateProject: (input: EntryCreateProjectInput) => Promise<boolean> | boolean | void;
+  /**
+   * Publish-to-GitHub / contribute-to-catalog task creation. The approved
+   * MMSBUILD Plugins screen has no such control (its card kebab is Details +
+   * Provenance and nothing else), so nothing in this shell calls it today. The
+   * prop stays threaded from App because the daemon flow it drives is intact
+   * and the next surface that needs it should not have to re-plumb three files.
+   */
   onCreatePluginShareProject: (
     pluginId: string,
     action: PluginShareAction,
@@ -423,8 +432,11 @@ interface Props {
   onDuplicateProject?: (id: string) => Promise<void> | void;
   onRenameProject: (id: string, name: string) => void;
   onProjectsRefresh?: () => Promise<void> | void;
-  onChangeDefaultDesignSystem: (id: string) => void;
-  onCreateDesignSystem?: () => void;
+  // `null` clears the default. The Design systems screen sends it when the
+  // system backing the default is unpublished, since an unpublished system is
+  // not eligible to back new chats. `AppConfig.designSystemId` is already
+  // `string | null`, so this only widens the prop to match the config it writes.
+  onChangeDefaultDesignSystem: (id: string | null) => void;
   // NOTE: first-run onboarding intentionally no longer hosts guided
   // design-system creation. The previous step-3 design-system surface was
   // replaced by the newsletter and brand-extraction steps, so EntryShell does
@@ -522,7 +534,6 @@ export function EntryShell({
   onRefreshAgents,
   onThemeChange,
   onCreateProject,
-  onCreatePluginShareProject,
   onImportClaudeDesign,
   onImportFolder,
   onImportFolderResponse,
@@ -533,7 +544,6 @@ export function EntryShell({
   onRenameProject,
   onProjectsRefresh,
   onChangeDefaultDesignSystem,
-  onCreateDesignSystem,
   onOpenDesignSystem,
   onDesignSystemsRefresh,
   onPersistComposioKey,
@@ -651,6 +661,19 @@ export function EntryShell({
     setHomePromptHandoff(
       createPluginUseHandoff(Date.now(), record.id, { action }),
     );
+    changeView('home');
+  }
+
+  // The Skills half of the Plugins screen. Same two doors as plugins — author a
+  // new one from a prompt, or pick an existing one — routed to the composer
+  // rather than duplicating the skill editor that already lives in Integrations.
+  function startSkillAuthoring() {
+    setHomePromptHandoff(createSkillAuthoringHandoff(Date.now()));
+    changeView('home');
+  }
+
+  function useSkillFromLibrary(skill: SkillSummary) {
+    setHomePromptHandoff(createSkillUseHandoff(Date.now(), skill.id));
     changeView('home');
   }
 
@@ -1182,53 +1205,43 @@ export function EntryShell({
               />
             </div>
             <div data-testid="entry-view-tasks" data-active={view === 'tasks' ? 'true' : 'false'} {...inactiveViewProps(view === 'tasks')}>
-              <TasksView
+              <AutomationsScreen
                 skills={skills}
                 designTemplates={designTemplates}
                 connectors={connectors}
                 connectorsLoading={connectorsLoading}
+                projects={projects}
+                designSystems={designSystems}
+                isActive={view === 'tasks'}
               />
             </div>
             <div data-testid="entry-view-plugins" data-active={view === 'plugins' ? 'true' : 'false'} {...inactiveViewProps(view === 'plugins')}>
-              <PluginsView
+              <PluginsScreen
+                skills={skills}
+                skillsLoading={skillsLoading}
+                isActive={view === 'plugins'}
                 onCreatePlugin={startPluginAuthoring}
+                onCreateSkill={startSkillAuthoring}
                 onUsePlugin={usePluginFromLibrary}
-                onCreatePluginShareProject={onCreatePluginShareProject}
+                onUseSkill={useSkillFromLibrary}
               />
             </div>
             <div data-testid="entry-view-design-systems" data-active={view === 'design-systems' ? 'true' : 'false'} {...inactiveViewProps(view === 'design-systems')}>
-              {designSystemsLoading ? (
-                <div className="entry-section">
-                  <header className="entry-section__head">
-                    <h1 className="entry-section__title">{t('entry.navDesignSystems')}</h1>
-                  </header>
-                  <DesignSystemsTab
-                    loading
-                    systems={[]}
-                    templates={templates}
-                    selectedId={defaultDesignSystemId}
-                    onSelect={onChangeDefaultDesignSystem}
-                    onCreate={onCreateDesignSystem}
-                    onOpenSystem={onOpenDesignSystem}
-                    onSystemsRefresh={onDesignSystemsRefresh}
-                  />
-                </div>
-              ) : (
-                <div className="entry-section">
-                  <header className="entry-section__head">
-                    <h1 className="entry-section__title">{t('entry.navDesignSystems')}</h1>
-                  </header>
-                  <DesignSystemsTab
-                    systems={designSystems}
-                    templates={templates}
-                    selectedId={defaultDesignSystemId}
-                    onSelect={onChangeDefaultDesignSystem}
-                    onCreate={onCreateDesignSystem}
-                    onOpenSystem={onOpenDesignSystem}
-                    onSystemsRefresh={onDesignSystemsRefresh}
-                  />
-                </div>
-              )}
+              {/* No `entry-section` wrapper and no h1 above the screen: the
+                  approved MMSBUILD screen owns its own page head (kicker,
+                  title, subtitle, primary action) and its own gutters, the way
+                  the Projects screen already does. No whole-page gate either —
+                  the head, handoff band and shell paint immediately and the
+                  wait shows inside the list and preview. */}
+              <DesignSystemsScreen
+                systems={designSystemsLoading ? [] : designSystems}
+                selectedId={defaultDesignSystemId}
+                onSelect={onChangeDefaultDesignSystem}
+                onOpenSystem={onOpenDesignSystem}
+                onSystemsRefresh={onDesignSystemsRefresh}
+                isActive={view === 'design-systems'}
+                loading={designSystemsLoading}
+              />
             </div>
             {LIBRARY_UI_VISIBLE ? (
               <div data-testid="entry-view-library" data-active={view === 'library' ? 'true' : 'false'} {...inactiveViewProps(view === 'library')}>

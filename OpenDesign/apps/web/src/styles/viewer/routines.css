@@ -2997,17 +2997,25 @@ body.od-quick-switcher-open .chat-composer-fixed-layer .composer-send:disabled {
 }
 /* Group heading separating "your systems" from "official presets", matching the
    Design Systems tab split. Sticks to the top while scrolling the list. */
+/* A section heading, not a filled band. It reads `var(--bg)` — the PAGE
+   surface — while it sits on the popover's raised surface, so it drew a
+   hard-edged box across the list. It keeps `position: sticky` (rows must not
+   run under it while scrolling) but takes the popover's own tone and separates
+   with a hairline instead of a slab. */
 .project-ds-picker-group-label {
   position: sticky;
   top: -5px;
   z-index: 1;
-  padding: 8px 8px 4px;
+  margin: 6px 6px 2px;
+  padding: 6px 4px 5px;
+  border-bottom: 1px solid var(--border-subtle, var(--border));
+  border-radius: var(--radius-sm, 6px);
   font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--text-faint);
-  background: var(--bg, var(--surface, #fff));
+  color: var(--text-muted);
+  background: var(--bg-elevated, var(--bg-panel));
 }
 .project-ds-picker-group-label:first-child {
   padding-top: 4px;

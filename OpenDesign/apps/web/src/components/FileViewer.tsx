@@ -1,7 +1,10 @@
 import { memo, useCallback, useEffect, useId, useMemo, useRef, useState, type ClipboardEvent as ReactClipboardEvent, type CSSProperties, type DragEvent as ReactDragEvent, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react';
 import { createPortal, flushSync } from 'react-dom';
 import { Button, Input, Select } from '@open-design/components';
+import { FaIcon } from '@mms/shell';
 import { APP_CHROME_FILE_ACTIONS_ID, APP_CHROME_FILE_ACTIONS_SELECTOR } from './AppChromeHeader';
+import { ViewportSwitcher } from './studio/ViewportSwitcher';
+import { WORKSPACE_VIEWPORT_SLOT_ID } from './studio/workspace-slots';
 import {
   buildSocialSharePayload,
   OPEN_DESIGN_GITHUB_REPO_URL,
@@ -212,7 +215,14 @@ import {
 import { MANUAL_EDIT_STYLE_PROPS, type ManualEditBridgeMessage, type ManualEditHistoryEntry, type ManualEditPatch, type ManualEditStyles, type ManualEditTarget } from '../edit-mode/types';
 import { isRenderableSketchJson, SketchPreview } from './SketchPreview';
 
-function resolveChromeActionsHost(): HTMLElement | null {
+/**
+ * Legacy lookup for the app-chrome file-actions strip. The Studio's file-tab
+ * row no longer hosts one — Present / Share / Download render into a slot
+ * inside this viewer's own preview toolbar, which is where the approved screen
+ * keeps file-scoped actions. Kept for the desktop `AppChromeHeader`, which
+ * still renders that strip.
+ */
+export function resolveChromeActionsHost(): HTMLElement | null {
   return document.querySelector<HTMLElement>(APP_CHROME_FILE_ACTIONS_SELECTOR)
     ?? document.getElementById(APP_CHROME_FILE_ACTIONS_ID);
 }
@@ -351,16 +361,24 @@ const PREVIEW_VIEWPORT_PRESETS: PreviewViewportPreset[] = [
     labelKey: 'fileViewer.viewportDesktop',
     titleKey: 'fileViewer.viewportDesktopTitle',
   },
+  // 744 / 360 rather than the reference's 820 / 390: at 820 a responsive site
+  // usually sits above its tablet breakpoint and reads as a narrow desktop, and
+  // 390 lands on the same breakpoint as a small tablet. These are the iPad-mini
+  // portrait and Android baseline widths — comfortably inside the tablet and
+  // phone breakpoints most sites author against, so each viewport shows the
+  // layout it is named after. Heights are deliberately untouched: the frame
+  // fills the stage and the page scrolls inside it, so they no longer drive
+  // layout.
   {
     id: 'tablet',
-    width: 820,
+    width: 744,
     height: 1180,
     labelKey: 'fileViewer.viewportTablet',
     titleKey: 'fileViewer.viewportTabletTitle',
   },
   {
     id: 'mobile',
-    width: 390,
+    width: 360,
     height: 844,
     labelKey: 'fileViewer.viewportMobile',
     titleKey: 'fileViewer.viewportMobileTitle',
@@ -1330,6 +1348,13 @@ interface Props {
   // Bumped nonce asking a deck preview to flip to `slideIndex` (a queued chat
   // send for this file just started processing).
   slideNavRequest?: { slideIndex: number; nonce: number } | null;
+  /** Bumped nonce from the Studio's mobile dock asking for manual-edit mode. */
+  manualEditRequest?: { nonce: number } | null;
+  /**
+   * Suppress Present / Share / Download. The approved Studio toolbar carries
+   * none of them; publishing is the project toolbar's `Share to CMS`.
+   */
+  hideFileActions?: boolean;
 }
 
 /**
@@ -1521,6 +1546,8 @@ export const FileViewer = memo(function FileViewer({
   shareRequest,
   downloadRequest,
   slideNavRequest,
+  manualEditRequest,
+  hideFileActions = false,
 }: Props) {
   const rendererMatch = artifactRendererRegistry.resolve({
     file,
@@ -1566,6 +1593,8 @@ export const FileViewer = memo(function FileViewer({
         shareRequest={shareRequest}
         downloadRequest={downloadRequest}
         slideNavRequest={slideNavRequest}
+        manualEditRequest={manualEditRequest}
+        hideFileActions={hideFileActions}
       />
     );
   }
@@ -1625,11 +1654,14 @@ export function LiveArtifactViewer({
   liveArtifact,
   liveArtifactEvents = [],
   onRefreshArtifacts,
+  hideFileActions = false,
 }: {
   projectId: string;
   liveArtifact: LiveArtifactWorkspaceEntry;
   liveArtifactEvents?: LiveArtifactEventItem[];
   onRefreshArtifacts?: () => Promise<void> | void;
+  /** See the note on `FileViewer`'s prop of the same name. */
+  hideFileActions?: boolean;
 }) {
   const t = useT();
   const tabs = useMemo(() => liveArtifactViewerTabs(t), [t]);
@@ -1899,7 +1931,7 @@ export function LiveArtifactViewer({
 
   return (
     <div className={`viewer html-viewer live-artifact-viewer${inTabPresent ? ' is-tab-present' : ''}`}>
-      {((node: ReactNode) => (
+      {hideFileActions ? null : ((node: ReactNode) => (
         chromeActionsHost ? createPortal(node, chromeActionsHost) : node
       ))(
         <div className="present-wrap chrome-present-wrap" ref={presentWrapRef}>
@@ -1944,21 +1976,21 @@ export function LiveArtifactViewer({
           <Icon name="close" size={14} />
         </button>
       ) : null}
-      <div className="viewer-toolbar">
-        <div className="viewer-toolbar-left">
+      <div className="viewer-toolbar preview-toolbar">
+        <div className="viewer-toolbar-left viewer-left-actions">
             <button
               type="button"
-              className="icon-only od-tooltip"
+              className="icon-only viewer-icon-action od-tooltip"
               onClick={() => setReloadKey((n) => n + 1)}
               title={`${t('fileViewer.reload')} ${t('fileViewer.preview')}`}
               data-tooltip={`${t('fileViewer.reload')} ${t('fileViewer.preview')}`}
               data-tooltip-placement="bottom"
               aria-label={`${t('fileViewer.reloadAria')} ${t('fileViewer.preview')}`}
             >
-            <Icon name="reload" size={14} />
+            <FaIcon name="rotate-right" size={14} />
           </button>
         </div>
-        <div className="viewer-toolbar-actions">
+        <div className="viewer-toolbar-actions preview-actions">
           <div className="viewer-tabs">
             {tabs.map((tab) => (
               <button
@@ -6190,6 +6222,8 @@ function HtmlViewer({
   shareRequest,
   downloadRequest,
   slideNavRequest,
+  manualEditRequest,
+  hideFileActions = false,
 }: {
   projectId: string;
   projectKind: TrackingProjectKind;
@@ -6213,6 +6247,8 @@ function HtmlViewer({
   shareRequest?: { nonce: number } | null;
   downloadRequest?: { nonce: number } | null;
   slideNavRequest?: { slideIndex: number; nonce: number } | null;
+  manualEditRequest?: { nonce: number } | null;
+  hideFileActions?: boolean;
 }) {
   const { locale, t } = useI18n();
   const analytics = useAnalytics();
@@ -7167,9 +7203,27 @@ function HtmlViewer({
   const shareRef = useRef<HTMLDivElement | null>(null);
   const [chromeActionsHost, setChromeActionsHost] = useState<HTMLElement | null>(null);
   useEffect(() => {
-    if (typeof document === 'undefined') return;
+    if (typeof document === 'undefined' || hideFileActions) return;
     setChromeActionsHost(resolveChromeActionsHost());
+  }, [hideFileActions]);
+
+  // The approved Studio puts the viewport switcher at the right end of the
+  // FILE TAB row, one level above this component (`Workspace.jsx:707`). The
+  // viewport is this viewer's state, so the control is portalled up rather
+  // than the state being lifted out.
+  const [viewportSlotHost, setViewportSlotHost] = useState<HTMLElement | null>(null);
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    setViewportSlotHost(document.getElementById(WORKSPACE_VIEWPORT_SLOT_ID));
   }, []);
+
+  // Studio mobile dock → Edit. The reference navigated to a separate Focus
+  // screen; edit-in-place is the upstream equivalent the build kit names.
+  useEffect(() => {
+    if (!manualEditRequest) return;
+    activateManualEditTool();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [manualEditRequest?.nonce]);
 
   useEffect(() => {
     liveCommentTargetsRef.current = liveCommentTargets;
@@ -11732,8 +11786,20 @@ function HtmlViewer({
             : undefined
         }
       />
-      <div className="viewer-toolbar">
-        <div className="viewer-toolbar-left">
+      {/* Viewport switcher — portalled into the file-tab row, where the
+          approved Studio puts it (`Workspace.jsx:707`). */}
+      {showPreviewToolbarControls && viewportSlotHost
+        ? createPortal(
+            <ViewportSwitcher viewport={previewViewport} onViewport={setPreviewViewport} />,
+            viewportSlotHost,
+          )
+        : null}
+      {/* `.preview-toolbar` — the approved 44px row: reload + Preview/Code
+          underline tabs on the left, the tool cluster and ⋮ on the right
+          (`prototype-reference/src/Workspace.jsx:172-213`,
+          `styles.css:2153-2368`). */}
+      <div className="viewer-toolbar preview-toolbar">
+        <div className="viewer-toolbar-left viewer-left-actions">
           {showDeckThumbnailRail ? (
             <button
               type="button"
@@ -11757,52 +11823,38 @@ function HtmlViewer({
           ) : null}
           <button
             type="button"
-            className="icon-only od-tooltip"
+            className="icon-only viewer-icon-action od-tooltip"
             onClick={reloadHtmlPreview}
             title={`${t('fileViewer.reload')} ${t('fileViewer.preview')}`}
             data-tooltip={`${t('fileViewer.reload')} ${t('fileViewer.preview')}`}
             data-tooltip-placement="bottom"
             aria-label={`${t('fileViewer.reloadAria')} ${t('fileViewer.preview')}`}
           >
-            <Icon name="reload" size={14} />
+            <FaIcon name="rotate-right" size={14} />
           </button>
-          {versioningAvailable ? (
+          {/* Preview ⇄ Code as the reference's underline tabs, replacing the
+              single toggle button. Versions moved into the ⋮ menu, which is
+              where the reference keeps it (`Workspace.jsx:204`). */}
+          <div className="preview-mode-tabs" role="tablist" aria-label={t('fileViewer.preview')}>
             <button
               type="button"
-              className="viewer-action file-version-trigger od-tooltip"
-              disabled={source === null}
-              title={t('fileViewer.versions.title')}
-              aria-label={t('fileViewer.versions.title')}
-              data-tooltip={t('fileViewer.versions.title')}
-              data-tooltip-placement="bottom"
-              onClick={() => {
-                fireArtifactToolbarClick('versions', 'toolbar');
-                setVersionModalOpen('toolbar');
-              }}
+              role="tab"
+              aria-selected={mode !== 'source'}
+              className={mode !== 'source' ? 'active' : ''}
+              onClick={() => setMode('preview')}
             >
-              <RemixIcon name="history-line" size={14} />
-              <span>{t('fileViewer.versions.entry')}</span>
+              {t('fileViewer.preview')}
             </button>
-          ) : null}
-          <button
-            type="button"
-            className={`viewer-action${mode === 'source' ? ' active' : ''}`}
-            aria-pressed={mode === 'source'}
-            onClick={() => setMode((current) => current === 'source' ? 'preview' : 'source')}
-          >
-            <RemixIcon name="code-s-slash-line" size={14} />
-            <span>{mode === 'source' ? t('fileViewer.preview') : t('fileViewer.source')}</span>
-          </button>
-          {showPreviewToolbarControls ? (
-            <span className="viewer-preview-toolbar-inline">
-              <span className="viewer-divider" aria-hidden />
-              <PreviewViewportControls
-                viewport={previewViewport}
-                onViewport={setPreviewViewport}
-                t={t}
-              />
-            </span>
-          ) : null}
+            <button
+              type="button"
+              role="tab"
+              aria-selected={mode === 'source'}
+              className={mode === 'source' ? 'active' : ''}
+              onClick={() => setMode('source')}
+            >
+              {t('fileViewer.source')}
+            </button>
+          </div>
           {showPreviewToolbarControls && showDeckNavigation && !showDeckFloatingNav ? (
             <span
               className="deck-nav viewer-deck-nav-inline"
@@ -11844,9 +11896,9 @@ function HtmlViewer({
             </span>
           ) : null}
         </div>
-        <div className="viewer-toolbar-actions">
+        <div className="viewer-toolbar-actions preview-actions">
           {showPreviewToolbarControls ? (
-            <div className="viewer-toolbar-inline-actions">
+            <div className="viewer-toolbar-inline-actions preview-actions">
               {SCREENSHOT_ENABLED && mode === 'preview' ? (
                 <button
                   type="button"
@@ -11864,7 +11916,7 @@ function HtmlViewer({
               <div className="artifact-tool-menu-anchor">
                 <button
                   type="button"
-                  className={`viewer-action viewer-action-icon viewer-comment-toggle od-tooltip${boardMode && !commentCreateMode && boardTool === 'inspect' ? ' active' : ''}`}
+                  className={`viewer-action viewer-comment-toggle od-tooltip${boardMode && !commentCreateMode && boardTool === 'inspect' ? ' active' : ''}`}
                   data-testid="board-mode-toggle"
                   data-tooltip={t('fileViewer.comment')}
                   data-tooltip-placement="bottom"
@@ -11873,11 +11925,12 @@ function HtmlViewer({
                   aria-pressed={boardMode && !commentCreateMode && boardTool === 'inspect'}
                   onClick={activateCommentTool}
                 >
-                  <RemixIcon name="chat-new-line" size={15} />
+                  <FaIcon name="comment" size={14} />
+                  <span>{t('fileViewer.comment')}</span>
                 </button>
               </div>
               <button
-                className={`viewer-action viewer-action-icon od-tooltip${drawOverlayOpen ? ' active' : ''}`}
+                className={`viewer-action od-tooltip${drawOverlayOpen ? ' active' : ''}`}
                 type="button"
                 data-testid="draw-overlay-toggle"
                 data-tooltip={t('fileViewer.mark')}
@@ -11887,11 +11940,13 @@ function HtmlViewer({
                 aria-pressed={drawOverlayOpen}
                 onClick={activateDrawTool}
               >
-                <RemixIcon name="mark-pen-line" size={15} />
+                <FaIcon name="bookmark" size={14} />
+                <span>{t('fileViewer.mark')}</span>
               </button>
-              <span className="viewer-toolbar-tool-divider" aria-hidden />
+              {/* `.edit-action` keeps its outline while inactive — the
+                  reference's one bordered tool (`styles.css:2316-2319`). */}
               <button
-                className={`viewer-action viewer-action-icon od-tooltip${manualEditMode ? ' active' : ''}`}
+                className={`viewer-action edit-action od-tooltip${manualEditMode ? ' active' : ''}`}
                 type="button"
                 data-testid="manual-edit-mode-toggle"
                 data-tooltip={t('fileViewer.edit')}
@@ -11901,12 +11956,12 @@ function HtmlViewer({
                 aria-pressed={manualEditMode}
                 onClick={activateManualEditTool}
               >
-                <RemixIcon name="edit-line" size={15} />
+                <FaIcon name="pen-to-square" size={14} />
+                <span>{t('fileViewer.edit')}</span>
               </button>
-              <span className="viewer-toolbar-tool-divider" aria-hidden />
               <button
                 type="button"
-                className={`viewer-action viewer-comment-count-trigger viewer-comment-toggle od-tooltip${boardMode && commentCreateMode ? ' active' : ''}`}
+                className={`viewer-action comment-count viewer-comment-count-trigger viewer-comment-toggle od-tooltip${boardMode && commentCreateMode ? ' active' : ''}`}
                 data-testid="comment-panel-toggle"
                 data-tooltip={t('chat.tabComments')}
                 data-tooltip-placement="bottom"
@@ -11915,14 +11970,14 @@ function HtmlViewer({
                 aria-pressed={boardMode && commentCreateMode}
                 onClick={activateCommentCreateTool}
               >
-                <RemixIcon name="message-3-line" size={15} />
+                <FaIcon name="comment" size={14} />
                 <span className="viewer-comment-count" aria-hidden>{visibleSideComments.length}</span>
               </button>
               {source !== null && mode === 'preview' ? (
                 <div className="zoom-menu viewer-toolbar-zoom" ref={zoomMenuRef}>
                   <button
                     type="button"
-                    className="viewer-action zoom-trigger od-tooltip"
+                    className="viewer-action zoom-action zoom-trigger od-tooltip"
                     aria-haspopup="menu"
                     aria-expanded={zoomMenuOpen}
                     title={t('fileViewer.resetZoom')}
@@ -11934,6 +11989,7 @@ function HtmlViewer({
                     }}
                   >
                     <span style={{ fontVariantNumeric: 'tabular-nums' }}>{previewZoomText}</span>
+                    <FaIcon name="chevron-down" size={9} />
                   </button>
                   {zoomMenuOpen ? (
                     <div className="zoom-menu-popover" role="menu">
@@ -11961,10 +12017,10 @@ function HtmlViewer({
               ) : null}
             </div>
           ) : null}
-          <div className="viewer-toolbar-more" ref={toolbarMoreRef}>
+          <div className="viewer-toolbar-more viewer-more" ref={toolbarMoreRef}>
             <button
               type="button"
-              className="viewer-action viewer-action-icon od-tooltip"
+              className={`viewer-action viewer-action-icon od-tooltip${toolbarMoreOpen ? ' active' : ''}`}
               aria-label={t('nextStep.more')}
               aria-haspopup="menu"
               aria-expanded={toolbarMoreOpen}
@@ -11973,10 +12029,10 @@ function HtmlViewer({
               title={t('nextStep.more')}
               onClick={() => setToolbarMoreOpen((value) => !value)}
             >
-              <RemixIcon name="more-2-line" size={16} />
+              <FaIcon name="ellipsis-vertical" size={16} />
             </button>
             {toolbarMoreOpen ? (
-              <div className="viewer-toolbar-more-menu" role="menu">
+              <div className="viewer-toolbar-more-menu viewer-more-menu" role="menu">
                 {versioningAvailable ? (
                   <button
                     type="button"
@@ -12139,7 +12195,14 @@ function HtmlViewer({
           </div>
         </div>
       </div>
-      {((filePrimaryActions: ReactNode) => (
+      {/* Present / Share / Download. The approved Studio toolbar has none of
+          them — publishing is `Share to CMS` in the project toolbar — so the
+          Studio passes `hideFileActions` and they render nowhere here. Other
+          hosts (the desktop app-chrome header) still portal them into their own
+          strip. Rendering them INLINE when no host exists is what put a notch
+          and two buttons between the toolbar and the preview, pushing the
+          canvas out of its grid row entirely. */}
+      {hideFileActions ? null : ((filePrimaryActions: ReactNode) => (
         chromeActionsHost ? createPortal(filePrimaryActions, chromeActionsHost) : filePrimaryActions
       ))(<>
           {showPresent ? (
@@ -12478,7 +12541,14 @@ function HtmlViewer({
             </div>
           ) : null}
         </>)}
-      <div className="viewer-body" ref={previewBodyRef}>
+      {/* `.preview-stage` is the approved canvas backdrop: a near-black
+          `#001923` in BOTH themes, holding a centred, framed page
+          (`styles.css:2370-2410`). The shell theme must never repaint the
+          authored website, so the two colours here are literals, not tokens. */}
+      <div
+        className={mode === 'preview' ? 'viewer-body preview-stage' : 'viewer-body'}
+        ref={previewBodyRef}
+      >
         {initialPreviewLoading || sourceModeLoading ? (
           initialPreviewLoading ? (
           <div
@@ -12515,7 +12585,12 @@ function HtmlViewer({
           )
         ) : mode === 'preview' ? (
           <div
-            className={`${manualEditMode ? 'manual-edit-workspace' : commentPreviewLayoutClass} preview-viewport preview-viewport-${previewViewport}${drawOverlayOpen ? ' preview-draw-active' : ''}`}
+            /* `preview-frame` only carries the reference's paper on desktop,
+               where this wrapper IS the page. At tablet/mobile widths upstream
+               nests the page in `.preview-frame-clip` and uses this element as
+               its own stage, so the frame chrome belongs on the clip — see
+               `studio.css`. */
+            className={`${manualEditMode ? 'manual-edit-workspace' : commentPreviewLayoutClass} preview-viewport preview-viewport-${previewViewport} preview-frame ${previewViewport}${drawOverlayOpen ? ' preview-draw-active' : ''}`}
             data-testid={manualEditMode ? undefined : 'comment-preview-layout'}
             ref={manualEditMode ? undefined : setCommentComposerHostRef}
             style={previewViewportStyle(previewViewport, previewScale, boardPreviewCanvasSize, boardPreviewScaleOptions)}

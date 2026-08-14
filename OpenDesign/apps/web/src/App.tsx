@@ -7,7 +7,6 @@ import {
   trackProjectCreateResult,
 } from './analytics/events';
 import { deriveUploadCohort } from './analytics/upload-tracking';
-import { setPendingDesignSystemCreateEntry } from './analytics/ds-create-entry';
 import { detectClientType } from './analytics/identity';
 import {
   stashOnboardingEntryForProject,
@@ -2461,6 +2460,9 @@ function AppInner() {
       <ProjectView
         key={activeProject.id}
         project={activeProject}
+        // The Studio renders the shared two-row chrome, so its navigation has
+        // to reach the same destinations the entry views use.
+        onNavigateView={(view) => navigate({ kind: 'home', view })}
         routeFileName={route.kind === 'project' ? route.fileName : null}
         routeConversationId={route.kind === 'project' ? route.conversationId : null}
         config={config}
@@ -2543,10 +2545,6 @@ function AppInner() {
         onRenameProject={handleRenameProject}
         onProjectsRefresh={refreshProjectsStrict}
         onChangeDefaultDesignSystem={handleChangeDefaultDesignSystem}
-        onCreateDesignSystem={() => {
-          setPendingDesignSystemCreateEntry('design_systems_page');
-          navigate({ kind: 'design-system-create' });
-        }}
         onOpenDesignSystem={(id: string) => navigate({ kind: 'design-system-detail', designSystemId: id })}
         onDesignSystemsRefresh={refreshDesignSystems}
         onPersistComposioKey={handleConfigPersistComposioKey}
@@ -2593,6 +2591,10 @@ function AppInner() {
       <div
         className={`workspace-shell workspace-shell--${clientType}`}
         data-client-type={clientType}
+        // The Studio scrolls in normal flow (its workbench has a 680px floor);
+        // every other route keeps the fixed-viewport shell. `shell.css` reads
+        // this rather than `:has()` so the rule is unambiguous.
+        data-route={route.kind}
       >
         <WorkspaceTabsBar
           route={route}

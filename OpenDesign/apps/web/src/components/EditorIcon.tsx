@@ -7,6 +7,13 @@ import type { HostEditorId } from '@open-design/contracts';
 interface Props {
   editorId: HostEditorId | string;
   size?: number;
+  /**
+   * `tile` (default) is the coloured square with a white mark — the shape the
+   * standalone hand-off popover uses. `flat` draws the mark itself in the app's
+   * brand colour with no square behind it, for lists that sit inside another
+   * menu.
+   */
+  variant?: 'tile' | 'flat';
 }
 
 interface EditorVisual {
@@ -127,8 +134,22 @@ const EDITORS: Record<string, EditorVisual> = {
   warp: { bg: '#01A4FF', fg: '#ffffff', glyph: simplePath(warpPath) },
 };
 
-export function EditorIcon({ editorId, size = 16 }: Props) {
+export function EditorIcon({ editorId, size = 16, variant = 'tile' }: Props) {
   const visual = EDITORS[editorId];
+  // `flat` drops the filled square and draws the mark itself in the app's brand
+  // colour — what a list of applications inside a menu wants, where a grid of
+  // coloured tiles reads as heavier than the rows around it. The glyphs are
+  // `fill="currentColor"`, so recolouring is all it takes.
+  if (variant === 'flat' && visual) {
+    return (
+      <span
+        className="editor-icon editor-icon--flat"
+        style={{ width: size, height: size, background: 'transparent', color: visual.bg }}
+      >
+        {visual.glyph(size)}
+      </span>
+    );
+  }
   if (!visual) {
     // Fallback — match a neutral folder tile rather than the abstract
     // global handoff glyph the previous design used.

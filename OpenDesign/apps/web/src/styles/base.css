@@ -21,3 +21,71 @@ body {
   font: 500 13px/1.4 var(--sans);
 }
 
+/* ── Theme swap ───────────────────────────────────────────────────────────
+ * While `data-theme` is being changed, nothing animates. Every surface owns a
+ * different `transition` duration, so without this a theme flip crossfades
+ * block by block — the header, the chat column and the panels each arriving at
+ * their own moment, leaving the page visibly half-light for a beat.
+ * `applyAppearanceToDocument` sets and clears the attribute around the swap. */
+[data-theme-swapping],
+[data-theme-swapping] *,
+[data-theme-swapping] *::before,
+[data-theme-swapping] *::after {
+  transition: none !important;
+  animation-duration: 0s !important;
+  animation-delay: 0s !important;
+}
+
+/* ── Focus ────────────────────────────────────────────────────────────────
+ * A pointer press must never leave a ring behind. Several surfaces style
+ * `:focus` rather than `:focus-visible`, so clicking a menu trigger, a tab or
+ * a toolbar control parked a heavy gold or green outline on it until something
+ * else was clicked. `:focus:not(:focus-visible)` is the standard way to keep
+ * the indicator for keyboard users and drop it for mouse users, and it is
+ * written here — the last global sheet before the app's own — so it applies
+ * everywhere rather than being re-fixed per surface.
+ *
+ * Keyboard focus keeps ONE indicator: a 2px accent ring, no offset jump. */
+:where(a, button, input, textarea, select, summary, [tabindex], [role='button']):focus:not(
+    :focus-visible
+  ) {
+  outline: none;
+  box-shadow: none;
+}
+
+:where(a, button, input, textarea, select, summary, [tabindex], [role='button']):focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 70%, transparent);
+  outline-offset: 1px;
+  box-shadow: none;
+}
+
+/* ── Scrollbars ───────────────────────────────────────────────────────────
+ * One thin, themed bar across the whole app, in both themes. Firefox reads the
+ * standard properties; Chromium/WebKit read the pseudo-elements. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--text-muted) 45%, transparent) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text-muted) 40%, transparent);
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--text-muted) 68%, transparent);
+  background-clip: content-box;
+}
+

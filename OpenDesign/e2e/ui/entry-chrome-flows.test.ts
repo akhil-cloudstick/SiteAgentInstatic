@@ -448,10 +448,14 @@ test('[P1] design systems page is reachable from entry nav and supports search, 
   await expect(page.getByTestId('design-systems-empty')).toBeVisible();
   await page.getByTestId('design-systems-search').fill('');
 
-  await page.getByTestId('design-systems-surface-video').click();
-  await expect(page.getByTestId('design-system-card-motion-poster')).toBeVisible();
-  await expect(page.getByTestId('design-system-card-agentic')).toHaveCount(0);
-  await page.getByTestId('design-systems-surface-all').click();
+  // The surface chip row was removed — every shipped preset is a `web` surface,
+  // so it offered one meaningful chip whose count always equalled `All`'s. The
+  // style-category select inside the list is the only preset filter now, and it
+  // stays pinned while the presets scroll under it.
+  await expect(page.getByTestId('design-systems-surface-all')).toHaveCount(0);
+  const categoryFilter = page.getByTestId('design-systems-category-filter');
+  await expect(categoryFilter).toBeVisible();
+  await expect(categoryFilter).toHaveCSS('position', 'sticky');
 
   // Master-detail: selecting a list row renders that system in the right
   // detail pane, where secondary actions live in the header overflow menu.

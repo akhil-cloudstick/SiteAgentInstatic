@@ -13,6 +13,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { KeyboardEvent as ReactKeyboardEvent, ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import type { DesignSystemSummary } from '@open-design/contracts';
+import { FaIcon } from '@mms/shell';
 import { useI18n } from '../i18n';
 import {
   localizeDesignSystemCategory,
@@ -53,8 +54,13 @@ interface Props {
    *   - 'footer': the home composer input-card footer pill.
    *   - 'home': the borderless trigger in the home composer's row below the
    *     card, sitting flush with the working-directory picker.
+   *   - 'toolbar': the approved Studio project toolbar's design-system
+   *     `SelectButton` (`prototype-reference/src/ui.jsx:255`) — a 185px pill
+   *     with a `fa-layer-group` glyph and a trailing 8px chevron.
+   *   - 'composer': the approved composer's 28px palette icon button
+   *     (`prototype-reference/src/Workspace.jsx:654`).
    */
-  variant?: 'project' | 'footer' | 'home';
+  variant?: 'project' | 'footer' | 'home' | 'toolbar' | 'composer';
   /** Footer variant: visually-hidden label for the trigger button. */
   label?: string;
   /** Hide the recursive "Create" action when the picker is already on create. */
@@ -454,6 +460,63 @@ export function DesignSystemPicker({
               : selected?.title ?? t('designSystemPicker.noneTitle')}
           </span>
           <Icon name="chevron-down" size={11} className="home-hero__ds-row-trigger-chevron" />
+        </button>
+        {popover}
+        {previewModal}
+      </div>
+    );
+  }
+
+  // The approved composer's design-system control: a bare 28px palette button
+  // in the control row (`prototype-reference/src/Workspace.jsx:654`), tinted
+  // green while a system is bound. It owns the same popover as every other
+  // variant, so there is exactly one picker on the screen.
+  if (variant === 'composer') {
+    const composerLabel = loading
+      ? t('designSystemPicker.loading')
+      : selected?.title ?? t('designSystemPicker.noneTitle');
+    return (
+      <div ref={wrapRef} className="composer-menu-anchor studio-ds-composer">
+        <button
+          ref={triggerRef}
+          type="button"
+          className={selected ? 'composer-icon-button active' : 'composer-icon-button'}
+          data-testid="project-ds-picker-trigger"
+          aria-haspopup="listbox"
+          aria-expanded={open}
+          disabled={loading}
+          title={composerLabel}
+          aria-label={composerLabel}
+          onClick={() => setOpen((v) => !v)}
+        >
+          <FaIcon name="palette" size={14} />
+        </button>
+        {popover}
+        {previewModal}
+      </div>
+    );
+  }
+
+  if (variant === 'toolbar') {
+    const toolbarLabel = loading
+      ? t('designSystemPicker.loading')
+      : selected?.title ?? t('designSystemPicker.noneTitle');
+    return (
+      <div ref={wrapRef} className="studio-ds-picker" data-testid="studio-ds-picker">
+        <button
+          ref={triggerRef}
+          type="button"
+          className="select-button"
+          data-testid="studio-ds-picker-trigger"
+          aria-haspopup="listbox"
+          aria-expanded={open}
+          disabled={loading}
+          title={toolbarLabel}
+          onClick={() => setOpen((v) => !v)}
+        >
+          <FaIcon name="layer-group" size={14} />
+          <span>{toolbarLabel}</span>
+          <FaIcon name="chevron-down" size={8} className="fa-chevron-down" />
         </button>
         {popover}
         {previewModal}

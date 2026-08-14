@@ -39,6 +39,7 @@ import {
   fetchLiveArtifacts,
   fetchProjectFiles,
   fetchProjectFileText,
+  fetchProjectFolders,
   fetchSkill,
   patchPreviewCommentStatus,
   projectRawUrl,
@@ -201,6 +202,7 @@ import type {
   PreviewCommentAttachment,
   PreviewCommentTarget,
   ProjectFile,
+  ProjectFolder,
   LiveArtifactEventItem,
   LiveArtifactSummary,
   SkillSummary,
@@ -217,7 +219,6 @@ import { historyWithApiAttachmentContext } from '../api-attachment-context';
 import { filterImplicitProducedFiles } from '../produced-files';
 import { AvatarMenu } from './AvatarMenu';
 import { EntrySettingsMenu } from './EntrySettingsMenu';
-import { MessageCenter } from './MessageCenter';
 import { HandoffButton } from './HandoffButton';
 import { Icon } from './Icon';
 import { localizePluginTitle } from './plugins-home/localization';
@@ -240,7 +241,35 @@ import { buildRepoImportPrompt, designSystemNeedsRepoConnect } from './design-sy
 import { isDesignSystemProject, resolveProjectDesignSystemId } from './design-system-project';
 import { collectReferencedJsxNames } from '../runtime/jsx-module-refs';
 import { KNOWN_PROVIDERS } from '../state/config';
-import { DESIGN_SYSTEM_TAB, FileWorkspace, type BrowserOpenRequest } from './FileWorkspace';
+import {
+  DESIGN_FILES_TAB,
+  DESIGN_SYSTEM_TAB,
+  FileWorkspace,
+  type BrowserOpenRequest,
+  type StudioActionRequest,
+} from './FileWorkspace';
+import { DesignShellRows } from './shell/DesignShellRows';
+import { useHubContext } from '../state/hubContext';
+import { ProjectToolbar } from './studio/ProjectToolbar';
+import { InheritedContextBand } from './studio/InheritedContextBand';
+import { ProductHubContextDrawer } from './start-desk/ProductHubContextDrawer';
+import { deriveInheritedContext } from './start-desk/inherited-context';
+import { PanelResizeHandle } from './studio/PanelResizeHandle';
+import { StudioDesignFilesPanel } from './studio/StudioDesignFilesPanel';
+import { MobileDock, type StudioMobilePanel } from './studio/MobileDock';
+import { ShareToCmsDialog } from './studio/ShareToCmsDialog';
+import {
+  buildFixInstruction,
+  buildFixVisibleMessage,
+  pushProjectToCms,
+} from './studio/share-to-cms';
+import {
+  CHAT_MIN,
+  FILES_MIN,
+  PANEL_RAIL,
+  useStudioLayout,
+} from './studio/useStudioLayout';
+import type { EntryHomeView } from '../router';
 import {
   type PluginFolderAgentAction,
 } from './design-files/pluginFolderActions';
@@ -454,6 +483,13 @@ interface Props {
     sourceProjectId: string,
     input?: { name?: string },
   ) => Promise<void> | void;
+  /**
+   * Leaves the Studio for one of the six MMS Design destinations. The Studio
+   * renders the shared two-row MMSBUILD chrome exactly as the approved
+   * `#/studio` screen does (`prototype-reference/src/App.jsx:161-175`), so its
+   * navigation has to reach the same router as the entry views'.
+   */
+  onNavigateView?: (view: EntryHomeView) => void;
 }
 
 interface QueuedChatSend {
@@ -1364,9 +1400,11 @@ export function ProjectView({
   onCreateProjectFromDesignSystem,
   onCreateDesignSystemFromProject,
   onDuplicateProject,
+  onNavigateView,
 }: Props) {
   const { locale, t } = useI18n();
   const analytics = useAnalytics();
+  const hubContext = useHubContext();
   // Onboarding first-generation funnel (spec §11.1). Consume the pending entry
   // (set by the Home recommendation) exactly once on mount; the refs guard the
   // two lifecycle events so each fires only for the genuine first send / first
@@ -1544,7 +1582,25 @@ export function ProjectView({
   const projectFilesRef = useRef<ProjectFile[]>([]);
   const [liveArtifacts, setLiveArtifacts] = useState<LiveArtifactSummary[]>([]);
   const [liveArtifactEvents, setLiveArtifactEvents] = useState<LiveArtifactEventItem[]>([]);
-  const [workspaceFocused, setWorkspaceFocused] = useState(false);
+  // The approved Studio's five-track workbench: chat │ handle │ canvas │
+  // handle │ Design Files, with per-project widths and collapse state. It also
+  // owns the compact (<=1100px) branch where the grid stacks and the mobile
+  // dock takes over. See `studio/useStudioLayout.ts`.
+  const studio = useStudioLayout(project.id);
+  // "Focus mode" is now the reference's chat collapse: the panel folds to its
+  // 44px rail instead of vanishing, so the way back is always on screen.
+  const workspaceFocused = studio.layout.chatCollapsed && !studio.isCompact;
+  const setWorkspaceFocused = useCallback(
+    (next: boolean) => {
+      if (next !== studio.layout.chatCollapsed) studio.togglePanel('chat');
+    },
+    [studio],
+  );
+  // Which panel the compact layout is showing. `canvas` is the resting state:
+  // the preview is why the screen exists.
+  const [mobilePanel, setMobilePanel] = useState<StudioMobilePanel>('canvas');
+  // The CMS compliance gate's block reason; `null` keeps the dialog closed.
+  const [cmsBlockReason, setCmsBlockReason] = useState<string | null>(null);
   const [commentInspectorActive, setCommentInspectorActive] = useState(false);
   const commentInspectorPortalId = useId();
   const leftInspectorActive = commentInspectorActive;
@@ -8486,6 +8542,104 @@ export function ProjectView({
   // resulting SSE stream.
   const critiqueTheaterEnabled = useCritiqueTheaterEnabled();
 
+  // ── Studio toolbar + Design Files column wiring ───────────────────────────
+  // The approved Studio's project toolbar and fifth column drive handlers that
+  // already existed inside FileWorkspace (upload, new document, new sketch) or
+  // FileViewer (manual edit). Rather than lifting that state out of two large
+  // components, they receive a bumped-nonce request — the same channel
+  // `openRequest` / `designSystemEditRequest` already use.
+  const [studioActionRequest, setStudioActionRequest] = useState<StudioActionRequest | null>(null);
+  const requestStudioAction = useCallback(
+    (action: StudioActionRequest['action'], target?: string, nextName?: string) => {
+      setStudioActionRequest({ action, target, nextName, nonce: Date.now() });
+    },
+    [],
+  );
+
+  const handleShareToCms = useCallback(() => {
+    void pushProjectToCms(project.id, setCmsBlockReason);
+  }, [project.id]);
+
+  // The Design Files column shows real directories, including empty ones the
+  // file list can't imply. Re-read on the same `filesRefresh` tick the file
+  // list uses so a newly created folder appears without a manual reload.
+  const [projectFolders, setProjectFolders] = useState<ProjectFolder[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    void fetchProjectFolders(project.id)
+      .then((next) => {
+        if (!cancelled) setProjectFolders(next);
+      })
+      .catch(() => {
+        if (!cancelled) setProjectFolders([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [project.id, filesRefresh]);
+
+  // The reference disables Share to CMS on a blank project ("no Share-to-CMS
+  // action until website files exist", prototype README). The app's equivalent
+  // is "the project has no page the CMS could import".
+  const shareToCmsDisabled = useMemo(
+    () => !projectFiles.some((file) => /\.html?$/i.test(file.name)),
+    [projectFiles],
+  );
+
+  // Read-only facts behind the toolbar's project-type control. Everything here
+  // is data the project already carries — nothing is invented for the popover.
+  const projectFacts = useMemo<Array<[string, string]>>(() => {
+    const facts: Array<[string, string]> = [
+      [t('studio.factType'), projectTypeLabel ?? t('projects.kindProject')],
+    ];
+    const designSystemTitle = designSystems.find((s) => s.id === projectDesignSystemId)?.title;
+    facts.push([t('studio.factDesignSystem'), designSystemTitle ?? t('designs.cardFreeform')]);
+    if (projectDetail.resolvedDir) facts.push([t('studio.factFolder'), projectDetail.resolvedDir]);
+    facts.push([
+      t('studio.factFiles'),
+      String(projectFiles.length),
+    ]);
+    return facts;
+  }, [
+    designSystems,
+    projectDesignSystemId,
+    projectDetail.resolvedDir,
+    projectFiles.length,
+    projectTypeLabel,
+    t,
+  ]);
+
+  // What this project's runs inherit from Product Hub, restated inside the
+  // composer as the reference does. Derived from the live hand-off, never from
+  // a fixture.
+  const inheritedContext = useMemo(
+    () =>
+      deriveInheritedContext(
+        hubContext,
+        designSystems.find((system) => system.id === projectDesignSystemId)?.title ?? null,
+      ),
+    [designSystems, hubContext, projectDesignSystemId],
+  );
+  const [contextDrawerOpen, setContextDrawerOpen] = useState(false);
+
+  const handleNavigateView = useCallback(
+    (view: EntryHomeView) => {
+      if (onNavigateView) onNavigateView(view);
+      else onBack();
+    },
+    [onBack, onNavigateView],
+  );
+
+  const shellTheme: 'light' | 'dark' =
+    (config.theme ?? 'system') === 'dark'
+      ? 'dark'
+      : (config.theme ?? 'system') === 'light'
+        ? 'light'
+        : typeof window !== 'undefined' &&
+            window.matchMedia?.('(prefers-color-scheme: dark)').matches
+          ? 'dark'
+          : 'light';
+
   // CLI / agent selector lives below the chat conversation (composer footer),
   // not in the top-right header.
   const executionControls = (
@@ -8537,37 +8691,142 @@ export function ProjectView({
         onOpenSettings={onOpenSettings}
         onRefreshAgents={onRefreshAgents}
         placement="up"
+        // Same approved `Agent & model` list as the toolbar's Local CLI
+        // control — two triggers, one menu.
+        referenceMenu
       />
     </>
   );
 
   return (
-    <div className="app">
+    <div className="app studio-root">
       <CritiqueTheaterMount
         projectId={project.id}
         enabled={critiqueTheaterEnabled}
       />
-      {/* ProjectActionsToolbar removed per 00efdcba — hide finalize-design
-          toolbar from project header. Restore from cf1cd9bb if product
-          wants the Finalize + Continue-in-CLI buttons back in the chrome. */}
+      {/* The Studio wears the shared two-row MMSBUILD chrome, exactly as the
+          approved `#/studio` screen does — `App.jsx` renders `Shell` and
+          `WorkspaceNav` above every screen, Studio included. Row 2 marks
+          Projects active while a project is open (`ui.jsx:156`) and omits the
+          `+ New project` button, which the reference shows only on Home. */}
+      <DesignShellRows
+        view="projects"
+        onSelectView={handleNavigateView}
+        theme={shellTheme}
+        onToggleTheme={() => handleThemeChange(shellTheme === 'dark' ? 'light' : 'dark')}
+        onOpenHelp={() => onOpenSettings('language')}
+        onOpenSettings={() => onOpenSettings('appearance')}
+        onOpenNotifications={() => onOpenSettings('notifications')}
+        notificationCount={0}
+        onNewProject={() => handleNavigateView('home')}
+        showNewProject={false}
+        projectName={project.name}
+        accountSlot={
+          <EntrySettingsMenu
+            config={config}
+            onThemeChange={handleThemeChange}
+            onOpenSettings={onOpenSettings}
+            triggerVariant="account"
+            account={{
+              name: hubContext?.user?.name ?? null,
+              initials: hubContext?.user?.initials ?? null,
+            }}
+            trackingPageName="artifact"
+          />
+        }
+      />
+      <main className="studio-screen">
+        <ProjectToolbar
+          projectName={project.name}
+          projectType={projectTypeLabel ?? t('projects.kindProject')}
+          projectFacts={projectFacts}
+          onRename={handleProjectRename}
+          onDuplicate={onDuplicateProject ? handleDuplicateProject : undefined}
+          onDelete={onDeleteProject ? () => void onDeleteProject(project.id) : undefined}
+          designSystemSlot={
+            <DesignSystemPicker
+              designSystems={designSystems}
+              selectedId={projectDesignSystemId ?? null}
+              onChange={handleChangeDesignSystemId}
+              variant="toolbar"
+            />
+          }
+          runtimeSlot={
+            <AvatarMenu
+              config={config}
+              agents={agents}
+              daemonLive={daemonLive}
+              variant="runtime"
+              onModeChange={onModeChange}
+              onAgentChange={onAgentChange}
+              onAgentModelChange={onAgentModelChange}
+              onApiModelChange={onApiModelChange}
+              onOpenSettings={onOpenSettings}
+              onRefreshAgents={onRefreshAgents}
+            />
+          }
+          onShareToCms={handleShareToCms}
+          shareDisabled={shareToCmsDisabled}
+          menuSlot={(
+            <HandoffButton
+              projectId={project.id}
+              projectName={project.name}
+              projectDir={projectDetail.resolvedDir}
+              agents={agents}
+              artifactId={headerArtifact.artifact_id}
+              artifactKind={headerArtifact.artifact_kind}
+              metricsConsent={config.telemetry?.metrics === true}
+              installationId={config.installationId}
+              iconVariant="flat"
+            />
+          )}
+        />
       <div
-        ref={splitRef}
+        ref={studio.gridRef}
         className={[
-          projectSplitClassName(workspaceFocused),
-          leftInspectorActive && !workspaceFocused ? 'split-manual-edit' : '',
-          resizingChatPanel && !workspaceFocused ? 'is-resizing-chat' : '',
+          'studio-grid',
+          'fluid-workbench',
+          studio.layout.chatCollapsed && !studio.isCompact ? 'chat-collapsed' : '',
+          studio.layout.filesCollapsed && !studio.isCompact ? 'files-collapsed' : '',
         ].filter(Boolean).join(' ')}
-        style={projectSplitStyle(workspaceFocused, splitLeftPanelWidth, workspacePanelTrack)}
+        style={studio.gridStyle}
       >
-        <div className="split-chat-slot" hidden={workspaceFocused}>
-          {commentInspectorActive ? (
+        {commentInspectorActive ? (
             <div
               id={commentInspectorPortalId}
-              className="comment-left-host"
+              className="comment-left-host chat-panel"
               aria-label="Comments"
             />
           ) : activeConversationId || conversationLoadError ? (
             <ChatPane
+              rootClassName="chat-panel"
+              rootId="studio-chat-panel"
+              composerLayerClassName="studio-composer-layer"
+              inlineComposer
+              /* The reference keeps a design-system control in BOTH places —
+                 the project toolbar (`ui.jsx:255`) and the composer
+                 (`Workspace.jsx:654`). This is the composer's. */
+              designSystemPicker={(
+                <DesignSystemPicker
+                  designSystems={designSystems}
+                  selectedId={projectDesignSystemId ?? null}
+                  onChange={handleChangeDesignSystemId}
+                  variant="composer"
+                />
+              )}
+              composerContextBand={(
+                <InheritedContextBand
+                  context={inheritedContext}
+                  onOpenContext={() => setContextDrawerOpen(true)}
+                  designSystemLabel={
+                    designSystems.find((system) => system.id === projectDesignSystemId)?.title
+                    ?? t('designSystemPicker.noneTitle')
+                  }
+                />
+              )}
+              collapsed={studio.layout.chatCollapsed && !studio.isCompact}
+              mobileOpen={studio.isCompact && mobilePanel === 'chat'}
+              onToggleCollapse={studio.isCompact ? undefined : () => studio.togglePanel('chat')}
               // The conversation id is part of the key so switching conversations
               // resets internal scroll/draft state inside ChatPane and ChatComposer.
               key={`${project.id}:${activeConversationId ?? 'conversation-unavailable'}:${chatSeed?.id ?? 'ready'}`}
@@ -8716,24 +8975,12 @@ export function ProjectView({
               onBack={onBack}
               backLabel={t('project.backToProjects')}
               composerFooterAccessory={executionControls}
+              /* The reference header is two stacked, ellipsised lines — name
+                 above type (`Workspace.jsx:501-504`). Renaming moved up to the
+                 project toolbar, where the reference puts it. */
               projectHeader={(
                 <span className="chat-project-title-line">
-                  <span
-                    className="title editable"
-                    data-testid="project-title"
-                    title={project.name}
-                    tabIndex={0}
-                    role="textbox"
-                    suppressContentEditableWarning
-                    contentEditable
-                    onBlur={(e) => handleProjectRename(e.currentTarget.textContent ?? '')}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        (e.currentTarget as HTMLElement).blur();
-                      }
-                    }}
-                  >
+                  <span className="title" data-testid="project-title" title={project.name}>
                     {project.name}
                   </span>
                   {projectTypeLabel ? (
@@ -8741,39 +8988,24 @@ export function ProjectView({
                   ) : null}
                 </span>
               )}
-              designSystemPicker={(
-                <DesignSystemPicker
-                  designSystems={designSystems}
-                  selectedId={projectDesignSystemId ?? null}
-                  onChange={handleChangeDesignSystemId}
-                />
-              )}
             />
           ) : (
-            <div className="pane" data-testid="chat-pane-loading">
+            <div className="pane chat-panel" data-testid="chat-pane-loading">
               <CenteredLoader />
             </div>
           )}
-        </div>
-        {!workspaceFocused ? (
-          leftInspectorActive ? (
-            <div className="split-edit-divider" aria-hidden />
-          ) : (
-            <div
-              className="split-resize-handle"
-              role="separator"
-              aria-orientation="vertical"
-              aria-label={chatResizeLabel}
-              aria-valuemin={chatPanelAriaMinWidth}
-              aria-valuemax={chatPanelMaxWidth}
-              aria-valuenow={chatPanelWidth}
-              tabIndex={0}
-              title={chatResizeLabel}
-              onPointerDown={handleChatResizePointerDown}
-              onKeyDown={handleChatResizeKeyDown}
-              onBlur={handleChatResizeBlur}
-            />
-          )
+        {!studio.isCompact && !studio.layout.chatCollapsed ? (
+          <PanelResizeHandle
+            className="chat-resize-handle"
+            label={chatResizeLabel}
+            controls="studio-chat-panel"
+            value={studio.layout.chatWidth}
+            minimum={CHAT_MIN}
+            maximum={studio.chatMaximum}
+            defaultValue={studio.defaults.chatWidth}
+            onChange={(value) => studio.setPanelWidth('chat', value)}
+            onCommit={(value) => studio.announcePanelWidth('chat', value)}
+          />
         ) : null}
         <FileWorkspace
           projectId={project.id}
@@ -8819,6 +9051,7 @@ export function ProjectView({
           autoPreviewDesignArtifacts={currentProject.metadata?.importedFrom === 'folder'}
           focusMode={workspaceFocused}
           onFocusModeChange={setWorkspaceFocused}
+          studioActionRequest={studioActionRequest}
           designSystemProject={designSystemProject}
           designSystemBrandId={designSystemBrandId}
           designSystemEditable={designSystemEditable}
@@ -8860,42 +9093,71 @@ export function ProjectView({
           onAuthorizeAndRetry={handleSwitchToAmrAndRetry}
           onLaunchTerminalAuth={handleLaunchAntigravityOauth}
           conversationId={activeConversationId}
-          headerActions={(
-            <>
-              <HandoffButton
-                projectId={project.id}
-                projectName={project.name}
-                projectDir={projectDetail.resolvedDir}
-                agents={agents}
-                artifactId={headerArtifact.artifact_id}
-                artifactKind={headerArtifact.artifact_kind}
-                metricsConsent={config.telemetry?.metrics === true}
-                installationId={config.installationId}
-              />
-              <MessageCenter
-                onOpenNotificationSettings={() => onOpenSettings('notifications')}
-              />
-              <EntrySettingsMenu
-                config={config}
-                onThemeChange={handleThemeChange}
-                onOpenSettings={onOpenSettings}
-                trackingPageName="artifact"
-                onTrackTriggerClick={() => {
-                  // Spec row 52: the settings gear in the artifact header.
-                  // Carry the active artifact so settings slices line up with
-                  // the rest of the artifact_header funnel.
-                  trackArtifactHeaderClick(analytics.track, {
-                    page_name: 'artifact',
-                    area: 'artifact_header',
-                    element: 'settings',
-                    ...headerArtifact,
-                  });
-                }}
-              />
-            </>
-          )}
+          /* The approved file-tab row carries the viewport switcher and nothing
+             else. Notifications, theme, settings and the account control moved
+             to shared row 1; Handoff is disclosed from the project toolbar's
+             own menu. */
+        />
+        {!studio.isCompact && !studio.layout.filesCollapsed ? (
+          <PanelResizeHandle
+            className="files-resize-handle"
+            label={t('studio.resizeDesignFiles')}
+            controls="studio-design-files-panel"
+            value={studio.layout.filesWidth}
+            minimum={FILES_MIN}
+            maximum={studio.filesMaximum}
+            defaultValue={studio.defaults.filesWidth}
+            dragDirection={-1}
+            onChange={(value) => studio.setPanelWidth('files', value)}
+            onCommit={(value) => studio.announcePanelWidth('files', value)}
+          />
+        ) : null}
+        <StudioDesignFilesPanel
+          files={projectFiles}
+          folders={projectFolders}
+          selectedFile={activeProjectFileName}
+          collapsed={studio.layout.filesCollapsed && !studio.isCompact}
+          onToggleCollapse={studio.isCompact ? undefined : () => studio.togglePanel('files')}
+          mobileOpen={studio.isCompact && mobilePanel === 'files'}
+          onSelectFile={(name) => requestOpenFile(name)}
+          onUploadFiles={() => requestStudioAction('upload')}
+          onNewDocument={() => requestStudioAction('new-document')}
+          onNewSketch={() => requestStudioAction('new-sketch')}
+          onOpenAllFiles={() => requestOpenFile(DESIGN_FILES_TAB)}
+          onRenameFile={(name, nextName) => requestStudioAction('rename', name, nextName)}
+          onDeleteFile={(name) => requestStudioAction('delete', name)}
         />
       </div>
+      {/* Resize/collapse announcements — `StudioScreen.jsx:381`. */}
+      <p className="visually-hidden" aria-live="polite" aria-atomic="true">
+        {studio.layoutMessage}
+      </p>
+      <MobileDock
+        active={mobilePanel}
+        onChange={setMobilePanel}
+        onEdit={() => {
+          setMobilePanel('canvas');
+          requestStudioAction('manual-edit');
+        }}
+      />
+      </main>
+      <ProductHubContextDrawer
+        open={contextDrawerOpen}
+        onClose={() => setContextDrawerOpen(false)}
+        context={inheritedContext}
+        hubContext={hubContext}
+      />
+      <ShareToCmsDialog
+        reason={cmsBlockReason}
+        onClose={() => setCmsBlockReason(null)}
+        onFix={() => {
+          handleFixItPrompt({
+            visible: buildFixVisibleMessage(),
+            instruction: buildFixInstruction(cmsBlockReason),
+          });
+          setCmsBlockReason(null);
+        }}
+      />
       {contextPluginDetails ? (
         <PluginDetailsModal
           record={contextPluginDetails}
@@ -8958,7 +9220,15 @@ export function ProjectView({
           <BrandReadyPrompt
             key="brand-ready-prompt"
             brandName={brandReadyPrompt.brandName}
-            workspaceOffsetPx={workspaceFocused ? 0 : splitLeftPanelWidth + SPLIT_RESIZE_HANDLE_WIDTH}
+            workspaceOffsetPx={
+              studio.isCompact
+                ? 0
+                : (studio.layout.chatCollapsed
+                    ? PANEL_RAIL
+                    : leftInspectorActive
+                      ? COMMENT_INSPECTOR_PANEL_WIDTH
+                      : studio.layout.chatWidth) + SPLIT_RESIZE_HANDLE_WIDTH
+            }
             onPreview={() => {
               requestOpenFile(DESIGN_SYSTEM_TAB);
               setProjectActionsToast({

@@ -74,7 +74,7 @@ import type {
   ProjectFile,
   ProjectMetadata,
 } from '../types';
-import { takeDesignSystemAssetSeed } from '../state/libraryHandoff';
+import { takeDesignSystemAssetSeed, takeDesignSystemSetupSeed } from '../state/libraryHandoff';
 import { decideAutoOpenAfterWrite } from './auto-open-file';
 import { ChatPane } from './ChatPane';
 import { DesignSystemAssetDropzone } from './DesignSystemAssetDropzone';
@@ -339,17 +339,41 @@ export function DesignSystemCreationFlow({
 }: CreationProps) {
   const { t } = useI18n();
   const [step, setStep] = useState<SetupStep>('setup');
-  // A Library "create design system from selection" hand-off pre-fills the
-  // source material with the chosen assets (single-shot; cleared on read).
-  const [state, setState] = useState<SetupState>(() => {
-    const seed = takeDesignSystemAssetSeed();
-    if (!seed || seed.files.length === 0) return EMPTY_SETUP;
-    return {
-      ...EMPTY_SETUP,
-      assetFiles: seed.files.map((file) => file.name),
-      assetFileObjects: seed.files,
-    };
+  // Two single-shot hand-offs can pre-fill this flow, and both are read in one
+  // initializer so a re-render can never re-read them (they self-clear) and the
+  // two paths cannot race:
+  //
+  //  1. The Design systems page's create modal — the approved MMSBUILD screen
+  //     collects every input there, so it stands in for this flow's setup and
+  //     confirm steps. Its seed is COMPLETE, so the flow skips straight to
+  //     generation rather than re-asking for what the user just typed.
+  //  2. A Library "create design system from selection" hand-off, which
+  //     pre-fills only the source material and still shows the setup form.
+  //
+  // With no seed at all (a deep link, a refresh, the onboarding embed) the flow
+  // renders its own full setup form exactly as before.
+  const [initialSetup] = useState<{ state: SetupState; autoGenerate: boolean }>(() => {
+    const setupSeed = takeDesignSystemSetupSeed();
+    if (setupSeed) {
+      return { state: { ...EMPTY_SETUP, ...setupSeed }, autoGenerate: true };
+    }
+    const assetSeed = takeDesignSystemAssetSeed();
+    if (assetSeed && assetSeed.files.length > 0) {
+      return {
+        state: {
+          ...EMPTY_SETUP,
+          assetFiles: assetSeed.files.map((file) => file.name),
+          assetFileObjects: assetSeed.files,
+        },
+        autoGenerate: false,
+      };
+    }
+    return { state: EMPTY_SETUP, autoGenerate: false };
   });
+  const [state, setState] = useState<SetupState>(initialSetup.state);
+  // True from the first paint when the modal seeded us, so the setup form never
+  // flashes before the generation effect below runs.
+  const [autoGenerating, setAutoGenerating] = useState(initialSetup.autoGenerate);
   const [error, setError] = useState<string | null>(null);
   const [errorToast, setErrorToast] = useState<{ id: number; message: string } | null>(null);
   const errorToastIdRef = useRef(0);
@@ -840,6 +864,28 @@ export function DesignSystemCreationFlow({
     }
   }
 
+  // Run generation once, on the mount that consumed a complete modal seed.
+  // `generate` is a hoisted function declaration in this component body and is
+  // deliberately not a dependency: re-running it on every render would fire a
+  // second extraction. The ref makes the guard survive StrictMode's double
+  // effect invocation in development.
+  const autoGenerateStartedRef = useRef(false);
+  useEffect(() => {
+    if (!initialSetup.autoGenerate || autoGenerateStartedRef.current) return;
+    autoGenerateStartedRef.current = true;
+    void generate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialSetup.autoGenerate]);
+
+  // Every bail-out inside `generate()` calls `setVisibleError(...)` and returns
+  // to `step: 'setup'`, so a visible error is the single reliable signal that
+  // the auto-run gave up. Dropping out of auto mode hands the user the full
+  // setup form with the values they typed in the modal still in place, which is
+  // the right recovery surface — the modal is gone by then.
+  useEffect(() => {
+    if (error) setAutoGenerating(false);
+  }, [error]);
+
   async function generate() {
     if (generationStarting) return;
     // Snapshot the user-pinned source state up front. Used for the
@@ -994,6 +1040,20 @@ export function DesignSystemCreationFlow({
     } finally {
       setGenerationStarting(false);
     }
+  }
+
+  // Seeded from the Design systems page's create modal: the user already saw
+  // the reference's confirmation step there, so this render is progress only.
+  if (autoGenerating) {
+    return (
+      <div className="ds-setup-shell ds-setup-shell--center">
+        <div className="ds-setup-center-card" role="status" aria-busy="true">
+          <Spinner size={22} />
+          <h1>{t('ds.creatingProjectTitle')}</h1>
+          <p>{t('ds.creatingProjectSubtitle')}</p>
+        </div>
+      </div>
+    );
   }
 
   if (step === 'confirm') {

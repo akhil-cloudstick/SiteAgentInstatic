@@ -24,6 +24,7 @@ import {
   localizeSkillName,
 } from '../i18n/content';
 import { resolveFlyoutSide } from './composer-flyout-placement';
+import { FaIcon } from '@mms/shell';
 import { Icon, type IconName } from './Icon';
 
 const PLUS_MENU_MARGIN = 12;
@@ -577,7 +578,9 @@ export function ComposerPlusMenu({
         aria-haspopup="menu"
         aria-expanded={open}
       >
-        <Icon name="plus" size={16} />
+        {/* `faPlus` — the approved composer's Add-context control
+            (`prototype-reference/src/Workspace.jsx:632`). */}
+        <FaIcon name="plus" size={14} />
       </button>
       {open && typeof document !== 'undefined' ? createPortal(
         <div

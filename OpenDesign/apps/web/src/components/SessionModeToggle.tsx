@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import type { ChatSessionMode } from '@open-design/contracts';
+import { FaIcon } from '@mms/shell';
 import { useT } from '../i18n';
 import { Icon } from './Icon';
 
@@ -302,9 +303,11 @@ export function SessionModeToggle({ mode, onChange, disabled = false }: Props) {
           setPreviewMode(mode);
         }}
       >
-        <Icon name={active.icon} size={13} />
+        {/* The approved composer's mode control is a wand + label + 8px
+            chevron (`prototype-reference/src/Workspace.jsx:664`). */}
+        <FaIcon name="wand-magic-sparkles" size={13} />
         <span className="session-mode-toggle__label">{active.label}</span>
-        <Icon name="chevron-down" size={12} />
+        <FaIcon name="chevron-down" size={8} />
       </button>
       {open ? (
         <div className="session-mode-toggle__popover">

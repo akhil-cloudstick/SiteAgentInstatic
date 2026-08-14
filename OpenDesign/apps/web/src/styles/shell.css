@@ -40,6 +40,15 @@
   min-height: 0;
 }
 
+/* The Studio fills the viewport like every other route. The approved `#/studio`
+   screen scrolls the document because it is a page; here it is an app shell,
+   and letting the whole thing scroll detaches the fixed composer layer from
+   the pane it is positioned against. Panels scroll internally instead. */
+.workspace-shell[data-route='project'] .workspace-shell__body > .app {
+  height: 100%;
+  min-height: 0;
+}
+
 .iframe-keep-alive-pool {
   display: none;
 }

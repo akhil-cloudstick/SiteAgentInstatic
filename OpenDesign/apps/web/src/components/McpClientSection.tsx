@@ -50,6 +50,17 @@ interface Props {
   // Settings -> External MCP panel. Defaults to 'integrations' so the
   // IntegrationsView call site stays unchanged.
   surface?: 'integrations' | 'settings';
+  /**
+   * Suppress this section's own `.section-head`, inline template picker and
+   * empty card. The approved MMSBUILD Integrations screen
+   * (`prototype-reference/src/IntegrationsScreen.jsx:173-203`) draws all three
+   * itself — the head with its own `Add server` button, the picker as a modal
+   * and the empty state as `.integration-empty-wide`. Defaults to `false`, so
+   * the Settings dialog surface is untouched.
+   */
+  hideChrome?: boolean;
+  /** Live draft-row count, so the host can pick empty-state vs list. */
+  onRowCountChange?: (count: number) => void;
 }
 
 // Imperative handle: lets the dialog footer Save button trigger this
@@ -57,6 +68,12 @@ interface Props {
 export interface McpClientSectionHandle {
   save: () => Promise<boolean>;
   hasDirty: () => boolean;
+  /** Template catalogue, for a host that renders its own picker. */
+  getTemplates: () => McpTemplate[];
+  /** Append a row from a template — same path the inline picker uses. */
+  addFromTemplate: (tpl: McpTemplate) => void;
+  /** Append an empty row — same path the inline picker's custom card uses. */
+  addBlank: () => void;
 }
 
 interface DraftRow extends McpServerConfig {
@@ -223,7 +240,7 @@ const ID_PATTERN = /^[a-z0-9][a-z0-9_-]{0,63}$/i;
 // The order here is the *display* order in the picker — keep it intentional
 // so the most useful categories for MMS Design (visual generation, then
 // editing, then publishing surfaces) sit at the top.
-const CATEGORY_ORDER: ReadonlyArray<{
+export const CATEGORY_ORDER: ReadonlyArray<{
   id: NonNullable<McpTemplate['category']>;
   label: string;
   hint: string;
@@ -270,7 +287,7 @@ const CATEGORY_ORDER: ReadonlyArray<{
   },
 ];
 
-function templateMatchesQuery(tpl: McpTemplate, q: string): boolean {
+export function templateMatchesQuery(tpl: McpTemplate, q: string): boolean {
   if (!q) return true;
   const needle = q.toLowerCase();
   return (
@@ -308,7 +325,16 @@ function signature(rows: DraftRow[]): string {
 }
 
 export const McpClientSection = forwardRef<McpClientSectionHandle, Props>(
-  function McpClientSection({ onServersChanged, onDirtyChange, surface = 'integrations' }, ref) {
+  function McpClientSection(
+    {
+      onServersChanged,
+      onDirtyChange,
+      surface = 'integrations',
+      hideChrome = false,
+      onRowCountChange,
+    },
+    ref,
+  ) {
   const t = useT();
   const analytics = useAnalytics();
   // Single dispatch point for every click in this section: routes to the
@@ -449,45 +475,60 @@ export const McpClientSection = forwardRef<McpClientSectionHandle, Props>(
   useImperativeHandle(ref, () => ({
     save,
     hasDirty: () => dirty,
-  }), [save, dirty]);
+    getTemplates: () => templates,
+    addFromTemplate,
+    addBlank,
+  }), [save, dirty, templates, addFromTemplate, addBlank]);
+
+  // Keep a host that owns the chrome (the Integrations screen) in sync with
+  // the live row count so it can swap its empty state for the list.
+  useEffect(() => {
+    onRowCountChange?.(rows.length);
+  }, [onRowCountChange, rows.length]);
 
   if (!loaded) {
     return (
       <section className="settings-section">
-        <div className="section-head">
-          <div>
-            <h3>{t('mcpClient.title')}</h3>
-            <p className="hint">{t('common.loading')}</p>
+        {hideChrome ? (
+          <p className="hint">{t('common.loading')}</p>
+        ) : (
+          <div className="section-head">
+            <div>
+              <h3>{t('mcpClient.title')}</h3>
+              <p className="hint">{t('common.loading')}</p>
+            </div>
           </div>
-        </div>
+        )}
       </section>
     );
   }
 
   return (
     <section className="settings-section">
-      <div className="section-head">
-        <div>
-          <h3>{t('mcpClient.title')}</h3>
-          <p className="hint">{t('mcpClient.subtitle')}</p>
+      {hideChrome ? null : (
+        <div className="section-head">
+          <div>
+            <h3>{t('mcpClient.title')}</h3>
+            <p className="hint">{t('mcpClient.subtitle')}</p>
+          </div>
+          <button
+            type="button"
+            className="primary mcp-add-btn"
+            onClick={() => {
+              trackMcpClick('add_server');
+              setPickerOpen((v) => !v);
+            }}
+            aria-expanded={pickerOpen}
+          >
+            <Icon name="sparkles" size={13} />
+            <span>{t('mcpClient.addServer')}</span>
+          </button>
         </div>
-        <button
-          type="button"
-          className="primary mcp-add-btn"
-          onClick={() => {
-            trackMcpClick('add_server');
-            setPickerOpen((v) => !v);
-          }}
-          aria-expanded={pickerOpen}
-        >
-          <Icon name="sparkles" size={13} />
-          <span>{t('mcpClient.addServer')}</span>
-        </button>
-      </div>
+      )}
 
       <McpAgentSupportBanner agents={agents} />
 
-      {pickerOpen ? (
+      {pickerOpen && !hideChrome ? (
         <PickerPanel
           templates={templates}
           query={pickerQuery}
@@ -503,12 +544,14 @@ export const McpClientSection = forwardRef<McpClientSectionHandle, Props>(
       ) : null}
 
       {rows.length === 0 ? (
-        <div className="empty-card">
-          <strong>{t('mcpClient.emptyTitle')}</strong>
-          <p className="hint">
-            {t('mcpClient.emptyBody')}
-          </p>
-        </div>
+        hideChrome ? null : (
+          <div className="empty-card">
+            <strong>{t('mcpClient.emptyTitle')}</strong>
+            <p className="hint">
+              {t('mcpClient.emptyBody')}
+            </p>
+          </div>
+        )
       ) : (
         <div className="mcp-rows">
           {rows.map((row, idx) => (

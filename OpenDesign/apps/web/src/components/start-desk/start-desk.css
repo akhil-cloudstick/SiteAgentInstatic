@@ -727,7 +727,7 @@
 
 .start-desk :is(button, input, textarea, select):focus-visible {
     outline: none;
-    box-shadow: 0 0 0 3px rgb(243 201 79 / 78%);
+    box-shadow: var(--mms-focus-ring);
 }
 
 /* ── Responsive ──────────────────────────────────────────────────────────

@@ -722,6 +722,21 @@ export function HomeView({
       return;
     }
 
+    // A skill pick is a selection, not an application: there is no snapshot to
+    // apply and no plugin chip to attach, so it lands on `activeSkill` — the
+    // same state the composer's own skill picker writes — and the user types
+    // their brief on top of it.
+    if (promptHandoff.source === 'skill-use') {
+      const picked = skills.find((skill) => skill.id === promptHandoff.skillId) ?? null;
+      setActive(null);
+      setActiveSkill(picked);
+      if (promptHandoff.focus) {
+        focusPromptAtEnd();
+      }
+      scrollHomeToTop();
+      return;
+    }
+
     setActive(null);
     setActiveSkill(null);
     setSelectedPluginContexts([]);
@@ -734,12 +749,21 @@ export function HomeView({
     }
     setPrompt(promptHandoff.prompt);
     setPromptEditedByUser(false);
+
+    // Skill authoring seeds the composer and stops there. The `create-plugin`
+    // chip below routes the run through the plugin-authoring scenario plugin,
+    // which would be the wrong pipeline for a SKILL.md folder.
+    if (promptHandoff.source === 'skill-authoring') {
+      scrollHomeToTop();
+      return;
+    }
+
     setPendingAuthoringPrompt(promptHandoff.prompt);
     setPendingAuthoringInputs(promptHandoff.inputs);
     setPendingAuthoringChipId('create-plugin');
     setPendingChipId('create-plugin');
     scrollHomeToTop();
-  }, [promptHandoff, scrollHomeToTop]);
+  }, [promptHandoff, scrollHomeToTop, skills]);
 
   // "Chat to design" hand-off from the Library multi-select bar: the chosen
   // assets are parked as File objects in a single-shot store, then we navigate

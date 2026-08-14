@@ -83,6 +83,7 @@ import {
 import type { PlaceholderScenario } from './home-hero/placeholderScenarios';
 import { listDesignArtifactCandidates } from './design-files/designArtifacts';
 import type { PluginFolderAgentAction } from './design-files/pluginFolderActions';
+import { FaIcon } from '@mms/shell';
 import { Icon, type IconName } from './Icon';
 import { repoConnectCopy } from './design-system-github-evidence';
 import { isRenderableSketchJson, SketchPreview } from './SketchPreview';
@@ -680,6 +681,35 @@ interface Props {
   backLabel?: string;
   projectHeader?: ReactNode;
   designSystemPicker?: ReactNode;
+  /**
+   * Extra class on the pane root. The Studio passes `chat-panel` so the pane
+   * IS the approved workbench's first grid track
+   * (`prototype-reference/src/Workspace.jsx:488`); the design-system flow and
+   * the side-chat tab keep the bare `.pane`.
+   */
+  rootClassName?: string;
+  /** DOM id for the panel a resize separator's `aria-controls` points at. */
+  rootId?: string;
+  /**
+   * Class for the fixed composer layer. The composer is portalled to
+   * `document.body`, so it escapes any scope its host pane sets — a host with
+   * its own composer skin (the Studio) has to name itself here or its rules
+   * never reach the control it owns.
+   */
+  composerLayerClassName?: string;
+  /** Row pinned above the composer input — the Studio's inherited-context band. */
+  composerContextBand?: ReactNode;
+  /**
+   * Keep the composer inside the pane instead of lifting it into the fixed
+   * layer. The approved Studio composer is an ordinary row of the chat column.
+   */
+  inlineComposer?: boolean;
+  /** Studio only: folded to the 44px rail. */
+  collapsed?: boolean;
+  /** Studio only: shown as a full-screen overlay below 1100px. */
+  mobileOpen?: boolean;
+  /** Studio only: present when the header chevron should collapse, not go Back. */
+  onToggleCollapse?: () => void;
   config?: AppConfig;
 }
 
@@ -900,6 +930,14 @@ export function ChatPane({
   backLabel,
   projectHeader,
   designSystemPicker,
+  rootClassName,
+  rootId,
+  composerLayerClassName,
+  composerContextBand,
+  inlineComposer = false,
+  collapsed = false,
+  mobileOpen = false,
+  onToggleCollapse,
   config,
 }: Props) {
   const t = useT();
@@ -907,6 +945,12 @@ export function ChatPane({
   const displayMessages = useMemo(
     () => messages.filter((message) => !shouldHideEmptyBrandAssistantMessage(message, projectMetadata)),
     [messages, projectMetadata],
+  );
+  // One rail dash per user turn — the reference's own selector
+  // (`Workspace.jsx:592-594`).
+  const railMessages = useMemo(
+    () => displayMessages.filter((message) => message.role === 'user' && Boolean(message.id)),
+    [displayMessages],
   );
   const amrProfile = config?.agentCliEnv?.amr?.[AMR_PROFILE_ENV_KEY] ?? null;
   const [inlineAmrLoginStatus, setInlineAmrLoginStatus] =
@@ -2098,13 +2142,22 @@ export function ChatPane({
       pinnedPluginId={activePluginSnapshot?.pluginId ?? null}
       footerAccessory={composerFooterAccessory}
       leadingAccessory={composerLeadingAccessory}
+      contextBand={composerContextBand}
+      designSystemPickerInRow={inlineComposer}
       currentDesignSystemId={currentDesignSystemId}
       onActiveDesignSystemChange={onActiveDesignSystemChange}
       onShowToast={onShowToast}
     />
   );
+  // Upstream lifts the composer into a `position: fixed` layer on
+  // `document.body`. The approved Studio has no such layer — the composer is
+  // simply the second row of `.chat-content` (`Workspace.jsx:605`) — and the
+  // promoted layer is what banded the panel into a lighter top and a darker
+  // bottom in dark theme, and what let the control drift away from the panel
+  // bottom while the page scrolled. Hosts that still want it keep it.
   const shouldPortalComposer =
-    tab === 'chat'
+    !inlineComposer
+    && tab === 'chat'
     && composerPortalTarget !== null
     && composerPortalRect !== null
     && composerPortalRect.width > 0;
@@ -2112,10 +2165,36 @@ export function ChatPane({
     ? { minHeight: composerSlotHeight > 0 ? composerSlotHeight : undefined }
     : undefined;
 
+  const collapseLabel = collapsed
+    ? t('studio.expandConversation')
+    : t('studio.collapseConversation');
+
   return (
-    <div className="pane">
+    <div
+      className={[
+        'pane',
+        rootClassName ?? '',
+        mobileOpen ? 'mobile-open' : '',
+        collapsed ? 'collapsed' : '',
+      ].filter(Boolean).join(' ')}
+      id={rootId}
+    >
       <div className="chat-project-header">
-        {onBack ? (
+        {/* In the Studio this button collapses the panel to its 44px rail
+            (`Workspace.jsx:490-500`); elsewhere it is still Back. */}
+        {onToggleCollapse ? (
+          <button
+            type="button"
+            className="chat-project-back"
+            onClick={onToggleCollapse}
+            title={collapseLabel}
+            aria-label={collapseLabel}
+            aria-expanded={!collapsed}
+            aria-controls="studio-chat-content"
+          >
+            <FaIcon name={collapsed ? 'chevron-right' : 'chevron-left'} size={14} />
+          </button>
+        ) : onBack ? (
           <button
             type="button"
             className="chat-project-back"
@@ -2123,7 +2202,7 @@ export function ChatPane({
             title={backLabel}
             aria-label={backLabel}
           >
-            <Icon name="arrow-left" size={16} />
+            <FaIcon name="arrow-left" size={14} />
           </button>
         ) : null}
         {projectHeader ? (
@@ -2159,7 +2238,7 @@ export function ChatPane({
               });
             }}
           >
-            <Icon name="comment" size={16} />
+            <FaIcon name="comments" size={14} />
           </button>
           {showConvList ? (
             <div className="chat-history-menu" role="menu" data-testid="conversation-history-menu">
@@ -2191,13 +2270,13 @@ export function ChatPane({
                       setShowConvList(false);
                     }}
                   >
-                    <Icon name="plus" size={11} />
+                    <FaIcon name="plus" size={10} />
                     <span>{t('chat.new')}</span>
                   </button>
                 ) : null}
               </div>
               <label className="chat-history-search">
-                <Icon name="search" size={12} />
+                <FaIcon name="magnifying-glass" size={12} />
                 <input
                   type="search"
                   value={conversationSearch}
@@ -2212,7 +2291,7 @@ export function ChatPane({
                     onClick={() => setConversationSearch('')}
                     aria-label={t('chat.comments.clear')}
                   >
-                    <Icon name="close" size={10} />
+                    <FaIcon name="xmark" size={10} />
                   </button>
                 ) : null}
               </label>
@@ -2246,6 +2325,12 @@ export function ChatPane({
           ) : null}
         </div>
       </div>
+      {/* The reference wraps the transcript + composer in one `.chat-content`
+          grid row and drops it entirely while collapsed
+          (`Workspace.jsx:559-696`), which is what lets the 44px rail be a
+          single full-height track. */}
+      {collapsed ? null : (
+      <div className="chat-content" id={rootId ? 'studio-chat-content' : undefined}>
       {tab === 'chat' ? (
         <>
           <div className={`chat-log-wrap${chatLogTray ? ' has-chat-log-tray' : ''}`}>
@@ -2670,6 +2755,31 @@ export function ChatPane({
                   the viewport, then shrinks as the reply streams in below. */}
               <div className="chat-log-tail-spacer" ref={tailSpacerRef} aria-hidden />
             </div>
+            {/* Jump-to-message rail (`Workspace.jsx:592-603`): one dash per
+                user turn, revealed on hover at the transcript's right edge.
+                Only worth drawing once there is more than one turn to jump
+                between — the reference applies the same gate. */}
+            {railMessages.length > 1 ? (
+              <nav className="chat-message-rail" aria-label={t('studio.messageRailAria')}>
+                {railMessages.map((message, index) => (
+                  <button
+                    key={`rail-${message.id}`}
+                    type="button"
+                    aria-label={t('studio.messageRailJump', {
+                      index: index + 1,
+                      text: (message.content ?? '').slice(0, 42),
+                    })}
+                    onClick={() => {
+                      document
+                        .getElementById(`chat-message-${message.id}`)
+                        ?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+                    }}
+                  >
+                    <span />
+                  </button>
+                ))}
+              </nav>
+            ) : null}
             {chatLogTray}
             {/* Always mounted so the CSS transition can play in both
                 directions; the `chat-jump-btn-active` class flips the
@@ -2741,7 +2851,11 @@ export function ChatPane({
           {shouldPortalComposer && composerPortalTarget && composerPortalRect
             ? createPortal(
                 <div
-                  className="chat-composer-fixed-layer"
+                  className={
+                    composerLayerClassName
+                      ? `chat-composer-fixed-layer ${composerLayerClassName}`
+                      : 'chat-composer-fixed-layer'
+                  }
                   ref={composerLayerRef}
                   style={{
                     left: composerPortalRect.left,
@@ -2756,6 +2870,8 @@ export function ChatPane({
             : null}
         </>
       ) : null}
+      </div>
+      )}
     </div>
   );
 }
@@ -3863,27 +3979,28 @@ function ConversationRow({
       className={`chat-conv-item${active ? ' active' : ''}`}
       data-testid={`conversation-item-${conversation.id}`}
     >
+      {/* Title over meta inside one button, delete alongside — the approved
+          history popover's row (`prototype-reference/src/Workspace.jsx:538-551`).
+          The meta used to be a third sibling, which is what made the list read
+          as a two-column table instead of a stacked entry. */}
       <button
         type="button"
         className="chat-conv-item-name"
         data-testid={`conversation-select-${conversation.id}`}
-        style={{ background: 'transparent', border: 'none', padding: 0, textAlign: 'left' }}
         onClick={onSelect}
       >
-        {displayTitle}
+        <strong title={displayTitle}>{displayTitle}</strong>
+        <span data-testid={`conversation-meta-${conversation.id}`}>
+          {messageCount !== null ? `${compactCount(messageCount)} msg · ` : ''}
+          {conversationMetaLabel(conversation, t)}
+        </span>
       </button>
-      <span
-        className="chat-conv-item-meta"
-        data-testid={`conversation-meta-${conversation.id}`}
-      >
-        {messageCount !== null ? `${compactCount(messageCount)} msg · ` : ''}
-        {conversationMetaLabel(conversation, t)}
-      </span>
       <button
         type="button"
-        className="chat-conv-item-del"
+        className="chat-conv-item-delete chat-conv-item-del"
         data-testid={`conversation-delete-${conversation.id}`}
         title={t('chat.deleteConversation')}
+        aria-label={t('chat.deleteConversation')}
         onClick={(e) => {
           e.stopPropagation();
           if (
@@ -3893,7 +4010,7 @@ function ConversationRow({
           }
         }}
       >
-        <Icon name="close" size={12} />
+        <FaIcon name="xmark" size={11} />
       </button>
     </div>
   );
@@ -3958,7 +4075,9 @@ function UserMessageImpl({
   const isDesignSystemWorkspaceRequest = isDesignSystemWorkspacePrompt(message.content);
 
   return (
-    <div className="msg user">
+    // The id is the anchor the Studio's jump-to-message rail scrolls to
+    // (`prototype-reference/src/Workspace.jsx:564, 599`).
+    <div className="msg user" id={message.id ? `chat-message-${message.id}` : undefined}>
       <span className="sr-only">{t('chat.you')}</span>
       {hasRunContext ? (
         <div className="msg-run-context-row" data-testid="msg-run-context-row">

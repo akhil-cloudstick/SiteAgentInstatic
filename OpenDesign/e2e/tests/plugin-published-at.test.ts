@@ -1,6 +1,7 @@
-// The Community gallery's "Newest" sort ranks bundled templates by the
-// manifest's `publishedAt` (apps/web/src/components/plugins-home/sortOrder.ts).
-// That field is the only recency signal that survives a fresh install: the
+// Bundled templates carry a manifest `publishedAt`. The web app's "Newest"
+// sort was retired with the old Plugins gallery (the approved MMSBUILD screen
+// has no sort control), but the field remains the catalog's publication record
+// and the only recency signal that survives a fresh install: the
 // installed-record timestamps are stamped when a machine seeds its own
 // database, so a first boot stamps the entire bundled catalog milliseconds
 // apart in folder-walk order and "Newest" would degrade back to an order

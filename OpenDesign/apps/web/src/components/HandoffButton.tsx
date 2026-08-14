@@ -122,6 +122,12 @@ interface Props {
   // existing shell.openPath bridge in case the daemon catalogue is empty
   // (highly unlikely on macOS / Win / Linux but harmless to support).
   onRequestRevealInFinder?: () => void;
+  /**
+   * How application marks are drawn. `flat` (brand-coloured glyph, no filled
+   * square) is what the Studio's project menu uses, where a column of coloured
+   * tiles would outweigh the rows around it.
+   */
+  iconVariant?: 'tile' | 'flat';
 }
 
 function readPreferred(): HostEditorId | null {
@@ -296,6 +302,7 @@ export function HandoffButton({
   metricsConsent = false,
   installationId,
   onRequestRevealInFinder,
+  iconVariant = 'tile',
 }: Props) {
   const t = useT();
   const analytics = useAnalytics();
@@ -582,7 +589,7 @@ export function HandoffButton({
               .finally(() => setBusy(null));
           }}
         >
-          <EditorIcon editorId={fallbackId} size={20} />
+          <EditorIcon editorId={fallbackId} size={20} variant={iconVariant} />
           <span className="handoff-trigger-label">{fallbackLabel}</span>
         </button>
         {error ? (
@@ -636,14 +643,14 @@ export function HandoffButton({
         >
           {primary ? (
             <>
-              <EditorIcon editorId={primary.id} size={20} />
+              <EditorIcon editorId={primary.id} size={20} variant={iconVariant} />
               <span className="handoff-trigger-label sr-only">
                 {primaryTitle}
               </span>
             </>
           ) : (
             <>
-              <EditorIcon editorId="finder" size={20} />
+              <EditorIcon editorId="finder" size={20} variant={iconVariant} />
               <span className="handoff-trigger-label sr-only">{primaryTitle}</span>
             </>
           )}
@@ -727,7 +734,7 @@ export function HandoffButton({
                       disabled={busy === editor.id}
                       title={t('handoff.openInTarget', { target: editor.label })}
                     >
-                      <EditorIcon editorId={editor.id} size={24} />
+                      <EditorIcon editorId={editor.id} size={18} variant={iconVariant} />
                       <span className="handoff-target-label">{editor.label}</span>
                       <Icon className="handoff-target-arrow" name="chevron-right" size={12} />
                     </button>
@@ -748,7 +755,7 @@ export function HandoffButton({
                         disabled={busy === editor.id}
                         title={t('handoff.notDetectedTitle', { target: editor.label })}
                       >
-                        <EditorIcon editorId={editor.id} size={24} />
+                        <EditorIcon editorId={editor.id} size={18} variant={iconVariant} />
                         <span className="handoff-target-label">{editor.label}</span>
                       </button>
                     ))}

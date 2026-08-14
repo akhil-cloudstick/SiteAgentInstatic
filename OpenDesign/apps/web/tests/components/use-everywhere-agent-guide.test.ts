@@ -6,7 +6,9 @@ import { GUIDE_SECTIONS } from '../../src/components/use-everywhere/sections';
 describe('buildAgentGuideMarkdown', () => {
   it('emits a top-level header and the setup checklist by default', () => {
     const md = buildAgentGuideMarkdown();
-    expect(md).toMatch(/^# Open Design — agent setup guide/);
+    // MMS naming: the product is "MMS Design" in every user-visible string
+    // (`agent-guide.ts:51`). These assertions predate that rebrand.
+    expect(md).toMatch(/^# MMS Design — agent setup guide/);
     expect(md).toContain('## Setup checklist');
     expect(md).toContain('http://127.0.0.1:7456/api/health');
     expect(md).toContain('http://127.0.0.1:7456/api/mcp/install-info');
@@ -58,13 +60,13 @@ describe('buildAgentGuideMarkdown', () => {
       versionHint: '0.42.0',
       cliHint: '/usr/local/bin/od',
     });
-    expect(md).toContain('Reported Open Design version: `0.42.0`');
+    expect(md).toContain('Reported MMS Design version: `0.42.0`');
     expect(md).toContain('The user reported `od` at: `/usr/local/bin/od`');
   });
 
   it('omits hint sentences when the corresponding option is not provided', () => {
     const md = buildAgentGuideMarkdown();
-    expect(md).not.toContain('Reported Open Design version');
+    expect(md).not.toContain('Reported MMS Design version');
     expect(md).not.toContain('The user reported `od` at');
   });
 

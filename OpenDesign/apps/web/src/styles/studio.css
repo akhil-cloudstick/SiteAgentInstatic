@@ -1,0 +1,3133 @@
+/* ===========================================================================
+ * MMS Design — Studio (`/projects/:id`)
+ *
+ * A verbatim port of the approved MMSBUILD prototype's `#/studio` screen:
+ *   prototype-reference/src/StudioScreen.jsx  — the 5-track workbench
+ *   prototype-reference/src/Workspace.jsx     — chat, design files, preview
+ *   prototype-reference/src/ui.jsx            — the project toolbar
+ *   prototype-reference/src/styles.css        — every value below
+ *   prototype-reference/src/project-context.css — the inherited-context chips
+ *
+ * Line references in the comments point at `styles.css` in that package. Every
+ * number here is the reference's own; nothing is rounded, normalised or
+ * re-derived. Where the reference hard-codes a literal that does NOT flip with
+ * the theme (the canvas backdrop, the preview paper, the withheld amber) the
+ * literal is reproduced as a literal — that is the approved behaviour, not an
+ * oversight.
+ *
+ * SCOPING: everything hangs off `.studio-screen` so this sheet outranks
+ * `chat.css`, `workspace/drawer.css` and `viewer/core.css` on specificity
+ * alone, without those files having to move. It is imported late in
+ * `index.css` for the same reason.
+ *
+ * The reference's `--mms-focus` is used by two rules and never defined, so
+ * those `box-shadow`s are invalid at computed-value time and the separators
+ * render with no ring. That is what the approved screen does, so it is what
+ * this file does — see the plan's risk R4.
+ * =========================================================================== */
+
+/* ── Studio-scoped tokens ──────────────────────────────────────────────────
+ * `--shell-height` / `--context-height` alias the shared two-row geometry,
+ * which already steps 61→58→56 and 54→48 at exactly the reference's
+ * breakpoints (`@mms/shell` tokens.css). `--toolbar-height` is Studio-only.
+ * `--mms-danger` is re-toned for dark here rather than globally: its only
+ * consumer on this screen is the conversation delete button, and the shared
+ * token is read by other screens that must not change. */
+.studio-screen {
+  --shell-height: var(--hub-shell-height);
+  --context-height: var(--product-row-height);
+  --toolbar-height: 69px;
+}
+
+[data-theme='dark'] .studio-screen,
+[data-theme='dark'] .studio-composer-layer {
+  --mms-danger: #ff8d7f;
+}
+
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme]) .studio-screen,
+  html:not([data-theme]) .studio-composer-layer {
+    --mms-danger: #ff8d7f;
+  }
+}
+
+/* The composer is portalled to `document.body`, so it inherits the document's
+   base size rather than the screen's. Restate the reference's 13px root here
+   or every unsized control in the composer row renders a step too large. */
+.studio-composer-layer {
+  color: var(--mms-text);
+  font-family: var(--sans);
+  font-size: 13px;
+}
+
+.studio-composer-layer button,
+.studio-composer-layer input,
+.studio-composer-layer textarea,
+.studio-composer-layer select {
+  font: inherit;
+}
+
+/* ── Screen shell ─────────────────────────────────────────────────────────
+ * The reference `:root` sets `font-size: 13px` and every Studio control that
+ * declares no size inherits it. Scoping it to the screen keeps the rest of the
+ * app on its own base. `styles.css:1-2, 1171-1176`. */
+/* The screen is a column — chrome rows, then the workbench taking the rest.
+   The reference expresses the same geometry as `100vh` arithmetic because its
+   document scrolls; an app shell that already owns the viewport gets the
+   identical result from `flex: 1`, and without a page-level scrollbar. */
+.studio-root {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--mms-bg);
+}
+
+.studio-screen {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--mms-bg);
+  color: var(--mms-text);
+  font-family: var(--sans);
+  font-size: 13px;
+}
+
+.studio-screen button,
+.studio-screen input,
+.studio-screen textarea,
+.studio-screen select {
+  font: inherit;
+}
+
+
+/* ── Project toolbar — `styles.css:1066-1167`, markup `ui.jsx:238-270` ───── */
+.studio-screen .project-toolbar {
+  display: flex;
+  min-height: var(--toolbar-height);
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 14px 21px 12px;
+  padding: 10px 16px;
+  border: 1px solid var(--mms-border);
+  border-radius: 8px;
+  background: var(--mms-surface);
+}
+
+.studio-screen .project-title {
+  display: flex;
+  min-width: 280px;
+  min-height: 44px;
+  align-items: center;
+  gap: 12px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.studio-screen .project-mark {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 7px;
+  background: var(--mms-surface-green);
+  color: var(--mms-action);
+}
+
+.studio-screen .project-title strong {
+  overflow: hidden;
+  font-size: 18px;
+  letter-spacing: -0.02em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The title is the app's real rename affordance, so it is an editable text box
+   rather than the reference's toast-only button. Geometry is unchanged. */
+.studio-screen .project-title strong[contenteditable] {
+  min-width: 40px;
+  padding: 2px 4px;
+  border-radius: 5px;
+  outline: 0;
+}
+
+.studio-screen .project-title strong[contenteditable]:hover {
+  background: var(--mms-surface-tint);
+}
+
+.studio-screen .project-title strong[contenteditable]:focus {
+  background: var(--mms-surface-tint);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--mms-action) 45%, transparent);
+}
+
+/* `min-width: 0` + `overflow-x: auto` are the reference's own answer to a
+   toolbar too wide for its row — it applies them at <=1100px
+   (`styles.css:4310-4315`). They are applied at every width here because the
+   four controls have hard minimums (185 + 185 + 182 + 168 + gaps) that, added
+   to the 280px title, exceed the row somewhat above that breakpoint; without
+   this the overflow escaped and put a scrollbar across the whole app. */
+.studio-screen .project-toolbar-controls {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: flex-end;
+  /* `overflow-y: hidden` is required, not tidy-up: setting only `overflow-x`
+     makes `overflow-y` compute to `auto`, which put a stray vertical scrollbar
+     in the toolbar row. */
+  overflow-x: auto;
+  overflow-y: hidden;
+  gap: 12px;
+  scrollbar-width: thin;
+}
+
+/* The reference's 280px floor is kept; only the controls give ground, so a
+   short project name still reserves its space. */
+.studio-screen .project-toolbar > .project-title {
+  overflow: hidden;
+}
+
+/* `styles.css:520-535` */
+.studio-screen .select-button {
+  display: inline-flex;
+  min-height: 42px;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px;
+  border: 1px solid var(--mms-border-strong);
+  border-radius: 7px;
+  background: var(--mms-surface);
+  color: var(--mms-text);
+  cursor: pointer;
+}
+
+.studio-screen .select-button > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.studio-screen .select-button > .fa-chevron-down,
+.studio-screen .select-button > svg:last-child {
+  margin-left: 6px;
+  font-size: 8px;
+}
+
+.studio-screen .project-toolbar-controls .select-button {
+  min-width: 185px;
+  justify-content: space-between;
+}
+
+/* The project-type control is a disclosure in the reference, so it opens one.
+   Geometry is the reference's own popover idiom (`.composer-popover`,
+   `styles.css:1990-2045`) rather than a new shape. */
+.studio-screen .studio-type-select {
+  position: relative;
+  display: inline-flex;
+}
+
+/* Portalled to `document.body` (see `ProjectToolbar.tsx`), so this is styled
+   outside `.studio-screen` and positioned from the trigger. */
+.studio-type-menu {
+  position: fixed;
+  z-index: 220;
+  display: grid;
+  width: 295px;
+  align-content: start;
+  gap: 2px;
+  overflow-y: auto;
+  padding: 7px;
+  border: 1px solid var(--mms-border-strong);
+  border-radius: 10px;
+  background: var(--mms-surface-raised);
+  box-shadow: var(--shadow-menu);
+  color: var(--mms-text);
+  font-family: var(--sans);
+  font-size: 13px;
+}
+
+.studio-type-menu > strong {
+  padding: 5px 7px 7px;
+  color: var(--mms-text-muted);
+  font-size: 9px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.studio-type-menu dl {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0 7px 4px;
+}
+
+.studio-type-menu dl > div {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: 96px minmax(0, 1fr);
+  align-items: baseline;
+  gap: 8px;
+}
+
+.studio-type-menu dt {
+  color: var(--mms-text-muted);
+  font-size: 9px;
+}
+
+.studio-type-menu dd {
+  overflow: hidden;
+  margin: 0;
+  color: var(--mms-text);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.studio-type-menu__divider {
+  height: 1px;
+  margin: 5px 4px;
+  background: var(--mms-border);
+}
+
+.studio-type-menu > button {
+  display: flex;
+  min-height: 32px;
+  align-items: center;
+  gap: 9px;
+  padding: 0 7px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--mms-text);
+  font-size: 10px;
+  text-align: left;
+}
+
+.studio-type-menu > button > i {
+  color: var(--mms-action);
+}
+
+.studio-type-menu > button:hover {
+  background: var(--mms-surface-tint);
+}
+
+.studio-type-menu > button.danger,
+.studio-type-menu > button.danger > i {
+  color: var(--mms-danger);
+}
+
+.studio-type-menu > button.danger:hover {
+  background: color-mix(in srgb, var(--mms-danger) 12%, transparent);
+}
+
+/* The design-system picker wears the toolbar `SelectButton` shell; its popover
+   keeps the app's own two-column body. */
+.studio-screen .studio-ds-picker {
+  position: relative;
+  display: inline-flex;
+}
+
+.studio-screen .runtime-button,
+.studio-screen .share-cms-button {
+  display: inline-flex;
+  min-height: 42px;
+  align-items: center;
+  gap: 10px;
+  padding: 0 15px;
+  border: 1px solid var(--mms-border-strong);
+  border-radius: 7px;
+  background: var(--mms-surface);
+  color: var(--mms-text);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.studio-screen .runtime-button {
+  min-width: 182px;
+}
+
+.studio-screen .runtime-button > span:not(.runtime-dot) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* `styles.css:1148-1154`. The reference reserved this dot and then shipped a
+   "Fixture" pill in its place; the pill is one of the behaviours the build kit
+   forbids preserving, so the dot does the job it was drawn for and reports
+   whether the local daemon is actually live. */
+.studio-screen .runtime-dot {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 8px;
+  margin-left: auto;
+  border-radius: 50%;
+  background: var(--mms-action);
+}
+
+.studio-screen .runtime-dot.is-offline {
+  background: var(--mms-text-muted);
+}
+
+.studio-screen .share-cms-button {
+  min-width: 168px;
+  justify-content: center;
+  border-color: var(--mms-action);
+  color: var(--mms-action-strong);
+  font-weight: 680;
+}
+
+.studio-screen .share-cms-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.46;
+}
+
+/* ── The workbench grid — `styles.css:1178-1224` ───────────────────────────
+ * The five tracks are driven ONLY by these custom properties. The panel
+ * widths are written as inline custom properties by `useStudioLayout` (and
+ * imperatively during a drag), never as the `grid-template-columns`
+ * shorthand — a shorthand written to `element.style` cannot be overridden
+ * from a stylesheet. */
+/* The canvas track is `minmax(0, 1fr)`, not the reference's `minmax(400px, 1fr)`:
+   `useStudioLayout` already enforces the 400px floor by shrinking the files
+   panel and then the chat panel, and a hard grid minimum on top of that pushes
+   the workbench wider than its container at in-between widths — which is what
+   produced a horizontal scrollbar across the whole app. */
+.studio-screen .studio-grid {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  grid-template-columns:
+    var(--studio-chat-width, 460px)
+    var(--studio-chat-handle-width, 8px)
+    minmax(0, 1fr)
+    var(--studio-files-handle-width, 8px)
+    var(--studio-files-width, 280px);
+  gap: 0;
+  margin: 0 12px 14px;
+}
+
+.studio-screen .fluid-workbench {
+  overflow: hidden;
+  border: 1px solid var(--mms-border);
+  border-radius: 10px;
+  background: var(--mms-surface);
+}
+
+.studio-screen .fluid-workbench > .chat-panel {
+  grid-column: 1;
+}
+
+.studio-screen .fluid-workbench > .chat-resize-handle {
+  grid-column: 2;
+}
+
+.studio-screen .fluid-workbench > .file-workspace {
+  grid-column: 3;
+}
+
+.studio-screen .fluid-workbench > .files-resize-handle {
+  grid-column: 4;
+}
+
+.studio-screen .fluid-workbench > .design-files-panel {
+  grid-column: 5;
+}
+
+.studio-screen .fluid-workbench > .chat-panel,
+.studio-screen .fluid-workbench > .file-workspace,
+.studio-screen .fluid-workbench > .design-files-panel {
+  border: 0;
+  border-radius: 0;
+}
+
+/* ── Resize handles — `styles.css:1226-1268` ──────────────────────────────
+ * An 8px track with a 1px hairline down the middle and an 8px bleed each side,
+ * so the pointer target is 24px while the paint stays hairline-thin. */
+.studio-screen .studio-resize-handle {
+  position: relative;
+  z-index: 3;
+  min-width: 0;
+  cursor: col-resize;
+  outline: 0;
+  touch-action: none;
+}
+
+.studio-screen .studio-resize-handle::before {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(50% - 0.5px);
+  width: 1px;
+  background: var(--mms-border);
+  content: '';
+  transition: width 0.12s ease, background 0.12s ease, left 0.12s ease;
+}
+
+.studio-screen .studio-resize-handle::after {
+  position: absolute;
+  inset: 0 -8px;
+  content: '';
+}
+
+.studio-screen .studio-resize-handle:hover::before,
+.studio-screen .studio-resize-handle:focus-visible::before,
+.studio-resizing .studio-screen .studio-resize-handle::before {
+  left: calc(50% - 1px);
+  width: 2px;
+  background: var(--mms-action);
+}
+
+/* Reproduced from `styles.css:1260-1262`. `--mms-focus` is undefined in the
+   approved screen, so this declaration is inert and the separator shows no
+   ring — the reference's rendered behaviour. */
+.studio-screen .studio-resize-handle:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--mms-focus);
+}
+
+html.studio-resizing,
+html.studio-resizing * {
+  cursor: col-resize !important;
+  user-select: none !important;
+}
+
+/* ── Shared panel chrome — `styles.css:1270-1305` ────────────────────────── */
+.studio-screen .chat-panel,
+.studio-screen .file-workspace,
+.studio-screen .design-files-panel {
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid var(--mms-border);
+  border-radius: 8px;
+  background: var(--mms-surface);
+}
+
+.studio-screen .panel-title {
+  display: flex;
+  min-height: 45px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 13px;
+  border-bottom: 1px solid var(--mms-border);
+}
+
+.studio-screen .panel-title strong {
+  font-size: 15px;
+}
+
+.studio-screen .panel-title button {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--mms-text-muted);
+  cursor: pointer;
+}
+
+.studio-screen .panel-title button:hover {
+  background: var(--mms-surface-tint);
+  color: var(--mms-text);
+}
+
+.studio-screen .panel-title > span {
+  display: flex;
+}
+
+/* ── Collapsed rails — `styles.css:2412-2488` ────────────────────────────── */
+.studio-screen .design-files-panel {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.studio-screen .design-files-content {
+  display: grid;
+  min-height: 0;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+
+.studio-screen .fluid-workbench > .chat-panel:not(.collapsed),
+.studio-screen .fluid-workbench > .design-files-panel:not(.collapsed) {
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.studio-screen .fluid-workbench > .chat-panel.collapsed,
+.studio-screen .fluid-workbench > .design-files-panel.collapsed {
+  background: var(--mms-surface-raised);
+}
+
+.studio-screen .fluid-workbench > .chat-panel.collapsed {
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.studio-screen .fluid-workbench > .chat-panel.collapsed .chat-project-header {
+  height: 100%;
+  min-height: 100%;
+  flex-direction: column;
+  justify-content: flex-start;
+  padding: 7px 3px;
+  backdrop-filter: none;
+}
+
+.studio-screen .fluid-workbench > .chat-panel.collapsed .chat-project-header::after,
+.studio-screen .fluid-workbench > .chat-panel.collapsed .chat-project-heading,
+.studio-screen .fluid-workbench > .chat-panel.collapsed .chat-project-header-title,
+.studio-screen .fluid-workbench > .chat-panel.collapsed .chat-session-switcher {
+  display: none;
+}
+
+.studio-screen .fluid-workbench > .chat-panel.collapsed .chat-project-back {
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  border: 1px solid var(--mms-border-strong);
+  border-radius: 7px;
+  background: var(--mms-surface);
+  color: var(--mms-action);
+}
+
+.studio-screen .fluid-workbench > .design-files-panel.collapsed .panel-title {
+  min-height: 100%;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 14px;
+  padding: 7px 3px;
+  border-bottom: 0;
+}
+
+.studio-screen .fluid-workbench > .design-files-panel.collapsed .panel-title strong {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  color: var(--mms-text-muted);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+}
+
+.studio-screen .fluid-workbench > .design-files-panel.collapsed .panel-title button {
+  width: 38px;
+  min-width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  border: 1px solid var(--mms-border-strong);
+  border-radius: 7px;
+  background: var(--mms-surface);
+  color: var(--mms-action);
+}
+
+/* ── Chat panel — `styles.css:1307-1342` ─────────────────────────────────── */
+/* One flat surface for the whole column. The reference writes this as
+   `color-mix(--mms-surface 94%, transparent)` over a workbench card that is
+   already `--mms-surface`, i.e. the same colour — but here `.pane` paints
+   `--bg-panel` (`--mms-surface-raised`, the lighter #103a46) underneath, so
+   the translucent version let that tone show through. Painting `--mms-surface`
+   opaque gives the reference's rendered result without depending on what is
+   behind it. */
+.studio-screen .chat-panel {
+  display: grid;
+  position: relative;
+  grid-template-rows: 38px minmax(0, 1fr);
+  background: var(--mms-surface);
+}
+
+/* Nothing between the panel and its content carries its own fill — the seam in
+   dark theme came from these inheriting `--bg-panel`. */
+.studio-screen .chat-panel > .chat-content,
+.studio-screen .chat-panel .chat-log-wrap,
+.studio-screen .chat-panel .chat-log,
+.studio-screen .chat-panel .chat-composer-slot,
+.studio-screen .chat-panel .composer {
+  background: transparent;
+  box-shadow: none;
+}
+
+/* A column, not the reference's two-row grid: this pane puts more between the
+   transcript and the composer than the prototype did (pinned todos, the queued
+   send list), and a fixed two-track grid leaves those in implicit rows that
+   strand the composer mid-panel instead of pinning it to the bottom. */
+.studio-screen .chat-panel > .chat-content {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.studio-screen .chat-panel > .chat-content > .chat-log-wrap {
+  min-height: 0;
+  flex: 1;
+}
+
+.studio-screen .chat-panel > .chat-content > .chat-composer-slot {
+  flex: 0 0 auto;
+  margin-top: auto;
+}
+
+.studio-screen .chat-project-header {
+  position: relative;
+  z-index: 12;
+  display: flex;
+  height: 38px;
+  min-width: 0;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 9px;
+  border: 0;
+  /* Opaque for the same reason as the panel: the reference's 88% mix sits on
+     its own colour, so the rendered result is `--mms-surface`. `backdrop-filter`
+     is dropped with it — with nothing translucent left to blur it only created
+     a compositing layer, and its edge was visible in dark theme. */
+  background: var(--mms-surface);
+}
+
+/* The reference's 16px scrim under the header exists to soften transcript
+   content scrolling under a TRANSLUCENT header. With an opaque header it has
+   nothing to soften and reads as a band, so it is drawn from the header's own
+   colour instead — same gradient, no seam. */
+.studio-screen .chat-project-header::after {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  left: 0;
+  height: 16px;
+  background: linear-gradient(to bottom, var(--mms-surface), transparent);
+  pointer-events: none;
+  content: '';
+}
+
+.studio-screen .chat-project-back,
+.studio-screen .chat-session-trigger {
+  display: inline-grid;
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  min-height: 28px;
+  flex: 0 0 28px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--mms-text-muted);
+}
+
+.studio-screen .chat-project-back:hover,
+.studio-screen .chat-session-trigger:hover,
+.studio-screen .chat-session-switcher.open .chat-session-trigger {
+  background: var(--mms-surface-tint);
+  color: var(--mms-text);
+}
+
+/* The app's header title slot plays the reference's `.chat-project-heading`:
+   two stacked lines, both ellipsised, 1.08 leading. `styles.css:1367-1387`. */
+.studio-screen .chat-project-header-title,
+.studio-screen .chat-project-heading {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+  line-height: 1.08;
+}
+
+.studio-screen .chat-project-title-line {
+  display: grid;
+  min-width: 0;
+  gap: 0;
+}
+
+.studio-screen .chat-project-title-line .title,
+.studio-screen .chat-project-title-line .meta,
+.studio-screen .chat-project-heading strong,
+.studio-screen .chat-project-heading span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.studio-screen .chat-project-title-line .title,
+.studio-screen .chat-project-heading strong {
+  color: var(--mms-text);
+  font-size: 12px;
+  font-weight: 720;
+}
+
+.studio-screen .chat-project-title-line .meta,
+.studio-screen .chat-project-heading span {
+  color: var(--mms-text-muted);
+  font-size: 9px;
+}
+
+.studio-screen .chat-session-switcher {
+  display: inline-flex;
+  flex: 0 0 auto;
+}
+
+/* ── Conversation history popover — `styles.css:1400-1570` ───────────────── */
+.studio-screen .chat-history-menu {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 6px);
+  right: 9px;
+  left: auto;
+  display: flex;
+  width: min(360px, calc(100% - 18px));
+  max-height: min(380px, calc(100vh - 250px));
+  flex-direction: column;
+  overflow: hidden;
+  padding: 0;
+  border: 1px solid var(--mms-border-strong);
+  border-radius: 11px;
+  background: var(--mms-surface-raised);
+  box-shadow: var(--shadow-menu);
+}
+
+.studio-screen .chat-history-menu-head {
+  display: flex;
+  min-height: 38px;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 9px 4px;
+  border: 0;
+}
+
+.studio-screen .chat-history-menu-title {
+  color: var(--mms-text-muted);
+  font-size: 10px;
+  font-weight: 760;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.studio-screen .chat-history-menu-title small,
+.studio-screen .chat-history-menu-count {
+  margin-left: 5px;
+  color: color-mix(in srgb, var(--mms-text-muted) 76%, transparent);
+  font-size: 10px;
+}
+
+.studio-screen .chat-history-new {
+  display: inline-flex;
+  height: 25px;
+  min-height: 25px;
+  align-items: center;
+  gap: 5px;
+  margin-left: auto;
+  padding: 0 8px;
+  border: 1px solid var(--mms-border);
+  border-radius: 6px;
+  background: var(--mms-surface-tint);
+  color: var(--mms-text-muted);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.studio-screen .chat-history-new:hover:not(:disabled) {
+  border-color: var(--mms-border-strong);
+  color: var(--mms-text);
+}
+
+.studio-screen .chat-history-search {
+  display: flex;
+  min-height: 35px;
+  align-items: center;
+  gap: 7px;
+  margin: 5px 8px;
+  padding: 0 9px;
+  border: 1px solid var(--mms-border);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--mms-surface) 78%, var(--mms-surface-raised));
+  color: var(--mms-text-muted);
+}
+
+.studio-screen .chat-history-search:focus-within {
+  border-color: color-mix(in srgb, var(--mms-action) 56%, var(--mms-border));
+}
+
+.studio-screen .chat-history-search input {
+  min-width: 0;
+  flex: 1;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--mms-text);
+  font-size: 11px;
+}
+
+.studio-screen .chat-history-search button,
+.studio-screen .chat-history-search-clear {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  min-width: 22px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--mms-text-muted);
+}
+
+.studio-screen .chat-history-list {
+  display: grid;
+  min-height: 0;
+  align-content: start;
+  gap: 2px;
+  overflow-y: auto;
+  padding: 3px 6px 7px;
+}
+
+.studio-screen .chat-conv-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 28px;
+  align-items: center;
+  gap: 4px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+}
+
+/* The ROW is the hover target. The app's global `button:hover` fill was
+   painting only the name button, which drew a block inside the row instead of
+   highlighting it — so the buttons stay transparent and the row carries the
+   tint. */
+.studio-screen .chat-conv-item:hover,
+.studio-screen .chat-conv-item:focus-within,
+.studio-screen .chat-conv-item.active {
+  background: var(--mms-surface-tint);
+}
+
+.studio-screen .chat-conv-item-name,
+.studio-screen .chat-conv-item-name:hover,
+.studio-screen .chat-conv-item-name:focus,
+.studio-screen .chat-conv-item-delete,
+.studio-screen .chat-conv-item-delete:focus {
+  background: transparent;
+}
+
+.studio-screen .chat-conv-item.active {
+  box-shadow: inset 2px 0 0 var(--mms-action);
+}
+
+.studio-screen .chat-conv-item-name {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+  padding: 7px 6px 7px 10px;
+  border: 0;
+  background: transparent;
+  color: var(--mms-text);
+  text-align: left;
+}
+
+.studio-screen .chat-conv-item-name strong,
+.studio-screen .chat-conv-item-name span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.studio-screen .chat-conv-item-name strong {
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.studio-screen .chat-conv-item-name span {
+  color: var(--mms-text-muted);
+  font-size: 9px;
+}
+
+.studio-screen .chat-conv-item-delete {
+  display: grid;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--mms-text-muted);
+  opacity: 0;
+}
+
+.studio-screen .chat-conv-item:hover .chat-conv-item-delete,
+.studio-screen .chat-conv-item:focus-within .chat-conv-item-delete {
+  opacity: 1;
+}
+
+.studio-screen .chat-conv-item-delete:hover {
+  background: color-mix(in srgb, var(--mms-danger) 12%, transparent);
+  color: var(--mms-danger);
+}
+
+.studio-screen .chat-history-empty {
+  margin: 0;
+  padding: 18px 10px;
+  color: var(--mms-text-muted);
+  font-size: 11px;
+  text-align: center;
+}
+
+/* ── Transcript — `styles.css:1572-1600, 1605-1810` ──────────────────────── */
+.studio-screen .chat-log-wrap {
+  position: relative;
+  min-height: 0;
+}
+
+.studio-screen .chat-log {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+  gap: 24px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 24px 20px 14px;
+  scrollbar-width: none;
+}
+
+.studio-screen .chat-log::-webkit-scrollbar {
+  display: none;
+}
+
+.studio-screen .chat-log > .msg {
+  max-width: 100%;
+  flex: 0 0 auto;
+  margin: 0;
+  animation: chat-message-enter 0.18s ease-out both;
+}
+
+.studio-screen .chat-log > .msg.user {
+  width: fit-content;
+  max-width: min(88%, 520px);
+  align-self: flex-end;
+}
+
+.studio-screen .chat-log > .msg.assistant {
+  width: 100%;
+  max-width: 620px;
+  align-self: flex-start;
+}
+
+.studio-screen .user-text-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+/* The app's bubble carries both classes (`user-text user-bubble`). */
+.studio-screen .user-bubble,
+.studio-screen .msg.user .user-text {
+  width: fit-content;
+  max-width: 100%;
+  margin: 0;
+  padding: 9px 12px;
+  border: 0;
+  border-radius: 13px 3px 13px 13px;
+  background: color-mix(in srgb, var(--mms-text) 9%, var(--mms-surface-raised));
+  color: var(--mms-text);
+  font-size: 12px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
+/* `.msg.user` sizing comes from the reference's own `.chat-log > .msg.user`
+   rule above; the legacy `max-width: min(78%, 560px)` must not win. */
+.studio-screen .chat-log > .msg.user {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.studio-screen .user-actions {
+  display: flex;
+  min-height: 22px;
+  align-items: center;
+  gap: 5px;
+  margin-top: 3px;
+  color: var(--mms-text-muted);
+  font-size: 9px;
+  opacity: 0;
+  transition: opacity 0.14s ease;
+}
+
+.studio-screen .user-text-wrap:hover .user-actions,
+.studio-screen .user-text-wrap:focus-within .user-actions {
+  opacity: 1;
+}
+
+.studio-screen .user-actions button {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: inherit;
+}
+
+.studio-screen .user-actions button:hover {
+  background: var(--mms-surface-tint);
+  color: var(--mms-text);
+}
+
+/* The app's assistant turn is `.role > .role-agent-icon + .role-name` where
+   the reference has `.assistant-role > .assistant-agent-mark + <strong>`.
+   Same anatomy, different names — mapped here rather than renamed in a
+   component whose internals (tool cards, artifacts, todos) are far richer
+   than the prototype's single paragraph. */
+.studio-screen .assistant-role,
+.studio-screen .msg.assistant > .role {
+  display: flex;
+  min-height: 24px;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 0;
+  color: var(--mms-text);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.studio-screen .assistant-agent-mark,
+.studio-screen .msg.assistant .role-agent-icon {
+  display: grid;
+  width: 23px;
+  height: 23px;
+  flex: 0 0 23px;
+  place-items: center;
+  border-radius: 6px;
+  background: var(--mms-surface-green);
+  color: var(--mms-action);
+  font-size: 10px;
+}
+
+.studio-screen .msg.assistant .role-name {
+  color: var(--mms-text);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.studio-screen .assistant-prose,
+.studio-screen .msg.assistant .prose {
+  max-width: 64ch;
+  margin: 8px 0 0;
+  color: var(--mms-text);
+  font-size: 13px;
+  line-height: 1.68;
+}
+
+.studio-screen .assistant-file-change {
+  width: min(100%, 340px);
+  margin-top: 10px;
+  overflow: hidden;
+  border: 1px solid var(--mms-border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--mms-surface-raised) 82%, transparent);
+}
+
+.studio-screen .assistant-file-change summary {
+  display: flex;
+  min-height: 34px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  color: var(--mms-text-muted);
+  cursor: pointer;
+  font-size: 10px;
+  list-style: none;
+}
+
+.studio-screen .assistant-file-change summary::-webkit-details-marker {
+  display: none;
+}
+
+.studio-screen .assistant-file-change summary > :first-child {
+  color: var(--mms-action);
+}
+
+.studio-screen .assistant-file-change summary > :last-child {
+  margin-left: auto;
+  transition: transform 0.14s ease;
+}
+
+.studio-screen .assistant-file-change[open] summary > :last-child {
+  transform: rotate(180deg);
+}
+
+.studio-screen .assistant-file-change > div {
+  display: grid;
+  padding: 0 6px 6px;
+}
+
+.studio-screen .assistant-file-change > div button {
+  display: grid;
+  min-height: 30px;
+  grid-template-columns: 16px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 7px;
+  padding: 0 7px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--mms-text);
+  font-size: 10px;
+  text-align: left;
+}
+
+.studio-screen .assistant-file-change > div button:hover {
+  background: var(--mms-surface-tint);
+}
+
+.studio-screen .assistant-file-change > div small {
+  color: var(--mms-text-muted);
+  font-size: 9px;
+}
+
+.studio-screen .assistant-footer {
+  display: flex;
+  min-height: 24px;
+  align-items: center;
+  gap: 6px;
+  padding-top: 6px;
+  color: var(--mms-text-muted);
+  font-size: 9px;
+}
+
+.studio-screen .assistant-footer time {
+  margin-left: auto;
+}
+
+.studio-screen .assistant-status-dot {
+  width: 5px;
+  height: 5px;
+  flex: 0 0 5px;
+  border-radius: 50%;
+  background: var(--mms-action);
+}
+
+.studio-screen .assistant-working {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 8px;
+  color: var(--mms-text-muted);
+  font-size: 10px;
+}
+
+.studio-screen .assistant-working > span {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--mms-action);
+  opacity: 0.3;
+  animation: chat-working-dot 0.9s ease-in-out infinite;
+}
+
+.studio-screen .assistant-working > span:nth-child(2) {
+  animation-delay: 0.12s;
+}
+
+.studio-screen .assistant-working > span:nth-child(3) {
+  animation-delay: 0.24s;
+}
+
+/* Jump-to-message rail — `styles.css:1815-1855` */
+.studio-screen .chat-message-rail {
+  position: absolute;
+  z-index: 8;
+  top: 0;
+  right: 4px;
+  bottom: 0;
+  display: flex;
+  width: 24px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  opacity: 0;
+  transition: opacity 0.14s ease;
+}
+
+.studio-screen .chat-message-rail:hover,
+.studio-screen .chat-message-rail:focus-within {
+  opacity: 1;
+}
+
+.studio-screen .chat-message-rail button {
+  display: flex;
+  width: 24px;
+  height: 24px;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.studio-screen .chat-message-rail button span {
+  width: 8px;
+  height: 2px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--mms-text-muted) 42%, transparent);
+  transition: width 0.15s ease, background 0.15s ease;
+}
+
+.studio-screen .chat-message-rail button:hover span,
+.studio-screen .chat-message-rail button:focus-visible span {
+  width: 15px;
+  background: var(--mms-text);
+}
+
+/* ── Composer — `styles.css:1860-1911, 1915-2089` ────────────────────────── */
+:is(.studio-screen, .studio-composer-layer) .composer {
+  position: relative;
+  z-index: 15;
+  padding: 8px 10px 10px;
+  border: 0;
+  background: transparent;
+}
+
+:is(.studio-screen, .studio-composer-layer) .composer-shell {
+  display: grid;
+  gap: 6px;
+  padding: 8px 10px 7px;
+  border: 1px solid var(--mms-border-strong);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--mms-surface-raised) 88%, var(--mms-surface-tint));
+  box-shadow: none;
+  transition: border-color 0.14s ease, box-shadow 0.14s ease;
+}
+
+:is(.studio-screen, .studio-composer-layer) .composer-shell:focus-within {
+  border-color: color-mix(in srgb, var(--mms-action) 45%, var(--mms-border-strong));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--mms-action) 10%, transparent);
+}
+
+:is(.studio-screen, .studio-composer-layer) .composer-input-wrap,
+:is(.studio-screen, .studio-composer-layer) .composer-shell textarea {
+  min-height: 72px;
+  max-height: min(184px, 32vh);
+  padding: 7px 5px;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--mms-text);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+:is(.studio-screen, .studio-composer-layer) .composer-shell textarea {
+  width: 100%;
+  overflow-y: auto;
+  resize: none;
+}
+
+:is(.studio-screen, .studio-composer-layer) .composer-input-wrap {
+  overflow-y: auto;
+}
+
+:is(.studio-screen, .studio-composer-layer) .composer-shell textarea::placeholder,
+:is(.studio-screen, .studio-composer-layer) .composer-input-wrap [data-lexical-placeholder],
+:is(.studio-screen, .studio-composer-layer) .composer-input-wrap .composer-placeholder {
+  color: color-mix(in srgb, var(--mms-text-muted) 78%, transparent);
+}
+
+:is(.studio-screen, .studio-composer-layer) .composer-row {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 0 0;
+  border-top: 1px solid var(--mms-border);
+  border-bottom: 0;
+}
+
+:is(.studio-screen, .studio-composer-layer) .composer-spacer {
+  min-width: 0;
+  flex: 1;
+}
+
+:is(.studio-screen, .studio-composer-layer) .composer-menu-anchor,
+:is(.studio-screen, .studio-composer-layer) .plus-menu {
+  position: relative;
+  display: inline-flex;
+  min-width: 0;
+}
+
+/* One control system: every trailing composer control is a 28px square, the
+   mode pill is a 28px-tall label. Overrides `chat.css:1504-1560`, which sizes
+   the same controls to the upstream 30/32px rhythm. */
+:is(.studio-screen, .studio-composer-layer) .composer-row .composer-icon-button,
+:is(.studio-screen, .studio-composer-layer) .composer-row .icon-btn,
+:is(.studio-screen, .studio-composer-layer) .composer-row .plus-menu__trigger,
+:is(.studio-screen, .studio-composer-layer) .composer-row .avatar-agent-trigger,
+:is(.studio-screen, .studio-composer-layer) .composer-row .avatar-btn,
+:is(.studio-screen, .studio-composer-layer) .composer-row .working-dir-pill-trigger,
+:is(.studio-screen, .studio-composer-layer) .composer-row .session-mode-toggle__trigger,
+:is(.studio-screen, .studio-composer-layer) .composer-row .composer-mode-button {
+  display: inline-flex;
+  height: 28px;
+  min-height: 28px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--mms-text-muted);
+}
+
+:is(.studio-screen, .studio-composer-layer) .composer-row .composer-icon-button,
+:is(.studio-screen, .studio-composer-layer) .composer-row .icon-btn,
+:is(.studio-screen, .studio-composer-layer) .composer-row .plus-menu__trigger,
+:is(.studio-screen, .studio-composer-layer) .composer-row .avatar-agent-trigger,
+:is(.studio-screen, .studio-composer-layer) .composer-row .avatar-btn {
+  width: 28px;
+  min-width: 28px;
+  flex: 0 0 28px;
+}
+
+:is(.studio-screen, .studio-composer-layer) .composer-row .composer-icon-button.active,
+:is(.studio-screen, .studio-composer-layer) .composer-row .icon-btn.active {
+  background: var(--mms-surface-green);
+  color: var(--mms-action);
+}
+
+:is(.studio-screen, .studio-composer-layer) .composer-row .composer-icon-button:hover:not(:disabled),
+:is(.studio-screen, .studio-composer-layer) .composer-row .icon-btn:hover:not(:disabled),
+:is(.studio-screen, .studio-composer-layer) .composer-row .plus-menu__trigger:hover:not(:disabled),
+:is(.studio-screen, .studio-composer-layer) .composer-row .avatar-agent-trigger:hover:not(:disabled),
+:is(.studio-screen, .studio-composer-layer) .composer-row .working-dir-pill-trigger:hover:not(:disabled),
+:is(.studio-screen, .studio-composer-layer) .composer-row .session-mode-toggle__trigger:hover:not(:disabled),
+:is(.studio-screen, .studio-composer-layer) .composer-row .composer-mode-button:hover:not(:disabled),
+:is(.studio-screen, .studio-composer-layer) .composer-row [aria-expanded='true'] {
+  border-color: var(--mms-border);
+  background: var(--mms-surface-tint);
+  color: var(--mms-text);
+}
+
+:is(.studio-screen, .studio-composer-layer) .composer-row .composer-mode-button,
+:is(.studio-screen, .studio-composer-layer) .composer-row .session-mode-toggle__trigger,
+:is(.studio-screen, .studio-composer-layer) .composer-row .working-dir-pill-trigger {
+  min-width: 0;
+  max-width: 108px;
+  gap: 5px;
+  padding: 0 8px;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+:is(.studio-screen, .studio-composer-layer) .composer-row .composer-mode-button span,
+:is(.studio-screen, .studio-composer-layer) .composer-row .session-mode-toggle__trigger span,
+:is(.studio-screen, .studio-composer-layer) .composer-row .working-dir-pill-trigger span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The approved mode control always carries its label ("Plan" / "Design" /
+   "Ask"); upstream hides it in tight containers. */
+:is(.studio-screen, .studio-composer-layer)
+  .composer-row
+  .session-mode-toggle__trigger
+  .session-mode-toggle__label {
+  display: inline;
+}
+
+:is(.studio-screen, .studio-composer-layer) .composer-row .composer-mode-button svg:last-child,
+:is(.studio-screen, .studio-composer-layer) .composer-row .composer-mode-button .fa-chevron-down {
+  font-size: 8px;
+}
+
+/* Composer popovers — `styles.css:1990-2065` */
+:is(.studio-screen, .studio-composer-layer) .composer-popover {
+  position: absolute;
+  z-index: 60;
+  bottom: calc(100% + 8px);
+  left: 0;
+  display: grid;
+  width: 295px;
+  align-content: start;
+  gap: 2px;
+  padding: 7px;
+  border: 1px solid var(--mms-border-strong);
+  border-radius: 10px;
+  background: var(--mms-surface-raised);
+  box-shadow: var(--shadow-menu);
+}
+
+:is(.studio-screen, .studio-composer-layer) .composer-popover.context-menu {
+  max-height: min(420px, 68vh);
+  overflow-y: auto;
+}
+
+:is(.studio-screen, .studio-composer-layer) .composer-trailing-menu .composer-popover {
+  right: 0;
+  left: auto;
+}
+
+:is(.studio-screen, .studio-composer-layer) .composer-popover > strong {
+  padding: 5px 7px 7px;
+  color: var(--mms-text-muted);
+  font-size: 9px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+:is(.studio-screen, .studio-composer-layer) .composer-popover > button {
+  display: grid;
+  min-height: 38px;
+  grid-template-columns: 20px minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+  padding: 5px 7px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--mms-text);
+  font-size: 10px;
+  text-align: left;
+}
+
+:is(.studio-screen, .studio-composer-layer) .composer-popover > button:hover,
+:is(.studio-screen, .studio-composer-layer) .composer-popover > button.selected {
+  background: var(--mms-surface-tint);
+}
+
+:is(.studio-screen, .studio-composer-layer) .composer-popover > button.selected {
+  box-shadow: inset 2px 0 0 var(--mms-action);
+}
+
+:is(.studio-screen, .studio-composer-layer) .composer-popover > button > :first-child {
+  justify-self: center;
+  color: var(--mms-action);
+}
+
+:is(.studio-screen, .studio-composer-layer) .composer-popover > button > span {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+:is(.studio-screen, .studio-composer-layer) .composer-popover > button small {
+  color: var(--mms-text-muted);
+  font-size: 9px;
+  line-height: 1.35;
+}
+
+:is(.studio-screen, .studio-composer-layer) .composer-popover.compact-menu {
+  width: 210px;
+}
+
+:is(.studio-screen, .studio-composer-layer) .composer-popover.compact-menu > button {
+  min-height: 32px;
+}
+
+:is(.studio-screen, .studio-composer-layer) .composer-popover.runtime-menu {
+  width: 246px;
+}
+
+/* The agent menu is portalled to `document.body` (it is anchored to a trigger
+   inside an `overflow` scroller), so it carries the popover chrome itself
+   rather than inheriting it from the composer scope. */
+.studio-runtime-menu {
+  position: fixed;
+  z-index: 220;
+  display: grid;
+  width: 246px;
+  align-content: start;
+  gap: 2px;
+  padding: 7px;
+  border: 1px solid var(--mms-border-strong);
+  border-radius: 10px;
+  background: var(--mms-surface-raised);
+  box-shadow: var(--shadow-menu);
+  color: var(--mms-text);
+  font-family: var(--sans);
+  font-size: 13px;
+}
+
+.studio-runtime-menu > strong {
+  padding: 5px 7px 7px;
+  color: var(--mms-text-muted);
+  font-size: 9px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.studio-runtime-menu > button {
+  display: grid;
+  min-height: 38px;
+  grid-template-columns: 20px minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+  padding: 5px 7px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--mms-text);
+  font-size: 10px;
+  text-align: left;
+}
+
+.studio-runtime-menu > button:hover,
+.studio-runtime-menu > button.selected {
+  background: var(--mms-surface-tint);
+}
+
+.studio-runtime-menu > button.selected {
+  box-shadow: inset 2px 0 0 var(--mms-action);
+}
+
+.studio-runtime-menu > button > i {
+  justify-self: center;
+  color: var(--mms-action);
+}
+
+.studio-runtime-menu > button > span {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.studio-runtime-menu > button small {
+  color: var(--mms-text-muted);
+  font-size: 9px;
+  line-height: 1.35;
+}
+
+/* Send / Stop — `styles.css:2066-2089`. The reference send button is a bare
+   34px circle carrying only the arrow, so the app's visible "Send" label is
+   suppressed; Stop keeps its label exactly as the reference does. */
+:is(.studio-screen, .studio-composer-layer) .composer-send {
+  display: inline-flex;
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
+  min-height: 34px;
+  flex: 0 0 34px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0;
+  border: 1px solid var(--mms-text);
+  border-radius: 50%;
+  background: var(--mms-text);
+  color: var(--mms-bg);
+}
+
+:is(.studio-screen, .studio-composer-layer) .composer-send:not(.stop) > span {
+  display: none;
+}
+
+:is(.studio-screen, .studio-composer-layer) .composer-send:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-frame);
+}
+
+:is(.studio-screen, .studio-composer-layer) .composer-send:disabled {
+  cursor: default;
+  opacity: 0.36;
+}
+
+:is(.studio-screen, .studio-composer-layer) .composer-send.stop {
+  width: auto;
+  min-width: 72px;
+  flex-basis: auto;
+  padding: 0 11px;
+  border-radius: 18px;
+  font-size: 10px;
+  font-weight: 720;
+}
+
+/* The approved composer ends at the control row. Working directory is not a
+   control there — it is an item in the `+` context menu ("Working directory ·
+   Select the folder used by Local CLI", `Workspace.jsx:640`) — so the standalone
+   row below the shell is dropped and the setting is reached from `+`. */
+:is(.studio-screen, .studio-composer-layer) .composer-workdir-row {
+  display: none;
+}
+
+/* ── Inherited Product Hub context — `project-context.css:59-109` ────────── */
+/* One line, scrolled horizontally with no visible bar — the reference's own
+   behaviour. Drag, shift-wheel or keyboard focus moves it. */
+:is(.studio-screen, .studio-composer-layer) .chat-inherited-context {
+  display: flex;
+  min-height: 38px;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 5px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 5px 6px 0;
+  scrollbar-width: none;
+  overscroll-behavior-x: contain;
+}
+
+:is(.studio-screen, .studio-composer-layer) .chat-inherited-context::-webkit-scrollbar {
+  display: none;
+}
+
+/* Chips keep their intrinsic width in a scroller — shrinking them was what
+   produced the sliced third chip. */
+:is(.studio-screen, .studio-composer-layer) .chat-inherited-context > button,
+:is(.studio-screen, .studio-composer-layer) .chat-inherited-context > span {
+  flex: 0 0 auto;
+}
+
+/* The active-file chip upstream adds to the staged strip is not in the approved
+   composer — the file being edited is already the active tab. The strip itself
+   stays for genuinely staged items (attachments, plugins, skills). */
+.studio-screen .staged-context--workspace {
+  display: none;
+}
+
+/* Collapse the strip entirely when the chip above was its only content. */
+.studio-screen .staged-context-row:not(:has(> *:not(.staged-context--workspace))) {
+  display: none;
+}
+
+:is(.studio-screen, .studio-composer-layer) .chat-inherited-context > button,
+:is(.studio-screen, .studio-composer-layer) .chat-inherited-context > span {
+  display: inline-flex;
+  min-width: 0;
+  min-height: 29px;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+  padding: 0 8px;
+  border: 1px solid var(--mms-border);
+  border-radius: 6px;
+  background: var(--mms-surface-tint);
+  color: var(--mms-text-muted);
+  font-size: 8px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+:is(.studio-screen, .studio-composer-layer) .chat-inherited-context > button {
+  color: var(--mms-text);
+  text-align: left;
+}
+
+:is(.studio-screen, .studio-composer-layer) .chat-inherited-context > button > span {
+  display: grid;
+  gap: 1px;
+}
+
+:is(.studio-screen, .studio-composer-layer) .chat-inherited-context > button strong,
+:is(.studio-screen, .studio-composer-layer) .chat-inherited-context > button small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+:is(.studio-screen, .studio-composer-layer) .chat-inherited-context > button strong {
+  font-size: 8px;
+}
+
+:is(.studio-screen, .studio-composer-layer) .chat-inherited-context > button small {
+  color: var(--mms-text-muted);
+  font-size: 7px;
+}
+
+:is(.studio-screen, .studio-composer-layer) .chat-inherited-context i,
+:is(.studio-screen, .studio-composer-layer) .chat-inherited-context svg {
+  color: var(--mms-action-strong);
+}
+
+/* Hard-coded amber in the reference, identical in both themes. */
+:is(.studio-screen, .studio-composer-layer) .chat-inherited-context .withheld i,
+:is(.studio-screen, .studio-composer-layer) .chat-inherited-context .withheld svg {
+  color: #a87710;
+}
+
+/* ── Canvas column — `styles.css:2106-2151` ──────────────────────────────── */
+/* The reference gives this column three tracks — `43px 44px 1fr` — because its
+   FileTabs, PreviewToolbar and preview stage are siblings
+   (`styles.css:2106-2107`). Here the toolbar and stage live one level down,
+   inside `.ws-body > .viewer`, so the same rhythm is expressed as 43px + the
+   rest, with the viewer owning the 44px toolbar row. The rendered geometry is
+   identical; only where the rule is written differs. */
+.studio-screen .file-workspace {
+  display: grid;
+  grid-template-rows: 43px minmax(0, 1fr);
+}
+
+/* `.ws-body` keeps its own flex column — it hosts every workspace surface at
+   once (browser panels, the design-system panel, the file manager, the
+   viewer), and a fixed grid track count would mis-size them. Only the viewer
+   itself takes the reference's toolbar/stage split. */
+.studio-screen .file-workspace .viewer {
+  display: grid;
+  min-height: 0;
+  grid-template-rows: 44px minmax(0, 1fr);
+}
+
+/* A viewer with no preview toolbar (code-only surfaces, empty states) simply
+   fills the track; the live-artifact viewer adds its own tab strip between
+   the toolbar and the body. */
+.studio-screen .file-workspace .viewer:not(:has(> .viewer-toolbar)) {
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.studio-screen .file-workspace .viewer.live-artifact-viewer {
+  grid-template-rows: 44px auto minmax(0, 1fr);
+}
+
+.studio-screen .file-tabs {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  height: 43px;
+  min-height: 43px;
+  align-items: stretch;
+  padding: 0;
+  border-bottom: 1px solid var(--mms-border);
+  background: var(--mms-surface);
+  box-shadow: none;
+}
+
+/* The approved tab row is exactly: file tabs, `+`, viewport switcher.
+   Two upstream controls are dropped from it, neither losing an action:
+     - `.ws-focus-expand` — the collapsed chat panel's own 44px rail carries
+       the expand chevron, which is the reference's single control for it;
+     - `.pages-tab` — the Pages dropdown listed pages and "All project files",
+       both of which the Design Files column now shows permanently, and new
+       pages come from the `+` launcher. */
+.studio-screen .file-tabs .ws-focus-expand,
+.studio-screen .file-tabs .ws-pages-menu-anchor {
+  display: none;
+}
+
+/* Not in the approved toolbar, and already present in the ⋮ menu. */
+.studio-screen .preview-actions [data-testid='screenshot-copy-button'] {
+  display: none;
+}
+
+.studio-screen .file-tabs .ws-tabs-bar {
+  min-width: 0;
+  flex: 1;
+  align-items: stretch;
+  gap: 0;
+  padding: 0;
+}
+
+.studio-screen .file-tabs .ws-tab {
+  display: inline-flex;
+  min-width: 150px;
+  height: auto;
+  min-height: 42px;
+  align-items: center;
+  gap: 9px;
+  padding: 0 12px;
+  border: 0;
+  border-right: 1px solid var(--mms-border);
+  border-radius: 0;
+  background: transparent;
+  color: var(--mms-text-muted);
+}
+
+.studio-screen .file-tabs .ws-tab.active {
+  background: var(--mms-surface-raised);
+  color: var(--mms-text);
+  font-weight: 650;
+}
+
+.studio-screen .file-tabs .ws-tab:hover:not(.active) {
+  background: var(--mms-surface-tint);
+  color: var(--mms-text);
+}
+
+.studio-screen .file-tabs .ws-tab-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.studio-screen .file-tabs .ws-add-tab {
+  display: flex;
+  align-items: stretch;
+}
+
+.studio-screen .file-tabs .ws-tab-add {
+  width: 43px;
+  min-width: 43px;
+  height: auto;
+  min-height: 42px;
+  justify-content: center;
+  border: 0;
+  border-right: 1px solid var(--mms-border);
+  border-radius: 0;
+  background: transparent;
+  color: var(--mms-text-muted);
+}
+
+.studio-screen .file-tabs .ws-tab-add:hover {
+  background: var(--mms-surface-tint);
+  color: var(--mms-text);
+}
+
+.studio-screen .file-tabs .ws-tabs-actions {
+  display: flex;
+  min-width: 0;
+  flex: 0 0 auto;
+  align-items: center;
+  align-self: center;
+  gap: 6px;
+  margin-right: 8px;
+  margin-left: auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.studio-screen .ws-tabs-viewport-slot {
+  display: contents;
+}
+
+/* ── "Open with" inside the project menu ──────────────────────────────────
+ * The handoff control is a standalone popover elsewhere; nested here it has to
+ * read as part of the menu. Its split trigger is dropped (the menu is already
+ * open, so a second trigger is the empty bordered box that was showing), its
+ * editor rows lose the card chrome, and the brand tiles lose the filled square
+ * so the marks sit on the menu like every other glyph. */
+.studio-type-menu__slot {
+  display: grid;
+  gap: 2px;
+}
+
+.studio-type-menu__slot .handoff-wrap,
+.studio-type-menu__slot .handoff-menu {
+  position: static;
+  display: block;
+  width: auto;
+  min-width: 0;
+  max-width: none;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+/* The split control IS the entry point — the default editor on the left, the
+   caret opening the full application list — so it reads as one menu row:
+   [icon] Open with <editor> … [▾]. Hiding it (as an earlier pass did) removed
+   the only way to reach the list. */
+.studio-type-menu__slot .handoff-split {
+  display: flex;
+  width: 100%;
+  min-height: 32px;
+  align-items: center;
+  gap: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+}
+
+.studio-type-menu__slot .handoff-split:hover {
+  background: var(--mms-surface-tint);
+}
+
+.studio-type-menu__slot .handoff-trigger {
+  display: flex;
+  min-width: 0;
+  min-height: 32px;
+  flex: 1;
+  align-items: center;
+  gap: 9px;
+  padding: 0 7px;
+  border: 0;
+  border-radius: 6px 0 0 6px;
+  background: transparent;
+  color: var(--mms-text);
+  font-size: 10px;
+  text-align: left;
+}
+
+/* Upstream hides the editor name for screen readers only; in a menu the row
+   needs to say what it opens. */
+.studio-type-menu__slot .handoff-trigger .handoff-trigger-label {
+  position: static;
+  overflow: hidden;
+  width: auto;
+  height: auto;
+  clip: auto;
+  clip-path: none;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.studio-type-menu__slot .handoff-caret {
+  display: grid;
+  width: 26px;
+  height: 26px;
+  min-height: 0;
+  flex: 0 0 26px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 0 6px 6px 0;
+  background: transparent;
+  color: var(--mms-text-muted);
+}
+
+.studio-type-menu__slot .handoff-caret:hover {
+  color: var(--mms-text);
+}
+
+/* The tab strip: only the editor list applies in this context. */
+.studio-type-menu__slot .handoff-menu-tabs,
+.studio-type-menu__slot .handoff-menu-error {
+  display: none;
+}
+
+/* The expanded list sits under the split row, still inside the project menu. */
+.studio-type-menu__slot .handoff-menu {
+  margin-top: 2px;
+  padding-top: 2px;
+  border-top: 1px solid var(--mms-border);
+}
+
+.studio-type-menu__slot .handoff-target-group-title {
+  padding: 6px 7px 4px;
+  color: var(--mms-text-muted);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.studio-type-menu__slot .handoff-target-rail {
+  display: grid;
+  gap: 2px;
+}
+
+/* One column: an 18px mark, the name, then the trailing chevron — so every
+   application lines up on the same left edge instead of drifting with its own
+   label width. */
+.studio-type-menu__slot .handoff-target-card,
+.studio-type-menu__slot .handoff-path-button,
+.studio-type-menu__slot .handoff-menu-item {
+  display: grid;
+  width: 100%;
+  min-height: 32px;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  align-items: center;
+  justify-items: start;
+  gap: 9px;
+  padding: 0 7px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--mms-text);
+  font-size: 10px;
+  text-align: left;
+}
+
+.studio-type-menu__slot .handoff-target-card:hover,
+.studio-type-menu__slot .handoff-path-button:hover,
+.studio-type-menu__slot .handoff-menu-item:hover {
+  background: var(--mms-surface-tint);
+}
+
+.studio-type-menu__slot .handoff-target-label,
+.studio-type-menu__slot .handoff-path-button-label {
+  overflow: hidden;
+  min-width: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.studio-type-menu__slot .handoff-target-arrow {
+  justify-self: end;
+  color: var(--mms-text-muted);
+}
+
+/* Brand marks keep their own colour (`variant="flat"` on the component draws
+   the glyph in the app's brand hue); only the filled square is gone. Centred
+   in an 18px cell so the names align. */
+.studio-type-menu__slot .editor-icon {
+  display: grid;
+  width: 18px !important;
+  height: 18px !important;
+  place-items: center;
+  border-radius: 0;
+}
+
+.studio-type-menu__slot .handoff-target-rail--unavailable .handoff-target-card {
+  opacity: 0.6;
+}
+
+/* No ring anywhere in this menu on a pointer press — the caret kept one after
+   being clicked, which read as a stray green box. Keyboard focus still shows,
+   as one quiet tint rather than an outline. */
+.studio-type-menu :focus,
+.studio-type-menu :focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.studio-type-menu :focus-visible {
+  background: var(--mms-surface-tint);
+}
+
+/* Viewport switcher — `styles.css:2211-2283` */
+.studio-screen .viewport-switcher {
+  position: relative;
+  flex: 0 0 auto;
+  align-self: center;
+  border: 1px solid var(--mms-border-strong);
+  border-radius: 7px;
+  background: var(--mms-surface-raised);
+}
+
+.studio-screen .viewport-switcher > summary {
+  display: inline-flex;
+  min-width: 128px;
+  min-height: 34px;
+  align-items: center;
+  gap: 7px;
+  padding: 0 9px;
+  color: var(--mms-text);
+  cursor: pointer;
+  font-weight: 650;
+  list-style: none;
+}
+
+.studio-screen .viewport-switcher > summary::-webkit-details-marker {
+  display: none;
+}
+
+.studio-screen .viewport-switcher > summary .viewport-chevron {
+  margin-left: auto;
+  color: var(--mms-text-muted);
+  font-size: 9px;
+}
+
+/* Inert in the reference — `--mms-focus` is never defined. Kept verbatim. */
+.studio-screen .viewport-switcher[open] > summary {
+  box-shadow: 0 0 0 2px var(--mms-focus);
+}
+
+.studio-screen .viewport-menu {
+  position: absolute;
+  z-index: 90;
+  top: calc(100% + 7px);
+  right: 0;
+  display: grid;
+  width: 210px;
+  overflow: hidden;
+  padding: 5px;
+  border: 1px solid var(--mms-border-strong);
+  border-radius: 8px;
+  background: var(--mms-surface-raised);
+  box-shadow: var(--shadow-menu);
+}
+
+.studio-screen .viewport-menu button {
+  display: grid;
+  min-height: 42px;
+  grid-template-columns: 20px 1fr auto;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--mms-text);
+  text-align: left;
+}
+
+.studio-screen .viewport-menu button small {
+  color: var(--mms-text-muted);
+  font-size: 9px;
+}
+
+.studio-screen .viewport-menu button.active,
+.studio-screen .viewport-menu button:hover {
+  background: var(--mms-surface-green);
+  color: var(--mms-action);
+}
+
+/* Preview toolbar — `styles.css:2153-2368` */
+.studio-screen .preview-toolbar {
+  display: flex;
+  min-width: 0;
+  min-height: 44px;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px;
+  border-bottom: 1px solid var(--mms-border);
+  background: var(--mms-surface);
+  box-shadow: none;
+}
+
+.studio-screen .viewer-left-actions {
+  display: flex;
+  min-width: 0;
+  align-self: stretch;
+  align-items: center;
+}
+
+.studio-screen .viewer-icon-action {
+  display: inline-grid;
+  width: 36px;
+  min-width: 36px;
+  height: 36px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--mms-text-muted);
+}
+
+.studio-screen .viewer-icon-action:hover {
+  background: var(--mms-surface-tint);
+  color: var(--mms-text);
+}
+
+.studio-screen .preview-mode-tabs {
+  display: flex;
+  align-self: stretch;
+}
+
+.studio-screen .preview-mode-tabs button {
+  position: relative;
+  min-width: 62px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--mms-text-muted);
+}
+
+.studio-screen .preview-mode-tabs button.active {
+  color: var(--mms-action);
+  font-weight: 700;
+}
+
+.studio-screen .preview-mode-tabs button.active::after {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 2px;
+  background: var(--mms-action);
+  content: '';
+}
+
+.studio-screen .preview-actions {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 3px;
+  margin-left: auto;
+}
+
+/* `width: auto` and `flex: 0 0 auto` are load-bearing: upstream's
+   `.viewer-action-icon` / `.viewer-comment-count-trigger` pin these buttons to
+   a 30–42px square built for an icon alone. The approved toolbar labels them
+   ("Comment", "Mark", "Edit"), and a label inside a 30px box is what made the
+   two overlap. */
+.studio-screen .preview-actions > button,
+.studio-screen .viewer-more > button {
+  display: inline-flex;
+  width: auto;
+  min-width: 0;
+  min-height: 34px;
+  height: auto;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 0 7px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--mms-text-muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.studio-screen .preview-actions > button > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.studio-screen .preview-actions > button:hover:not(.active),
+.studio-screen .viewer-more > button:hover:not(.active) {
+  background: var(--mms-surface-tint);
+  color: var(--mms-text);
+}
+
+.studio-screen .preview-actions button.active {
+  background: var(--mms-action);
+  color: #fff;
+}
+
+[data-theme='dark'] .studio-screen .preview-actions button.active {
+  color: #001e2d;
+}
+
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme]) .studio-screen .preview-actions button.active {
+    color: #001e2d;
+  }
+}
+
+.studio-screen .preview-actions button.edit-action:not(.active) {
+  border: 1px solid var(--mms-border-strong);
+  color: var(--mms-action);
+}
+
+.studio-screen .preview-actions .comment-count {
+  gap: 4px !important;
+}
+
+.studio-screen .preview-actions .zoom-action {
+  border: 1px solid var(--mms-border) !important;
+}
+
+/* Present / Share / Download inside the ⋮ menu: full-width rows matching the
+   menu's own items rather than the toolbar pills they were drawn as. */
+.studio-screen .viewer-file-actions-host {
+  display: contents;
+}
+
+.studio-screen .viewer-more-menu .present-wrap,
+.studio-screen .viewer-more-menu .chrome-file-action-menus,
+.studio-screen .viewer-more-menu .share-menu {
+  position: relative;
+  display: block;
+  width: 100%;
+}
+
+.studio-screen .viewer-more-menu .chrome-action {
+  display: flex;
+  width: 100%;
+  min-height: 38px;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 9px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--mms-text);
+  font-size: 13px;
+  font-weight: 500;
+  text-align: left;
+}
+
+.studio-screen .viewer-more-menu .chrome-action:hover:not(:disabled) {
+  background: var(--mms-surface-green);
+  color: var(--mms-action);
+}
+
+.studio-screen .viewer-more-menu .chrome-action i,
+.studio-screen .viewer-more-menu .chrome-action svg {
+  flex: 0 0 auto;
+}
+
+.studio-screen .viewer-more {
+  position: relative;
+}
+
+.studio-screen .viewer-more > button {
+  width: 34px;
+  justify-content: center;
+}
+
+.studio-screen .viewer-more-menu {
+  position: absolute;
+  z-index: 100;
+  top: calc(100% + 7px);
+  right: 0;
+  display: grid;
+  width: 210px;
+  align-content: start;
+  padding: 5px;
+  border: 1px solid var(--mms-border-strong);
+  border-radius: 8px;
+  background: var(--mms-surface-raised);
+  box-shadow: var(--shadow-menu);
+}
+
+.studio-screen .viewer-more-menu button,
+.studio-screen .viewer-more-menu .viewer-toolbar-more-item {
+  display: flex;
+  width: 100%;
+  min-height: 38px;
+  align-items: center;
+  gap: 9px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--mms-text);
+  text-align: left;
+}
+
+.studio-screen .viewer-more-menu button:hover:not(:disabled),
+.studio-screen .viewer-more-menu .viewer-toolbar-more-item:hover:not(:disabled) {
+  background: var(--mms-surface-green);
+  color: var(--mms-action);
+}
+
+.studio-screen .viewer-more-menu .viewer-toolbar-more-separator {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--mms-border);
+}
+
+/* Preview stage + frame — `styles.css:2370-2410`.
+   `#001923` and `#fffdf8` are literals in the reference and identical in both
+   themes: the shell theme must never repaint the authored website. */
+.studio-screen .preview-stage {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  align-items: flex-start;
+  justify-content: center;
+  overflow: auto;
+  padding: 10px;
+  background: #001923;
+}
+
+/* Desktop: the wrapper IS the page, so it wears the reference's paper —
+   1px `--mms-border-strong`, radius 6, `#fffdf8`, `--shadow-frame`. */
+.studio-screen .preview-frame.desktop {
+  width: 100%;
+  min-height: 100%;
+  flex: 0 0 auto;
+  overflow: auto;
+  border: 1px solid var(--mms-border-strong);
+  border-radius: 6px;
+  background: #fffdf8;
+  box-shadow: var(--shadow-frame);
+  transition: width 0.18s ease;
+}
+
+/* Tablet / mobile: upstream turns this same wrapper into ITS own stage —
+   24px padding and a checkerboard fill — and puts the page in a nested
+   `.preview-frame-clip`. The Studio already has a stage, so the wrapper is
+   flattened to a transparent centring box and the clip becomes the paper.
+   Without this the canvas showed a padded checkerboard card at those widths
+   instead of the reference's device frame. */
+.studio-screen .preview-stage .preview-viewport:not(.preview-viewport-desktop) {
+  width: 100%;
+  min-height: 100%;
+  align-items: stretch;
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  overflow: visible;
+}
+
+/* Same paper as desktop: 6px corners, the reference's border and shadow — not
+   upstream's 18px (28px on mobile) device-bezel look, and not its heavy drop
+   shadow. And the same HEIGHT as desktop: upstream sizes the frame to the full
+   device height (820 × 1180 / 390 × 844) and scales it down to fit, which left
+   a band of empty canvas under a shrunken page. Here the frame is the device
+   WIDTH at true size and fills the stage vertically, so the site scrolls inside
+   it exactly as it does on desktop — which is all the reference ever specifies
+   (`width: min(100%, 820px)`, `min-height: 100%`). */
+.studio-screen .preview-stage .preview-frame-clip,
+.studio-screen .preview-stage .comment-frame-clip,
+.studio-screen .preview-stage .comment-preview-canvas,
+.studio-screen .preview-stage .manual-edit-canvas {
+  /* `!important` because upstream sets the device height (1180 / 844) and an
+     18px — 28px on mobile — bezel radius from selectors of equal weight. The
+     canvas must not scroll: the frame is exactly the stage's height and the
+     site scrolls inside it, as it does on desktop. */
+  width: min(100%, var(--preview-viewport-width, 100%)) !important;
+  height: 100% !important;
+  max-height: 100% !important;
+  align-self: stretch;
+  border: 1px solid var(--mms-border-strong);
+  border-radius: 6px !important;
+  background: #fffdf8;
+  box-shadow: var(--shadow-frame) !important;
+  transition: width 0.18s ease;
+}
+
+/* `--preview-scale` drives both the width/height calc and the inner
+   `transform: scale(...)`. Pinning it to 1 is what makes the device preview
+   true-size; the inline value upstream computes is a fit-to-stage shrink the
+   reference does not do. */
+.studio-screen .preview-stage .preview-viewport:not(.preview-viewport-desktop) {
+  --preview-scale: 1 !important;
+}
+
+.studio-screen .preview-stage .preview-frame-clip > div,
+.studio-screen .preview-stage .comment-frame-clip > div,
+.studio-screen .preview-stage .comment-preview-canvas > div,
+.studio-screen .preview-stage .manual-edit-canvas > div {
+  width: 100% !important;
+  height: 100% !important;
+  transform: none !important;
+}
+
+.studio-screen .preview-stage iframe {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* Nothing overflows the stage now, so it never grows its own scrollbar. */
+.studio-screen .preview-stage {
+  overflow: hidden;
+}
+
+.studio-screen .preview-frame iframe {
+  display: block;
+  border: 0;
+  background: transparent;
+}
+
+/* Switching files paints a skeleton before the next preview mounts. The stage
+   centres and top-aligns its child, which cropped that skeleton down the
+   middle — it is not a page, it is a full-bleed placeholder, so it stretches
+   to the stage and centres its own contents. */
+.studio-screen .preview-stage > .viewer-loading,
+.studio-screen .preview-stage > .viewer-empty {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  min-height: 100%;
+  flex: 1 1 auto;
+  align-items: center;
+  align-self: stretch;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--mms-surface) 55%, transparent);
+}
+
+.studio-screen .preview-stage > .viewer-loading .viewer-loading-stage {
+  max-width: 100%;
+  max-height: 100%;
+}
+
+/* ── Design Files column — `styles.css:2490-2567` ────────────────────────── */
+.studio-screen .file-search {
+  display: flex;
+  min-height: 43px;
+  align-items: center;
+  gap: 9px;
+  margin: 13px 11px 9px;
+  padding: 0 12px;
+  border: 1px solid var(--mms-border-strong);
+  border-radius: 6px;
+  color: var(--mms-text-muted);
+}
+
+.studio-screen .file-search input {
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--mms-text);
+}
+
+.studio-screen .file-tree {
+  min-height: 0;
+  align-content: start;
+  overflow-y: auto;
+  padding: 2px 10px;
+}
+
+/* Name and kebab are ONE row: the wrapper owns the border, the fill and the
+   hover, so the two never read as separate controls. The reference's
+   four-column grid lives on the label button inside it. */
+.studio-screen .file-tree-row {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  padding-right: 4px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  color: var(--mms-text-muted);
+}
+
+.studio-screen .file-tree-row:hover,
+.studio-screen .file-tree-row:focus-within {
+  background: var(--mms-surface-tint);
+  color: var(--mms-text);
+}
+
+.studio-screen .file-tree-row:has(> button:first-child.selected) {
+  border-color: color-mix(in srgb, var(--mms-action) 32%, var(--mms-border));
+  background: var(--mms-surface-tint);
+  color: var(--mms-text);
+}
+
+.studio-screen .file-tree-row > button:first-child {
+  display: grid;
+  min-width: 0;
+  min-height: 37px;
+  flex: 1;
+  grid-template-columns: 13px 20px minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+  padding: 0 4px 0 calc(8px + var(--file-level) * 14px);
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+
+.studio-screen .file-tree-row > button:first-child > span:not(.tree-chevron) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The kebab only appears once the row is engaged, so a long list stays quiet. */
+.studio-screen .file-menu-icon {
+  opacity: 0;
+}
+
+.studio-screen .file-tree-row:hover .file-menu-icon,
+.studio-screen .file-tree-row:focus-within .file-menu-icon,
+.studio-screen .file-menu-icon[aria-expanded='true'] {
+  opacity: 1;
+}
+
+.studio-screen .tree-chevron {
+  width: 11px;
+  font-size: 7px;
+}
+
+.studio-screen .file-menu-icon {
+  display: inline-grid;
+  width: 20px;
+  height: 20px;
+  min-height: 0;
+  flex: 0 0 20px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--mms-text-muted);
+  cursor: pointer;
+}
+
+.studio-screen .file-menu-icon:hover,
+.studio-screen .file-menu-icon[aria-expanded='true'] {
+  background: color-mix(in srgb, var(--mms-text) 10%, transparent);
+  color: var(--mms-text);
+}
+
+/* Portalled to `document.body` — the tree scrolls, so an absolutely-positioned
+   menu inside it would be clipped. */
+.studio-file-row-menu {
+  position: fixed;
+  z-index: 220;
+  display: grid;
+  width: 168px;
+  align-content: start;
+  gap: 2px;
+  padding: 5px;
+  border: 1px solid var(--mms-border-strong);
+  border-radius: 8px;
+  background: var(--mms-surface-raised);
+  box-shadow: var(--shadow-menu);
+  color: var(--mms-text);
+  font-family: var(--sans);
+}
+
+.studio-file-row-menu button {
+  display: flex;
+  width: 100%;
+  min-height: 32px;
+  align-items: center;
+  gap: 9px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--mms-text);
+  font-size: 11px;
+  text-align: left;
+}
+
+.studio-file-row-menu button:hover {
+  background: var(--mms-surface-tint);
+}
+
+.studio-file-row-menu button > i {
+  color: var(--mms-action);
+}
+
+.studio-file-row-menu button.danger,
+.studio-file-row-menu button.danger > i {
+  color: var(--mms-danger);
+}
+
+.studio-file-row-menu button.danger:hover {
+  background: color-mix(in srgb, var(--mms-danger) 12%, transparent);
+}
+
+.studio-screen .file-tree-empty {
+  padding: 18px 10px;
+  color: var(--mms-text-muted);
+  font-size: 11px;
+  text-align: center;
+}
+
+.studio-screen .file-actions {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+}
+
+.studio-screen .file-actions button {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  border: 1px solid var(--mms-border-strong);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--mms-text);
+}
+
+.studio-screen .file-actions button:hover {
+  background: var(--mms-surface-tint);
+}
+
+.studio-screen .file-actions button:first-child {
+  border-color: var(--mms-action);
+  color: var(--mms-action-strong);
+}
+
+/* ── Share-to-CMS dialog — `styles.css:3805-3869, 4158-4178, 508-518` ────── */
+.studio-modal-backdrop {
+  position: fixed;
+  z-index: 200;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgb(0 20 29 / 58%);
+  backdrop-filter: blur(3px);
+}
+
+.studio-share-dialog {
+  position: relative;
+  width: min(520px, 100%);
+  padding: 33px 34px 26px;
+  border: 1px solid var(--mms-border-strong);
+  border-radius: 10px;
+  background: var(--mms-surface);
+  box-shadow: var(--shadow-menu);
+  color: var(--mms-text);
+  font-family: var(--sans);
+  font-size: 13px;
+  text-align: center;
+}
+
+.studio-share-dialog .dialog-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--mms-text-muted);
+}
+
+.studio-share-dialog .dialog-close:hover {
+  background: var(--mms-surface-tint);
+  color: var(--mms-text);
+}
+
+.studio-share-dialog .dialog-icon {
+  display: grid;
+  width: 58px;
+  height: 58px;
+  margin: 0 auto 18px;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--mms-surface-green);
+  color: var(--mms-action);
+  font-size: 22px;
+}
+
+.studio-share-dialog .dialog-eyebrow {
+  margin: 0 0 8px;
+  color: var(--mms-action-strong);
+  font-size: 10px;
+  font-weight: 780;
+  letter-spacing: 0.14em;
+}
+
+.studio-share-dialog h2 {
+  margin: 0 0 13px;
+  font-size: 23px;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+}
+
+.studio-share-dialog > p:not(.dialog-eyebrow) {
+  max-width: 410px;
+  margin: 0 auto;
+  color: var(--mms-text-muted);
+  line-height: 1.6;
+}
+
+/* The prototype had no live gate, so it had no reason to print. This carries
+   the daemon's real message in the same measure, one step quieter. */
+.studio-share-dialog__reason {
+  margin-top: 12px !important;
+  padding: 10px 12px;
+  border: 1px solid var(--mms-border);
+  border-radius: 8px;
+  background: var(--mms-surface-tint);
+  font-size: 11px;
+  text-align: left;
+  white-space: pre-wrap;
+}
+
+.studio-share-dialog .dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 28px;
+}
+
+.studio-share-dialog .dialog-actions button {
+  min-width: 105px;
+  min-height: 42px;
+  border: 1px solid var(--mms-border-strong);
+  border-radius: 6px;
+  background: var(--mms-surface-raised);
+  color: var(--mms-text);
+}
+
+.studio-share-dialog .dialog-actions button.primary-button {
+  border-color: var(--mms-action);
+  background: var(--mms-action);
+  color: #fff;
+  font-weight: 680;
+}
+
+[data-theme='dark'] .studio-share-dialog .dialog-actions button.primary-button {
+  color: #001e2d;
+}
+
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme]) .studio-share-dialog .dialog-actions button.primary-button {
+    color: #001e2d;
+  }
+}
+
+/* ── Toast — `styles.css:4180-4200` ──────────────────────────────────────── */
+.studio-root .od-toast {
+  min-height: 48px;
+  gap: 9px;
+  padding: 0 16px;
+  border: 1px solid var(--mms-border-strong);
+  border-radius: 8px;
+  background: var(--mms-surface-raised);
+  box-shadow: var(--shadow-menu);
+  color: var(--mms-text);
+  font-weight: 650;
+}
+
+/* ── Mobile dock — `styles.css:4202-4204`, shown only ≤1100px ────────────── */
+.studio-screen .mobile-dock {
+  display: none;
+}
+
+/* ── Animation — `styles.css:1600-1603, 1807-1810` ───────────────────────── */
+@keyframes chat-message-enter {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes chat-working-dot {
+  0%,
+  70%,
+  100% {
+    opacity: 0.28;
+    transform: translateY(0);
+  }
+
+  35% {
+    opacity: 1;
+    transform: translateY(-3px);
+  }
+}
+
+@media (hover: none) {
+  .studio-screen .user-actions,
+  .studio-screen .chat-message-rail,
+  .studio-screen .chat-conv-item-delete {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .studio-screen .chat-log > .msg,
+  .studio-screen .assistant-working > span {
+    animation: none;
+  }
+}
+
+/* ===========================================================================
+ * Responsive — the reference's ladder, breakpoint for breakpoint.
+ * =========================================================================== */
+
+/* `styles.css:4206-4252` */
+@media (max-width: 1399px) {
+  .studio-screen .preview-toolbar {
+    gap: 8px;
+  }
+
+  .studio-screen .preview-actions button {
+    padding: 0 7px;
+  }
+}
+
+/* `styles.css:4295-4496` — matches the JS `isCompact` breakpoint exactly. */
+@media (max-width: 1100px) {
+  .studio-screen .project-toolbar {
+    min-height: auto;
+    flex-wrap: wrap;
+    margin: 10px 12px;
+  }
+
+  .studio-screen .project-title {
+    min-width: 0;
+  }
+
+  .studio-screen .project-toolbar-controls {
+    min-width: 100%;
+    justify-content: flex-start;
+    overflow-x: auto;
+    padding-bottom: 2px;
+  }
+
+  .studio-screen .project-toolbar-controls .select-button {
+    min-width: auto;
+  }
+
+  .studio-screen .runtime-button {
+    min-width: auto;
+  }
+
+  /* Stacked: the canvas is the only column, so the screen scrolls rather than
+     the workbench holding a fixed height. */
+  .studio-screen {
+    overflow-y: auto;
+  }
+
+  .studio-screen .studio-grid {
+    display: block;
+    height: auto;
+    min-height: 0;
+    flex: 1;
+    margin: 0 12px 74px;
+  }
+
+  .studio-screen .fluid-workbench {
+    overflow: visible;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+  }
+
+  .studio-screen .fluid-workbench > .chat-panel,
+  .studio-screen .fluid-workbench > .file-workspace,
+  .studio-screen .fluid-workbench > .design-files-panel {
+    border: 1px solid var(--mms-border);
+    border-radius: 8px;
+  }
+
+  .studio-screen .studio-resize-handle {
+    display: none;
+  }
+
+  .studio-screen .chat-panel,
+  .studio-screen .design-files-panel {
+    display: none;
+  }
+
+  .studio-screen .chat-panel.mobile-open,
+  .studio-screen .design-files-panel.mobile-open {
+    position: fixed;
+    z-index: 120;
+    top: calc(var(--shell-height) + var(--context-height) + 10px);
+    right: 10px;
+    bottom: 72px;
+    left: 10px;
+    display: grid;
+    box-shadow: var(--shadow-menu);
+  }
+
+  .studio-screen .chat-panel.mobile-open {
+    background: var(--mms-surface);
+  }
+
+  .studio-screen .file-workspace {
+    height: 100%;
+  }
+
+  .studio-screen .mobile-dock {
+    position: fixed;
+    z-index: 90;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    display: grid;
+    height: 62px;
+    grid-template-columns: repeat(4, 1fr);
+    border-top: 1px solid var(--mms-border-strong);
+    background: var(--mms-surface-raised);
+  }
+
+  .studio-screen .mobile-dock button {
+    display: grid;
+    min-height: 62px;
+    place-content: center;
+    gap: 5px;
+    border: 0;
+    background: transparent;
+    color: var(--mms-text-muted);
+    font-size: 10px;
+  }
+
+  .studio-screen .mobile-dock button.active {
+    color: var(--mms-action);
+  }
+}
+
+/* `styles.css:4498-4765` (Studio subset) */
+@media (max-width: 760px) {
+  .studio-screen .project-toolbar {
+    padding: 8px;
+  }
+
+  .studio-screen .project-title strong {
+    font-size: 15px;
+  }
+
+  .studio-screen .project-toolbar-controls .select-button:nth-child(2) {
+    display: none;
+  }
+
+  .studio-screen .share-cms-button {
+    min-width: 48px;
+    font-size: 0;
+  }
+
+  .studio-screen .share-cms-button i,
+  .studio-screen .share-cms-button svg {
+    font-size: 13px;
+  }
+
+  .studio-screen .file-workspace {
+    grid-template-rows: 42px minmax(0, 1fr);
+  }
+
+  .studio-screen .file-workspace .viewer {
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  .studio-screen .preview-toolbar {
+    flex-wrap: nowrap;
+    gap: 4px;
+    padding: 3px 5px;
+  }
+
+  .studio-screen .preview-actions {
+    width: auto;
+    overflow: visible;
+    margin-left: auto;
+  }
+
+  .studio-screen .preview-actions button {
+    flex: 0 0 auto;
+  }
+
+  .studio-screen .preview-stage {
+    padding: 6px;
+  }
+
+  .studio-screen .file-tabs .ws-tab {
+    min-width: 110px;
+  }
+
+  .studio-screen .file-tabs .ws-tab-add {
+    min-width: 42px;
+    width: 42px;
+  }
+
+  .studio-screen .viewport-switcher > summary {
+    min-width: 42px;
+    justify-content: center;
+    padding: 0 8px;
+  }
+
+  .studio-screen .viewport-switcher > summary > span,
+  .studio-screen .viewport-switcher > summary .viewport-chevron {
+    display: none;
+  }
+
+  .studio-screen .preview-actions .comment-count,
+  .studio-screen .preview-actions .zoom-action {
+    display: none;
+  }
+
+  .studio-screen .preview-mode-tabs button {
+    min-width: 56px;
+  }
+}
+
+/* `styles.css:4767-4780` */
+@media (max-width: 600px) {
+  .studio-screen .preview-actions > button:not(.edit-action) {
+    display: none;
+  }
+
+  .studio-screen .preview-mode-tabs button {
+    min-width: 50px;
+  }
+}

@@ -37,5 +37,10 @@
 @import './styles/viewer/routines.css';
 @import './styles/modal-window-drag.css';
 @import './styles/entrance.css';
+/* The Studio skin re-scopes chat.css / workspace/drawer.css / viewer/core.css
+   onto the approved MMSBUILD `#/studio` geometry, so it has to be imported
+   AFTER all three. Every selector in it is anchored on `.studio-screen`, so it
+   cannot reach any other route. */
+@import './styles/studio.css';
 @import './styles/mms-shell-host.css';
 @import './styles/mms-overrides.css';

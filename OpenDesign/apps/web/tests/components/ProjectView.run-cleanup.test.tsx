@@ -1143,7 +1143,9 @@ describe('ProjectView daemon cleanup', () => {
       });
       expect(toast.textContent).not.toContain('chat.brandBrowserAssistDownloadGuideDetails');
       expect(toast.closest('.project-actions-toast-anchor')).toBeTruthy();
-      expect(toast.closest('.split-chat-slot')).toBeTruthy();
+      // The Studio rebuild dropped `.split-chat-slot`; the chat pane IS the
+      // workbench's first grid track now (`.chat-panel`).
+      expect(toast.closest('.chat-panel')).toBeTruthy();
       expect(toast.closest('.chat-log-wrap')?.className).toContain('has-chat-log-tray');
     } finally {
       registerBrandBrowser('brand-project', BRAND_BROWSER_TAB_ID, null);

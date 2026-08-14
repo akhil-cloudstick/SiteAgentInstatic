@@ -1,0 +1,1422 @@
+/* Design systems screen — a reproduction of the approved MMSBUILD reference
+ * `#/design-systems` (`prototype-reference/src/DesignSystemsScreen.jsx`).
+ *
+ * Every declaration below is copied from the reference stylesheets at the line
+ * ranges noted per block; only the selector names changed (global class ->
+ * CSS Module, per this repo's `Web CSS ownership` rule). Values are NOT
+ * approximations — if a number here disagrees with the reference, the reference
+ * wins and this file is the bug.
+ *
+ * NOT here, deliberately:
+ *  - the handoff band and the inherited-context drawer, already transcribed for
+ *    the Start Desk (`start-desk/context-surfaces.css`) and rendered as shared
+ *    components rather than re-copied;
+ *  - the create dialog, which portals to <body> and therefore owns its own
+ *    token/---font block (`CreateDesignSystemDialog.module.css`).
+ *
+ * Sources:
+ *   styles.css           4841-4997  .catalog-screen / -page-head / -kicker
+ *                                   / -primary-action / -scope-row / -search
+ *   styles.css           4999-5122  .ds-library-shell / -system-list / -list-mark
+ *                                   / -row-palette / -list-copy / -status-dot
+ *   styles.css           5124-5273  .ds-system-preview / -detail-head / -detail-mark
+ *                                   / -title-line / -detail-actions / .icon-button
+ *                                   / .publish-toggle
+ *   styles.css           5275-5335  .catalog-menu-wrap / .catalog-popover
+ *   styles.css           5337-5517  .ds-detail-scroll / .ds-module / -package-strip
+ *                                   / -large-palette / -type-specimen / .tone-chips
+ *                                   / .imagery-rule
+ *   styles.css           5519-5551  .catalog-empty
+ *   styles.css            508-518   .primary-button
+ *   styles.css             78-83    focus ring
+ *   styles.css           6675-7039  responsive tiers 1180 / 900 / 760 / 520
+ *   project-context.css   654-706   .ds-provenance-flow
+ *   project-context.css   761-770   .ds-provenance-flow responsive
+ *   resource-screens.css  177-215   .plugin-scope-tabs / .plugin-category-row
+ *                                   (the secondary filter row)
+ */
+
+/* ── Screen ───────────────────────────────────────────────────────────────
+ * The reference sets `font-size: 13px` on :root and several elements here (the
+ * primary action, scope tabs, module body copy, popover items) declare no size
+ * of their own and inherit it. This app's body is 13.5px, so the reference's
+ * root size is re-established on the screen root rather than globally —
+ * changing base.css would move every other page in the product.
+ *
+ * `--shell-height` / `--context-height` in the reference are this app's
+ * `--hub-shell-height` (61px) / `--product-row-height` (54px).
+ *
+ * The three token declarations are the only values the reference keeps in
+ * `:root` that `@mms/shell` does not ship:
+ *   --shadow-frame  does not exist in the shared layer at all;
+ *   --shadow-menu   exists as `--mms-shadow-menu`, whose LIGHT value is
+ *                   identical but whose dark value differs from the reference;
+ *   --mms-danger    the shared layer deliberately does not flip danger between
+ *                   themes (documented decision in tokens.css) while the
+ *                   reference does. Scoped here so this screen is exact without
+ *                   moving a system-wide decision.
+ */
+.screen {
+    --shadow-frame: 0 4px 16px rgb(8 39 49 / 8%);
+    --shadow-menu: 0 18px 48px rgb(8 39 49 / 16%);
+
+    min-height: calc(100vh - var(--hub-shell-height) - var(--product-row-height));
+    padding: 34px 48px 64px;
+    background: var(--mms-workspace);
+    color: var(--mms-text);
+    font-family: var(--font-mms);
+    font-size: 13px;
+}
+
+:global([data-theme='dark']) .screen {
+    --shadow-frame: 0 6px 20px rgb(0 8 12 / 24%);
+    --shadow-menu: 0 20px 52px rgb(0 8 12 / 38%);
+    --mms-danger: #ff8d7f;
+}
+
+/* ── Local reset ──────────────────────────────────────────────────────────
+ * `styles/primitives.css` styles bare `button` / `input` / `textarea` /
+ * `select` globally (panel background, 1px border, radius, padding, accent
+ * focus ring). The reference gives those elements no chrome at all — every
+ * control here paints its own — so the global chrome has to come off first or
+ * each class below would be fighting it declaration by declaration.
+ *
+ * SPECIFICITY IS THE WHOLE TRICK HERE, in both directions:
+ *
+ *  - it must OUTRANK primitives, whose rules are element-level: `button`
+ *    (0,0,1), `button:hover:not(:disabled)` (0,2,1), `button:focus-visible`
+ *    (0,1,1);
+ *  - it must UNDERRANK the component classes below it, or `padding: 0` would
+ *    flatten `.scopeTab`'s `0 13px`, `border-radius: 0` would square the
+ *    buttons and `font: inherit` would drop every non-standard weight.
+ *
+ * `:where()` contributes nothing, so `.screen :where(button)` is (0,1,0):
+ * one class beats primitives' bare element, and it ties the single-class
+ * component rules — which are all declared after it and therefore win on
+ * source order, the way a reset is supposed to lose. The hover and focus
+ * variants add pseudo-classes inside `:where()`'s scope only, keeping the same
+ * relationship at each tier.
+ */
+.screen :where(button, input, textarea, select) {
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    transition: none;
+}
+
+.screen :where(button, select) {
+    cursor: pointer;
+}
+
+.screen :where(button):hover:not(:disabled) {
+    border-color: transparent;
+    background: transparent;
+}
+
+/* Primitives paints an accent ring on `:focus` for inputs; the reference draws
+   nothing until `:focus-visible`, so the `:focus` ring is cleared first and the
+   reference's own halo is applied after (order matters — same specificity). */
+.screen :where(button, input, textarea, select):focus {
+    outline: none;
+    box-shadow: none;
+}
+
+/* The reference's one global interaction rule — styles.css 78-83, except for
+   its colour: the gold halo was rejected in review, so the shared
+   `--mms-focus-ring` token carries the replacement (see @mms/shell tokens.css).
+   `outline: none` is part of the rule, not an accessibility slip — the ring
+   replaces the outline. */
+.screen :where(button, input, textarea, select):focus-visible {
+    outline: none;
+    box-shadow: var(--mms-focus-ring);
+}
+
+/* ── Page head — styles.css 4847-4906 ─────────────────────────────────── */
+.pageHead {
+    display: flex;
+    max-width: 1440px;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 28px;
+    margin: 0 auto 24px;
+}
+
+.kicker {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    margin: 0;
+    color: var(--mms-action-strong);
+    font-size: 10px;
+    font-weight: 820;
+    letter-spacing: 0.14em;
+}
+
+.pageHead h1 {
+    margin: 5px 0 7px;
+    color: var(--mms-text);
+    font-size: clamp(28px, 3vw, 38px);
+    font-weight: 780;
+    letter-spacing: -0.04em;
+}
+
+.pageHeadSub {
+    margin: 0;
+    color: var(--mms-text-muted);
+    font-size: 14px;
+}
+
+.primaryAction {
+    display: inline-flex;
+    min-height: 42px;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
+    padding: 0 17px;
+    border: 1px solid var(--mms-action);
+    border-radius: 7px;
+    background: var(--mms-action);
+    color: #fff;
+    font-weight: 720;
+}
+
+:global([data-theme='dark']) .primaryAction {
+    color: #001e2d;
+}
+
+.screen .primaryAction:hover:not(:disabled),
+.primaryAction:focus-visible {
+    border-color: var(--mms-action-strong);
+    background: var(--mms-action-strong);
+}
+
+/* The reference's `.context-handoff-band.compact` bottom margin (20px) rather
+   than the Start Desk's 18px. One declaration, so the band component stays
+   shared instead of forking. */
+.handoffCompact {
+    width: 100%;
+    margin-bottom: 20px;
+}
+
+/* ── Scope row — styles.css 4908-4997 ─────────────────────────────────── */
+.scopeRow {
+    display: flex;
+    max-width: 1440px;
+    min-height: 52px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    margin: 0 auto;
+    padding: 0 4px;
+    border-bottom: 1px solid var(--mms-border);
+}
+
+.scopeTabs {
+    display: flex;
+    min-width: 0;
+    align-items: stretch;
+    gap: 3px;
+}
+
+.scopeTab {
+    display: inline-flex;
+    min-height: 40px;
+    align-items: center;
+    gap: 8px;
+    padding: 0 13px;
+    border-radius: 6px 6px 0 0;
+    color: var(--mms-text-muted);
+    font-weight: 650;
+    white-space: nowrap;
+}
+
+.scopeCount {
+    display: grid;
+    min-width: 22px;
+    height: 22px;
+    padding: 0 6px;
+    place-items: center;
+    border-radius: 11px;
+    background: var(--mms-surface-tint);
+    color: var(--mms-text-muted);
+    font-size: 10px;
+}
+
+.scopeTabActive {
+    position: relative;
+    color: var(--mms-action-strong);
+}
+
+.scopeTabActive::after {
+    position: absolute;
+    right: 10px;
+    bottom: -1px;
+    left: 10px;
+    height: 3px;
+    border-radius: 2px 2px 0 0;
+    background: var(--mms-action);
+    content: '';
+}
+
+.search {
+    display: flex;
+    width: min(310px, 32vw);
+    min-height: 38px;
+    align-items: center;
+    gap: 9px;
+    padding: 0 12px;
+    border: 1px solid var(--mms-border-strong);
+    border-radius: 7px;
+    background: var(--mms-surface);
+    color: var(--mms-text-muted);
+}
+
+.screen .searchInput {
+    width: 100%;
+    min-width: 0;
+    outline: 0;
+    background: transparent;
+    color: var(--mms-text);
+}
+
+.screen .searchInput::placeholder {
+    color: var(--mms-text-muted);
+}
+
+/* ── Secondary filter row (this app only) ─────────────────────────────────
+ * Surface pills + the category select have no counterpart on the reference
+ * design-systems screen, but they are existing product filters and are not
+ * being dropped. Their chrome is taken from the reference's OWN filter row on
+ * the Plugins/Integrations screens (resource-screens.css 177-215) so they read
+ * as the same design language rather than as an invention: same 34px chip,
+ * same 7px radius, same green active treatment, same hairline separator above.
+ */
+/* The surface-chip row (`.filterRow` / `.filterChip*`) was removed with its
+   markup: every shipped preset is a `web` surface, so the row offered one
+   meaningful chip whose count always equalled `All`'s. */
+
+/* ── Category filter (CustomSelect) ───────────────────────────────────────
+ * A native `<select>` would be simpler, but its popup is an OS widget: CSS
+ * cannot reach the scrollbar inside it, so an open category menu showed the
+ * default 17px slab next to this screen's slim pill. `CustomSelect` renders the
+ * menu as real DOM, which is what makes `.categorySelectMenu` below possible.
+ *
+ * These two rules restyle `@open-design/components`' `.od-select-*` defaults,
+ * which are drawn from the app-alias token layer (`--bg-panel`, `--selected`
+ * orange). The trigger keeps its specificity from `.screen`; the MENU portals
+ * to `<body>`, outside `.screen`, so it doubles its own class instead.
+ */
+.screen .categorySelectTrigger {
+    min-height: 34px;
+    padding: 0 10px;
+    border: 1px solid var(--mms-border-strong);
+    border-radius: 7px;
+    background: var(--mms-surface);
+    color: var(--mms-text);
+    font-size: 10px;
+}
+
+.screen .categorySelectTrigger:hover:not(:disabled),
+.screen .categorySelectTrigger[aria-expanded='true'] {
+    border-color: var(--mms-action);
+    background: var(--mms-surface);
+}
+
+/* No orange halo — this screen has no focus ring; a border tint is the cue. */
+.screen .categorySelectTrigger:focus-visible,
+.screen .categorySelectTrigger[aria-expanded='true'] {
+    outline: none;
+    border-color: var(--mms-action);
+    box-shadow: none;
+}
+
+.screen .categorySelectTrigger :global(.od-select-value) {
+    font-size: 10px;
+}
+
+.categorySelectMenu.categorySelectMenu {
+    padding: 6px;
+    border: 1px solid var(--mms-border-strong);
+    border-radius: 9px;
+    background: var(--mms-surface-raised);
+    box-shadow: var(--shadow-menu);
+    /* Same slim pill as `.list` below — the whole point of the swap. */
+    scrollbar-width: thin;
+    scrollbar-color: var(--mms-border-strong) transparent;
+}
+
+.categorySelectMenu.categorySelectMenu::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+.categorySelectMenu.categorySelectMenu::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.categorySelectMenu.categorySelectMenu::-webkit-scrollbar-thumb {
+    border: 3px solid transparent;
+    border-radius: 999px;
+    background-clip: content-box;
+    background-color: var(--mms-border-strong);
+}
+
+.categorySelectMenu.categorySelectMenu::-webkit-scrollbar-thumb:hover {
+    background-color: color-mix(in srgb, var(--mms-text-muted) 55%, var(--mms-border-strong));
+}
+
+.categorySelectMenu.categorySelectMenu :global(.od-select-option) {
+    min-height: 32px;
+    border-radius: 6px;
+    color: var(--mms-text);
+    font-size: 11px;
+}
+
+.categorySelectMenu.categorySelectMenu :global(.od-select-option:hover:not(:disabled)),
+.categorySelectMenu.categorySelectMenu :global(.od-select-option.active:not(:disabled)) {
+    background: var(--mms-surface-tint);
+}
+
+.categorySelectMenu.categorySelectMenu :global(.od-select-option.selected) {
+    background: var(--mms-surface-green);
+    color: var(--mms-action-strong);
+    font-weight: 700;
+}
+
+/* ── Scrollbars ───────────────────────────────────────────────────────────
+ * Every scroller on this screen uses the same slim pill the Projects panel
+ * uses, rather than the OS default — a 17px grey slab reads as foreign on both
+ * the cream and the navy canvas. `background-clip: content-box` keeps the
+ * transparent border as breathing room so the thumb sits inset from the edge.
+ */
+.list,
+.popover {
+    scrollbar-width: thin;
+    scrollbar-color: var(--mms-border-strong) transparent;
+}
+
+.list::-webkit-scrollbar,
+.popover::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+.list::-webkit-scrollbar-track,
+.popover::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.list::-webkit-scrollbar-thumb,
+.popover::-webkit-scrollbar-thumb {
+    border: 3px solid transparent;
+    border-radius: 999px;
+    background-clip: content-box;
+    background-color: var(--mms-border-strong);
+}
+
+.list::-webkit-scrollbar-thumb:hover,
+.popover::-webkit-scrollbar-thumb:hover {
+    background-color: var(--mms-action);
+}
+
+/* ── Library shell — styles.css 4999-5018 ─────────────────────────────── */
+.shell {
+    display: grid;
+    max-width: 1440px;
+    min-height: 650px;
+    grid-template-columns: 304px minmax(0, 1fr);
+    margin: 18px auto 0;
+    overflow: clip;
+    border: 1px solid var(--mms-border-strong);
+    border-radius: 10px;
+    background: var(--mms-surface-raised);
+    box-shadow: var(--shadow-frame);
+}
+
+/* ── Loading progress bar ─────────────────────────────────────────────────
+ * Transcribed from `ProjectsScreen.module.css` so the two screens read as one
+ * product: same 4px track, same 45%-wide feathered segment, same 1.9s linear
+ * sweep. Do not "improve" the timing here in isolation — if it changes, it
+ * changes in both files.
+ *
+ * It spans both shell columns so the whole card reads as loading, and it sits
+ * ABOVE the list and preview (row 1 of the grid) so it stays put while the rows
+ * below it fill in.
+ */
+.progressTrack {
+    position: relative;
+    height: 4px;
+    grid-column: 1 / -1;
+    overflow: hidden;
+    background: color-mix(in srgb, var(--mms-text) 12%, transparent);
+}
+
+/* Three things make this read as a smooth glide rather than a flicker:
+ *  - `transform`, not `left`: a transform is composited, so the motion is even
+ *    under load;
+ *  - `linear`, not an ease: an accelerating curve on a short sweep crawls at
+ *    the edges and shoots across the middle, which reads as a flick;
+ *  - feathered ENDS only: colour holds solid across the middle 56% so a 4px bar
+ *    still reads as coloured.
+ */
+.progressTrack::after {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 45%;
+    border-radius: 999px;
+    background: linear-gradient(
+        90deg,
+        transparent 0%,
+        var(--mms-action) 22%,
+        var(--mms-action) 78%,
+        transparent 100%
+    );
+    animation: design-systems-progress-sweep 1.9s linear infinite;
+    content: '';
+    will-change: transform;
+}
+
+/* Translation is a percentage of the segment's own width (45% of the track),
+   so -100% parks it fully off the left edge and 223% clears the right. */
+@keyframes design-systems-progress-sweep {
+    from {
+        transform: translateX(-100%);
+    }
+    to {
+        transform: translateX(223%);
+    }
+}
+
+.list {
+    max-height: 740px;
+    overflow: auto;
+    padding: 8px;
+    border-right: 1px solid var(--mms-border);
+    background: color-mix(in srgb, var(--mms-surface-tint) 50%, var(--mms-surface));
+}
+
+/* ── Category filter, pinned to the top of the list ───────────────────────
+ * It scopes THIS list, so it leads the column it filters — and it stays put
+ * while 151 presets scroll under it.
+ *
+ * `.list` is the scroll container and carries 8px of padding. A plain
+ * `position: sticky; top: 0` would pin the control at the padding's inner edge
+ * and leave an 8px transparent strip above it through which rows would be seen
+ * sliding past. The negative margins bleed the wrapper out over that padding on
+ * three sides and the padding puts the spacing back inside, so the wrapper's
+ * own background covers the full width of the scrollport.
+ */
+.listFilter {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    margin: -8px -8px 6px;
+    padding: 8px 8px 6px;
+    /* `.list`'s own background, or rows would show through the wrapper. */
+    background: color-mix(in srgb, var(--mms-surface-tint) 50%, var(--mms-surface));
+}
+
+/* ── List row — styles.css 5020-5122 ──────────────────────────────────── */
+.row {
+    display: grid;
+    width: 100%;
+    min-height: 76px;
+    grid-template-columns: 42px minmax(0, 1fr) 12px;
+    align-items: center;
+    gap: 11px;
+    margin-bottom: 4px;
+    padding: 9px 10px;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--mms-text);
+    text-align: left;
+}
+
+.screen .row:hover:not(:disabled) {
+    background: var(--mms-surface-tint);
+}
+
+.screen .rowActive,
+.screen .rowActive:hover:not(:disabled) {
+    border-color: color-mix(in srgb, var(--mms-action) 55%, var(--mms-border));
+    background: var(--mms-surface-green);
+}
+
+.rowMark {
+    display: grid;
+    width: 42px;
+    height: 42px;
+    overflow: hidden;
+    place-items: stretch;
+    border: 1px solid var(--mms-border-strong);
+    border-radius: 8px;
+    background: var(--mms-surface-raised);
+}
+
+.rowPalette {
+    display: grid;
+    width: 100%;
+    min-height: 32px;
+    overflow: hidden;
+    border-radius: 6px;
+}
+
+.rowPaletteCompact {
+    height: 100%;
+    border-radius: 0;
+}
+
+.rowCopy {
+    display: grid;
+    min-width: 0;
+    gap: 5px;
+}
+
+.rowTitle {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 6px;
+    overflow: hidden;
+    font-size: 12px;
+    font-weight: 730;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* The title itself has to carry the ellipsis, not just the flex row: without
+   `min-width: 0` on the text node a long system name pushes the badge out of
+   the 1fr track instead of truncating. */
+.rowTitleText {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.rowBadge,
+.titleBadge {
+    display: inline-flex;
+    min-height: 20px;
+    flex: 0 0 auto;
+    align-items: center;
+    padding: 0 7px;
+    border: 1px solid color-mix(in srgb, var(--mms-action) 45%, var(--mms-border));
+    border-radius: 10px;
+    background: var(--mms-surface-green);
+    color: var(--mms-action-strong);
+    font-size: 8px;
+    font-style: normal;
+    font-weight: 790;
+    letter-spacing: 0.03em;
+    white-space: nowrap;
+}
+
+.rowSub {
+    overflow: hidden;
+    color: var(--mms-text-muted);
+    font-size: 10px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.statusDot {
+    font-size: 7px;
+}
+
+.statusDotPublished {
+    color: var(--mms-success);
+}
+
+.statusDotDraft {
+    color: var(--mms-text-muted);
+}
+
+/* ── Preview pane — styles.css 5124-5213 ──────────────────────────────── */
+.preview {
+    min-width: 0;
+    background: var(--mms-surface-raised);
+}
+
+.detailHead {
+    position: sticky;
+    top: 0;
+    z-index: 3;
+    display: flex;
+    min-height: 100px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 22px;
+    padding: 20px 22px;
+    border-bottom: 1px solid var(--mms-border);
+    background: color-mix(in srgb, var(--mms-surface-raised) 94%, transparent);
+    backdrop-filter: blur(16px);
+}
+
+.detailIdentity {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 14px;
+}
+
+.detailMark {
+    display: grid;
+    width: 54px;
+    height: 54px;
+    flex: 0 0 54px;
+    place-items: center;
+    border: 1px solid var(--mms-border-strong);
+    border-radius: 12px;
+    background: var(--mms-surface-green);
+    color: var(--mms-action-strong);
+    font-size: 16px;
+    font-weight: 820;
+}
+
+.detailCopy {
+    min-width: 0;
+}
+
+.titleLine {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 9px;
+}
+
+.titleLine h2 {
+    overflow: hidden;
+    margin: 0;
+    font-size: 20px;
+    font-weight: 760;
+    letter-spacing: -0.025em;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.detailCopy p,
+.detailCopy small {
+    display: block;
+    overflow: hidden;
+    margin: 4px 0 0;
+    color: var(--mms-text-muted);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.detailCopy small {
+    font-size: 10px;
+}
+
+.detailActions {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 8px;
+}
+
+/* .primary-button (styles.css 508-518) + the detail-head sizing that the
+   reference layers on top of it (styles.css 5207-5213). */
+.primaryButton {
+    display: inline-flex;
+    min-height: 40px;
+    align-items: center;
+    gap: 8px;
+    padding: 0 14px;
+    border: 1px solid var(--mms-action);
+    border-radius: 6px;
+    background: var(--mms-action);
+    color: #fff;
+    font-weight: 680;
+}
+
+:global([data-theme='dark']) .primaryButton {
+    color: #001e2d;
+}
+
+.screen .primaryButton:hover:not(:disabled) {
+    border-color: var(--mms-action-strong);
+    background: var(--mms-action-strong);
+}
+
+.iconButton {
+    display: grid;
+    width: 40px;
+    height: 40px;
+    place-items: center;
+    border: 1px solid var(--mms-border-strong);
+    border-radius: 7px;
+    background: var(--mms-surface);
+}
+
+.screen .iconButton:hover:not(:disabled) {
+    border-color: var(--mms-border-strong);
+    background: var(--mms-surface-tint);
+}
+
+/* ── Publish toggle — styles.css 5229-5273 ────────────────────────────── */
+.publishToggle {
+    display: flex;
+    min-height: 40px;
+    align-items: center;
+    gap: 9px;
+    padding: 0 10px 0 12px;
+    border: 1px solid var(--mms-border-strong);
+    border-radius: 7px;
+    background: var(--mms-surface);
+    color: var(--mms-text-muted);
+    font-size: 11px;
+    font-weight: 680;
+}
+
+.publishTrack {
+    position: relative;
+    width: 28px;
+    height: 16px;
+    border-radius: 8px;
+    background: var(--mms-border-strong);
+}
+
+.publishTrack::after {
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--mms-surface-raised);
+    content: '';
+    transition: transform 0.16s ease;
+}
+
+.publishToggleOn {
+    color: var(--mms-success);
+}
+
+.publishToggleOn .publishTrack {
+    background: var(--mms-success);
+}
+
+.publishToggleOn .publishTrack::after {
+    transform: translateX(12px);
+}
+
+/* ── Overflow menu — styles.css 5275-5335 ─────────────────────────────── */
+.menuWrap {
+    position: relative;
+    display: inline-flex;
+}
+
+.popover {
+    position: absolute;
+    z-index: 50;
+    top: calc(100% + 7px);
+    right: 0;
+    display: grid;
+    width: 240px;
+    max-height: min(440px, 60vh);
+    overflow: auto;
+    padding: 6px;
+    border: 1px solid var(--mms-border-strong);
+    border-radius: 9px;
+    background: var(--mms-surface-raised);
+    box-shadow: var(--shadow-menu);
+}
+
+.popoverItem {
+    display: flex;
+    width: 100%;
+    min-height: 40px;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 9px;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--mms-text);
+    text-align: left;
+}
+
+.screen .popoverItem:hover:not(:disabled) {
+    background: var(--mms-surface-tint);
+}
+
+.popoverItem:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+}
+
+.popoverDanger {
+    color: var(--mms-danger);
+}
+
+/* ── Detail body — styles.css 5337-5517 ───────────────────────────────── */
+.detailScroll {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 13px;
+    padding: 18px;
+}
+
+.module {
+    min-width: 0;
+    border: 1px solid var(--mms-border);
+    border-radius: 9px;
+    background: var(--mms-surface);
+}
+
+.moduleWide {
+    grid-column: 1 / -1;
+}
+
+.moduleHead {
+    display: flex;
+    min-height: 45px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 0 13px;
+    border-bottom: 1px solid var(--mms-border);
+}
+
+.moduleHeadTitle {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 9px;
+    color: var(--mms-action-strong);
+}
+
+.moduleHeadTitle h3 {
+    margin: 0;
+    color: var(--mms-text);
+    font-size: 12px;
+    font-weight: 730;
+}
+
+.moduleAction {
+    display: grid;
+    width: 32px;
+    height: 32px;
+    flex: 0 0 32px;
+    place-items: center;
+    border-radius: 6px;
+    background: transparent;
+}
+
+.screen .moduleAction:hover:not(:disabled) {
+    background: var(--mms-surface-tint);
+}
+
+.moduleBody {
+    padding: 15px;
+}
+
+.description,
+.moduleBody > p,
+.quote {
+    margin: 0;
+    color: var(--mms-text-muted);
+    line-height: 1.55;
+}
+
+.packageStrip,
+.toneChips {
+    display: flex;
+    flex-wrap: wrap;
+    margin-top: 14px;
+}
+
+.packageStrip {
+    gap: 8px;
+}
+
+.toneChips {
+    gap: 6px;
+}
+
+.chip {
+    display: inline-flex;
+    min-height: 26px;
+    align-items: center;
+    gap: 6px;
+    padding: 0 9px;
+    border: 1px solid var(--mms-border);
+    border-radius: 13px;
+    background: var(--mms-surface-tint);
+    color: var(--mms-text-muted);
+    font-size: 9px;
+    font-weight: 690;
+}
+
+.largePalette {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 6px;
+}
+
+.swatch {
+    display: flex;
+    min-width: 0;
+    height: 74px;
+    align-items: flex-end;
+    overflow: hidden;
+    border: 1px solid var(--mms-border);
+    border-radius: 7px;
+}
+
+.swatchLabel {
+    display: block;
+    width: 100%;
+    padding: 5px 3px;
+    background: rgb(0 0 0 / 48%);
+    color: #fff;
+    font-size: 7px;
+    font-style: normal;
+    text-align: center;
+}
+
+.specimen {
+    display: grid;
+    grid-template-columns: 56px minmax(0, 1fr);
+    align-items: center;
+    gap: 12px;
+    padding-bottom: 12px;
+}
+
+.specimen + .specimen {
+    padding-top: 12px;
+    padding-bottom: 0;
+    border-top: 1px solid var(--mms-border);
+}
+
+.specimenGlyph {
+    font-size: 35px;
+    line-height: 1;
+}
+
+.specimenBody .specimenGlyph {
+    font-family: Inter, sans-serif;
+    font-size: 26px;
+}
+
+.specimenCopy {
+    display: grid;
+    min-width: 0;
+    gap: 4px;
+}
+
+.specimenCopy b {
+    overflow: hidden;
+    font-size: 11px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.specimenCopy span {
+    color: var(--mms-text-muted);
+    font-size: 9px;
+}
+
+.quote {
+    padding-left: 13px;
+    border-left: 3px solid var(--mms-action);
+}
+
+.imageryRule {
+    display: grid;
+    height: 88px;
+    grid-template-columns: 1.35fr 0.75fr 0.75fr;
+    gap: 6px;
+    margin-top: 14px;
+}
+
+.imageryRule span {
+    border-radius: 7px;
+    background:
+        linear-gradient(145deg, rgb(21 150 78 / 10%), transparent 55%),
+        linear-gradient(45deg, var(--mms-surface-tint), var(--mms-border));
+}
+
+/* ── Provenance flow — project-context.css 654-706 ────────────────────── */
+.provenance {
+    display: grid;
+    min-height: 92px;
+    grid-column: 1 / -1;
+    grid-template-columns: minmax(0, 1fr) 30px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 10px;
+    padding: 12px;
+    border: 1px solid var(--mms-action);
+    border-radius: 8px;
+    background: var(--mms-surface-green);
+}
+
+.provenance > div {
+    min-width: 0;
+}
+
+.provenance small {
+    color: var(--mms-action-strong);
+    font-size: 7px;
+    font-weight: 800;
+    letter-spacing: 0.09em;
+}
+
+.provenance strong {
+    display: block;
+    overflow: hidden;
+    margin-top: 4px;
+    font-size: 11px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.provenance p {
+    margin: 3px 0 0;
+    color: var(--mms-text-muted);
+    font-size: 9px;
+    line-height: 1.4;
+}
+
+.provenanceArrow {
+    justify-self: center;
+    color: var(--mms-action-strong);
+}
+
+.provenance > button {
+    min-height: 36px;
+    padding: 0 11px;
+    border: 1px solid var(--mms-border-strong);
+    border-radius: 6px;
+    background: var(--mms-surface-raised);
+    color: var(--mms-action-strong);
+    font-size: 9px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+/* ── Empty states — styles.css 5519-5551 ──────────────────────────────── */
+.empty {
+    display: grid;
+    min-height: 190px;
+    place-items: center;
+    align-content: center;
+    gap: 8px;
+    padding: 24px;
+    color: var(--mms-text-muted);
+    text-align: center;
+}
+
+.emptyPreview {
+    min-height: 650px;
+}
+
+.empty > i {
+    color: var(--mms-action-strong);
+    font-size: 20px;
+}
+
+.empty strong {
+    color: var(--mms-text);
+}
+
+.empty span {
+    font-size: 11px;
+}
+
+/* ── Loading skeletons ────────────────────────────────────────────────────
+ * No counterpart on the reference (its data is a local fixture, so it never
+ * waits). These reproduce the reference's own geometry — a 76px row with the
+ * 42px mark and two copy lines, and the detail head + module grid — so the
+ * frame does not reflow when real data lands. The sheen matches the tone the
+ * rest of the app already uses for skeletons.
+ */
+.skeletonBlock {
+    display: block;
+    border-radius: 6px;
+    background:
+        linear-gradient(
+                110deg,
+                transparent 28%,
+                color-mix(in srgb, #fff 34%, transparent) 50%,
+                transparent 72%
+            )
+            0 0 / 200% 100%,
+        color-mix(in srgb, var(--mms-surface-tint) 84%, var(--mms-surface-raised));
+    animation: dsSkeletonSheen 1.55s cubic-bezier(0.23, 1, 0.32, 1) infinite;
+}
+
+:global([data-theme='dark']) .skeletonBlock {
+    background:
+        linear-gradient(
+                110deg,
+                transparent 28%,
+                color-mix(in srgb, #fff 13%, transparent) 50%,
+                transparent 72%
+            )
+            0 0 / 200% 100%,
+        color-mix(in srgb, var(--mms-surface-tint) 68%, var(--mms-surface-raised));
+}
+
+@keyframes dsSkeletonSheen {
+    from {
+        background-position:
+            180% 0,
+            0 0;
+    }
+    to {
+        background-position:
+            -80% 0,
+            0 0;
+    }
+}
+
+.skeletonRow {
+    display: grid;
+    width: 100%;
+    min-height: 76px;
+    grid-template-columns: 42px minmax(0, 1fr);
+    align-items: center;
+    gap: 11px;
+    margin-bottom: 4px;
+    padding: 9px 10px;
+    border: 1px solid transparent;
+}
+
+.skeletonMark {
+    width: 42px;
+    height: 42px;
+    border-radius: 8px;
+}
+
+.skeletonLines {
+    display: grid;
+    gap: 7px;
+}
+
+.skeletonLineTitle {
+    width: 64%;
+    height: 12px;
+}
+
+.skeletonLineSub {
+    width: 86%;
+    height: 10px;
+}
+
+.skeletonModuleBody {
+    display: grid;
+    gap: 10px;
+}
+
+.skeletonParagraph {
+    width: 100%;
+    height: 13px;
+}
+
+.skeletonParagraphShort {
+    width: 68%;
+    height: 13px;
+}
+
+.skeletonSwatchRow {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 6px;
+}
+
+.skeletonSwatch {
+    height: 74px;
+    border-radius: 7px;
+}
+
+/* ── Responsive — styles.css 6675-7039, project-context.css 761-770 ───── */
+@media (max-width: 1180px) {
+    .screen {
+        padding-right: 28px;
+        padding-left: 28px;
+    }
+}
+
+@media (max-width: 900px) {
+    .shell {
+        grid-template-columns: 1fr;
+    }
+
+    .list {
+        display: grid;
+        max-height: 310px;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 4px;
+        border-right: 0;
+        border-bottom: 1px solid var(--mms-border);
+    }
+
+    .row,
+    .skeletonRow {
+        margin: 0;
+    }
+
+    /* Only the ROWS pair up at this width. Everything else in the column is
+       full-width furniture — dropping the filter, the loading block or an empty
+       state into a single 50% cell would leave a half-width control beside a
+       hole. */
+    .listFilter,
+    .listStatus,
+    .empty {
+        grid-column: 1 / -1;
+    }
+}
+
+@media (max-width: 760px) {
+    .screen {
+        padding: 24px 16px 48px;
+    }
+
+    .pageHead,
+    .scopeRow {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .pageHead {
+        margin-bottom: 20px;
+    }
+
+    .primaryAction {
+        align-self: stretch;
+    }
+
+    .scopeRow {
+        gap: 10px;
+        padding-bottom: 10px;
+    }
+
+    .scopeTabs {
+        overflow-x: auto;
+        overflow-y: hidden;
+        scrollbar-width: none;
+    }
+
+    .scopeTabs::-webkit-scrollbar {
+        display: none;
+    }
+
+    .search {
+        width: 100%;
+    }
+
+    .screen .categorySelect {
+        width: 100%;
+    }
+
+    .list {
+        grid-template-columns: 1fr;
+    }
+
+    .detailHead {
+        position: static;
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .detailActions {
+        width: 100%;
+    }
+
+    .detailActions .primaryButton {
+        flex: 1 1 auto;
+        justify-content: center;
+    }
+
+    .detailScroll {
+        grid-template-columns: 1fr;
+    }
+
+    .moduleWide {
+        grid-column: auto;
+    }
+
+    .provenance {
+        grid-template-columns: 1fr;
+    }
+
+    .provenanceArrow {
+        transform: rotate(90deg);
+    }
+
+    .provenance > button {
+        width: 100%;
+    }
+}
+
+@media (max-width: 520px) {
+    .pageHead h1 {
+        font-size: 29px;
+    }
+
+    .detailIdentity {
+        align-items: flex-start;
+    }
+
+    .detailMark {
+        width: 44px;
+        height: 44px;
+        flex-basis: 44px;
+        font-size: 13px;
+    }
+
+    .titleLine {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .detailActions {
+        flex-wrap: wrap;
+    }
+
+    .publishToggle {
+        flex: 1;
+        justify-content: center;
+    }
+
+    .largePalette,
+    .skeletonSwatchRow {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+
+/* The reference suppresses its only hover transform under reduced motion
+   (resource-screens.css 1626-1634). The two transforms on this screen are the
+   publish knob and the provenance arrow; neither should animate. */
+/* `entrance.css` carries a blanket
+ *   @media (prefers-reduced-motion: reduce) { *, *::before, *::after {
+ *       animation-duration: 0.01ms !important } }
+ * A blanket rule is the right default for decorative motion and the wrong one
+ * for a loading indicator: at 0.01ms the sweep finishes instantly and parks off
+ * the right edge, so the card reads as hung — the exact failure this bar exists
+ * to prevent. So the bar keeps moving, slower, and it is the only thing that
+ * does; the skeleton sheen holds still. Same reasoning and same values as
+ * ProjectsScreen. `!important` is required to beat the universal rule.
+ */
+@media (prefers-reduced-motion: reduce) {
+    .publishTrack::after {
+        transition: none;
+    }
+
+    .skeletonBlock {
+        animation: none;
+    }
+
+    .progressTrack::after {
+        animation-duration: 3.2s !important;
+    }
+}

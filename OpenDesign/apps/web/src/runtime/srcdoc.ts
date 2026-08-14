@@ -454,9 +454,15 @@ export function buildSrcdoc(
   // sandbox shim so it is installed before any author script or meta refresh.
   const withRedirectGuard = injectPreviewRedirectGuard(withShim, { blockLoadTimeScriptRedirect });
   const withKeydownRegistry = options.deck ? injectDeckKeydownRegistryHook(withRedirectGuard) : withRedirectGuard;
-  const withFocusGuard = options.previewFocusGuard
-    ? injectPreviewFocusGuard(withKeydownRegistry)
+  const withScrollbarSkin = options.previewFocusGuard
+    // `previewFocusGuard` marks the on-screen preview documents (as opposed to
+    // export / thumbnail builds), which is exactly where the scrollbar is part
+    // of what the user is looking at.
+    ? injectPreviewScrollbarSkin(withKeydownRegistry)
     : withKeydownRegistry;
+  const withFocusGuard = options.previewFocusGuard
+    ? injectPreviewFocusGuard(withScrollbarSkin)
+    : withScrollbarSkin;
   const withMotionFreeze = options.freezeMotion ? injectMotionFreeze(withFocusGuard) : withFocusGuard;
   const withDeckStageFallback = options.deck
     ? injectDeckStageFallback(withMotionFreeze)
@@ -1475,6 +1481,42 @@ function injectSandboxShim(doc: string): string {
   if (/<body[^>]*>/i.test(doc))
     return doc.replace(/<body[^>]*>/i, (m) => `${m}${shim}`);
   return shim + doc;
+}
+
+/**
+ * A thin, rounded scrollbar for the preview iframe. The platform default is a
+ * wide grey bar with stepper arrows, which reads as browser chrome sitting
+ * inside the design being reviewed.
+ *
+ * The thumb derives from `currentColor`, so it takes the previewed page's OWN
+ * text colour and therefore follows that page's light/dark treatment — the
+ * Studio's theme must never repaint the authored site.
+ *
+ * Preview-only: `buildSrcdoc` composes what the iframe renders, never what is
+ * written to disk, so the project's files and anything exported from them are
+ * unaffected. The daemon applies the same skin on the URL-load preview route so
+ * both render modes match.
+ */
+function injectPreviewScrollbarSkin(doc: string): string {
+  if (doc.includes('data-od-preview-scrollbar-skin')) return doc;
+  const style = `<style data-od-preview-scrollbar-skin>
+  html { scrollbar-width: thin; scrollbar-color: color-mix(in srgb, currentColor 32%, transparent) transparent; }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track, ::-webkit-scrollbar-corner { background: transparent; }
+  ::-webkit-scrollbar-thumb {
+    border: 3px solid transparent;
+    border-radius: 999px;
+    background: color-mix(in srgb, currentColor 32%, transparent);
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-thumb:hover { background: color-mix(in srgb, currentColor 55%, transparent); background-clip: content-box; }
+  ::-webkit-scrollbar-button { display: none; }
+</style>`;
+  const headClose = doc.search(/<\/head\s*>/i);
+  if (headClose >= 0) return `${doc.slice(0, headClose)}${style}${doc.slice(headClose)}`;
+  const bodyClose = doc.search(/<\/body\s*>/i);
+  if (bodyClose >= 0) return `${doc.slice(0, bodyClose)}${style}${doc.slice(bodyClose)}`;
+  return `${doc}${style}`;
 }
 
 function injectPreviewFocusGuard(doc: string): string {

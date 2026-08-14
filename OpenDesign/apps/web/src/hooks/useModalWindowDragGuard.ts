@@ -8,7 +8,10 @@ export const MODAL_WINDOW_DRAG_BACKDROP_SELECTOR = [
   '.automation-modal-backdrop',
   '.use-everywhere-modal-backdrop',
   '.plugin-details-modal-backdrop',
-  '.plugins-import-modal__backdrop',
+  // Shared backdrop of the approved MMSBUILD resource-screen dialogs (Plugins
+  // Add / Provenance). Replaces `.plugins-import-modal__backdrop`, whose modal
+  // went with the old Plugins page.
+  '.resource-modal-backdrop',
   '.ds-modal-backdrop',
   '.prompt-template-modal-backdrop',
   '.prompt-template-lightbox-backdrop',

@@ -287,13 +287,26 @@
     /* The header reads the `--mms-*` set directly. Those ARE the approved
        palette now, so aliasing keeps one source of truth: re-toning the system
        moves the header with it instead of leaving it a shade behind. */
-    /* Both rows sit on the DEEPEST tone, not the card surface: `--mms-bg`
-       (#001e2d dark / #fbf7ea light) rather than `--mms-surface` (#082f3b /
-       #fffef9). MMS-CMS already rendered its header at #001e2d while MMS
-       Design rendered #082f3b, so the one "shared" surface was the one place
-       the two products visibly disagreed. Pinning it here is what actually
-       makes them identical — a per-product override would have re-split it. */
-    --toolbar-bg: var(--mms-bg);
+    /* THE header tone for both rows, in both products (MMS Design + MMS-CMS).
+       Owner-specified 2026-08-13: #fdfbf6 light, #001e2d dark.
+
+       This is the one token in the set that is NOT an alias, and deliberately
+       so — the pair is asymmetric. Dark sits on the page tone (#001e2d is also
+       `--mms-bg`), while light sits ABOVE it: #fdfbf6 is a near-white warm,
+       lighter than `--mms-bg` (#fbf7ea) and fractionally softer than
+       `--mms-surface` (#fffef9). No existing token carries that light value, so
+       aliasing either one would be wrong in one theme or the other.
+
+       History, so this does not get "fixed" back a third time: it first aliased
+       `--mms-bg` (to stop MMS-CMS at #001e2d disagreeing with MMS Design at
+       #082f3b), then `--mms-surface` (the value the prototype declares at
+       `styles.css` 118 / 433). Both were single aliases and neither produced
+       the owner-approved pair above. Keeping ONE shared token is still what
+       guarantees the two products match — only the value changed.
+
+       The dark override lives in the `[data-theme='dark']` block below; without
+       it, dark would inherit the light literal. */
+    --toolbar-bg: #fdfbf6;
     --toolbar-text: var(--mms-text);
     --toolbar-text-muted: var(--mms-text-muted);
     --toolbar-border: var(--mms-border);
@@ -303,9 +316,21 @@
     /* Tint behind the Hub context mark and the account avatar. */
     --toolbar-icon-tint: var(--mms-surface-green);
     --toolbar-danger: var(--mms-danger);
-    /* The approved screen's single focus treatment — a gold halo, identical in
-       both themes, on every interactive element in both rows. */
-    --toolbar-focus-ring: 0 0 0 3px rgb(243 201 79 / 78%);
+    /* THE focus treatment for the whole product — one token, so it is changed
+       in one place rather than re-declared per screen.
+     *
+     * The MMSBUILD reference draws a gold halo (`rgb(243 201 79 / 78%)`) on
+     * every focused control. That was rejected in review 2026-08-13: the gold
+     * box reads as a warning next to the green action colour and belongs to no
+     * other part of the UI. It is replaced by a soft ring in the action green,
+     * which is the colour the same reference already uses for a focused input's
+     * border — so focus stays clearly visible (removing the indicator outright
+     * would strand keyboard users) without introducing a second accent.
+     *
+     * Deliberately alpha-based rather than solid: a translucent ring reads
+     * correctly on cream, on navy, and on the green primary button itself. */
+    --mms-focus-ring: 0 0 0 3px color-mix(in srgb, var(--mms-action) 34%, transparent);
+    --toolbar-focus-ring: var(--mms-focus-ring);
 
     /* Semantic state — MMS cue colors. Base tones darkened for WCAG AA on cream;
        -text tones are deepest for copy on the tinted backgrounds. */
@@ -532,6 +557,13 @@
     --mms-workspace: #062936;
     --mms-surface: #082f3b;
     --mms-surface-raised: #103a46;
+
+    /* Header chrome, both rows, both products. Required because the light value
+       is a literal (see the `--toolbar-bg` note in `:root`) — without this
+       override the dark header would inherit #fdfbf6. Written out rather than
+       aliased `--mms-bg` because the owner specified the hex, even though the
+       two happen to coincide today. */
+    --toolbar-bg: #001e2d;
     /* Was an olive (#2b2c20) carried over from the warm set — on navy it read
        as a stain rather than a tint. The approved dark tint is a lifted slate. */
     --mms-surface-tint: #173f49;

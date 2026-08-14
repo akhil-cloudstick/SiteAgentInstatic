@@ -17,6 +17,22 @@ export type HomePromptHandoff =
     source: 'plugin-use';
     action: PluginUseAction;
     inputs?: Record<string, unknown>;
+  }
+  // Skills mirror the two plugin hand-offs, minus the plugin machinery: a skill
+  // is picked (not applied), and authoring one produces a SKILL.md folder rather
+  // than a plugin manifest. Both are reachable from the Plugins screen's Skills
+  // mode, whose cards and Add dialog must land somewhere real.
+  | {
+    id: number;
+    skillId: string;
+    focus: boolean;
+    source: 'skill-use';
+  }
+  | {
+    id: number;
+    prompt: string;
+    focus: boolean;
+    source: 'skill-authoring';
   };
 
 export const PLUGIN_AUTHORING_GOAL_INPUT = 'pluginGoal';
@@ -92,6 +108,37 @@ export function createPluginAuthoringHandoff(
     goal: normalizedGoal,
     inputs,
     queryTemplate: PLUGIN_AUTHORING_PROMPT_TEMPLATE,
+  };
+}
+
+// Skill authoring is deliberately a plain composer seed rather than a scripted
+// pipeline: unlike a plugin (manifest, capabilities, pack/install/validate),
+// a skill is a folder with a SKILL.md, and the agent needs the user's subject
+// far more than it needs a procedure.
+export const SKILL_AUTHORING_PROMPT = [
+  'Create a new MMS Design skill for: <describe the workflow>.',
+  '',
+  'Produce a folder named generated-skill containing a SKILL.md with YAML frontmatter',
+  '(`name`, `description` written for activation — "Use this skill when…") followed by an',
+  'explicit workflow with checkpoints and expected outputs. Keep SKILL.md under 500 lines',
+  'and move long API notes, visual rules or exporter details into references/.',
+].join('\n');
+
+export function createSkillAuthoringHandoff(id: number): HomePromptHandoff {
+  return {
+    id,
+    prompt: SKILL_AUTHORING_PROMPT,
+    focus: true,
+    source: 'skill-authoring',
+  };
+}
+
+export function createSkillUseHandoff(id: number, skillId: string): HomePromptHandoff {
+  return {
+    id,
+    skillId,
+    focus: true,
+    source: 'skill-use',
   };
 }
 

@@ -963,6 +963,34 @@ function injectBeforeBodyClose(html: string, marker: string, injection: string):
   return `${html}${injection}`;
 }
 
+/**
+ * A thin, rounded scrollbar for the preview iframe. The platform default is a
+ * wide grey bar with stepper arrows, which reads as browser chrome sitting
+ * inside the design being reviewed.
+ *
+ * The thumb is derived from `currentColor`, so it takes the previewed page's
+ * OWN text colour and therefore its own light/dark treatment — it is not tied
+ * to the Studio's theme, which must never repaint the authored site.
+ *
+ * This is a response transform on the preview route only. Nothing is written to
+ * disk: the project's files, and anything exported or shared from them, are
+ * unchanged.
+ */
+const URL_PREVIEW_SCROLLBAR_SKIN = `
+<style data-od-url-scrollbar-skin>
+  html { scrollbar-width: thin; scrollbar-color: color-mix(in srgb, currentColor 32%, transparent) transparent; }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track, ::-webkit-scrollbar-corner { background: transparent; }
+  ::-webkit-scrollbar-thumb {
+    border: 3px solid transparent;
+    border-radius: 999px;
+    background: color-mix(in srgb, currentColor 32%, transparent);
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-thumb:hover { background: color-mix(in srgb, currentColor 55%, transparent); background-clip: content-box; }
+  ::-webkit-scrollbar-button { display: none; }
+</style>`;
+
 function injectUrlPreviewBridge(html: string, bridge: 'scroll' | 'selection' | 'snapshot'): string {
   if (bridge === 'scroll') {
     return injectBeforeBodyClose(html, 'data-od-url-scroll-bridge', URL_PREVIEW_SCROLL_BRIDGE);
@@ -994,6 +1022,7 @@ function applyUrlPreviewBridgesToHtml(
   // filename. URL-load iframes cannot rely on the host rewriting the document
   // title after load, and powered previews are intentionally cross-origin.
   html = daemonSanitizeTitleInDoc(html);
+  html = injectBeforeBodyClose(html, 'data-od-url-scrollbar-skin', URL_PREVIEW_SCROLLBAR_SKIN);
   if (wantsUrlPreviewScrollBridge(requestedBridge)) {
     html = injectUrlPreviewBridge(html, 'scroll');
   }

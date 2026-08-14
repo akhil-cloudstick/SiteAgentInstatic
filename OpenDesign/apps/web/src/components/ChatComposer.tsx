@@ -35,6 +35,7 @@ import type {
   DesignToolboxClickProps,
 } from '@open-design/contracts/analytics';
 import { sessionModeToTracking } from '@open-design/contracts/analytics';
+import { FaIcon } from '@mms/shell';
 import { deriveUploadCohort } from '../analytics/upload-tracking';
 import { projectRawUrl, uploadProjectFiles, openFolderDialog, fetchRecentLinkedDirs, pushRecentLinkedDir, dirExists, applyLibraryAsset, fetchLibraryAssetElementHtml } from "../providers/registry";
 import { WorkingDirPicker } from './WorkingDirPicker';
@@ -325,6 +326,18 @@ interface Props {
   // "+" menu. Hosts the working-directory pill so the folder selector sits by
   // the composer (mirroring the home input) instead of the file-panel header.
   leadingAccessory?: ReactNode;
+  /**
+   * Row pinned to the TOP of the composer shell, above the input. The approved
+   * Studio uses it for the inherited Product Hub context
+   * (`prototype-reference/src/Workspace.jsx:607-616`).
+   */
+  contextBand?: ReactNode;
+  /**
+   * Render `designSystemPicker` in the control row instead of the staged-context
+   * strip above the input. The approved Studio composer has the picker in the
+   * row; leaving it in both places showed the bound system twice.
+   */
+  designSystemPickerInRow?: boolean;
   // Design-system picker slot rendered at the top of the composer (above
   // the textarea). The former standalone chrome header row was removed;
   // ProjectView owns the project record so it renders the picker as a slot.
@@ -464,6 +477,8 @@ export const ChatComposer = forwardRef<ChatComposerHandle, Props>(
       pinnedPluginId = null,
       footerAccessory,
       leadingAccessory,
+      contextBand,
+      designSystemPickerInRow = false,
       designSystemPicker,
       onShowToast,
     },
@@ -2646,6 +2661,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, Props>(
         onDrop={handleDrop}
       >
         <div className="composer-shell">
+          {contextBand}
           {/*
             Spec §8.4 — context bar above the composer input. The
             section now behaves as a pure context bar: it renders the
@@ -2689,9 +2705,9 @@ export const ChatComposer = forwardRef<ChatComposerHandle, Props>(
               }}
             />
           ) : null}
-          {designSystemPicker || selectedWorkspaceContexts.length > 0 || stagedSkills.length > 0 || stagedMcpServers.length > 0 || stagedConnectors.length > 0 || staged.length > 0 || activeAppliedPlugin ? (
+          {(designSystemPicker && !designSystemPickerInRow) || selectedWorkspaceContexts.length > 0 || stagedSkills.length > 0 || stagedMcpServers.length > 0 || stagedConnectors.length > 0 || staged.length > 0 || activeAppliedPlugin ? (
             <StagedRunContexts
-              designSystemPicker={designSystemPicker}
+              designSystemPicker={designSystemPickerInRow ? undefined : designSystemPicker}
               workspaceItems={selectedWorkspaceContexts}
               currentWorkspaceContextId={visibleWorkspaceContext?.id ?? null}
               skills={stagedSkills}
@@ -3069,9 +3085,15 @@ export const ChatComposer = forwardRef<ChatComposerHandle, Props>(
                 </div>
               </div>
             ) : null}
+            {/* Design system — the approved composer's second control
+                (`prototype-reference/src/Workspace.jsx:654`). The picker itself
+                renders here rather than in the staged-context row above, so the
+                bound system appears exactly once. */}
+            {designSystemPickerInRow ? designSystemPicker : null}
             {leadingAccessory}
             <span className="composer-spacer" />
-            {footerAccessory}
+            {/* Reference order for the trailing cluster: session mode, then the
+                agent/model control, then send (`Workspace.jsx:663-691`). */}
             <SessionModeToggle
               mode={sessionMode}
               onChange={(next) => {
@@ -3088,6 +3110,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, Props>(
                 onSessionModeChange?.(next);
               }}
             />
+            {footerAccessory}
             {showStopButton ? (
               <button
                 type="button"
@@ -3097,7 +3120,8 @@ export const ChatComposer = forwardRef<ChatComposerHandle, Props>(
                 data-tooltip={t('chat.stop')}
                 aria-label={t('chat.stop')}
               >
-                <Icon name="stop" size={16} />
+                {/* `faStop` in the approved composer (`Workspace.jsx:688`). */}
+                <FaIcon name="stop" size={14} />
                 <span>{t('chat.stop')}</span>
               </button>
             ) : null}
@@ -3119,7 +3143,9 @@ export const ChatComposer = forwardRef<ChatComposerHandle, Props>(
                 title={t('chat.send')}
                 data-tooltip={t('chat.send')}
               >
-                <Icon name="send" size={16} />
+                {/* `faArrowUp` in the approved composer (`Workspace.jsx:690`);
+                    the label stays for screen readers and non-Studio hosts. */}
+                <FaIcon name="arrow-up" size={16} />
                 <span>{t('chat.send')}</span>
               </button>
             ) : null}

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent } from 'react';
 import { createPortal } from 'react-dom';
 import type { AmrWalletSnapshot } from '@open-design/contracts';
+import { FaIcon } from '@mms/shell';
 import { getResolvedDeviceId } from '../analytics/client';
 import { amrHandoffDeviceId, attributedAmrUrl, recordAmrEntry } from '../analytics/amr-attribution';
 import { useAnalytics } from '../analytics/provider';
@@ -51,10 +52,40 @@ interface Props {
   placement?: 'down' | 'up';
   /** Fired when the dropdown transitions from closed to open. */
   onOpen?: () => void;
+  /**
+   * Trigger shape. `icon` is the compact composer-footer control. `runtime`
+   * is the approved Studio toolbar's Local CLI button
+   * (`prototype-reference/src/ui.jsx:256-258`): a labelled 182px pill whose
+   * trailing dot reports whether the local daemon is actually reachable. The
+   * prototype shipped a static "Fixture" chip there, which the build kit
+   * forbids preserving — the dot is the honest version of the same slot.
+   */
+  variant?: 'icon' | 'runtime';
+  /** Label for the `runtime` trigger; defaults to the agent/protocol name. */
+  runtimeLabel?: string;
+  /**
+   * Open the approved Studio's `Agent & model` list instead of the legacy
+   * execution panel. Independent of `variant`, because the Studio has two
+   * triggers with different shapes — the toolbar's labelled Local CLI pill and
+   * the composer's 28px robot — and both open the same reference list.
+   */
+  referenceMenu?: boolean;
 }
 
 function displayAgentName(agent: Pick<AgentInfo, 'id' | 'name'>): string {
   return agent.id === 'amr' ? 'MMS Design' : agent.name;
+}
+
+/**
+ * The approved composer gives each agent its own Font Awesome glyph — Codex a
+ * robot, Claude a terminal, OpenCode a code mark
+ * (`prototype-reference/src/Workspace.jsx:678-680`). Anything the reference did
+ * not enumerate falls back to the robot the control itself wears.
+ */
+function runtimeAgentGlyph(agentId: string): string {
+  if (agentId.includes('claude')) return 'terminal';
+  if (agentId.includes('opencode') || agentId.includes('code')) return 'code';
+  return 'robot';
 }
 
 /**
@@ -75,6 +106,9 @@ export function AvatarMenu({
   onBack,
   placement = 'down',
   onOpen,
+  variant = 'icon',
+  runtimeLabel,
+  referenceMenu = false,
 }: Props) {
   const t = useT();
   const analytics = useAnalytics();
@@ -125,7 +159,9 @@ export function AvatarMenu({
 
       const margin = 16;
       const gap = 8;
-      const width = Math.min(320, window.innerWidth - margin * 2);
+      // The approved `Agent & model` list is 246px (`.runtime-menu`,
+      // `prototype-reference/src/styles.css:2062`); the legacy panel is 320.
+      const width = Math.min(referenceMenu ? 246 : 320, window.innerWidth - margin * 2);
       const left = Math.min(
         Math.max(rect.left + rect.width / 2 - width / 2, margin),
         window.innerWidth - width - margin,
@@ -169,7 +205,7 @@ export function AvatarMenu({
       window.removeEventListener('resize', updatePosition);
       window.removeEventListener('scroll', updatePosition, true);
     };
-  }, [open, placement]);
+  }, [open, placement, referenceMenu]);
 
   const currentAgent = useMemo(
     () => agents.find((a) => a.id === config.agentId) ?? null,
@@ -322,25 +358,93 @@ export function AvatarMenu({
 
   return (
     <div className={`avatar-menu avatar-menu--${placement}`} ref={wrapRef}>
-      <button
-        ref={triggerRef}
-        type="button"
-        className="avatar-agent-trigger"
-        onClick={toggleOpen}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        data-tooltip={t('avatar.title')}
-        title={t('avatar.title')}
-        aria-label={t('avatar.title')}
-      >
-        {config.mode === 'daemon' && currentAgent ? (
-          <AgentIcon id={currentAgent.id} size={20} />
-        ) : (
-          <RemixIcon name="link" size={20} />
-        )}
-        <RemixIcon name="arrow-down-s-line" size={14} />
-      </button>
-      {open && popoverStyle ? createPortal(
+      {variant === 'runtime' ? (
+        <button
+          ref={triggerRef}
+          type="button"
+          className="runtime-button"
+          onClick={toggleOpen}
+          aria-haspopup="menu"
+          aria-expanded={open}
+          title={t('avatar.title')}
+          aria-label={t('avatar.title')}
+        >
+          {/* `faTerminal` in the reference toolbar (`ui.jsx:257`). */}
+          <FaIcon name="terminal" size={14} />
+          <span>
+            {runtimeLabel
+              ?? (config.mode === 'daemon' && currentAgent
+                ? displayAgentName(currentAgent)
+                : apiProtocolLabel(config.apiProtocol))}
+          </span>
+          <span
+            className={daemonLive ? 'runtime-dot' : 'runtime-dot is-offline'}
+            aria-hidden="true"
+          />
+        </button>
+      ) : (
+        <button
+          ref={triggerRef}
+          type="button"
+          className="avatar-agent-trigger"
+          onClick={toggleOpen}
+          aria-haspopup="menu"
+          aria-expanded={open}
+          data-tooltip={t('avatar.title')}
+          title={t('avatar.title')}
+          aria-label={t('avatar.title')}
+        >
+          {/* `faRobot` — the approved composer's agent/model control
+              (`prototype-reference/src/Workspace.jsx:673`). The per-agent
+              brand mark is kept inside the menu, where the reference also
+              distinguishes Codex / Claude / OpenCode. */}
+          <FaIcon name="robot" size={14} />
+        </button>
+      )}
+      {/* The approved composer's agent control opens one list and nothing else:
+          a heading, then every detected agent as icon + name + a one-line state
+          (`prototype-reference/src/Workspace.jsx:674-685`, `.runtime-menu`,
+          246px). Execution mode, model, PATH rescan and the rest keep working
+          — they live in Settings › Execution, which the shell's gear opens. */}
+      {open && popoverStyle && referenceMenu ? createPortal(
+        <div
+          ref={popoverRef}
+          className="composer-popover runtime-menu studio-runtime-menu"
+          role="menu"
+          aria-label={t('studio.agentAndModel')}
+          style={popoverStyle}
+        >
+          <strong>{t('studio.agentAndModel')}</strong>
+          {installedAgents.map((a) => {
+            const selected = config.mode === 'daemon' && currentAgent?.id === a.id;
+            return (
+              <button
+                type="button"
+                key={a.id}
+                role="menuitemradio"
+                aria-checked={selected}
+                className={selected ? 'selected' : ''}
+                data-testid={`avatar-agent-option-${a.id}`}
+                onClick={() => {
+                  if (config.mode !== 'daemon') onModeChange('daemon');
+                  onAgentChange(a.id);
+                  setOpen(false);
+                }}
+              >
+                <FaIcon name={runtimeAgentGlyph(a.id)} size={14} />
+                <span>
+                  <strong>{displayAgentName(a)}</strong>
+                  <small>
+                    {selected ? t('studio.agentSelected') : t('studio.agentDetected')}
+                  </small>
+                </span>
+              </button>
+            );
+          })}
+        </div>,
+        document.body,
+      ) : null}
+      {open && popoverStyle && !referenceMenu ? createPortal(
         <div
           ref={popoverRef}
           className="avatar-popover"

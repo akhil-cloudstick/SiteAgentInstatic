@@ -115,7 +115,7 @@ import {
 } from './DesignBrowserPanel';
 import type { PluginFolderAgentAction } from './design-files/pluginFolderActions';
 import { designSystemGithubEvidenceState, repoConnectCopy } from './design-system-github-evidence';
-import { APP_CHROME_FILE_ACTIONS_ID } from './AppChromeHeader';
+import { WORKSPACE_VIEWPORT_SLOT_ID } from './studio/workspace-slots';
 import { FileViewer, LiveArtifactViewer } from './FileViewer';
 import { Icon, type IconName } from './Icon';
 import { Toast } from './Toast';
@@ -243,6 +243,7 @@ interface Props {
   ) => void;
   onUseDesignSystem?: (id: string, title: string) => Promise<void> | void;
   designSystemEditRequest?: DesignKitEditFocusRequest | null;
+  studioActionRequest?: StudioActionRequest | null;
   onConnectRepo?: () => void;
   githubConnected?: boolean;
   commentPortalId?: string;
@@ -348,6 +349,22 @@ function shouldKeepCurrentSketchState(
 
 export const DESIGN_FILES_TAB = '__design_files__';
 export const DESIGN_SYSTEM_TAB = '__design_system__';
+
+/**
+ * Bumped-nonce request from the Studio's Design Files column and mobile dock.
+ * Those surfaces live in `ProjectView`, but the handlers they fire — upload,
+ * new document, new sketch, rename, delete — are owned here, and manual edit is
+ * owned by the active `FileViewer`. Same channel `openRequest` and
+ * `designSystemEditRequest` already use.
+ */
+export interface StudioActionRequest {
+  action: 'upload' | 'new-document' | 'new-sketch' | 'manual-edit' | 'rename' | 'delete';
+  /** File the action applies to, for `rename` / `delete`. */
+  target?: string;
+  /** New base name, for `rename`. */
+  nextName?: string;
+  nonce: number;
+}
 
 // Module-level default so a caller that omits `previewComments` doesn't mint
 // a fresh [] every render — that identity feeds the memoized FileViewer.
@@ -1237,6 +1254,7 @@ export function FileWorkspace({
   onDesignSystemReviewDecision,
   onUseDesignSystem,
   designSystemEditRequest,
+  studioActionRequest,
   onConnectRepo,
   githubConnected,
   commentPortalId,
@@ -1817,6 +1835,26 @@ export function FileWorkspace({
     setPersistedActive(designSystemProject ? DESIGN_SYSTEM_TAB : DESIGN_FILES_TAB);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [designSystemEditRequest?.nonce]);
+
+  // The Studio's Design Files column and mobile dock live in ProjectView, but
+  // the handlers they fire (upload, new document, new sketch, manual edit) are
+  // owned here and in FileViewer. They arrive as a bumped nonce on the same
+  // channel `openRequest` / `designSystemEditRequest` already use. `manual-edit`
+  // falls through to FileViewer via `manualEditRequest`.
+  useEffect(() => {
+    if (!studioActionRequest) return;
+    const { action, target, nextName } = studioActionRequest;
+    if (action === 'upload') fileInputRef.current?.click();
+    else if (action === 'new-document') void createMarkdownDocument();
+    else if (action === 'new-sketch') void startNewSketch();
+    else if (action === 'rename' && target && nextName) {
+      // `handleRename` takes the full names it already tracks; the column only
+      // knows the base name the user typed, so keep the directory prefix.
+      const dir = target.includes('/') ? `${target.slice(0, target.lastIndexOf('/'))}/` : '';
+      void handleRename(target, `${dir}${nextName}`);
+    } else if (action === 'delete' && target) void handleDelete(target);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [studioActionRequest?.nonce]);
 
   // External open requests from chat (tool cards, produced-file chips,
   // deep-linked URL, or the parent's auto-open after an agent Write) —
@@ -3358,13 +3396,17 @@ export function FileWorkspace({
     <div
       className={[
         'workspace',
+        // The approved Studio's third grid track. `file-workspace` carries the
+        // 43px / 44px / 1fr row rhythm from `styles.css:2106-2107`.
+        'file-workspace',
         designSystemProject ? 'has-design-system-tab' : '',
         browserSnapshotToast ? 'has-browser-snapshot-toast' : '',
       ].filter(Boolean).join(' ')}
+      id="studio-canvas-panel"
       data-testid="file-workspace"
     >
       <SketchEnginePrewarm />
-      <div className="ws-tabs-shell">
+      <div className="ws-tabs-shell file-tabs">
         {onFocusModeChange && focusMode ? (
           <button
             type="button"
@@ -3539,14 +3581,14 @@ export function FileWorkspace({
             <Icon name="plus" size={15} />
           </button>
         </div>
-        {/* Pinned to the right for project/file actions; the tab launcher sits
-            next to the file tabs so its spatial relationship stays clear. */}
+        {/* The approved tab row ends with the viewport switcher and nothing
+            else (`styles.css:2146-2151`). The file-actions host is gone: with
+            no element to portal into, FileViewer renders Present / Share /
+            Download inline in the preview toolbar's action cluster, which is
+            where the reference keeps file-scoped actions. Handoff has no
+            shared-row home, so it stays here beside the switcher. */}
         <div className="ws-tabs-actions">
-          <div
-            id={APP_CHROME_FILE_ACTIONS_ID}
-            className="ws-tabs-file-actions"
-            data-app-chrome-file-actions="true"
-          />
+          <div id={WORKSPACE_VIEWPORT_SLOT_ID} className="ws-tabs-viewport-slot" />
           {headerActions ? (
             <div className="ws-tabs-project-actions">{headerActions}</div>
           ) : null}
@@ -3856,6 +3898,7 @@ export function FileWorkspace({
             liveArtifact={activeLiveArtifact}
             liveArtifactEvents={liveArtifactEvents}
             onRefreshArtifacts={onRefreshFiles}
+            hideFileActions
           />
         ) : activeFile ? (
           <FileViewer
@@ -3882,6 +3925,14 @@ export function FileWorkspace({
             shareRequest={activeFileShareRequest}
             downloadRequest={activeFileDownloadRequest}
             slideNavRequest={activeFileSlideNavRequest}
+            manualEditRequest={
+              studioActionRequest?.action === 'manual-edit'
+                ? { nonce: studioActionRequest.nonce }
+                : null
+            }
+            /* The approved Studio toolbar has no Present / Share / Download —
+               publishing is the project toolbar's `Share to CMS`. */
+            hideFileActions
           />
         ) : (
           <div className="viewer-empty">
