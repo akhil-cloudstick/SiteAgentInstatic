@@ -270,6 +270,11 @@ export function buildWeb() {
       ...process.env,
       OD_WEB_BASE_PATH: '/design',
       OD_WEB_OUTPUT_MODE: 'server',
+      // NEXT_PUBLIC_* is inlined at BUILD time, so setting this only on the
+      // `next start` env (below, in startSharedWeb) never reached the client
+      // bundle. The shared build serves tenants exclusively, so managed mode is
+      // a constant here: no first-run onboarding, no tenant-facing BYOK step.
+      NEXT_PUBLIC_OD_MANAGED_AI: '1',
       // Build to a fresh VERSIONED dir (…-<ms>) so a rebuild never fights the dir the
       // running web is serving; the next restart picks up the newest.
       OD_WEB_DIST_DIR: `${SHARED_WEB_PREFIX}${Date.now()}`,

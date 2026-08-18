@@ -89,6 +89,11 @@ export function useHubContext(): HubContext | null {
   return useSyncExternalStore(subscribe, snapshot, () => null);
 }
 
+/** Non-React read of the same snapshot, for module-level guards. */
+export function getHubContext(): HubContext | null {
+  return snapshot();
+}
+
 /** Test seam: place a session in a known Hub scope without a gateway. */
 export function setHubContextForTests(next: HubContext | null): void {
   cached = next;

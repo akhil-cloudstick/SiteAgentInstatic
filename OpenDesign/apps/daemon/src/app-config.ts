@@ -662,6 +662,26 @@ function applyTelemetryDefaults(prefs: AppConfigPrefs): AppConfigPrefs {
   return prefs;
 }
 
+// A Hub-managed tenant never runs first-run onboarding. `OD_MANAGED_AI` is set
+// by the MMSBUILD control plane when it launches this daemon for a tenant, and
+// it means two things are already settled: the person authenticated once at the
+// Product Hub (so the panel's sign-in fork would be a second login), and the
+// operator owns the model/provider choice in the control-plane Settings panel
+// (so its BYOK step would decide nothing). Reporting the flag as complete keeps
+// every gate that keys off it — the agent backfill, the post-onboarding
+// disclosure — on its normal path instead of waiting for a panel that will
+// never render. Read-side only: nothing is written, so unsetting the env var
+// restores the standalone first-run flow untouched.
+function applyManagedDefaults(prefs: AppConfigPrefs): AppConfigPrefs {
+  if (process.env.OD_MANAGED_AI !== '1') return prefs;
+  if (prefs.onboardingCompleted === true) return prefs;
+  return { ...prefs, onboardingCompleted: true };
+}
+
+function applyReadDefaults(prefs: AppConfigPrefs): AppConfigPrefs {
+  return applyManagedDefaults(applyTelemetryDefaults(prefs));
+}
+
 export async function readAppConfig(dataDir: string): Promise<AppConfigPrefs> {
   const base = await readAppConfigFileOnly(dataDir);
   // Channel-root installation file is the new authoritative source for the
@@ -678,7 +698,7 @@ export async function readAppConfig(dataDir: string): Promise<AppConfigPrefs> {
   const installationDir = resolveInstallationDir(dataDir);
   const installation = await readInstallationFile(installationDir);
   if (typeof installation.installationId === 'string' && installation.installationId.length > 0) {
-    return applyTelemetryDefaults({ ...base, installationId: installation.installationId });
+    return applyReadDefaults({ ...base, installationId: installation.installationId });
   }
   if (typeof base.installationId === 'string' && base.installationId.length > 0) {
     // Best-effort migration. A write failure here doesn't break the read —
@@ -690,7 +710,7 @@ export async function readAppConfig(dataDir: string): Promise<AppConfigPrefs> {
       // swallow — observability beats correctness on this path
     }
   }
-  return applyTelemetryDefaults(base);
+  return applyReadDefaults(base);
 }
 
 // Synchronous mirror of readAppConfig for callers that cannot await — e.g.
@@ -708,12 +728,12 @@ export function readAppConfigSync(dataDir: string): AppConfigPrefs {
     typeof installation.installationId === 'string' &&
     installation.installationId.length > 0
   ) {
-    return applyTelemetryDefaults({
+    return applyReadDefaults({
       ...base,
       installationId: installation.installationId,
     });
   }
-  return applyTelemetryDefaults(base);
+  return applyReadDefaults(base);
 }
 
 function readAppConfigFileOnlySync(dataDir: string): AppConfigPrefs {

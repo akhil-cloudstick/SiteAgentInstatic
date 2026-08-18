@@ -89,6 +89,7 @@ import {
   syncConfigToDaemon,
   syncMediaProvidersToDaemon,
 } from './state/config';
+import { isManagedSession } from './state/managed';
 import { createSilentUpdatePreferenceWriter } from './state/silent-update-preference';
 import { applyAppearanceToDocument } from './state/appearance';
 import { isMacPlatform } from './utils/platform';
@@ -517,6 +518,16 @@ function AppInner() {
   const [composioConfigLoading, setComposioConfigLoading] = useState(true);
   const route = useRoute();
   const analytics = useAnalytics();
+
+  // /onboarding is unreachable in a Hub-managed session: the person signed in
+  // once at the Hub and the operator owns the runtime choice, so the panel has
+  // nothing to ask. Bounce a stale bookmark or a hand-typed URL back to Home
+  // rather than parking an authenticated tenant on a second sign-in screen.
+  useEffect(() => {
+    if (route.kind !== 'home' || route.view !== 'onboarding') return;
+    if (!isManagedSession()) return;
+    navigate({ kind: 'home', view: 'home' }, { replace: true });
+  }, [route]);
 
   const beginAgentStreamRequest = useCallback(() => {
     agentStreamRequestSeqRef.current += 1;
@@ -1056,7 +1067,10 @@ function AppInner() {
         // banner keys off `privacyDecisionAt`. They may coexist on the
         // first launch; the banner sits above the modal layer so it
         // stays actionable regardless of the active view.
-        if (!next.onboardingCompleted) {
+        // A Hub-managed session is already authenticated and already has its
+        // runtime chosen for it by the operator, so first-run onboarding has
+        // nothing left to ask — see state/managed.ts.
+        if (!next.onboardingCompleted && !isManagedSession()) {
           navigate({ kind: 'home', view: 'onboarding' }, { replace: true });
         }
         setDaemonConfigLoaded(true);
@@ -1097,7 +1111,9 @@ function AppInner() {
   // backfills an empty slot for returning users.
   useEffect(() => {
     if (!daemonConfigLoaded || agentsLoading) return;
-    if (config.onboardingCompleted !== true) return;
+    // Managed sessions never run onboarding, so the flag would never flip and
+    // the slot would stay empty forever — there this backfill IS the pick.
+    if (config.onboardingCompleted !== true && !isManagedSession()) return;
     if (config.agentId) return;
     const firstAvailable = agents.find((a) => a.available);
     if (!firstAvailable) return;
@@ -2398,10 +2414,14 @@ function AppInner() {
   // independent of any active project.
   let appMain: ReactNode;
   const pendingFirstRunOnboardingRoute =
-    route.kind === 'home' &&
-    route.view === 'home' &&
-    config.onboardingCompleted !== true &&
-    !daemonConfigLoaded;
+    (route.kind === 'home' &&
+      route.view === 'home' &&
+      config.onboardingCompleted !== true &&
+      !daemonConfigLoaded) ||
+    // Managed session on /onboarding: the redirect effect above is about to
+    // replace the route. Hold the loader for that frame so the panel — and its
+    // "Sign in to MMS Design" fork — never paints, not even briefly.
+    (route.kind === 'home' && route.view === 'onboarding' && isManagedSession());
   if (pendingFirstRunOnboardingRoute) {
     appMain = (
       <div className="entry-shell entry-shell--no-header">
