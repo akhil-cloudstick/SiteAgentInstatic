@@ -28,6 +28,7 @@ import { listPromptTemplates, readPromptTemplate } from '../media/prompt-templat
 import { readAppConfig } from '../app-config.js';
 import { installFromTarget, uninstallById } from '../library-install.js';
 import type { RouteDeps } from '../server-context.js';
+import { cachedRead } from '../read-cache.js';
 
 export interface RegisterAtomRoutesDeps {
   db: Database.Database;
@@ -163,7 +164,7 @@ export function registerStaticResourceRoutes(app: Express, ctx: RegisterStaticRe
 
   app.get('/api/skills', async (_req, res) => {
     try {
-      const skills = await listAllSkills();
+      const skills = await cachedRead('skills:all', () => listAllSkills());
       // Strip full body + on-disk dir from the listing — frontend fetches the
       // body via /api/skills/:id when needed (keeps the listing payload small).
       res.json({
@@ -388,7 +389,7 @@ export function registerStaticResourceRoutes(app: Express, ctx: RegisterStaticRe
 
   app.get('/api/design-systems', async (_req, res) => {
     try {
-      const systems = await listAllDesignSystems();
+      const systems = await cachedRead('design-systems:all', () => listAllDesignSystems());
       res.json({
         designSystems: systems.map(({ body, ...rest }) => rest),
       });
@@ -399,7 +400,7 @@ export function registerStaticResourceRoutes(app: Express, ctx: RegisterStaticRe
 
   app.get('/api/prompt-templates', async (_req, res) => {
     try {
-      const templates = await listPromptTemplates(PROMPT_TEMPLATES_DIR);
+      const templates = await cachedRead('prompt-templates:all', () => listPromptTemplates(PROMPT_TEMPLATES_DIR));
       res.json({
         promptTemplates: templates.map(({ prompt: _prompt, ...rest }) => rest),
       });

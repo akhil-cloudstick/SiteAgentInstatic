@@ -12,6 +12,11 @@ import { signTenantToken, verifyTenantToken, decrypt } from './lib/crypto.mjs';
 import * as rt from './runtime/tenantRuntime.mjs';
 import * as odrt from './runtime/odRuntime.mjs';
 import { handleHub } from './hub/hub.mjs';
+import { handleMcpGateway } from './mcp/gateway.mjs';
+import * as mcpAgents from './registry/mcpAgents.mjs';
+import { normalizePermissions, normalizeTables, PERMISSION_PRESETS } from './mcp/permissions.mjs';
+import { pluginInstalled } from './mcp/session.mjs';
+import { installBridge } from './mcp/bridgeInstall.mjs';
 import { handleGatewayProxy, handleGatewayUpgrade } from './gateway/proxy.mjs';
 import { openFunnel, closeFunnel } from './gateway/funnel.mjs';
 
@@ -118,6 +123,11 @@ const server = http.createServer(async (req, res) => {
   if (path.startsWith('/ai/')) return handleGateway(req, res, path.slice(4));
 
   try {
+    // MCP gateway (external AI agents). Mounted ahead of the hub and the tenant
+    // proxy: it authenticates with its own bearer key, not a hub session, so it
+    // must never fall through to either.
+    if (path.startsWith('/mcp/') && (await handleMcpGateway(req, res, method, path))) return;
+
     // Tenant Hub (login / invite / two-card home) — the HTML surface tenants use.
     if (await handleHub(req, res, method, path)) return;
 
@@ -157,6 +167,90 @@ const server = http.createServer(async (req, res) => {
         return send(res, 200, await provisionTenant(body));
       }
     }
+    // ---- MCP agent keys (operator console) --------------------------------
+    // Minting happens HERE, not in the tenant: the QuickJS sandbox has no
+    // CSPRNG, and keeping every key in one registry means one revoke path.
+    if (path === '/api/mcp/agents') {
+      if (method === 'GET') {
+        const tenant = new URL(req.url, 'http://x').searchParams.get('tenant');
+        return send(res, 200, { agents: await mcpAgents.listAgentKeys(tenant || null) });
+      }
+      if (method === 'POST') {
+        const b = await readJson(req);
+        if (!b.tenantSlug) throw new Error('tenantSlug is required');
+        const permissions = b.preset
+          ? normalizePermissions(PERMISSION_PRESETS[b.preset])
+          : normalizePermissions(b.permissions);
+        if (permissions.length === 0) throw new Error('Grant at least one permission');
+        const agent = await mcpAgents.createAgentKey({
+          tenantSlug: b.tenantSlug,
+          label: b.label,
+          permissions,
+          tables: normalizeTables(b.tables),
+          expiresInDays: b.expiresInDays,
+        });
+        // `token` is present exactly once, here.
+        return send(res, 200, { agent, endpoint: `${config.gatewayOrigin}/mcp/${b.tenantSlug}` });
+      }
+    }
+    if (path === '/api/mcp/presets' && method === 'GET') {
+      return send(res, 200, { presets: PERMISSION_PRESETS });
+    }
+    if (path === '/api/mcp/directory' && method === 'GET') {
+      const [tenants, counts] = await Promise.all([
+        tenantsRepo.listTenants(),
+        mcpAgents.agentKeyCounts(),
+      ]);
+      const byTenant = new Map(counts.map((c) => [c.tenant_slug, c]));
+      const rows = await Promise.all(
+        tenants.map(async (t) => {
+          const c = byTenant.get(t.slug);
+          // Probing costs an SSO round-trip per tenant, so only ask a tenant
+          // that could actually answer. A stopped or unprovisioned one reports
+          // `null` (unknown) rather than a misleading "not installed".
+          const reachable = t.status === 'active' && !!t.port;
+          return {
+            slug: t.slug,
+            status: t.status,
+            endpoint: `${config.gatewayOrigin}/mcp/${t.slug}`,
+            activeKeys: c ? Number(c.active) : 0,
+            totalKeys: c ? Number(c.total) : 0,
+            lastUsed: c ? c.last_used : null,
+            bridgeInstalled: reachable ? await pluginInstalled(t.slug).catch(() => false) : null,
+          };
+        }),
+      );
+      return send(res, 200, { tenants: rows });
+    }
+    if (path === '/api/mcp/audit' && method === 'GET') {
+      const url = new URL(req.url, 'http://x');
+      const tenant = url.searchParams.get('tenant');
+      if (!tenant) throw new Error('tenant is required');
+      return send(res, 200, { events: await mcpAgents.listAgentAudit(tenant, url.searchParams.get('limit')) });
+    }
+    // Build the bridge package from source and install it into one tenant.
+    // Zipping by hand and uploading through each tenant's admin UI does not
+    // scale, so rollout is one call per site — and re-callable to upgrade.
+    const mcpInstall = path.match(/^\/api\/mcp\/tenants\/([a-z0-9-]+)\/install-bridge$/);
+    if (mcpInstall && method === 'POST') {
+      return send(res, 200, await installBridge(mcpInstall[1]));
+    }
+
+    const mcpKey = path.match(/^\/api\/mcp\/agents\/([A-Za-z0-9_-]+)(?:\/(revoke|reveal))?$/);
+    if (mcpKey) {
+      const keyId = mcpKey[1];
+      if (mcpKey[2] === 'revoke' && method === 'POST') {
+        const agent = await mcpAgents.revokeAgentKey(keyId);
+        if (!agent) return send(res, 404, { error: 'key not found or already revoked' });
+        return send(res, 200, { agent });
+      }
+      if (mcpKey[2] === 'reveal' && method === 'GET') {
+        const token = await mcpAgents.revealAgentKey(keyId);
+        if (!token) return send(res, 404, { error: 'key not found or revoked' });
+        return send(res, 200, { token });
+      }
+    }
+
     const m = path.match(/^\/api\/tenants\/([a-z0-9-]+)(?:\/(start|deploy|update|repair|expose|invite))?$/);
     if (m) {
       const slug = m[1];

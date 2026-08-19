@@ -72,6 +72,16 @@ export function start(tenant) {
   const webPort = sharedWebPort();
   const env = {
     ...process.env,
+    // libuv runs every fs call on a threadpool that defaults to FOUR threads, so
+    // the daemon can only ever have 4 file operations in flight. That is fine on
+    // a local SSD and ruinous here: this repo is served from a network share, so
+    // each call is a round trip and the daemon spends its time waiting, four at
+    // a time. The endpoints that walk a directory tree (design systems, skills,
+    // prompt templates, plugins) and the plugin registration that gates startup
+    // are all bound by exactly this. Measured on this share: 266 design-system
+    // reads take 1339ms at the default and 275ms at 64 — the threads are blocked
+    // on I/O, not burning CPU, so a large pool costs almost nothing.
+    UV_THREADPOOL_SIZE: process.env.UV_THREADPOOL_SIZE || '64',
     OD_DATA_DIR: p.dataDir,
     OD_PORT: String(odPort),
     // The daemon trusts the web origin for /api calls via OD_WEB_PORT. Every

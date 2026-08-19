@@ -827,6 +827,32 @@
 .viewer.is-tab-present .viewer-body {
   inset: 0;
 }
+/* Full-page preview: the viewer takes the whole window so the canvas gets the
+   full screen instead of the column left beside the chat rail. The toolbar
+   rides along — the zoom control and the button that exits this mode both
+   live in it — and Esc exits too (FileViewer's `previewFullView` effect).
+   1250 clears the app chrome (1100) while staying under the modal tier. */
+.viewer.is-full-view {
+  position: fixed;
+  inset: 0;
+  z-index: 1250;
+  border-radius: 0;
+  background: var(--bg);
+}
+.viewer-zoom-stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.viewer-zoom-stepper .zoom-step-action:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.zoom-menu-separator {
+  height: 1px;
+  margin: 4px 0;
+  background: var(--border);
+}
 .viewer .present-exit-btn {
   position: absolute;
   top: 12px;

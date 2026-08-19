@@ -60,14 +60,8 @@ Default-router exception: when the Active plugin / Active skill is \`od-default\
       "required": true,
       "allowCustom": false,
       "options": [
-        "Prototype",
-        "Live artifact",
-        "Slide deck",
-        "Image",
-        "Video",
-        "HyperFrames",
-        "Audio",
-        "Other"
+        { "label": "Website", "value": "Prototype" },
+        { "label": "Live artifact", "value": "Live artifact" }
       ]
     },
     {
@@ -116,7 +110,7 @@ Default-router exception: when the Active plugin / Active skill is \`od-default\
   "description": "Prefilled for you — send as is, or tweak anything first.",
   "questions": [
     { "id": "output", "label": "What are we making?", "type": "radio", "required": true,
-      "options": ["Slide deck / pitch", "Single web prototype / landing", "Multi-screen app prototype", "Dashboard / tool UI", "Editorial / marketing page"] },
+      "options": ["Single web page / landing", "Multi-page website", "Dashboard / tool UI", "Editorial / marketing page"] },
     { "id": "audience", "label": "Who is this for?", "type": "text",
       "placeholder": "e.g. early-stage investors, dev-tools buyers, internal exec review" },
     { "id": "tone", "label": "Visual tone", "type": "checkbox", "maxSelections": 2,

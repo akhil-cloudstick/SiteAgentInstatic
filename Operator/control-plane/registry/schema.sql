@@ -91,3 +91,51 @@ create table if not exists siteagent_control.tenant_users (
 -- invite link inline (stable, until accepted) without re-minting on every view.
 -- A raw DB leak still can't replay it — decrypting needs the enc key (.state/enc.key).
 alter table siteagent_control.tenant_users add column if not exists invite_token_enc text;
+
+-- ---------------------------------------------------------------------------
+-- MCP agent keys — external AI agents that drive a tenant's CMS over MCP.
+--
+-- One row per issued key. `token_enc` is a reversible copy (same rationale as
+-- the invite token above: the console can re-show a key the operator already
+-- minted) while `token_hash` is what an inbound bearer is matched against, so
+-- verification never needs the enc key. Revoking is a timestamp, never a
+-- delete, so the audit trail keeps pointing at a real row.
+--
+-- `permissions` and `tables` are the per-key profile the MCP gateway enforces:
+-- permissions is the granted verb set (read/create/edit/publish/...), tables
+-- narrows which content tables the key may touch ('*' = every table the
+-- plugin manifest already allows).
+create table if not exists siteagent_control.mcp_agents (
+  id           bigserial primary key,
+  tenant_slug  text not null references siteagent_control.tenants(slug) on delete cascade,
+  key_id       text not null unique,
+  label        text not null,
+  token_hash   text not null,
+  token_enc    text,
+  permissions  text[] not null default '{}',
+  tables       text[] not null default '{*}',
+  expires_at   timestamptz,
+  last_used_at timestamptz,
+  revoked_at   timestamptz,
+  created_at   timestamptz not null default now()
+);
+
+create index if not exists mcp_agents_tenant on siteagent_control.mcp_agents (tenant_slug);
+create index if not exists mcp_agents_token  on siteagent_control.mcp_agents (token_hash);
+
+-- Per-call audit. The tenant CMS logs agent work as the owner (the gateway
+-- signs in over hub SSO), so this table is what keeps agent activity separable
+-- from human activity — and is the only place the originating key is recorded.
+create table if not exists siteagent_control.mcp_agent_audit (
+  id          bigserial primary key,
+  tenant_slug text not null,
+  key_id      text,
+  tool        text not null,
+  target      text,
+  ok          boolean not null,
+  error       text,
+  created_at  timestamptz not null default now()
+);
+
+create index if not exists mcp_agent_audit_tenant_time
+  on siteagent_control.mcp_agent_audit (tenant_slug, created_at desc);

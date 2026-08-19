@@ -195,6 +195,33 @@
     cursor: pointer;
 }
 
+/* This button declared no hover state of its own, so a generic global
+   `button:hover` won and repainted it to the pale surface — while the label
+   stayed white, leaving an apparently blank box under the pointer. These rules
+   are more specific than any bare-element hover, so the fill stays green and
+   the label stays legible; hover only deepens it. */
+.start-desk__send:hover:not(:disabled) {
+    border-color: var(--mms-action-strong);
+    background: var(--mms-action-strong);
+    color: #fff;
+}
+
+.start-desk__send:active:not(:disabled) {
+    border-color: var(--mms-action-strong);
+    background: var(--mms-action-strong);
+    color: #fff;
+}
+
+/* Busy (`Starting…`). Dimmed so it clearly cannot be pressed again, but still
+   green with white text — a disabled control still has to be readable. */
+.start-desk__send:disabled {
+    border-color: var(--mms-action);
+    background: var(--mms-action);
+    color: #fff;
+    cursor: default;
+    opacity: 0.75;
+}
+
 .start-desk__menu {
     position: absolute;
     z-index: 80;
@@ -285,8 +312,11 @@
     color: var(--mms-text-muted);
 }
 
+/* Send now sits in this row too, and it is the one button here that is NOT a
+   quiet inline control — excluded so the reset below cannot strip its fill,
+   border and white label back to transparent text. */
 .start-desk__footer label,
-.start-desk__footer button {
+.start-desk__footer button:not(.start-desk__send) {
     display: inline-flex;
     min-height: 42px;
     align-items: center;
@@ -718,6 +748,49 @@
 
 .sd-toast[data-tone='error'] i {
     color: var(--mms-danger);
+}
+
+/* Guidance — "paste a URL", "pick Local CLI first". These are instructions for
+   a step the user has not reached yet, not failures, so they must not borrow
+   the danger edge: routed through the error tone they read as something having
+   gone wrong, which is what made picking a start card look broken. Neutral
+   edge, action-coloured glyph. */
+.sd-toast[data-tone='info'] {
+    border-color: var(--mms-action);
+}
+
+.sd-toast[data-tone='info'] i {
+    color: var(--mms-action);
+}
+
+/* ── Busy spinner ────────────────────────────────────────────────────────
+ * Own element + own keyframes rather than Font Awesome's `fa-spin`: the icon
+ * font is not guaranteed to have painted when a busy state first appears, and
+ * an unpainted glyph is a motionless box — which reads as a hung screen, the
+ * exact thing the spinner is there to disprove. A bordered circle needs no
+ * font at all. */
+@keyframes sd-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.sd-spinner {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    flex: 0 0 auto;
+    border: 2px solid rgb(255 255 255 / 45%);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: sd-spin 0.7s linear infinite;
+}
+
+/* Respect a reduced-motion preference: keep the shape, drop the rotation. */
+@media (prefers-reduced-motion: reduce) {
+    .sd-spinner {
+        animation: none;
+    }
 }
 
 /* ── Focus ───────────────────────────────────────────────────────────────

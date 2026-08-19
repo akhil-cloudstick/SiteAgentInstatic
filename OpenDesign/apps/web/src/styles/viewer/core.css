@@ -1531,6 +1531,26 @@
   background: var(--bg);
   isolation: isolate;
 }
+
+/* -------- Desktop zoom ---------------------------------------------------
+   `DesktopZoomLayout` (FileViewer.tsx) only kicks in off 100%: the page keeps
+   its 1:1 layout width and is scaled visually, so the clip stops being the
+   page and becomes the canvas the page floats in.
+
+   The scaled shell is positioned absolutely inside this clip, so the clip has
+   to be its containing block. `.comment-frame-clip` already is; the
+   manual-edit clip carries no class of its own, hence the :not(). */
+.preview-zoom-clip:not(.comment-frame-clip) {
+  position: relative;
+}
+/* Zoomed IN, the shell's transformed box is wider than the clip and the clip
+   pans across it. `overflow-y` stays hidden: the shell's height is divided by
+   the scale, so it lands exactly on the clip height and never overflows down. */
+.preview-zoom-clip.preview-zoom-pan {
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+}
 .comment-overlay-layer {
   position: absolute;
   inset: 0;
@@ -1691,6 +1711,15 @@
 .comment-popover-section-params {
   display: grid;
   gap: 8px;
+}
+/* Hard ceiling on the hover inspector. `.comment-popover` already caps it
+   against its container, but that container is the whole preview layer — so a
+   tall card could still blanket the page the user is trying to point at. This
+   keeps the page readable behind it no matter what the hovered element is. */
+.annotation-hover-popover {
+  max-width: 320px;
+  max-height: min(46vh, calc(100% - 28px));
+  overflow: auto;
 }
 .annotation-style-summary {
   display: grid;

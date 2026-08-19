@@ -19,9 +19,11 @@ export interface StartDeskNotice {
   /**
    * A failure and an acknowledgement must not look alike. `success` is the
    * reference's green check; `error` swaps the glyph and the accent so a
-   * "could not reach the daemon" never appears under a tick.
+   * "could not reach the daemon" never appears under a tick. `info` is for
+   * guidance about a step not yet taken ("paste the target URL") — it is
+   * neither, and showing it as either misreads the situation to the user.
    */
-  tone: 'success' | 'error';
+  tone: 'success' | 'error' | 'info';
 }
 
 export interface StartDeskToastProps {
@@ -50,7 +52,9 @@ export function StartDeskToast({ notice, onDismiss }: StartDeskToastProps) {
     // acknowledgement so it waits its turn and does not interrupt typing.
     <div className="sd-toast" data-tone={notice.tone} role={failed ? 'alert' : 'status'}>
       <i
-        className={`fa-solid fa-${failed ? 'circle-exclamation' : 'circle-check'}`}
+        className={`fa-solid fa-${
+          failed ? 'circle-exclamation' : notice.tone === 'info' ? 'circle-info' : 'circle-check'
+        }`}
         aria-hidden="true"
       />
       {text}

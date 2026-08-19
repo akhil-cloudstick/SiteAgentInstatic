@@ -103,10 +103,10 @@ export const HOME_HERO_CHIPS: ReadonlyArray<HomeHeroChip> = [
   },
   {
     id: 'prototype',
-    label: 'Prototype',
+    label: 'Website',
     icon: 'palette',
     group: 'create',
-    description: 'Interactive app mockups',
+    description: 'Build a new site from a brief',
     // Prototype now binds to the bundled `example-web-prototype` plugin,
     // which ships `assets/template.html` (single-file HTML prototype
     // seed), `references/layouts.md` (paste-ready section layouts), and

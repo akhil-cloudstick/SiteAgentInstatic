@@ -2477,14 +2477,32 @@ html.studio-resizing * {
   --preview-scale: 1 !important;
 }
 
-.studio-screen .preview-stage .preview-frame-clip > div,
-.studio-screen .preview-stage .comment-frame-clip > div,
-.studio-screen .preview-stage .comment-preview-canvas > div,
-.studio-screen .preview-stage .manual-edit-canvas > div {
+/* Flattening upstream's fit-to-stage shrink is a TABLET/MOBILE concern: those
+   viewports render a fixed device width that upstream scales down, and the
+   Studio shows it at true size instead.
+
+   This used to be unscoped, so it also killed the desktop canvas's
+   `transform: scale(...)` — which IS the zoom control. Picking 50% or 200%
+   relabelled the trigger and changed nothing on screen. Desktop is excluded
+   here so the inline zoom transform survives. */
+.studio-screen .preview-stage .preview-viewport:not(.preview-viewport-desktop) .preview-frame-clip > div,
+.studio-screen .preview-stage .preview-viewport:not(.preview-viewport-desktop) .comment-frame-clip > div,
+.studio-screen .preview-stage .preview-viewport:not(.preview-viewport-desktop) .comment-preview-canvas > div,
+.studio-screen .preview-stage .preview-viewport:not(.preview-viewport-desktop) .manual-edit-canvas > div {
   width: 100% !important;
   height: 100% !important;
   transform: none !important;
 }
+
+/* Desktop keeps the same flattening for the CLIP itself (a `> div` of the
+   canvas), which carries no zoom transform of its own — only its child does. */
+.studio-screen .preview-stage .preview-viewport-desktop .comment-preview-canvas > div,
+.studio-screen .preview-stage .preview-viewport-desktop.manual-edit-workspace .manual-edit-canvas > div {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+
 
 .studio-screen .preview-stage iframe {
   width: 100% !important;

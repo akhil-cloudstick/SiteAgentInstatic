@@ -391,6 +391,20 @@ import {
 import { deriveRunErrorCode, runResultFromStatus } from './run-result.js';
 import { classifyRunFailure, isResumableFailure } from './run-failure-classification.js';
 import { decideSafeRunRetry } from './run-retry-policy.js';
+import { cachedRead, invalidateReadCache } from './read-cache.js';
+// How many times ONE run may transparently resume itself after a transient
+// mid-stream upstream drop before it gives up and shows the explicit Retry
+// affordance. Distinct from the same-run retry budget in run-retry-policy:
+// that one RESTARTS the turn from scratch (hence its single attempt and its
+// hard suppression once any work is committed), whereas this CONTINUES the
+// agent's own session via `--resume`, so it never re-does committed work and
+// can safely afford more than one. Long agentic turns on a provider that goes
+// quiet mid-stream (OpenRouter answers `{"code":504,"message":"Upstream idle
+// timeout exceeded"}` for exactly this) routinely need two.
+const MAX_TRANSIENT_AUTO_RESUMES = 2;
+// Backoff before each transparent resume. The upstream just dropped us; going
+// straight back at it tends to land on the same unhealthy provider route.
+const TRANSIENT_AUTO_RESUME_DELAYS_MS = [1_500, 4_000];
 import {
   amrUserIdForRunAnalytics,
   scanRunEventsForUsageAnalytics,
@@ -2080,6 +2094,41 @@ export async function startServer({
   // API stays at the conservative 4mb. Registered first so this parser claims
   // the ingest body before the global one (express.json is a no-op once a body
   // has already been read).
+  // Writes that can change a cached listing drop the whole cache (see
+  // read-cache.ts). Registered before the body parsers so no route can skip it
+  // by consuming the body itself.
+  //
+  // Scoped to the areas that OWN the cached content rather than firing on every
+  // write: the app POSTs /api/active on each project/file focus change, and
+  // chat runs POST continuously, so a blanket "any mutation" rule would clear
+  // the cache several times a minute and leave it permanently cold — the exact
+  // failure it exists to prevent. Anything that installs, edits or removes a
+  // plugin, skill, design system, prompt template or project passes through one
+  // of these prefixes; unrelated writes cannot affect the listings.
+  // Each prefix drops only the listings it can actually change. `/projects` is
+  // the reason this is a map and not a flat list: every run creates a project,
+  // and it can materialise a user design system, but it cannot touch the skill
+  // or plugin catalogs — clearing those here would re-pay their multi-second
+  // walk at the start of every clone.
+  const READ_CACHE_INVALIDATION: ReadonlyArray<readonly [string, readonly string[]]> = [
+    ['/plugins', ['plugins:installed']],
+    ['/marketplaces', ['plugins:installed']],
+    // Library installs land skills as well as plugins.
+    ['/library', ['plugins:installed', 'skills:all']],
+    ['/skills', ['skills:all']],
+    ['/design-systems', ['design-systems:all']],
+    ['/prompt-templates', ['prompt-templates:all']],
+    ['/projects', ['design-systems:all']],
+  ];
+  app.use('/api', (req, _res, next) => {
+    if (req.method !== 'GET' && req.method !== 'HEAD' && req.method !== 'OPTIONS') {
+      // `req.path` is mount-relative here (the `/api` prefix is stripped).
+      const affected = READ_CACHE_INVALIDATION.filter(([prefix]) => req.path.startsWith(prefix))
+        .flatMap(([, keys]) => keys);
+      if (affected.length > 0) invalidateReadCache(affected);
+    }
+    next();
+  });
   app.use('/api/library/ingest', express.json({ limit: '128mb' }));
   // Brand extract-from-html carries the full rendered page DOM (+ collected CSS)
   // the web read out of the in-app browser tab after the user cleared an anti-bot
@@ -5589,6 +5638,21 @@ export async function startServer({
     // window lets a follow-on signal (e.g. the inactivity watchdog's SIGTERM)
     // drive a second close-handler pass that finalizes the run as failed before
     // the retry ever spawns.
+    // A model-service stream error whose `error` frame we deliberately did NOT
+    // push to the client yet, because this attempt may be auto-resumable. The
+    // web paints "Task failed" the instant an `error` frame lands and tears
+    // down its text buffer, so emitting it and THEN resuming would leave a
+    // dead failure card above a stream that is still running. The close
+    // handler owns the decision: it either resumes (and this payload is
+    // dropped) or flushes the payload verbatim before finalizing, so a run we
+    // cannot resume reports exactly what it reported before.
+    //
+    // Declared HERE, above finishWithRetryDecision, rather than beside the
+    // other stream-error state further down: the close handler reads it, and a
+    // spawn that fails early can reach that handler before the later
+    // declaration has executed — which for a `let` would be a TDZ crash, not a
+    // null read.
+    let withheldAutoResumeErrorPayload = null;
     const tearDownAttemptForRetry = () => {
       // Snapshot the failing attempt's child + process group BEFORE we detach
       // them, so the reap targets THIS attempt's group and never the next one.
@@ -5863,6 +5927,50 @@ export async function startServer({
           resumed: agentResumeCtx.isResuming,
         });
         publishNativeSessionRecoveryMetadata();
+        // Transparent auto-resume. The session handle is persisted immediately
+        // above, so re-spawning this same run now resolves isResuming=true and
+        // the CLI continues from the block it had already committed — it does
+        // NOT redo the work, which is exactly why this can run where the
+        // from-scratch retry above must suppress itself. Without it a long
+        // agentic turn dies on the first mid-stream provider hiccup and the
+        // user has to click Retry to get the identical resume by hand.
+        //
+        // Deliberately narrow: only a failure the classifier already calls
+        // resumable (transient upstream drop / inactivity), only while the
+        // budget lasts, and never after a cancel. Anything else falls through
+        // to the unchanged terminal path below.
+        if (
+          !run.cancelRequested &&
+          !design.runs.isTerminal(run.status) &&
+          (run.autoResumeCount ?? 0) < MAX_TRANSIENT_AUTO_RESUMES
+        ) {
+          const autoResumeIndex = (run.autoResumeCount ?? 0) + 1;
+          run.autoResumeCount = autoResumeIndex;
+          // The withheld frame is now definitively unwanted: this attempt is
+          // continuing, not failing, so the chat must never see it.
+          withheldAutoResumeErrorPayload = null;
+          design.runs.emit(run, 'diagnostic', {
+            type: 'agent_transient_auto_resume',
+            agent_id: def.id,
+            attempt: autoResumeIndex,
+            max_attempts: MAX_TRANSIENT_AUTO_RESUMES,
+            session_id: liveSessionId,
+            failure_category: failure?.failure_category ?? null,
+            failure_detail: failure?.failure_detail ?? null,
+            error: run.error ?? null,
+          });
+          scheduleRetryRestart(
+            TRANSIENT_AUTO_RESUME_DELAYS_MS[autoResumeIndex - 1] ?? 4_000,
+          );
+          return true;
+        }
+      }
+      // We are finalizing for real. Any error frame held back on the chance of
+      // a resume must be delivered now, or the chat would show a failed run
+      // with no reason attached.
+      if (withheldAutoResumeErrorPayload) {
+        send(withheldAutoResumeErrorPayload[0], withheldAutoResumeErrorPayload[1]);
+        withheldAutoResumeErrorPayload = null;
       }
       finalizeRetryTelemetry(status, decision, failure, errorCode);
       if (executionProfile === 'filesystem' && result === 'success' && visibleAssistantText.trim().length === 0) {
@@ -7194,6 +7302,26 @@ export async function startServer({
     // plain streams (most other CLIs) we forward raw chunks unchanged so
     // the browser can append them to the assistant's text buffer.
     let agentStreamError = null;
+    // Cheap, deliberately CONSERVATIVE pre-check for "this attempt might be
+    // resumable". It never decides to resume — the close handler re-derives
+    // that from the full failure classification (isResumableFailure) — it only
+    // decides whether holding the `error` frame back is worth it. Every
+    // condition here is also a hard requirement at close time, so a `true`
+    // here can still end in a plain failure; a `false` keeps the pre-existing
+    // behaviour byte for byte.
+    const mayAutoResumeAfterStreamError = () => {
+      if (run.cancelRequested) return false;
+      if (def.resumesSessionViaCli !== true) return false;
+      if (!run.conversationId) return false;
+      if ((run.autoResumeCount ?? 0) >= MAX_TRANSIENT_AUTO_RESUMES) return false;
+      // `--resume` can only pick up from a block the agent already COMMITTED
+      // to its session. Without one there is nothing to continue and a resume
+      // would silently re-run the turn from the previous user message, so the
+      // explicit Retry affordance stays the right answer. Mirrors the
+      // `committedWorkSeen` gate the close handler applies.
+      const effects = runSideEffectsForRun(run);
+      return !!(effects.toolCallSeen || effects.artifactWriteSeen || effects.liveArtifactSeen);
+    };
     // Preserve whether a latched error predates a later cancel request. The
     // close handler runs after cancel() has already flipped cancelRequested,
     // so consulting only the current flag loses the ordering of those events.
@@ -7484,10 +7612,23 @@ export async function startServer({
         // execution-failed bucket.
         const serviceCode = classifyAgentServiceFailure(failureText);
         if (serviceCode) {
+          if (mayAutoResumeAfterStreamError()) {
+            withheldAutoResumeErrorPayload = ['error', createSseErrorPayload(serviceCode, agentStreamError, {
+              details: ev.raw ? { raw: ev.raw } : undefined,
+              retryable: true,
+            })];
+            return;
+          }
           send('error', createSseErrorPayload(serviceCode, agentStreamError, {
             details: ev.raw ? { raw: ev.raw } : undefined,
             retryable: true,
           }));
+          return;
+        }
+        if (mayAutoResumeAfterStreamError()) {
+          withheldAutoResumeErrorPayload = ['error', createSseErrorPayload('AGENT_EXECUTION_FAILED', agentStreamError, {
+            details: ev.raw ? { raw: ev.raw } : undefined,
+          })];
           return;
         }
         send('error', createSseErrorPayload('AGENT_EXECUTION_FAILED', agentStreamError, {

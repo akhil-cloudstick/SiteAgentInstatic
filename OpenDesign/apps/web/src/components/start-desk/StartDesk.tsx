@@ -48,8 +48,8 @@ export const WEBSITE_STARTS = [
   },
   {
     id: 'prototype',
-    label: 'Prototype',
-    description: 'Interactive app mockups',
+    label: 'Website',
+    description: 'Build a new site from a brief',
     requirement: 'Brief + target platform',
     icon: 'file-code',
   },
@@ -165,6 +165,13 @@ export interface StartDeskProps {
   onPromptChange: (value: string) => void;
   /** Fires when a start is chosen AND its preconditions are met. */
   onStart: (start: StartId, context: { prompt: string }) => void;
+  /**
+   * A start is in flight (binding the scenario, creating the project, opening
+   * the run). Send has to reflect it: the work behind this click can take a
+   * while, and with no busy state the desk looked frozen, so users clicked Send
+   * repeatedly and then clicked away believing it had hung.
+   */
+  sending?: boolean;
   /** Blank project bypasses the composer entirely — it needs no brief. */
   onBlankProject: () => void;
   onOpenTemplates: () => void;
@@ -213,6 +220,7 @@ export function StartDesk({
   prompt,
   onPromptChange,
   onStart,
+  sending = false,
   onBlankProject,
   onOpenTemplates,
   onCreateDesignSystem,
@@ -344,7 +352,11 @@ export function StartDesk({
 
       <ContextHandoffBand context={inherited} onOpenContext={() => setContextOpen(true)} />
 
-      {active.id === 'website-clone' && <CloneBoundary context={inherited} />}
+      {/* `CloneBoundary` is intentionally not rendered. It explained the split
+          between Product Hub's governed capture and MMS Design's editable
+          rebuild — accurate, but it took a full row on every Website clone to
+          restate a division of labour the operator already knows.
+          `CloneBoundary` stays exported for the surfaces that still want it. */}
 
       <section
         className="start-desk__composer"
@@ -571,10 +583,6 @@ export function StartDesk({
             )}
           </div>
 
-          <button type="button" className="start-desk__send" onClick={submit}>
-            <i className="fa-solid fa-paper-plane" aria-hidden="true" />
-            Send
-          </button>
         </div>
 
         <div className="start-desk__footer">
@@ -583,7 +591,28 @@ export function StartDesk({
             <span>Design system:</span>
             {designSystemSlot}
           </label>
-          {workingDirSlot}
+          {/* Send lives in this last row, beside the design-system picker, rather
+              than in the controls row above — the row it used to share held the
+              context/template/mode controls, and the footer had free space once
+              the working-directory picker came out. */}
+          <button
+            type="button"
+            className="start-desk__send"
+            onClick={submit}
+            disabled={sending}
+            aria-busy={sending}
+          >
+            {sending ? (
+              <span className="sd-spinner" aria-hidden="true" />
+            ) : (
+              <i className="fa-solid fa-paper-plane" aria-hidden="true" />
+            )}
+            {sending ? 'Starting…' : 'Send'}
+          </button>
+          {/* Working-directory picker removed from this screen by request. The
+              prop is still accepted so the host keeps passing its slot and no
+              caller breaks; a run simply starts without a working directory,
+              which is what "Not selected" already meant. */}
         </div>
 
         {runtime === 'byok' && (

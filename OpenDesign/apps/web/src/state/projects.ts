@@ -784,21 +784,50 @@ let cachedVisiblePlugins: InstalledPluginRecord[] | null = null;
 let cachedVisibleAt = 0;
 const PLUGINS_CACHE_TTL_MS = 10_000;
 
-export async function listPlugins(
+/** "The daemon answered with N plugins" vs "the daemon could not be asked". */
+export type PluginsLoadResult =
+  | { ok: true; plugins: InstalledPluginRecord[] }
+  | { ok: false };
+
+// Collapsing a failed fetch into `[]` (what `listPlugins` does, and must keep
+// doing for its callers) loses the one distinction that matters: an empty list
+// is a legitimate answer, so callers cannot tell "nothing installed" from
+// "never got a reply". That mattered because Home commits the result to state
+// — mount it while the daemon is still booting, when every /api/* answers 502,
+// and the empty list becomes the app's idea of reality: an empty create rail,
+// and every scenario chip reporting its bundled plugin as "not installed" with
+// advice to reinstall the daemon. Callers that react to the list should use
+// this and keep their last good value on `ok: false`.
+export async function loadPlugins(
   options: ListPluginsOptions = {},
-): Promise<InstalledPluginRecord[]> {
+): Promise<PluginsLoadResult> {
   try {
     const resp = await fetch('/api/plugins');
-    if (!resp.ok) return [];
+    if (!resp.ok) return { ok: false };
     const json = (await resp.json()) as { plugins?: InstalledPluginRecord[] };
     const plugins = json.plugins ?? [];
     const visible = plugins.filter(isVisiblePlugin);
     cachedVisiblePlugins = visible;
     cachedVisibleAt = Date.now();
-    return options.includeHidden ? plugins : visible;
+    return { ok: true, plugins: options.includeHidden ? plugins : visible };
   } catch {
-    return [];
+    return { ok: false };
   }
+}
+
+/** Cache-aware `loadPlugins`, mirroring `listPluginsFresh`. */
+export async function loadPluginsFresh(): Promise<PluginsLoadResult> {
+  if (cachedVisiblePlugins !== null && Date.now() - cachedVisibleAt < PLUGINS_CACHE_TTL_MS) {
+    return { ok: true, plugins: cachedVisiblePlugins };
+  }
+  return loadPlugins();
+}
+
+export async function listPlugins(
+  options: ListPluginsOptions = {},
+): Promise<InstalledPluginRecord[]> {
+  const result = await loadPlugins(options);
+  return result.ok ? result.plugins : [];
 }
 
 // Return the cached visible plugins without hitting the network when the cache

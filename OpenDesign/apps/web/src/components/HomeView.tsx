@@ -39,8 +39,8 @@ import {
   applyPlugin,
   createProject,
   duplicatePluginAsProject,
-  listPlugins,
-  listPluginsFresh,
+  loadPlugins,
+  loadPluginsFresh,
   patchProject,
   renderPluginBriefTemplate,
   resolvePluginQueryFallback,
@@ -504,7 +504,9 @@ export function HomeView({
    * green check is worse than no feedback. `setError` keeps its name and its
    * ~30 call sites and always means the former; `notify` is the latter.
    */
-  const [notice, setNotice] = useState<{ text: string; tone: 'success' | 'error' } | null>(null);
+  const [notice, setNotice] = useState<
+    { text: string; tone: 'success' | 'error' | 'info' } | null
+  >(null);
   const setError = useCallback(
     (text: string | null) => setNotice(text ? { text, tone: 'error' } : null),
     [],
@@ -513,6 +515,11 @@ export function HomeView({
   // Composer in-flight guard: disables the send button, shows Sending…, and
   // swallows repeat clicks across the whole async create tail.
   const [sending, setSending] = useState(false);
+  // Covers the Start Desk's bind-then-run, which spans two awaits: `submit()`
+  // owns `sending` but only for its own half, leaving the scenario bind before
+  // it with no busy state. Kept separate rather than reusing `sending` because
+  // submit() early-returns when `sending` is already true.
+  const [starting, setStarting] = useState(false);
   const [elevenLabsVoices, setElevenLabsVoices] = useState<AudioVoiceOption[]>([]);
   const [elevenLabsVoicesLoading, setElevenLabsVoicesLoading] = useState(false);
   // Live AIHubMix image catalogue merged into the home media composer's model
@@ -585,12 +592,30 @@ export function HomeView({
   }, []);
   useEffect(() => {
     let cancelled = false;
+    let retryTimer: number | null = null;
+    let failedAttempts = 0;
     // On mount use the cache-aware loader (skips the network when warm); an
     // explicit plugins-changed event forces a fresh fetch.
     const load = (force = false) => {
-      void (force ? listPlugins() : listPluginsFresh()).then((rows) => {
+      void (force ? loadPlugins() : loadPluginsFresh()).then((result) => {
         if (cancelled) return;
-        setPlugins(rows);
+        if (!result.ok) {
+          // Could not reach the daemon — NOT "zero plugins installed". Home
+          // mounts while the daemon is still booting (it binds its port only
+          // after registering every bundled plugin, and until then the gateway
+          // answers 502 for all of /api/*), so committing this as the list
+          // emptied the create rail and made every scenario chip insist its
+          // bundled plugin was missing. Hold the last good list, stay in the
+          // loading state, and keep asking until the daemon answers.
+          failedAttempts += 1;
+          retryTimer = window.setTimeout(
+            () => load(true),
+            Math.min(1_000 * 2 ** (failedAttempts - 1), 15_000),
+          );
+          return;
+        }
+        failedAttempts = 0;
+        setPlugins(result.plugins);
         setPluginsLoading(false);
       });
     };
@@ -599,6 +624,7 @@ export function HomeView({
     window.addEventListener('open-design:plugins-changed', onChanged);
     return () => {
       cancelled = true;
+      if (retryTimer !== null) window.clearTimeout(retryTimer);
       window.removeEventListener('open-design:plugins-changed', onChanged);
     };
   }, []);
@@ -1811,7 +1837,7 @@ export function HomeView({
   // Pure UI-state mapping — the heavy lifting is delegated back to
   // existing handlers. Migration chips that don't have a bound plugin
   // (`open-template-picker`) forward to callbacks threaded in from EntryShell.
-  function pickChip(chip: HomeHeroChip) {
+  function pickChip(chip: HomeHeroChip): Promise<boolean> | undefined {
     setError(null);
     // P0 ui_click area=chat_composer element=plugin_chip|action_chip. The
     // chip's `action.kind` discriminates: plugin-bound chips
@@ -1835,8 +1861,14 @@ export function HomeView({
         const targetId = chip.action.pluginId;
         const record = plugins.find((p) => p.id === targetId);
         if (!record) {
+          // Only accuse the install once the list actually loaded. While
+          // `pluginsLoading` is still true the loader above is retrying a
+          // daemon that has not answered yet, and telling the user to reinstall
+          // the daemon over a transient 502 is both wrong and destructive.
           setError(
-            `Bundled scenario "${targetId}" is not installed. Reinstall the daemon to restore the default plugin set.`,
+            pluginsLoading
+              ? 'Still loading plugins from the daemon — it may still be starting up. Try again in a moment.'
+              : `Bundled scenario "${targetId}" is not installed. Reinstall the daemon to restore the default plugin set.`,
           );
           return;
         }
@@ -1896,7 +1928,11 @@ export function HomeView({
             ? t('homeHero.chip.webClonePromptSeed')
             : null;
         if (chip.group === 'create') {
-          void usePlugin(record, promptSeed ?? undefined, {
+          // Returned, not voided, so a caller that must RUN the scenario (the
+          // Start Desk's Send) can wait for the bind to settle before
+          // submitting. The chip rail itself still ignores it: there, picking
+          // a chip is a mode switch and the user sends when ready.
+          return usePlugin(record, promptSeed ?? undefined, {
             ...pluginOptions,
             suppressPromptUpdate: promptSeed === null,
             deferApply: true,
@@ -2213,6 +2249,118 @@ export function HomeView({
     }
   }
 
+  // Hand-over to Studio. Returned INSTEAD of the Start Desk — not layered over
+  // it — so the shell keeps rendering around us: both header rows, the product
+  // switcher and the tab strip stay put, and only the work area swaps. An
+  // earlier attempt used a fixed full-viewport panel, which blanked the chrome
+  // too and read as having been dumped on some other page.
+  //
+  // It renders the shape Studio will occupy (conversation column, preview
+  // pane) rather than a spinner on empty space, so the layout does not jump
+  // when the real view arrives. Every hook above has already run; this is a
+  // render-only branch, so the composer draft and every piece of state survive
+  // and are still here if the start fails.
+  if (sending || starting) {
+    return (
+      <div className="home-view" data-testid="home-view-opening-studio" aria-busy="true">
+        <style>
+          {'@keyframes od-skeleton-pulse{0%,100%{opacity:.55}50%{opacity:1}}'}
+        </style>
+        {(() => {
+          // Local so the skeleton stays self-contained — it is scaffolding for
+          // one transient state, not a new shared primitive.
+          const bar = (width: string, height = 12, delay = 0): React.CSSProperties => ({
+            width,
+            height,
+            borderRadius: 6,
+            background: 'var(--mms-border-strong, #dfe6e8)',
+            animation: `od-skeleton-pulse 1.2s ease-in-out ${delay}s infinite`,
+          });
+          return (
+            <div
+              style={{
+                display: 'flex',
+                gap: 18,
+                padding: '22px 26px',
+                minHeight: 'calc(100vh - 210px)',
+                alignItems: 'stretch',
+              }}
+            >
+              {/* Conversation column */}
+              <div
+                style={{
+                  flex: '0 0 380px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 14,
+                  padding: 18,
+                  borderRadius: 10,
+                  border: '1px solid var(--mms-border-strong, #dfe6e8)',
+                  background: 'var(--mms-surface-raised, #fff)',
+                }}
+              >
+                <div style={bar('45%', 14)} />
+                <div style={bar('100%', 60, 0.05)} />
+                <div style={bar('80%', 12, 0.1)} />
+                <div style={bar('92%', 12, 0.15)} />
+                <div style={{ flex: 1 }} />
+                <div style={bar('100%', 44, 0.2)} />
+              </div>
+
+              {/* Preview pane */}
+              <div
+                style={{
+                  flex: 1,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 14,
+                  padding: 18,
+                  borderRadius: 10,
+                  border: '1px solid var(--mms-border-strong, #dfe6e8)',
+                  background: 'var(--mms-surface-raised, #fff)',
+                }}
+              >
+                <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                  <div style={bar('120px', 12)} />
+                  <div style={{ flex: 1 }} />
+                  <div style={bar('64px', 12, 0.08)} />
+                </div>
+                <div style={{ ...bar('100%', 0, 0.12), flex: 1, minHeight: 220 }} />
+                <div
+                  style={{
+                    display: 'flex',
+                    gap: 10,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: 'var(--mms-text-muted, #6b7a7f)',
+                    fontSize: 13,
+                  }}
+                >
+                  <span
+                    aria-hidden="true"
+                    style={{
+                      width: 16,
+                      height: 16,
+                      borderRadius: '50%',
+                      border: '2px solid var(--mms-border-strong, #dfe6e8)',
+                      borderTopColor: 'var(--mms-action, #12855b)',
+                      animation: 'od-studio-spin 0.7s linear infinite',
+                      display: 'inline-block',
+                    }}
+                  />
+                  <span role="status" aria-live="polite">
+                    Opening Project Studio — setting up your project and starting the run.
+                  </span>
+                  <style>{'@keyframes od-studio-spin{to{transform:rotate(360deg)}}'}</style>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+      </div>
+    );
+  }
+
   return (
     <div className="home-view" data-testid="home-view" ref={homeViewRef}>
       {/* The client-approved Website Start Desk replaces the upstream hero.
@@ -2222,13 +2370,30 @@ export function HomeView({
       <StartDesk
         prompt={prompt}
         onPromptChange={handlePromptChange}
+        sending={sending || starting}
         onStart={(start) => {
           const chipId = START_TO_CHIP[start];
           const chip = chipId ? findChip(chipId) : undefined;
-          // Binds the scenario plugin exactly as the old chip rail did, then
-          // leaves the run to the unchanged submit path.
-          if (chip) pickChip(chip);
-          else void submit();
+          if (!chip) {
+            void submit();
+            return;
+          }
+          // Bind the scenario plugin exactly as the chip rail does, THEN run.
+          // `pickChip` alone only binds (create-group chips apply with
+          // `deferApply`), which is right for the rail — picking a chip there
+          // is a mode switch and the user sends when ready — but the Start
+          // Desk's Send is the send: its own copy promises "Send opens Project
+          // Studio". Without this the click just swapped the Template label and
+          // nothing else happened, so the page looked frozen.
+          void (async () => {
+            setStarting(true);
+            try {
+              await pickChip(chip);
+              await submit();
+            } finally {
+              setStarting(false);
+            }
+          })();
         }}
         onBlankProject={() => { void submit(); }}
         onOpenTemplates={() => onOpenNewProject?.('template')}
@@ -2238,7 +2403,12 @@ export function HomeView({
         }}
         onAddContext={(optionId) => void openContextSource(optionId)}
         contextBadges={contextBadges}
-        onNotice={(message) => setError(message)}
+        // Notices are guidance ("paste the target URL", "Website clone
+        // selected"), so they belong on the toast, not in `error`. Routing them
+        // through the error state painted every start-card selection in the
+        // danger treatment, which read as a failure and made users think the
+        // card had not worked. Genuine failures still call setError directly.
+        onNotice={(message) => setNotice({ text: message, tone: 'info' })}
         onViewAllProjects={onViewAllProjects}
         // Conversation mode and runtime are the HOST's state, not the view's:
         // `sessionMode` is what the created run is given as its
@@ -2311,6 +2481,8 @@ export function HomeView({
         />
         }
       />
+
+
 
       {/* The screen's one notice surface. Before this, `onNotice` fed a state
           field nothing rendered, so Send-without-a-URL looked like a dead

@@ -92,7 +92,11 @@ function renderUiLocalePrompt(
     '',
     `The Open Design UI locale for this run is \`${normalized}\` (${languageName}). All user-visible chat prose and generated UI controls must follow this locale, especially \`<question-form>\` titles, descriptions, labels, placeholders, helper text, and option labels. Keep machine-readable ids and object option \`value\` fields exact and unlocalized.`,
     `The artifacts you generate must also be in ${languageName}: every piece of user-visible copy in the HTML/React/page/deck you produce — headings, body text, navigation, button and link labels, captions, alt text, and form fields — is written in this language by default. This holds even when a chosen template, plugin, or design system ships its reference/example content in another language: treat that copy as a layout and style reference and translate/adapt it into ${languageName}, do not ship its wording verbatim. Keep brand names, code, and technical identifiers as-is, and honor an explicit user request for a different output language.`,
-    'Exception: for the default task-type form, keep the `taskType` option labels as the canonical routing choices: `Prototype`, `Live artifact`, `Slide deck`, `Image`, `Video`, `HyperFrames`, `Audio`, `Other`. Do not translate, reorder, or rewrite those option labels.',
+    // This deployment builds websites only, so the task-type form offers just
+    // the two routes that produce one. `Website` is a LABEL over the unchanged
+    // `Prototype` routing value — the value is what selects the workflow, so
+    // renaming it would silently re-route the run.
+    'Exception: for the default task-type form, offer exactly two `taskType` options and no others: `Website` (object option, value `Prototype`) and `Live artifact`. Do not add, reorder, or rewrite them, do not reintroduce slide deck / image / video / HyperFrames / audio / other, and do not translate the object option `value`.',
   ];
   // The worked zh-CN quick-brief copy below matches the CLASSIC default
   // discovery form verbatim. The slim charter recipes that form instead of

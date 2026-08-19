@@ -785,8 +785,17 @@ function AppInner() {
     });
   }, [activeProjectId, activeFileName]);
 
+  // Only the AMR runtime serves this catalog, and only when its `vela` CLI is
+  // actually installed — `/api/amr/models` throws "AMR vela binary could not
+  // be resolved" (HTTP 500) otherwise. `/api/agents` already tells us that, so
+  // polling regardless made every AMR-less install log a 500 on each boot and
+  // on every restart token bump. Deriving the flag from `agents` is loop-safe:
+  // the only thing this effect writes back is `models`, never `available`.
+  const amrRuntimeAvailable = agents.some((agent) => agent.id === 'amr' && agent.available);
+
   useEffect(() => {
     if (!daemonLive) return;
+    if (!amrRuntimeAvailable) return;
     let cancelled = false;
     let timer: number | null = null;
     const pollGeneration = amrPollGenerationRef.current + 1;
@@ -825,7 +834,7 @@ function AppInner() {
       cancelled = true;
       if (timer !== null) window.clearTimeout(timer);
     };
-  }, [amrPollRestartToken, daemonLive]);
+  }, [amrPollRestartToken, daemonLive, amrRuntimeAvailable]);
 
   // App-level AMR sign-in state. Feeds two analytics globals: the
   // `amr` configure_type bucket (deriveConfigureGlobals below) and the

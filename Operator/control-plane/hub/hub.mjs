@@ -45,7 +45,8 @@ function html(res, code, body) {
 }
 function redirect(res, location, cookie) {
   const headers = { Location: location, 'Cache-Control': 'no-store' };
-  if (cookie) headers['Set-Cookie'] = cookie;
+  // `cookie` may be an array — signing out expires one cookie per tool.
+  if (cookie && (!Array.isArray(cookie) || cookie.length > 0)) headers['Set-Cookie'] = cookie;
   res.writeHead(302, headers);
   res.end();
 }
@@ -81,8 +82,24 @@ function sessionCookie(slug) {
   const val = signValue({ sub: slug, kind: 'hub' }, SESSION_TTL_SEC);
   return `${SESSION_COOKIE}=${val}; HttpOnly; Path=/; SameSite=None; Secure; Max-Age=${SESSION_TTL_SEC}`;
 }
+// One login means one logout. The hub cookie is only the OUTER session — each
+// tool mints its own, longer-lived-than-you-think cookie during SSO, and
+// clearing just `sa_hub` left the user still signed in to whichever tool they
+// opened next: the hub bounced them to /login while /design and /cms happily
+// served the previous tenant's session. Every one of these is set on the funnel
+// origin, so the control plane can expire all three here.
+//
+// Deletion matches on name + domain + PATH, so each Path must mirror the one
+// the cookie was set with — `instatic_admin_session` is scoped to /cms and a
+// Path=/ clear would silently miss it.
 function clearCookie() {
-  return `${SESSION_COOKIE}=; HttpOnly; Path=/; SameSite=None; Secure; Max-Age=0`;
+  return [
+    `${SESSION_COOKIE}=; HttpOnly; Path=/; SameSite=None; Secure; Max-Age=0`,
+    // OpenDesign daemon session (apps/daemon/src/server.ts).
+    'od_session=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0',
+    // Instatic admin session (server/handlers/cms/session.ts).
+    'instatic_admin_session=; HttpOnly; Path=/cms; SameSite=Lax; Secure; Max-Age=0',
+  ];
 }
 
 // Where to send the user after a successful login. `next` comes from

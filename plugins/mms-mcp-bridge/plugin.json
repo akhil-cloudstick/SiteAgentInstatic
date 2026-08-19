@@ -1,0 +1,47 @@
+{
+  "id": "mms.mcp-bridge",
+  "name": "MMS MCP Bridge",
+  "version": "1.0.0",
+  "apiVersion": 1,
+  "description": "Headless content backend for the MMS MCP gateway. Exposes capability-gated internal routes so the Operator control-plane can create and edit pages, blogs and content on behalf of an AI agent. Not an MCP server itself and not callable anonymously.",
+  "permissions": [
+    "cms.routes",
+    "cms.content.read",
+    "cms.content.write",
+    "cms.content.publish",
+    "cms.content.delete",
+    "cms.content.tables.manage"
+  ],
+  "resources": [],
+  "adminPages": [],
+  "entrypoints": {
+    "server": "server/index.js"
+  },
+  "contentAccess": [
+    { "table": "pages",         "modes": ["read", "write", "publish", "delete"] },
+    { "table": "posts",         "modes": ["read", "write", "publish", "delete"] },
+    { "table": "components",    "modes": ["read", "write", "publish", "delete"] },
+    { "table": "layouts",       "modes": ["read", "write", "publish", "delete"] },
+    { "table": "blogs",         "modes": ["read", "write", "publish", "delete"] },
+    { "table": "services",      "modes": ["read", "write", "publish", "delete"] },
+    { "table": "team",          "modes": ["read", "write", "publish", "delete"] },
+    { "table": "testimonials",  "modes": ["read", "write", "publish", "delete"] },
+    { "table": "faqs",          "modes": ["read", "write", "publish", "delete"] },
+    { "table": "projects",      "modes": ["read", "write", "publish", "delete"] },
+    { "table": "careers",       "modes": ["read", "write", "publish", "delete"] },
+    { "table": "events",        "modes": ["read", "write", "publish", "delete"] },
+    { "table": "products",      "modes": ["read", "write", "publish", "delete"] },
+    { "table": "case-studies",  "modes": ["read", "write", "publish", "delete"] },
+    { "table": "locations",     "modes": ["read", "write", "publish", "delete"] },
+    { "table": "partners",      "modes": ["read", "write", "publish", "delete"] },
+    { "table": "resources",     "modes": ["read", "write", "publish", "delete"] },
+    { "table": "press",         "modes": ["read", "write", "publish", "delete"] },
+    { "table": "gallery",       "modes": ["read", "write", "publish", "delete"] },
+    { "table": "categories",    "modes": ["read", "write", "publish", "delete"] },
+    { "table": "tags",          "modes": ["read", "write", "publish", "delete"] },
+    { "table": "authors",       "modes": ["read", "write", "publish", "delete"] }
+  ],
+  "author": { "name": "MMSBUILD" },
+  "license": "UNLICENSED",
+  "keywords": ["mcp", "agent", "headless", "content"]
+}

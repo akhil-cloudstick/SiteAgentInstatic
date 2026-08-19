@@ -61,6 +61,7 @@ import {
   commentPreviewCanvasSize,
   desktopPreviewAutoFitZoomPercent,
   desktopPreviewDocumentContentWidth,
+  desktopZoomLayout,
   deckKeyboardShortcutForEvent,
   effectivePreviewScale,
   fileVersionPreviewOptions,
@@ -379,6 +380,33 @@ describe('FileViewer preview scale', () => {
     expect(desktopPreviewAutoFitZoomPercent({ width: 900, height: 700 }, 1440)).toBeCloseTo(62.5);
     expect(desktopPreviewAutoFitZoomPercent({ width: 900, height: 700 }, 900)).toBe(100);
     expect(desktopPreviewAutoFitZoomPercent({ width: 1600, height: 900 }, 1440)).toBe(100);
+  });
+
+  it('scales the desktop page instead of resizing its viewport when zooming', () => {
+    // Zoom OUT: the page keeps its 1000px layout width — so it does not reflow
+    // — and is drawn at half size, centred in the 1000px clip.
+    const out = desktopZoomLayout('desktop', 'manual', 0.5, 1000);
+    expect(out).toEqual({
+      scale: 0.5,
+      baseWidth: 1000,
+      scaledWidth: 500,
+      offsetX: 250,
+      overflow: false,
+    });
+
+    // Zoom IN: same layout width, drawn double size, so the clip has to pan.
+    const zoomedIn = desktopZoomLayout('desktop', 'manual', 2, 1000);
+    expect(zoomedIn?.scaledWidth).toBe(2000);
+    expect(zoomedIn?.offsetX).toBe(0);
+    expect(zoomedIn?.overflow).toBe(true);
+  });
+
+  it('leaves the preview shell untouched at 1:1, on auto-fit, and off desktop', () => {
+    expect(desktopZoomLayout('desktop', 'manual', 1, 1000)).toBeNull();
+    expect(desktopZoomLayout('desktop', 'auto', 0.5, 1000)).toBeNull();
+    expect(desktopZoomLayout('tablet', 'manual', 0.5, 1000)).toBeNull();
+    expect(desktopZoomLayout('desktop', 'manual', 0.5, undefined)).toBeNull();
+    expect(desktopZoomLayout('desktop', 'manual', 0.5, 0)).toBeNull();
   });
 
   it('measures desktop preview document content width from real iframe layout', () => {

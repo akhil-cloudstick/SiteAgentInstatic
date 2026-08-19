@@ -1124,9 +1124,16 @@ export function EntryShell({
               }
             />
             <WhatsNewPopup active={view === 'home'} />
-            <MessageCenter
-              onOpenNotificationSettings={() => onOpenSettings('notifications')}
-            />
+            {/* The Message Center is a VELA-hosted service reached through the
+                AMR runtime's proxy routes. With no `vela` CLI installed there
+                is no profile to proxy with, so every 60s sync 502s and the
+                panel sits permanently in its error state — a control that can
+                never succeed. Mount it only where its backing runtime exists. */}
+            {agents.some((agent) => agent.id === 'amr' && agent.available) ? (
+              <MessageCenter
+                onOpenNotificationSettings={() => onOpenSettings('notifications')}
+              />
+            ) : null}
             {/* The account control now lives in row 1 of the shared shell. */}
             {amrBalanceGateBlock ? (
               <AmrBalanceDialog

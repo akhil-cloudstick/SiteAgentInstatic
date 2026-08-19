@@ -148,7 +148,7 @@ const PRIMARY_CATEGORIES: readonly CategoryDef[] = [
   },
   {
     slug: 'prototype',
-    label: 'Prototype',
+    label: 'Website',
     starterPrompt: 'Create an MMS Design plugin that generates an interactive prototype from a product brief.',
     test: (record) => byMode('prototype')(record) && !isLiveArtifactPlugin(record),
   },

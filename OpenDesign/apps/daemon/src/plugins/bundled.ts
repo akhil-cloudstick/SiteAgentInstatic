@@ -82,36 +82,63 @@ export async function registerBundledPlugins(
     throw err;
   }
 
-  for (const tier of topLevel) {
-    if (!tier.isDirectory()) continue;
-    // Two layouts are supported:
-    //   - plugins/_official/<plugin-id>/        — direct plugin
-    //   - plugins/_official/atoms/<atom>/       — atom subtree
-    //   - plugins/_official/scenarios/<id>/     — scenario subtree
-    //   - plugins/_official/bundles/<id>/       — bundle subtree
-    // We try the direct shape first, then recurse one level if the
-    // tier directory itself isn't a manifest folder.
-    const tierAbs = path.join(input.bundledRoot, tier.name);
-    const tierManifest = path.join(tierAbs, 'open-design.json');
-    if (await pathExists(tierManifest)) {
-      // Direct: <bundledRoot>/<plugin-id>/open-design.json
-      await registerOne({ folder: tierAbs, folderId: tier.name, out, warnings, seenFolderIds, input });
-      continue;
-    }
-    let inner;
-    try {
-      inner = await fsp.readdir(tierAbs, { withFileTypes: true });
-    } catch {
-      continue;
-    }
-    for (const entry of inner) {
-      if (!entry.isDirectory()) continue;
-      const folder = path.join(tierAbs, entry.name);
-      const manifest = path.join(folder, 'open-design.json');
-      if (!(await pathExists(manifest))) continue;
-      await registerOne({ folder, folderId: entry.name, out, warnings, seenFolderIds, input });
-    }
-  }
+  // This walk GATES STARTUP — the daemon does not bind its port until it
+  // returns — and it covers ~460 folders, each needing a manifest probe and a
+  // read. Done one await at a time on a network-mounted repo it was the bulk of
+  // a 3m20s boot, which is the window where every request 502s. So: discover
+  // the candidates first, then register them concurrently. The registrations
+  // are independent upserts keyed by folder id, so the order they complete in
+  // carries no meaning; `out` is only used to build marketplace entries.
+  //
+  // Two layouts are supported:
+  //   - plugins/_official/<plugin-id>/        — direct plugin
+  //   - plugins/_official/atoms/<atom>/       — atom subtree
+  //   - plugins/_official/scenarios/<id>/     — scenario subtree
+  //   - plugins/_official/bundles/<id>/       — bundle subtree
+  // The direct shape is tried first; otherwise we recurse one level.
+  const tierResults = await Promise.all(
+    topLevel.map(async (tier) => {
+      if (!tier.isDirectory()) return [];
+      const tierAbs = path.join(input.bundledRoot, tier.name);
+      if (await pathExists(path.join(tierAbs, 'open-design.json'))) {
+        // Direct: <bundledRoot>/<plugin-id>/open-design.json
+        return [{ folder: tierAbs, folderId: tier.name }];
+      }
+      let inner;
+      try {
+        inner = await fsp.readdir(tierAbs, { withFileTypes: true });
+      } catch {
+        return [];
+      }
+      const found = await Promise.all(
+        inner.map(async (entry) => {
+          if (!entry.isDirectory()) return null;
+          const folder = path.join(tierAbs, entry.name);
+          // A folder with no manifest is skipped WITHOUT being recorded in
+          // seenFolderIds, exactly as before, so pruning still treats it as
+          // absent rather than as a broken plugin.
+          if (!(await pathExists(path.join(folder, 'open-design.json')))) return null;
+          return { folder, folderId: entry.name };
+        }),
+      );
+      return found.filter((item): item is { folder: string; folderId: string } => item !== null);
+    }),
+  );
+
+  await Promise.all(
+    tierResults
+      .flat()
+      .map((candidate) =>
+        registerOne({
+          folder: candidate.folder,
+          folderId: candidate.folderId,
+          out,
+          warnings,
+          seenFolderIds,
+          input,
+        }),
+      ),
+  );
 
   const pruned = pruneRemovedBundledPlugins(input.db, seenFolderIds);
   return { registered: out, pruned, warnings };

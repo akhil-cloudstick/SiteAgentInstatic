@@ -1,0 +1,339 @@
+---
+import Layout from '../layouts/Layout.astro';
+const CP = 'http://127.0.0.1:4400';
+const rawBase = import.meta.env.BASE_URL;
+const baseUrl = rawBase.endsWith('/') ? rawBase : `${rawBase}/`;
+
+let error = '';
+let notice = '';
+// A freshly minted key is rendered inline instead of redirecting: the plaintext
+// exists exactly once and must never travel in a URL (browser history, logs,
+// referrers). Reload the page and it is gone.
+let minted = null;
+
+const PERMISSION_GROUPS = [
+  {
+    title: 'Content',
+    items: [
+      ['read', 'Read pages, posts and collections'],
+      ['create', 'Create new entries'],
+      ['edit', 'Edit entries and page layouts'],
+      ['delete', 'Delete entries (recoverable from Trash)'],
+      ['publish', 'Publish entries to the live site'],
+      ['tables.manage', 'Create new collections'],
+    ],
+  },
+  {
+    title: 'Media',
+    items: [
+      ['media.read', 'Browse the media library'],
+      ['media.write', 'Upload and edit media'],
+      ['media.delete', 'Delete media (recoverable from Trash)'],
+    ],
+  },
+  {
+    title: 'Design',
+    items: [['design.edit', 'Edit global design tokens and styles']],
+  },
+];
+
+async function cp(path, init) {
+  const res = await fetch(`${CP}${path}`, init);
+  const text = await res.text();
+  let parsed = {};
+  try { parsed = text ? JSON.parse(text) : {}; } catch {}
+  if (!res.ok) throw new Error(parsed.error || `request failed (${res.status})`);
+  return parsed;
+}
+
+if (Astro.request.method === 'POST') {
+  const f = await Astro.request.formData();
+  const action = (f.get('action') || '').toString();
+  try {
+    if (action === 'create') {
+      const permissions = f.getAll('permissions').map((p) => p.toString());
+      const tablesRaw = (f.get('tables') || '').toString().trim();
+      const expiresRaw = (f.get('expiresInDays') || '').toString().trim();
+      const body = {
+        tenantSlug: (f.get('tenantSlug') || '').toString(),
+        label: (f.get('label') || '').toString().trim() || 'agent',
+        permissions,
+        tables: tablesRaw ? tablesRaw.split(',').map((t) => t.trim()).filter(Boolean) : ['*'],
+        expiresInDays: expiresRaw ? Number(expiresRaw) : undefined,
+      };
+      const out = await cp('/api/mcp/agents', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      minted = { ...out.agent, endpoint: out.endpoint };
+      notice = 'Key created. Copy it now — it is shown only once.';
+    } else if (action === 'revoke') {
+      await cp(`/api/mcp/agents/${encodeURIComponent((f.get('keyId') || '').toString())}/revoke`, { method: 'POST' });
+      return Astro.redirect(`${baseUrl}mcp?revoked=1`);
+    } else if (action === 'install-bridge') {
+      const slug = (f.get('tenantSlug') || '').toString();
+      const out = await cp(`/api/mcp/tenants/${encodeURIComponent(slug)}/install-bridge`, { method: 'POST' });
+      return Astro.redirect(`${baseUrl}mcp?installed=${encodeURIComponent(slug)}&v=${encodeURIComponent(out.version || '')}`);
+    }
+  } catch (e) {
+    error = e.message;
+  }
+}
+
+if (Astro.url.searchParams.get('revoked')) notice = 'Key revoked. It stops working immediately.';
+const installedSlug = Astro.url.searchParams.get('installed');
+if (installedSlug) {
+  const v = Astro.url.searchParams.get('v');
+  notice = `Bridge plugin installed on ${installedSlug}${v ? ` (v${v})` : ''}. Content tools are live for that site.`;
+}
+
+let directory = [];
+let agents = [];
+try {
+  const [d, a] = await Promise.all([cp('/api/mcp/directory'), cp('/api/mcp/agents')]);
+  directory = d.tenants || [];
+  agents = a.agents || [];
+} catch (e) {
+  if (!error) error = e.message;
+}
+
+const activeTenants = directory.filter((t) => t.status !== 'removed');
+const fmt = (v) => (v ? new Date(v).toLocaleString() : '—');
+---
+
+<Layout title="MCP Agents">
+  <h1>MCP Agents</h1>
+  <p class="sub">
+    Give an external AI agent scoped access to one tenant's CMS. Each key is bound to a single site and
+    carries its own permissions — content, media and design arrive through one endpoint.
+  </p>
+
+  {error && <div class="banner err">{error}</div>}
+  {notice && !error && <div class="banner ok">{notice}</div>}
+
+  {minted && (
+    <div class="card" style="border-color:var(--accent)">
+      <h2 style="margin:0 0 6px;font-size:15px">Your new agent key</h2>
+      <p class="hint" style="margin:0 0 10px">
+        This is the only time the key is shown. Store it in the agent's configuration now.
+      </p>
+      <div class="copyrow">
+        <pre class="tok" id="tok-key">{minted.token}</pre>
+        <button type="button" class="ghost copy" data-copy="tok-key">Copy key</button>
+      </div>
+
+      <p class="hint" style="margin:14px 0 4px"><strong>Endpoint</strong></p>
+      <div class="copyrow">
+        <pre class="tok" id="tok-endpoint">{minted.endpoint}</pre>
+        <button type="button" class="ghost copy" data-copy="tok-endpoint">Copy endpoint</button>
+      </div>
+
+      <p class="hint" style="margin:14px 0 4px"><strong>Connect with Claude Code</strong></p>
+      <div class="copyrow">
+        <pre class="tok" id="tok-claude">{`claude mcp add mms-cms --transport http ${minted.endpoint} --header "Authorization: Bearer ${minted.token}"`}</pre>
+        <button type="button" class="ghost copy" data-copy="tok-claude">Copy command</button>
+      </div>
+
+      <p class="hint" style="margin:14px 0 4px"><strong>Any other MCP client</strong></p>
+      <div class="copyrow">
+        <pre class="tok" id="tok-manual">{`endpoint: ${minted.endpoint}\nheader:   Authorization: Bearer ${minted.token}`}</pre>
+        <button type="button" class="ghost copy" data-copy="tok-manual">Copy both</button>
+      </div>
+    </div>
+  )}
+
+  <div class="card">
+    <h2 style="margin:0 0 12px;font-size:15px">Create a key</h2>
+    {activeTenants.length === 0 ? (
+      <p class="hint">No tenants yet. Provision one first.</p>
+    ) : (
+      <form method="POST">
+        <input type="hidden" name="action" value="create" />
+        <div class="grid2">
+          <div>
+            <label for="tenantSlug">Site</label>
+            <select id="tenantSlug" name="tenantSlug" required>
+              {activeTenants.map((t) => (
+                <option value={t.slug}>{t.slug}{t.bridgeInstalled ? '' : '  (bridge plugin not installed)'}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label for="label">Label</label>
+            <input id="label" name="label" placeholder="marketing-agent" />
+          </div>
+        </div>
+        <div class="grid2">
+          <div>
+            <label for="tables">Tables (comma-separated, blank = all)</label>
+            <input id="tables" name="tables" placeholder="posts, pages" />
+          </div>
+          <div>
+            <label for="expiresInDays">Expires in (days, blank = never)</label>
+            <input id="expiresInDays" name="expiresInDays" type="number" min="1" placeholder="90" />
+          </div>
+        </div>
+
+        <label style="margin-top:16px">Permissions</label>
+        <div class="perms">
+          {PERMISSION_GROUPS.map((group) => (
+            <fieldset>
+              <legend>{group.title}</legend>
+              {group.items.map(([value, description]) => (
+                <label class="check">
+                  <input type="checkbox" name="permissions" value={value} checked={value === 'read'} />
+                  <span><code>{value}</code> — {description}</span>
+                </label>
+              ))}
+            </fieldset>
+          ))}
+        </div>
+        <p class="hint" style="margin:12px 0 14px">
+          Grant the least the agent needs. <code>publish</code> is what makes work visible to visitors;
+          without it every edit stays a draft a human can review.
+        </p>
+        <button type="submit">Create key</button>
+      </form>
+    )}
+  </div>
+
+  <div class="card">
+    <h2 style="margin:0 0 12px;font-size:15px">Keys</h2>
+    {agents.length === 0 ? (
+      <p class="hint">No keys issued yet.</p>
+    ) : (
+      <table>
+        <thead>
+          <tr><th>Label</th><th>Site</th><th>Permissions</th><th>Tables</th><th>Last used</th><th>Status</th><th></th></tr>
+        </thead>
+        <tbody>
+          {agents.map((a) => (
+            <tr>
+              <td>{a.label}</td>
+              <td><code>{a.tenantSlug}</code></td>
+              <td class="hint">{(a.permissions || []).join(', ') || '—'}</td>
+              <td class="hint">{(a.tables || ['*']).join(', ')}</td>
+              <td class="hint">{fmt(a.lastUsedAt)}</td>
+              <td>
+                {a.revokedAt
+                  ? <span class="pill bad">revoked</span>
+                  : a.expiresAt && new Date(a.expiresAt) < new Date()
+                    ? <span class="pill warn">expired</span>
+                    : <span class="pill ok">active</span>}
+              </td>
+              <td class="row-actions">
+                {!a.revokedAt && (
+                  <form method="POST" onsubmit="return confirm('Revoke this key? The agent loses access immediately.')">
+                    <input type="hidden" name="action" value="revoke" />
+                    <input type="hidden" name="keyId" value={a.keyId} />
+                    <button class="danger" type="submit">Revoke</button>
+                  </form>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    )}
+  </div>
+
+  <div class="card">
+    <h2 style="margin:0 0 12px;font-size:15px">Endpoint directory</h2>
+    <p class="hint" style="margin:0 0 12px">
+      One endpoint per site. The bridge plugin must be installed on a site before content tools work there;
+      media and design tools work without it.
+    </p>
+    <table>
+      <thead>
+        <tr><th>Site</th><th>Endpoint</th><th>Bridge</th><th>Keys</th><th>Last used</th><th></th></tr>
+      </thead>
+      <tbody>
+        {directory.map((t) => (
+          <tr>
+            <td><code>{t.slug}</code></td>
+            <td>
+              <div class="copyrow tight">
+                <code class="ep" id={`ep-${t.slug}`}>{t.endpoint}</code>
+                <button type="button" class="ghost copy small" data-copy={`ep-${t.slug}`}>Copy</button>
+              </div>
+            </td>
+            <td>
+              {t.bridgeInstalled === null
+                ? <span class="pill">site not running</span>
+                : t.bridgeInstalled
+                  ? <span class="pill ok">installed</span>
+                  : <span class="pill warn">not installed</span>}
+            </td>
+            <td>{t.activeKeys}</td>
+            <td class="hint">{fmt(t.lastUsed)}</td>
+            <td class="row-actions">
+              {t.bridgeInstalled !== null && (
+                <form method="POST">
+                  <input type="hidden" name="action" value="install-bridge" />
+                  <input type="hidden" name="tenantSlug" value={t.slug} />
+                  <button class="ghost small" type="submit">
+                    {t.bridgeInstalled ? 'Reinstall' : 'Install bridge'}
+                  </button>
+                </form>
+              )}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+    <p class="hint" style="margin:12px 0 0">
+      <strong>Install bridge</strong> builds the plugin from source and installs it into that site — no zip,
+      no upload. Run it once per site; run it again after the plugin is updated.
+    </p>
+  </div>
+
+  <script is:inline>
+    // Clipboard with a visible confirmation — a copy button that gives no
+    // feedback leaves you unsure whether the key is actually on the clipboard,
+    // and this one is shown only once. execCommand is the fallback for
+    // non-secure origins, where navigator.clipboard is undefined.
+    document.addEventListener('click', function (e) {
+      var btn = e.target.closest('button.copy');
+      if (!btn) return;
+      var src = document.getElementById(btn.dataset.copy);
+      if (!src) return;
+      var text = src.textContent;
+      var done = function () {
+        var was = btn.textContent;
+        btn.textContent = 'Copied';
+        btn.classList.add('copied');
+        setTimeout(function () { btn.textContent = was; btn.classList.remove('copied'); }, 1400);
+      };
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(text).then(done, function () { btn.textContent = 'Press Ctrl+C'; });
+      } else {
+        var ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        try { document.execCommand('copy'); done(); } catch (err) { btn.textContent = 'Press Ctrl+C'; }
+        document.body.removeChild(ta);
+      }
+    });
+  </script>
+
+  <style>
+    .tok{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px 12px;
+         font:12px/1.6 'Roboto Mono',ui-monospace,monospace;white-space:pre-wrap;word-break:break-all;margin:0}
+    .copyrow{display:flex;gap:8px;align-items:flex-start}
+    .copyrow .tok{flex:1;min-width:0}
+    .copyrow.tight{align-items:center;gap:6px}
+    .copyrow .ep{font:11px/1.5 'Roboto Mono',ui-monospace,monospace;word-break:break-all}
+    button.copy{white-space:nowrap;flex:0 0 auto}
+    button.copy.copied{background:var(--accent);color:#fff;border-color:var(--accent)}
+    button.small{padding:5px 10px;font-size:12px}
+    .perms{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+    fieldset{border:1px solid var(--line);border-radius:10px;padding:10px 12px 12px;margin:0}
+    legend{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--mut);padding:0 4px}
+    label.check{display:flex;gap:8px;align-items:flex-start;margin:8px 0 0;font-size:12px;color:var(--ink);cursor:pointer}
+    label.check input{width:auto;margin-top:2px}
+  </style>
+</Layout>

@@ -176,12 +176,31 @@ function isDaemonPath(p) {
 // scheme/host so it can build correct absolute URLs and set Secure cookies.
 // `rewritePath` overrides the upstream path (used to restore the OD basePath).
 function forward(req, res, target) {
-  const { port, prefix, rewritePath, injectHead } = target;
+  const { port, prefix, rewritePath, injectHead, kind } = target;
   const headers = { ...req.headers };
   headers.host = `127.0.0.1:${port}`;
   headers['x-forwarded-proto'] = 'https';
   headers['x-forwarded-host'] = req.headers.host || '';
   headers['x-forwarded-for'] = req.socket?.remoteAddress || '';
+  // The OD daemon gates its privileged routes (connector connect/disconnect,
+  // Composio config, library pairing, db verify/vacuum) behind
+  // `requireLocalDaemonRequest`, which insists the request LOOK local on all
+  // three axes: loopback peer, loopback Host, loopback Origin. We already
+  // satisfy the first two (we dial 127.0.0.1 and rewrite Host above), but the
+  // browser stamps the public funnel Origin, so every one of those routes 403s
+  // "request origin must be a loopback daemon origin" — the whole connector UI
+  // is dead behind the gateway. OD_ALLOWED_ORIGINS does NOT help: that guard
+  // never reads it.
+  //
+  // Present the daemon's own loopback origin instead — but ONLY when the
+  // browser's Origin is EXACTLY our gateway origin. That is the proof the call
+  // came from a page we served, on the session this cookie authorizes. A
+  // cross-site attacker's request carries its own Origin, fails this equality,
+  // is forwarded unrewritten, and is still rejected by OD's own /api origin
+  // guard — so this widens nothing for anyone but our first-party app.
+  if (kind === 'od-daemon' && headers.origin === config.gatewayOrigin) {
+    headers.origin = `http://127.0.0.1:${port}`;
+  }
   // Rewriting the body means reading it, so ask the upstream for identity
   // encoding rather than teaching this proxy to gunzip. Only the (small,
   // single) SPA document takes this path; every asset still streams compressed.

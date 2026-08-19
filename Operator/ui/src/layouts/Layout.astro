@@ -13,6 +13,8 @@ const rawBase = import.meta.env.BASE_URL;            // "/operator" or "/operato
 const base = rawBase.endsWith('/') ? rawBase : `${rawBase}/`;
 const path = Astro.url.pathname.replace(/\/$/, '');  // drop trailing slash
 const isSettings = path.endsWith('/settings');
+const isMcp = path.endsWith('/mcp');
+const isTenants = !isSettings && !isMcp;
 ---
 <!doctype html>
 <html lang="en">
@@ -76,7 +78,8 @@ const isSettings = path.endsWith('/settings');
   <header>
     <span class="brand">{BRAND_EMOJI} {BRAND_NAME}</span>
     <nav>
-      <a href={base} class={isSettings ? '' : 'active'}>Tenants</a>
+      <a href={base} class={isTenants ? 'active' : ''}>Tenants</a>
+      <a href={`${base}mcp`} class={isMcp ? 'active' : ''}>MCP Agents</a>
       <a href={`${base}settings`} class={isSettings ? 'active' : ''}>Settings</a>
     </nav>
   </header>

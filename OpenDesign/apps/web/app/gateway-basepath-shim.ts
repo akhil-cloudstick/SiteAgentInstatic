@@ -33,6 +33,36 @@ if (typeof window !== 'undefined' && !window.__odBasePathPatched) {
     const withBase = (p: string) => (p === BASE || p.startsWith(BASE + '/') ? p : BASE + p);
     const sameOrigin = (origin: string) => origin === window.location.origin;
 
+    // ---- expired hub session ----
+    // The gateway answers 401 for a daemon request whose `sa_hub` session is
+    // gone or expired. A top-level navigation gets bounced to /login, but a
+    // fetch cannot follow that, so the app used to sit on a dead page throwing
+    // errors it could not recover from — the user had no way to know they had
+    // simply been signed out.
+    //
+    // One login covers both tools, so the fix is to re-enter the SAME hand-off
+    // the shell uses: /sso/design silently re-mints when the hub session is
+    // still valid and only shows /login when it genuinely is not. `next`
+    // carries the current location so the user lands back where they were.
+    //
+    // Latched, because a signed-out page usually fails many requests at once
+    // and each one must not queue its own navigation.
+    let hubSessionRedirectStarted = false;
+    function handleExpiredHubSession(response: Response): void {
+      if (response.status !== 401 || hubSessionRedirectStarted) return;
+      // Only the gateway's own "not signed in" is a session problem. A 401 from
+      // a daemon route (an unauthenticated API-token call, a provider probe) is
+      // the app's business and must not eject the user.
+      const path = (() => {
+        try { return new URL(response.url, window.location.origin).pathname; }
+        catch { return ''; }
+      })();
+      if (!isDaemonPath(path.startsWith(BASE) ? path.slice(BASE.length) || '/' : path)) return;
+      hubSessionRedirectStarted = true;
+      const next = window.location.pathname + window.location.search;
+      window.location.replace(`/sso/design?next=${encodeURIComponent(next)}`);
+    }
+
     // ---- fetch ----
     const origFetch = window.fetch.bind(window);
     window.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
@@ -52,7 +82,10 @@ if (typeof window !== 'undefined' && !window.__odBasePathPatched) {
           }
         } catch { /* leave non-absolute Request URLs untouched */ }
       }
-      return origFetch(input as RequestInfo | URL, init);
+      return origFetch(input as RequestInfo | URL, init).then((response) => {
+        handleExpiredHubSession(response);
+        return response;
+      });
     }) as typeof window.fetch;
 
     // ---- EventSource (SSE: /api/memory/events, /api/library/events, terminals) ----

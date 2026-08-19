@@ -1035,10 +1035,87 @@ export function previewOverlayTransform(
   };
 }
 
+/* True zoom for the desktop canvas.
+
+   Upstream's desktop "zoom" never zoomed: it only resized the iframe
+   VIEWPORT (`width: 100 / scale%`), so 50% re-rendered the site into a
+   2x-wide viewport at the same apparent size and 200% squeezed it into a
+   mobile breakpoint. Neither reads as zoom in / zoom out.
+
+   `DesktopZoomLayout` pins the page's LAYOUT width to the canvas width at
+   every zoom level — so the site never reflows while zooming — and makes the
+   percentage a pure visual `scale()`, kept centred in the canvas. Height is
+   still divided by the scale, which is what makes zooming out reveal MORE of
+   the page instead of the same slice, shrunk.
+
+   `offsetX` centres the scaled page; once it grows past the canvas
+   (`overflow`) the clip scrolls instead and `offsetX` collapses to 0. */
+export type DesktopZoomLayout = {
+  scale: number;
+  baseWidth: number;
+  scaledWidth: number;
+  offsetX: number;
+  overflow: boolean;
+};
+
+export function desktopZoomLayout(
+  viewport: PreviewViewportId,
+  zoomMode: 'auto' | 'manual',
+  previewScale: number,
+  // The CLIP's width, not the stage's: the clip is the box the page is centred
+  // in AND the box the comment overlay layer measures from, so any other
+  // width leaves pins sitting beside their elements once the page is zoomed.
+  clipWidth: number | undefined,
+): DesktopZoomLayout | null {
+  if (viewport !== 'desktop' || zoomMode !== 'manual') return null;
+  const width = clipWidth;
+  if (!width || !Number.isFinite(width) || width <= 0) return null;
+  const scale = Number.isFinite(previewScale) && previewScale > 0 ? previewScale : 1;
+  // 1:1 keeps the plain full-bleed shell, so the default view renders exactly
+  // as it did before zoom became a real transform.
+  if (Math.abs(scale - 1) < 0.001) return null;
+  const scaledWidth = width * scale;
+  return {
+    scale,
+    baseWidth: width,
+    scaledWidth,
+    offsetX: Math.max(0, (width - scaledWidth) / 2),
+    overflow: scaledWidth > width + 0.5,
+  };
+}
+
+/* The shell is taken OUT OF FLOW to centre it.
+
+   Its layout width stays `baseWidth` at every zoom level (that is the whole
+   point — the page must not reflow), so a centring `margin-left` in normal
+   flow would push its layout box past the clip and scroll a page that
+   visually fits. Absolute positioning makes `left` pure paint, and the
+   scrollable extent then comes from the TRANSFORMED box, which is what lets a
+   zoomed-in page pan without a wrapper element.
+
+   No wrapper is the point: an element that appears and disappears as zoom
+   crosses 100% re-parents the iframes, and React remounts them — the preview
+   blanked and reloaded on every zoom step. */
+function desktopZoomShellStyle(
+  layout: DesktopZoomLayout,
+): CSSProperties & Record<string, string | number> {
+  return {
+    position: 'absolute',
+    left: `${layout.offsetX}px`,
+    top: 0,
+    width: `${layout.baseWidth}px`,
+    height: `${100 / layout.scale}%`,
+    transform: `scale(${layout.scale})`,
+    transformOrigin: '0 0',
+  };
+}
+
 function previewScaleShellStyle(
   viewport: PreviewViewportId,
   previewScale: number,
+  zoomLayout?: DesktopZoomLayout | null,
 ): CSSProperties & Record<string, string | number> {
+  if (zoomLayout) return desktopZoomShellStyle(zoomLayout);
   if (viewport === 'desktop') {
     return {
       width: `${100 / previewScale}%`,
@@ -1059,7 +1136,11 @@ function manualEditPreviewShellStyle(
   viewport: PreviewViewportId,
   previewScale: number,
   frozenWidth: number | null,
+  zoomLayout?: DesktopZoomLayout | null,
 ): CSSProperties & Record<string, string | number> {
+  // A live zoom layout already pins the layout width, which is the same
+  // no-reflow guarantee the frozen width exists to give — so it wins.
+  if (zoomLayout) return desktopZoomShellStyle(zoomLayout);
   if (viewport === 'desktop' && frozenWidth) {
     return {
       width: `${frozenWidth / previewScale}px`,
@@ -1070,6 +1151,7 @@ function manualEditPreviewShellStyle(
   }
   return previewScaleShellStyle(viewport, previewScale);
 }
+
 
 function deploymentTimestamp(deployment: WebDeploymentInfo): number {
   const maybeDeployedAt = (deployment as WebDeploymentInfo & { deployedAt?: number | string }).deployedAt;
@@ -1119,6 +1201,7 @@ function manualEditFloatingPanelStyle(
   target: ManualEditTarget,
   previewScale: number,
   canvasSize: PreviewCanvasSize | undefined,
+  offsetX = 0,
 ): CSSProperties {
   const scale = Number.isFinite(previewScale) && previewScale > 0 ? previewScale : 1;
   const panelWidth = 320;
@@ -1127,9 +1210,11 @@ function manualEditFloatingPanelStyle(
   const canvasWidth = canvasSize?.width ?? 1200;
   const canvasHeight = canvasSize?.height ?? 800;
   const panelHeight = Math.min(preferredPanelHeight, Math.max(260, canvasHeight - pad * 2));
-  const targetLeft = target.rect.x * scale;
+  // `offsetX` is the zoom's centring / pan shift: the panel is a sibling of
+  // the scaled shell, so it has to repeat it or it anchors to the wrong x.
+  const targetLeft = target.rect.x * scale + offsetX;
   const targetTop = target.rect.y * scale;
-  const targetRight = (target.rect.x + target.rect.width) * scale;
+  const targetRight = (target.rect.x + target.rect.width) * scale + offsetX;
   let left = targetRight + pad;
   if (left + panelWidth > canvasWidth - pad) {
     left = Math.max(pad, targetLeft - panelWidth - pad);
@@ -1157,6 +1242,7 @@ function manualEditHoverIconStyle(
   target: ManualEditTarget,
   previewScale: number,
   canvasSize: PreviewCanvasSize | undefined,
+  offsetX = 0,
 ): CSSProperties {
   const scale = Number.isFinite(previewScale) && previewScale > 0 ? previewScale : 1;
   const iconSize = 26;
@@ -1164,7 +1250,7 @@ function manualEditHoverIconStyle(
   const canvasWidth = canvasSize?.width ?? 1200;
   const canvasHeight = canvasSize?.height ?? 800;
   const targetTop = target.rect.y * scale;
-  const targetRight = (target.rect.x + target.rect.width) * scale;
+  const targetRight = (target.rect.x + target.rect.width) * scale + offsetX;
   const left = Math.max(
     inset,
     Math.min(targetRight - iconSize - inset, canvasWidth - iconSize - inset),
@@ -1186,6 +1272,54 @@ export function cancelManualEditPendingStyleSnapshot(
   for (const key of keys) delete nextStyles[key];
   if (Object.keys(nextStyles).length === 0) return null;
   return { ...pending, styles: nextStyles };
+}
+
+/* Live width + scrollLeft of the desktop zoom clip.
+
+   Separate from `usePreviewCanvasSize` for two reasons: the clip is mounted
+   conditionally (only once the preview has a source), so it has to attach
+   through a callback ref rather than a mount-time `ref.current` read; and a
+   zoomed-IN clip pans, so scrollLeft is state the overlay layer depends on,
+   not an incidental extra. */
+type PreviewZoomClipMetrics = { width: number; scrollLeft: number };
+
+// The zoom stops offered by the % menu and stepped through by the -/+ buttons.
+// Kept in one place so the two controls can never disagree about the ladder.
+const PREVIEW_ZOOM_LEVELS = [50, 75, 100, 125, 150, 200];
+
+function usePreviewZoomClip() {
+  const [node, setNodeState] = useState<HTMLDivElement | null>(null);
+  const [metrics, setMetrics] = useState<PreviewZoomClipMetrics>({ width: 0, scrollLeft: 0 });
+  const setNode = useCallback((next: HTMLDivElement | null) => {
+    setNodeState((current) => (current === next ? current : next));
+  }, []);
+
+  useEffect(() => {
+    if (!node) {
+      setMetrics((current) => (current.width === 0 && current.scrollLeft === 0 ? current : { width: 0, scrollLeft: 0 }));
+      return;
+    }
+    const measure = () => {
+      setMetrics((current) => (
+        current.width === node.clientWidth && current.scrollLeft === node.scrollLeft
+          ? current
+          : { width: node.clientWidth, scrollLeft: node.scrollLeft }
+      ));
+    };
+    measure();
+    let observer: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== 'undefined') {
+      observer = new ResizeObserver(measure);
+      observer.observe(node);
+    }
+    node.addEventListener('scroll', measure, { passive: true });
+    return () => {
+      observer?.disconnect();
+      node.removeEventListener('scroll', measure);
+    };
+  }, [node]);
+
+  return { setNode, node, metrics };
 }
 
 function usePreviewCanvasSize<T extends HTMLElement>() {
@@ -1921,9 +2055,24 @@ export function LiveArtifactViewer({
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setZoomMenuOpen(false);
     };
+    // Clicking the PAGE does not close this menu on `mousedown` alone: the page
+    // is an iframe, and a click inside it is delivered to the iframe's own
+    // document, never to ours. Since almost all of the screen IS that iframe,
+    // the menu read as stuck open. Focus moving into the frame blurs this
+    // window, so that is the signal for "clicked the page".
+    const onWindowBlur = () => {
+      if (document.activeElement instanceof HTMLIFrameElement) setZoomMenuOpen(false);
+    };
+    // Scrolling the canvas out from under an anchored popover leaves it
+    // floating over unrelated content, so scroll dismisses it too.
+    const onScroll = () => setZoomMenuOpen(false);
     document.addEventListener('mousedown', onDocClick);
     document.addEventListener('keydown', onKey);
+    window.addEventListener('blur', onWindowBlur);
+    window.addEventListener('scroll', onScroll, true);
     return () => {
+      window.removeEventListener('blur', onWindowBlur);
+      window.removeEventListener('scroll', onScroll, true);
       document.removeEventListener('mousedown', onDocClick);
       document.removeEventListener('keydown', onKey);
     };
@@ -6526,6 +6675,17 @@ function HtmlViewer({
   }, [fileViewportKey]);
   const [zoomMenuOpen, setZoomMenuOpen] = useState(false);
   const zoomMenuRef = useRef<HTMLDivElement | null>(null);
+  // Width + pan of the desktop zoom clip. Both feed the zoom layout: the width
+  // is what the page is centred in, the scrollLeft is what the overlay layer
+  // has to subtract once a zoomed-in canvas is scrolled.
+  const {
+    setNode: setPreviewZoomClipNode,
+    node: previewZoomClipNode,
+    metrics: previewZoomClipMetrics,
+  } = usePreviewZoomClip();
+  // Full-page preview: the viewer takes over the window so the canvas gets the
+  // whole screen instead of the column left over beside the chat rail.
+  const [previewFullView, setPreviewFullView] = useState(false);
   const [presentMenuOpen, setPresentMenuOpen] = useState(false);
   const [deployMenuOpen, setDeployMenuOpen] = useState(false);
   // Share-to-CMS block reason for this viewer's "Back to OpenDesign" dialog.
@@ -7188,18 +7348,63 @@ function HtmlViewer({
     : zoom;
   const previewScale = previewZoomPercent / 100;
   const previewZoomText = zoomPercentLabel(previewZoomPercent);
-  const zoomLevelActive = (level: number) => Math.abs(previewZoomPercent - level) < 0.001;
+  const zoomLevelActive = (level: number) =>
+    zoomMode === 'manual' && Math.abs(previewZoomPercent - level) < 0.001;
+  const desktopZoom = desktopZoomLayout(
+    previewViewport,
+    zoomMode,
+    previewScale,
+    previewZoomClipMetrics.width || boardPreviewCanvasSize?.width,
+  );
   const overlayPreviewScale = effectivePreviewScale(
     previewViewport,
     previewScale,
     boardPreviewCanvasSize,
     boardPreviewScaleOptions,
   );
+  // Comment pins / draw strokes live OUTSIDE the scaled shell, so they have to
+  // repeat the zoom's centring offset — and subtract the pan, or every pin
+  // drifts away from its element the moment a zoomed-in canvas is scrolled.
   const overlayPreviewTransform: PreviewOverlayTransform = {
     scale: overlayPreviewScale,
-    offsetX: 0,
+    offsetX: desktopZoom ? desktopZoom.offsetX - previewZoomClipMetrics.scrollLeft : 0,
     offsetY: 0,
   };
+  const desktopZoomScale = desktopZoom?.scale ?? null;
+  const desktopZoomScaledWidth = desktopZoom?.scaledWidth ?? null;
+  const desktopZoomOverflow = desktopZoom?.overflow ?? false;
+  // Zooming past the canvas re-centres the pan instead of snapping to the left
+  // edge: what the user was looking at is the middle of the canvas, and that is
+  // what has to stay put across a zoom step.
+  useEffect(() => {
+    if (!previewZoomClipNode) return;
+    previewZoomClipNode.scrollLeft = desktopZoomOverflow && desktopZoomScaledWidth
+      ? Math.max(0, (desktopZoomScaledWidth - previewZoomClipNode.clientWidth) / 2)
+      : 0;
+  }, [desktopZoomOverflow, desktopZoomScale, desktopZoomScaledWidth, previewZoomClipNode]);
+  // The -/+ buttons walk the same ladder the % menu lists. Stepping always
+  // lands on manual mode: auto-fit is a computed percentage, so stepping from
+  // it has to pin a real level or the next step recomputes from scratch.
+  const previewZoomStepTarget = (direction: -1 | 1) => (
+    direction > 0
+      ? PREVIEW_ZOOM_LEVELS.find((level) => level > previewZoomPercent + 0.001)
+      : [...PREVIEW_ZOOM_LEVELS].reverse().find((level) => level < previewZoomPercent - 0.001)
+  );
+  const stepPreviewZoom = (direction: -1 | 1) => {
+    const next = previewZoomStepTarget(direction);
+    if (next === undefined) return;
+    setZoomMode('manual');
+    setZoom(next);
+  };
+  // Esc leaves the full-page preview, matching every other overlay here.
+  useEffect(() => {
+    if (!previewFullView) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setPreviewFullView(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [previewFullView]);
   const shareRef = useRef<HTMLDivElement | null>(null);
   const [chromeActionsHost, setChromeActionsHost] = useState<HTMLElement | null>(null);
   useEffect(() => {
@@ -9707,9 +9912,24 @@ function HtmlViewer({
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setZoomMenuOpen(false);
     };
+    // Clicking the PAGE does not close this menu on `mousedown` alone: the page
+    // is an iframe, and a click inside it is delivered to the iframe's own
+    // document, never to ours. Since almost all of the screen IS that iframe,
+    // the menu read as stuck open. Focus moving into the frame blurs this
+    // window, so that is the signal for "clicked the page".
+    const onWindowBlur = () => {
+      if (document.activeElement instanceof HTMLIFrameElement) setZoomMenuOpen(false);
+    };
+    // Scrolling the canvas out from under an anchored popover leaves it
+    // floating over unrelated content, so scroll dismisses it too.
+    const onScroll = () => setZoomMenuOpen(false);
     document.addEventListener('mousedown', onDocClick);
     document.addEventListener('keydown', onKey);
+    window.addEventListener('blur', onWindowBlur);
+    window.addEventListener('scroll', onScroll, true);
     return () => {
+      window.removeEventListener('blur', onWindowBlur);
+      window.removeEventListener('scroll', onScroll, true);
       document.removeEventListener('mousedown', onDocClick);
       document.removeEventListener('keydown', onKey);
     };
@@ -11467,6 +11687,7 @@ function HtmlViewer({
               selectedManualEditTarget,
               overlayPreviewScale,
               previewBodySize,
+              overlayPreviewTransform.offsetX,
             ),
             ...(manualEditPanelPosition ?? {}),
           }
@@ -11498,6 +11719,7 @@ function HtmlViewer({
           manualEditHoverTarget,
           overlayPreviewScale,
           previewBodySize,
+          overlayPreviewTransform.offsetX,
         )}
         onClick={() => {
           const target = manualEditHoverTarget;
@@ -11770,7 +11992,10 @@ function HtmlViewer({
   ) : null;
 
   return (
-    <div className={`viewer html-viewer${inTabPresent ? ' is-tab-present' : ''}`}>
+    <div
+      className={`viewer html-viewer${inTabPresent ? ' is-tab-present' : ''}${previewFullView ? ' is-full-view' : ''}`}
+      data-preview-full-view={previewFullView ? 'true' : undefined}
+    >
       <CmsBlockedDialog
         reason={cmsBlockReason}
         onClose={() => setCmsBlockReason(null)}
@@ -11974,6 +12199,23 @@ function HtmlViewer({
                 <span className="viewer-comment-count" aria-hidden>{visibleSideComments.length}</span>
               </button>
               {source !== null && mode === 'preview' ? (
+                <div className="viewer-zoom-stepper">
+                <button
+                  type="button"
+                  className="viewer-action viewer-action-icon zoom-step-action od-tooltip"
+                  data-testid="preview-zoom-out"
+                  data-tooltip={t('fileViewer.zoomOut')}
+                  data-tooltip-placement="bottom"
+                  title={t('fileViewer.zoomOut')}
+                  aria-label={t('fileViewer.zoomOut')}
+                  disabled={previewZoomStepTarget(-1) === undefined}
+                  onClick={() => {
+                    fireArtifactToolbarClick('zoom_level_dropdown');
+                    stepPreviewZoom(-1);
+                  }}
+                >
+                  <RemixIcon name="subtract-line" size={14} />
+                </button>
                 <div className="zoom-menu viewer-toolbar-zoom" ref={zoomMenuRef}>
                   <button
                     type="button"
@@ -11993,7 +12235,23 @@ function HtmlViewer({
                   </button>
                   {zoomMenuOpen ? (
                     <div className="zoom-menu-popover" role="menu">
-                      {[50, 75, 100, 125, 150, 200].map((level) => (
+                      {/* Auto-fit is the default state, so it needs a way back
+                          into it — without this entry, picking any level was a
+                          one-way door. */}
+                      <button
+                        type="button"
+                        className={`zoom-menu-item${zoomMode === 'auto' ? ' active' : ''}`}
+                        role="menuitem"
+                        onClick={() => {
+                          setZoomMode('auto');
+                          setZoomMenuOpen(false);
+                        }}
+                      >
+                        <span>{t('fileViewer.resetZoom')}</span>
+                        {zoomMode === 'auto' ? <Icon name="check" size={13} /> : null}
+                      </button>
+                      <div className="zoom-menu-separator" role="separator" />
+                      {PREVIEW_ZOOM_LEVELS.map((level) => (
                         <button
                           key={level}
                           type="button"
@@ -12014,6 +12272,38 @@ function HtmlViewer({
                     </div>
                   ) : null}
                 </div>
+                <button
+                  type="button"
+                  className="viewer-action viewer-action-icon zoom-step-action od-tooltip"
+                  data-testid="preview-zoom-in"
+                  data-tooltip={t('fileViewer.zoomIn')}
+                  data-tooltip-placement="bottom"
+                  title={t('fileViewer.zoomIn')}
+                  aria-label={t('fileViewer.zoomIn')}
+                  disabled={previewZoomStepTarget(1) === undefined}
+                  onClick={() => {
+                    fireArtifactToolbarClick('zoom_level_dropdown');
+                    stepPreviewZoom(1);
+                  }}
+                >
+                  <RemixIcon name="add-line" size={14} />
+                </button>
+                </div>
+              ) : null}
+              {mode === 'preview' ? (
+                <button
+                  type="button"
+                  className={`viewer-action viewer-action-icon od-tooltip${previewFullView ? ' active' : ''}`}
+                  data-testid="preview-full-view-toggle"
+                  data-tooltip={previewFullView ? t('common.exitFullscreen') : t('common.fullscreen')}
+                  data-tooltip-placement="bottom"
+                  title={previewFullView ? t('common.exitFullscreen') : t('common.fullscreen')}
+                  aria-label={previewFullView ? t('common.exitFullscreen') : t('common.fullscreen')}
+                  aria-pressed={previewFullView}
+                  onClick={() => setPreviewFullView((value) => !value)}
+                >
+                  <RemixIcon name={previewFullView ? 'fullscreen-exit-line' : 'fullscreen-line'} size={15} />
+                </button>
               ) : null}
             </div>
           ) : null}
@@ -12619,12 +12909,20 @@ function HtmlViewer({
               data-testid={manualEditMode ? undefined : 'comment-preview-canvas'}
               ref={manualEditMode ? undefined : setCommentPreviewCanvasRef}
             >
-              <div className={manualEditMode ? undefined : 'comment-frame-clip'} style={manualEditMode ? { height: '100%' } : undefined}>
+              <div
+                ref={setPreviewZoomClipNode}
+                className={[
+                  manualEditMode ? null : 'comment-frame-clip',
+                  desktopZoom ? 'preview-zoom-clip' : null,
+                  desktopZoom?.overflow ? 'preview-zoom-pan' : null,
+                ].filter(Boolean).join(' ') || undefined}
+                style={manualEditMode ? { height: '100%' } : undefined}
+              >
                 <div
                   style={
                     manualEditMode
-                      ? manualEditPreviewShellStyle(previewViewport, previewScale, manualEditViewportWidth)
-                      : previewScaleShellStyle(previewViewport, previewScale)
+                      ? manualEditPreviewShellStyle(previewViewport, previewScale, manualEditViewportWidth, desktopZoom)
+                      : previewScaleShellStyle(previewViewport, previewScale, desktopZoom)
                   }
                 >
                   <PreviewDrawOverlay
