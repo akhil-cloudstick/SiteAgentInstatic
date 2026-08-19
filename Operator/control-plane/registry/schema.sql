@@ -139,3 +139,20 @@ create table if not exists siteagent_control.mcp_agent_audit (
 
 create index if not exists mcp_agent_audit_tenant_time
   on siteagent_control.mcp_agent_audit (tenant_slug, created_at desc);
+
+-- ---------------------------------------------------------------------------
+-- Operator-managed AI for MMS Design (OpenDesign).
+--
+-- design_model: the ONE model every tenant's MMS Design session runs on. It is
+--   deliberately NOT a third ai_categories row: ai_categories is the CMS's
+--   per-task routing map (served to tenants by the gateway's /config probe and
+--   validated as "exactly one isDefault, builtins design+content"), whereas OD
+--   has no classifier and needs a single tool-calling + vision capable model.
+--   NULL falls back to the default category's model, so an operator who never
+--   picks one still gets a working /design.
+-- media_keys_enc: operator-owned media provider keys (image/video/speech), one
+--   encrypted JSON blob {providerId: apiKey} rather than a column per provider
+--   because the provider list is long and grows upstream. Injected into each
+--   tenant's OD daemon as OD_*_API_KEY env vars at spawn.
+alter table siteagent_control.settings add column if not exists design_model    text;
+alter table siteagent_control.settings add column if not exists media_keys_enc  text;

@@ -1,3 +1,4 @@
+import { isManagedSession, MANAGED_RUNTIME_ERROR_MESSAGE } from '../state/managed';
 /**
  * Daemon provider — fetch-based SSE client for /api/runs. The daemon can
  * emit three event streams depending on the agent's streamFormat:
@@ -385,11 +386,18 @@ function notifyRunsChanged() {
 
 function daemonSseErrorMessage(data: SseErrorPayload): string {
   const formattedOpenCodeError = formatOpenCodeSessionError(data.error?.details);
-  if (formattedOpenCodeError) return formattedOpenCodeError;
+  if (formattedOpenCodeError) {
+    // Managed tenants never see the engine named: it is a program they did not
+    // install, on a machine they do not own, and its session diagnostics give
+    // them nothing to act on.
+    return isManagedSession() ? MANAGED_RUNTIME_ERROR_MESSAGE : formattedOpenCodeError;
+  }
 
   const message = String(data.error?.message ?? data.message ?? 'daemon error');
   const legacyOpenCodeError = formatLegacyOpenCodeSessionError(message);
-  if (legacyOpenCodeError) return legacyOpenCodeError;
+  if (legacyOpenCodeError) {
+    return isManagedSession() ? MANAGED_RUNTIME_ERROR_MESSAGE : legacyOpenCodeError;
+  }
 
   const detail =
     data.error?.details &&

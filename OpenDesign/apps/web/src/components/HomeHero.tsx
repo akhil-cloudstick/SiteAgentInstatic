@@ -240,7 +240,6 @@ interface Props {
   // "…or start a blank project" — creates an empty project directly (no dialog,
   // no design system / template / prompt) and enters it. Omit to hide the link.
   onStartBlankProject?: () => void;
-  executionSwitcher?: ReactNode;
   // Personalized first-run starting point (spec §7). Rendered directly under
   // the composer card — before the template section — so a brand-new user sees
   // their recommended entry without scrolling.
@@ -367,7 +366,6 @@ export const HomeHero = forwardRef<HomeHeroHandle, Props>(function HomeHero(
     onClearWorkingDir,
     onExamplePromptStatusChange,
     onStartBlankProject,
-    executionSwitcher,
     recommendationSlot,
   },
   ref,
@@ -1981,11 +1979,6 @@ export const HomeHero = forwardRef<HomeHeroHandle, Props>(function HomeHero(
                 }}
               />
             </div>
-            {executionSwitcher ? (
-              <div className="home-hero__execution-switcher">
-                {executionSwitcher}
-              </div>
-            ) : null}
             <button
               type="button"
               className={`home-hero__submit od-tooltip${sendAttention ? ' home-hero__attention-sheen' : ''}${submitting ? ' is-sending' : ''}`}

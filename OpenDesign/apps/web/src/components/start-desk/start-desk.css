@@ -236,6 +236,13 @@
     box-shadow: 0 18px 48px rgb(8 39 49 / 16%);
 }
 
+/* Long catalogues (the design-system list runs to a couple of hundred entries)
+   scroll inside the panel instead of running off the screen. */
+.start-desk__menu--scroll {
+    max-height: 320px;
+    overflow-y: auto;
+}
+
 .start-desk__control-wrap--trailing .start-desk__menu {
     right: 0;
     left: auto;
@@ -312,11 +319,13 @@
     color: var(--mms-text-muted);
 }
 
-/* Send now sits in this row too, and it is the one button here that is NOT a
-   quiet inline control — excluded so the reset below cannot strip its fill,
-   border and white label back to transparent text. */
+/* Scoped to DIRECT children. This reset exists for the footer's own quiet
+   inline controls; once the runtime picker and Send moved into this row it
+   would otherwise also flatten the picker's pill and every option button
+   inside its popup menu. Send is excluded outright — it is the one filled
+   button in the row. */
 .start-desk__footer label,
-.start-desk__footer button:not(.start-desk__send) {
+.start-desk__footer > button:not(.start-desk__send) {
     display: inline-flex;
     min-height: 42px;
     align-items: center;
@@ -328,14 +337,62 @@
     cursor: pointer;
 }
 
+/* The row is `space-between`, which with three children would strand the
+   runtime picker in the middle. Pushing it right groups it with Send, so the
+   row reads as "what it uses" + "go" on one side and the design system on the
+   other. Send needs no rule of its own — it follows. */
+.start-desk__footer .start-desk__control-wrap--trailing {
+    margin-left: auto;
+}
+
+/* Opens UPWARD from the last row. The shared rule drops menus below their
+   trigger, which from the bottom edge of the composer would hang off the panel
+   and, for the two-line runtime options, past the viewport. */
+.start-desk__footer .start-desk__menu {
+    top: auto;
+    bottom: calc(100% + 8px);
+}
+
+/* Design-system picker. It was a bare transparent `<select>`, which leaves the
+   control to the platform: the closed field inherited no surface of its own,
+   and the DROP-DOWN LIST is painted by the OS, not by this stylesheet — so in
+   dark mode the browser drew a light popup with light text and the options
+   were unreadable.
+   `color-scheme` is the part that actually fixes the popup: it tells the
+   browser which palette to render the native list with, and it is the only
+   hook there is, since the option list cannot be styled from CSS on most
+   platforms. The rest gives the closed field the same pill treatment as the
+   other controls in this row. */
 .start-desk__footer select {
     max-width: 180px;
-    border: 0;
-    outline: 0;
-    background: transparent;
+    min-height: 34px;
+    padding: 0 8px;
+    border: 1px solid var(--mms-border-strong);
+    border-radius: 6px;
+    background: var(--mms-surface-raised);
     color: var(--mms-text);
+    color-scheme: light dark;
     font: inherit;
     font-weight: 600;
+    cursor: pointer;
+}
+
+.start-desk__footer select:hover {
+    border-color: var(--mms-action);
+}
+
+.start-desk__footer select:focus-visible {
+    border-color: var(--mms-action);
+    outline: 2px solid var(--mms-action);
+    outline-offset: 1px;
+}
+
+/* Explicit colours on the options as well. Firefox and most Linux builds DO
+   honour these; the platforms that ignore them fall back to `color-scheme`
+   above, so the list is legible either way. */
+.start-desk__footer select option {
+    background: var(--mms-surface-raised);
+    color: var(--mms-text);
 }
 
 .start-desk__footer strong {
@@ -491,6 +548,11 @@
     min-width: 0;
     overflow: hidden;
     border: 1px solid var(--mms-border);
+    /* NOTE: `overflow: hidden` above is what rounds the preview into the card's
+       corners — and it was also silently clipping the kebab menu, which is
+       absolutely positioned inside the card and opens downward past its bottom
+       edge. The menu was there and working; you just could not see most of it.
+       See the `:has` rule below. */
     border-radius: 7px;
     background: var(--mms-surface-raised);
 }
@@ -511,11 +573,17 @@
     cursor: pointer;
 }
 
+/* Rounds its own top corners. The card used to do this for it by clipping
+   everything, but that also clipped the kebab menu — see the `:has` rule under
+   `.sd-project-card`. With the radius here, the card can stop clipping while a
+   menu is open without the preview turning square. */
 .sd-project-card__cover {
     position: relative;
     display: grid;
     height: 204px;
     overflow: hidden;
+    border-top-left-radius: 6px;
+    border-top-right-radius: 6px;
     place-items: center;
     background: var(--mms-surface-raised);
     /* Sizing context for the HTML preview below. `size` (not `inline-size`)
@@ -604,6 +672,16 @@
 
 .sd-project-card__copy small b {
     color: var(--mms-border-strong);
+}
+
+/* Let the kebab menu out of the card — but only while one is actually open, so
+   the preview stays clipped to the rounded corners the rest of the time. The
+   cover carries its own top radius now, so nothing looks square during the
+   moment the card is not clipping. Raised above its neighbours too, otherwise
+   the next card in the grid paints over the escaping panel. */
+.sd-project-card:has(.sd-project-card__menu) {
+    z-index: 5;
+    overflow: visible;
 }
 
 .sd-project-card__menu-anchor {

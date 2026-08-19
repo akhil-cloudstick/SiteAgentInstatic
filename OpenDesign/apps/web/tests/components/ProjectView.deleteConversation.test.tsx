@@ -97,9 +97,6 @@ vi.mock('../../src/components/AppChromeHeader', () => ({
   AppChromeHeader: () => null,
 }));
 
-vi.mock('../../src/components/AvatarMenu', () => ({
-  AvatarMenu: () => null,
-}));
 
 vi.mock('../../src/components/ChatPane', () => ({
   ChatPane: (props: {

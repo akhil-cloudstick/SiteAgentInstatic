@@ -17,6 +17,7 @@ import * as mcpAgents from './registry/mcpAgents.mjs';
 import { normalizePermissions, normalizeTables, PERMISSION_PRESETS } from './mcp/permissions.mjs';
 import { pluginInstalled } from './mcp/session.mjs';
 import { installBridge } from './mcp/bridgeInstall.mjs';
+import { serveMcpDocumentation } from './mcp/documentation.mjs';
 import { handleGatewayProxy, handleGatewayUpgrade } from './gateway/proxy.mjs';
 import { openFunnel, closeFunnel } from './gateway/funnel.mjs';
 
@@ -90,6 +91,13 @@ async function listOpenrouterModels() {
         toolCalling: Array.isArray(m.supported_parameters)
           ? m.supported_parameters.includes('tools')
           : null,
+        // Image input capability. The CMS can route around a text-only model
+        // (requiresVision -> the Design category), but MMS Design runs on ONE
+        // model, so a text-only pick there means every tenant screenshot
+        // attachment fails. null = unknown metadata (the picker keeps it).
+        vision: m.architecture && Array.isArray(m.architecture.input_modalities)
+          ? m.architecture.input_modalities.includes('image')
+          : null,
       }))
       .sort((a, b) => a.id.localeCompare(b.id));
   } catch {
@@ -101,14 +109,28 @@ async function listOpenrouterModels() {
 // categories always send tools) — server-side enforcement (Codex R2-#1). Models
 // with unknown capability are allowed (the UI warns). If the catalogue can't be
 // loaded (no key / upstream down) we can't verify, so we don't block.
-async function enforceToolCapability(aiCategories) {
-  if (!Array.isArray(aiCategories) || aiCategories.length === 0) return;
+// Also covers the MMS Design model, which needs tool-calling even more than the
+// CMS categories do: an OpenDesign run is one long tool loop, so a model without
+// tools produces a session that talks but never builds anything.
+async function enforceToolCapability({ aiCategories, designModel } = {}) {
+  const needs = [];
+  if (Array.isArray(aiCategories)) {
+    for (const c of aiCategories) {
+      if (c && typeof c === 'object' && c.modelId) {
+        needs.push({ model: c.modelId, label: `category "${c.slug || c.name}"` });
+      }
+    }
+  }
+  if (typeof designModel === 'string' && designModel.trim()) {
+    needs.push({ model: designModel.trim(), label: 'MMS Design' });
+  }
+  if (!needs.length) return;
   const models = await listOpenrouterModels();
   if (!models.length) return;
   const cap = new Map(models.map((m) => [m.id, m.toolCalling]));
-  for (const c of aiCategories) {
-    if (c && typeof c === 'object' && cap.get(c.modelId) === false) {
-      throw new Error(`model "${c.modelId}" for category "${c.slug || c.name}" does not support tool calling`);
+  for (const n of needs) {
+    if (cap.get(n.model) === false) {
+      throw new Error(`model "${n.model}" for ${n.label} does not support tool calling`);
     }
   }
 }
@@ -128,6 +150,10 @@ const server = http.createServer(async (req, res) => {
     // must never fall through to either.
     if (path.startsWith('/mcp/') && (await handleMcpGateway(req, res, method, path))) return;
 
+    // MCP guide. Ahead of the gateway proxy, which would otherwise hand every
+    // /operator/* path to the Astro console.
+    if (await serveMcpDocumentation(req, res, method, path)) return;
+
     // Tenant Hub (login / invite / two-card home) — the HTML surface tenants use.
     if (await handleHub(req, res, method, path)) return;
 
@@ -138,7 +164,7 @@ const server = http.createServer(async (req, res) => {
       if (method === 'GET') return send(res, 200, await getSettings());
       if (method === 'POST') {
         const bodyIn = await readJson(req);
-        await enforceToolCapability(bodyIn.aiCategories); // throws -> 400
+        await enforceToolCapability(bodyIn); // throws -> 400
         return send(res, 200, await saveSettings(bodyIn));
       }
     }

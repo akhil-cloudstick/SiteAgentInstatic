@@ -47,11 +47,47 @@ function parseCategories(v) {
   return Array.isArray(arr) ? arr : [];
 }
 
+// Media provider ids the operator may hold a key for. These are exactly the
+// slots OpenDesign's media layer resolves from the environment (see
+// OpenDesign/apps/daemon/src/media/config.ts ENV_KEYS) — anything not listed
+// here has no env route into a tenant daemon, so accepting it would store a
+// secret that can never be used.
+export const MEDIA_PROVIDER_IDS = [
+  'openrouter',
+  'replicate',
+  'fal',
+  'bfl',
+  'elevenlabs',
+  'google',
+  'minimax',
+  'kling',
+  'aihubmix',
+  'tavily',
+];
+
+// Decrypt the media-key blob. Any corruption is treated as "no keys" rather
+// than an exception: a bad blob must not take down tenant spawning.
+function parseMediaKeys(enc) {
+  if (!enc) return {};
+  try {
+    const parsed = JSON.parse(decrypt(enc));
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+    const out = {};
+    for (const [id, key] of Object.entries(parsed)) {
+      if (MEDIA_PROVIDER_IDS.includes(id) && typeof key === 'string' && key) out[id] = key;
+    }
+    return out;
+  } catch {
+    return {};
+  }
+}
+
 // Safe view for the UI (never returns plaintext secrets, but DOES return the
 // category→model map: model ids are not secret to the operator console).
 export async function getSettings() {
   const { rows } = await query('select * from siteagent_control.settings where id = 1');
   const r = rows[0] || {};
+  const mediaKeys = parseMediaKeys(r.media_keys_enc);
   return {
     openrouterModel: r.openrouter_model || '',
     cloudflareAccountId: r.cloudflare_account_id || '',
@@ -60,6 +96,12 @@ export async function getSettings() {
     aiCategories: parseCategories(r.ai_categories),
     classifierModel: r.classifier_model || '',
     aiGuidance: r.ai_guidance || '',
+    designModel: r.design_model || '',
+    // Masked, never plaintext — the console only needs to show which slots are
+    // filled and enough of a tail to tell two keys apart.
+    mediaKeys: Object.fromEntries(
+      Object.entries(mediaKeys).map(([id, key]) => [id, `••••${key.slice(-4)}`]),
+    ),
   };
 }
 
@@ -72,6 +114,9 @@ export async function getSecrets() {
     openrouterModel: r.openrouter_model || null,
     cloudflareToken: r.cloudflare_token_enc ? decrypt(r.cloudflare_token_enc) : null,
     cloudflareAccountId: r.cloudflare_account_id || null,
+    // Plaintext media keys — server-side only (odRuntime injects them into each
+    // tenant daemon's spawn env).
+    mediaKeys: parseMediaKeys(r.media_keys_enc),
   };
 }
 
@@ -80,7 +125,7 @@ export async function getSecrets() {
 // paths never touch the encrypted key (Codex #7).
 export async function readAiSettingsRaw() {
   const { rows } = await query(
-    'select ai_categories, ai_guidance, classifier_model, openrouter_model from siteagent_control.settings where id = 1',
+    'select ai_categories, ai_guidance, classifier_model, openrouter_model, design_model from siteagent_control.settings where id = 1',
   );
   const r = rows[0] || {};
   return {
@@ -88,6 +133,7 @@ export async function readAiSettingsRaw() {
     classifierModel: r.classifier_model || null,
     guidance: r.ai_guidance || '',
     legacyModel: r.openrouter_model || null, // back-compat default source
+    designModel: r.design_model || null,
   };
 }
 
@@ -98,6 +144,16 @@ export function defaultModelOf({ categories, legacyModel }) {
   const any = categories.find((c) => c.modelId);
   if (any) return any.modelId;
   return legacyModel || null;
+}
+
+// The model every tenant's MMS Design (OpenDesign) session runs on.
+//
+// OD has no per-message classifier: one agentic run is a long tool loop against
+// a single model, so there is nothing to route. When the operator hasn't picked
+// one we fall back to the CMS default rather than failing — an operator who has
+// configured the CMS has already expressed a usable choice.
+export function designModelOf(cfg) {
+  return cfg.designModel || defaultModelOf(cfg);
 }
 
 // Resolve the concrete model id for a routed call.
@@ -141,7 +197,7 @@ export function publicAiConfig(cfg) {
 }
 
 // Reject a malformed AI config before it is written (Codex #6). Throws -> 400.
-function validateAiConfig({ aiCategories, aiGuidance, classifierModel }) {
+function validateAiConfig({ aiCategories, aiGuidance, classifierModel, designModel, mediaKeys }) {
   if (aiCategories !== undefined) {
     if (!Array.isArray(aiCategories) || aiCategories.length === 0) {
       throw new Error('aiCategories must be a non-empty array');
@@ -174,6 +230,18 @@ function validateAiConfig({ aiCategories, aiGuidance, classifierModel }) {
   if (classifierModel != null && typeof classifierModel !== 'string') {
     throw new Error('classifierModel must be text');
   }
+  if (designModel != null && typeof designModel !== 'string') {
+    throw new Error('designModel must be text');
+  }
+  if (mediaKeys != null) {
+    if (typeof mediaKeys !== 'object' || Array.isArray(mediaKeys)) {
+      throw new Error('mediaKeys must be an object');
+    }
+    for (const [id, key] of Object.entries(mediaKeys)) {
+      if (!MEDIA_PROVIDER_IDS.includes(id)) throw new Error(`unknown media provider: ${id}`);
+      if (typeof key !== 'string') throw new Error(`media key for ${id} must be text`);
+    }
+  }
 }
 
 // Normalize categories server-side: force builtin flag for design/content,
@@ -199,18 +267,39 @@ export async function saveSettings({
   aiCategories,
   classifierModel,
   aiGuidance,
+  designModel,
+  mediaKeys,
+  mediaKeysClear,
 } = {}) {
-  validateAiConfig({ aiCategories, aiGuidance, classifierModel });
+  validateAiConfig({ aiCategories, aiGuidance, classifierModel, designModel, mediaKeys });
 
   const categoriesJson = aiCategories !== undefined
     ? JSON.stringify(normalizeCategories(aiCategories))
     : null;
 
+  // Media keys merge rather than replace, because an HTML form posts a blank
+  // field for every provider the operator did not retype — a wholesale replace
+  // would silently wipe every other key on each save. Blank means "keep", and
+  // clearing is an explicit act (the Remove checkbox -> mediaKeysClear).
+  let mediaKeysEnc = null;
+  if (mediaKeys !== undefined || mediaKeysClear !== undefined) {
+    const { rows } = await query(
+      'select media_keys_enc from siteagent_control.settings where id = 1',
+    );
+    const merged = parseMediaKeys(rows[0]?.media_keys_enc);
+    for (const [id, key] of Object.entries(mediaKeys ?? {})) {
+      const trimmed = String(key).trim();
+      if (trimmed) merged[id] = trimmed;
+    }
+    for (const id of mediaKeysClear ?? []) delete merged[id];
+    mediaKeysEnc = encrypt(JSON.stringify(merged));
+  }
+
   await query(
     `insert into siteagent_control.settings
        (id, openrouter_key_enc, openrouter_model, cloudflare_token_enc, cloudflare_account_id,
-        ai_categories, classifier_model, ai_guidance, updated_at)
-     values (1, $1, $2, $3, $4, $5, $6, $7, now())
+        ai_categories, classifier_model, ai_guidance, design_model, media_keys_enc, updated_at)
+     values (1, $1, $2, $3, $4, $5, $6, $7, $8, $9, now())
      on conflict (id) do update set
        openrouter_key_enc    = coalesce($1, siteagent_control.settings.openrouter_key_enc),
        openrouter_model      = coalesce($2, siteagent_control.settings.openrouter_model),
@@ -219,6 +308,8 @@ export async function saveSettings({
        ai_categories         = coalesce($5, siteagent_control.settings.ai_categories),
        classifier_model      = coalesce($6, siteagent_control.settings.classifier_model),
        ai_guidance           = coalesce($7, siteagent_control.settings.ai_guidance),
+       design_model          = coalesce($8, siteagent_control.settings.design_model),
+       media_keys_enc        = coalesce($9, siteagent_control.settings.media_keys_enc),
        updated_at = now()`,
     [
       openrouterKey ? encrypt(openrouterKey) : null,
@@ -228,6 +319,10 @@ export async function saveSettings({
       categoriesJson,
       classifierModel != null ? (classifierModel || '') : null,
       aiGuidance != null ? aiGuidance : null,
+      // Same idiom as classifierModel: posting '' clears the pick (and OD falls
+      // back to the default category), omitting the field preserves it.
+      designModel != null ? (designModel || '') : null,
+      mediaKeysEnc,
     ],
   );
   return getSettings();

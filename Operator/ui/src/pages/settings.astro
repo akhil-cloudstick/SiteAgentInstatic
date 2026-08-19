@@ -8,6 +8,25 @@ let error = '';
 const rawBase = import.meta.env.BASE_URL;
 const baseUrl = rawBase.endsWith('/') ? rawBase : `${rawBase}/`;
 
+// Media providers the operator can hold a key for. These are the slots MMS
+// Design resolves from its environment, so a key saved here reaches every
+// tenant daemon at spawn and tenants never configure media generation at all.
+// Must stay in sync with MEDIA_PROVIDER_IDS (control-plane/registry/settings.mjs)
+// and MEDIA_KEY_ENV (control-plane/runtime/odRuntime.mjs).
+// Declared above the POST handler because the handler reads it.
+const MEDIA_PROVIDERS = [
+  { id: 'openrouter', label: 'OpenRouter', note: 'Images via OpenRouter' },
+  { id: 'replicate', label: 'Replicate', note: 'Image + video' },
+  { id: 'fal', label: 'fal.ai', note: 'Image + video' },
+  { id: 'bfl', label: 'Black Forest Labs', note: 'FLUX images' },
+  { id: 'google', label: 'Google', note: 'Gemini / Imagen' },
+  { id: 'minimax', label: 'MiniMax', note: 'Video + speech' },
+  { id: 'kling', label: 'Kling', note: 'Video' },
+  { id: 'elevenlabs', label: 'ElevenLabs', note: 'Speech' },
+  { id: 'aihubmix', label: 'AIHubMix', note: 'Image + video + speech' },
+  { id: 'tavily', label: 'Tavily', note: 'Web search' },
+];
+
 if (Astro.request.method === 'POST') {
   const f = await Astro.request.formData();
   const str = (k) => (f.get(k) || '').toString().trim() || undefined;
@@ -38,15 +57,29 @@ if (Astro.request.method === 'POST') {
         cloudflareToken: str('cloudflareToken'),
         cloudflareAccountId: str('cloudflareAccountId'),
       };
+    } else if (section === 'media') {
+      // Media provider keys. A blank field means "keep the stored key" (the same
+      // convention as every other secret here), so only non-empty values are
+      // sent; clearing is the explicit Remove checkbox.
+      const mediaKeys = {};
+      const mediaKeysClear = [];
+      for (const id of MEDIA_PROVIDERS.map((p) => p.id)) {
+        const v = (f.get(`media_${id}`) || '').toString().trim();
+        if (v) mediaKeys[id] = v;
+        if (f.get(`mediaClear_${id}`)) mediaKeysClear.push(id);
+      }
+      payload = { mediaKeys, mediaKeysClear };
     } else {
-      // AI agent: OpenRouter key + per-task-type models + classifier. The global
-      // guidance is edited in its own section below, not sent here.
+      // AI agent: OpenRouter key + per-task-type models + classifier + the one
+      // MMS Design model. The global guidance is edited in its own section
+      // below, not sent here.
       let aiCategories = [];
       try { aiCategories = JSON.parse((f.get('aiCategories') || '[]').toString()); } catch {}
       payload = {
         openrouterKey: str('openrouterKey'),
         aiCategories,
         classifierModel: (f.get('classifierModel') || '').toString().trim(),
+        designModel: (f.get('designModel') || '').toString().trim(),
       };
     }
     try {
@@ -58,7 +91,7 @@ if (Astro.request.method === 'POST') {
         try { msg = (await r.json()).error || msg; } catch {}
         throw new Error(msg);
       }
-      return Astro.redirect(`${baseUrl}settings?saved=${section === 'cloudflare' ? 'cloudflare' : 'ai'}`);
+      return Astro.redirect(`${baseUrl}settings?saved=${section === 'cloudflare' || section === 'media' ? section : 'ai'}`);
     } catch (e) { error = e.message; }
   }
 }
@@ -91,7 +124,10 @@ const savedSection = Astro.url.searchParams.get('saved');
 const savedLabel = savedSection === 'cloudflare' ? 'Cloudflare settings saved.'
   : savedSection === 'ai' ? 'AI agent settings saved.'
   : savedSection === 'guidance' ? 'Global AI guidance saved — all tenants use it on their next message.'
+  : savedSection === 'media' ? 'Media provider keys saved — restart tenants to apply.'
   : savedSection ? 'Saved.' : '';
+
+const mediaKeys = s.mediaKeys || {};
 ---
 <Layout title="Settings">
   <h1>Settings</h1>
@@ -128,7 +164,50 @@ const savedLabel = savedSection === 'cloudflare' ? 'Cloudflare settings saved.'
         </div>
       </div>
 
+      <h2 class="sec">MMS Design model</h2>
+      <p class="hint">The one model every tenant's <strong>MMS Design</strong> session runs on. MMS Design has no classifier — one build is a single long tool loop — so it needs a model that supports <strong>tool calling</strong> and <strong>image input</strong> (tenants attach reference screenshots). The picker lists only models that do both. Leave blank to reuse the Default category's model.</p>
+      <div class="combo" id="design-combo" data-full="1">
+        <input type="hidden" name="designModel" class="combo-value" value={s.designModel || ''} />
+        <button type="button" class="combo-trigger" disabled={models.length === 0}>
+          <span class:list={['combo-trigger-label', !s.designModel && 'placeholder']} data-placeholder={models.length ? 'Select a model…' : 'Save an API key to load models'}>{s.designModel || (models.length ? 'Select a model…' : 'Save an API key to load models')}</span>
+          <span class="combo-clear" title="Clear selection" hidden>✕</span>
+          <span class="combo-caret">▾</span>
+        </button>
+        <div class="combo-panel" hidden>
+          <input type="text" class="combo-search" placeholder="Type to search…" autocomplete="off" />
+          <div class="combo-list"></div>
+        </div>
+      </div>
+
       <div style="margin-top:18px"><button type="submit">Save AI settings</button></div>
+    </form>
+  </div>
+
+  <div class="card">
+    <h2 class="card-title">Media provider keys</h2>
+    <p class="hint card-sub">Keys for image, video and speech generation in <strong>MMS Design</strong>. They are injected into each tenant's daemon at start-up, so tenants never see or set them — a provider left blank simply means that kind of generation is unavailable. Saved keys apply to tenants on their <strong>next restart</strong>, not immediately.</p>
+    <form method="POST" id="media-form">
+      <input type="hidden" name="section" value="media" />
+      {MEDIA_PROVIDERS.map((p) => (
+        <div class="media-row">
+          <label class="media-label">
+            {p.label}
+            <span class="hint">{p.note}</span>
+          </label>
+          <input
+            name={`media_${p.id}`}
+            type="password"
+            autocomplete="off"
+            placeholder={mediaKeys[p.id] ? mediaKeys[p.id] : 'not set'}
+          />
+          {mediaKeys[p.id] && (
+            <label class="media-clear">
+              <input type="checkbox" name={`mediaClear_${p.id}`} value="1" /> Remove
+            </label>
+          )}
+        </div>
+      ))}
+      <div style="margin-top:18px"><button type="submit">Save media keys</button></div>
     </form>
   </div>
 
@@ -185,6 +264,19 @@ const savedLabel = savedSection === 'cloudflare' ? 'Cloudflare settings saved.'
   #guidance-form .guidance-area::-webkit-scrollbar-thumb { background: var(--line); border-radius: 8px; border: 2px solid var(--bg); background-clip: padding-box; }
   #guidance-form .guidance-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 14px; }
   #guidance-form #guidance-count.near { color: var(--bad); }
+
+  /* Media provider keys — one compact row per provider so ten of them read as a
+     list rather than ten stacked forms. Collapses to stacked on narrow screens. */
+  #media-form .media-row { display: grid; grid-template-columns: minmax(150px, 220px) 1fr auto; align-items: center; gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--line); }
+  #media-form .media-row:last-of-type { border-bottom: 0; }
+  #media-form .media-label { display: flex; flex-direction: column; gap: 2px; margin: 0; font-weight: 500; }
+  #media-form .media-label .hint { font-weight: 400; }
+  #media-form .media-row input[type="password"] { margin: 0; }
+  #media-form .media-clear { display: flex; align-items: center; gap: 6px; margin: 0; white-space: nowrap; font-weight: 400; }
+  #media-form .media-clear input { width: auto; margin: 0; }
+  @media (max-width: 700px) {
+    #media-form .media-row { grid-template-columns: 1fr; gap: 6px; }
+  }
 
   #settings-form .cat-card { background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; margin-bottom: 12px; }
   #settings-form .cat-card-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 14px; }
@@ -304,6 +396,12 @@ const savedLabel = savedSection === 'cloudflare' ? 'Cloudflare settings saved.'
     // Category models must support tools: hide KNOWN-false, keep unknown (warned).
     const toolModels = models.filter((m) => m.toolCalling !== false);
 
+    // MMS Design additionally needs image input. Unlike the CMS — which routes a
+    // request with an attachment to the Design category — MMS Design has ONE
+    // model, so a text-only pick means every reference screenshot a tenant
+    // attaches is refused. Unknown capability is kept (the item warns).
+    const designModels = models.filter((m) => m.toolCalling !== false && m.vision !== false);
+
     const rowsBox = document.getElementById('cat-rows');
     const rowCombos = []; // { getSlug, getName, getDesc, getModel, isDefault, builtin }
 
@@ -375,6 +473,9 @@ const savedLabel = savedSection === 'cloudflare' ? 'Cloudflare settings saved.'
 
     // Classifier combo (full, unrestricted list).
     makeCombo(document.getElementById('classifier-combo'), { list: models });
+
+    // MMS Design combo (tool-calling + vision capable only).
+    makeCombo(document.getElementById('design-combo'), { list: designModels });
 
     // Serialize categories to the hidden field + validate on submit.
     document.getElementById('settings-form').addEventListener('submit', (e) => {

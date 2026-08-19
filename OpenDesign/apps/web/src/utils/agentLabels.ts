@@ -1,3 +1,8 @@
+import { isManagedSession } from '../state/managed';
+
+/** What a tenant sees instead of the runtime's provider/CLI/model plumbing. */
+export const MANAGED_AGENT_LABEL = 'MMS Design';
+
 const AGENT_LABELS: Record<string, string> = {
   aider: 'Aider',
   amp: 'Amp',
@@ -49,6 +54,13 @@ export function agentDisplayName(
   agentId?: string | null,
   fallbackName?: string | null,
 ): string | null {
+  // Managed (hosted) sessions get the product name, never the plumbing. The
+  // runtime really is "OpenAI-protocol via OpenCode" — OpenCode is the engine
+  // that executes BYOK runs — but to a tenant that reads as a CLI they did not
+  // install and a provider they did not choose, and it names a model choice the
+  // operator owns. One label, applied at the only two functions that produce
+  // user-facing agent text.
+  if (isManagedSession()) return MANAGED_AGENT_LABEL;
   for (const raw of [agentId, fallbackName]) {
     const known = knownAgentLabel(raw);
     if (known) return known;
@@ -84,6 +96,11 @@ export function agentIconId(
 
 export function exactAgentDisplayName(raw: string | null | undefined): string | null {
   if (!raw) return null;
+  // Guarded too: this is the lookup that turns a stored agentName straight into
+  // "OpenAI API via OpenCode", and it is reached from paths that never touch
+  // agentDisplayName. Every exported label function has to be sealed, not just
+  // the obvious one.
+  if (isManagedSession()) return MANAGED_AGENT_LABEL;
   const key = normalizeKey(raw);
   const alias = AGENT_ALIASES[key] ?? key;
   return AGENT_LABELS[alias] ?? null;
@@ -95,6 +112,10 @@ export function agentModelDisplayName(
   model?: string | null,
 ): string | undefined {
   const label = agentDisplayName(agentId, fallbackName) ?? undefined;
+  // Managed: the model id is deliberately withheld from tenants — the operator
+  // picks it, and showing it invites "can I change this?" about a control that
+  // does not exist here.
+  if (isManagedSession()) return label;
   const modelId = displayableModelId(model);
   if (!modelId) return label;
   return label ? `${label} · ${modelId}` : modelId;

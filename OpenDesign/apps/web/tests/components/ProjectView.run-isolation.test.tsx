@@ -123,9 +123,6 @@ vi.mock('../../src/components/AppChromeHeader', () => ({
   AppChromeHeader: ({ children }: { children: ReactNode }) => <header>{children}</header>,
 }));
 
-vi.mock('../../src/components/AvatarMenu', () => ({
-  AvatarMenu: () => null,
-}));
 
 vi.mock('../../src/components/FileWorkspace', () => ({
   DESIGN_SYSTEM_TAB: '__design_system__',

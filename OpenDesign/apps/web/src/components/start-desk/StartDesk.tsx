@@ -160,6 +160,22 @@ const RUNTIMES = [
 
 export type StartDeskRuntime = (typeof RUNTIMES)[number]['id'];
 
+/**
+ * Show the Local CLI / BYOK runtime picker in the composer's last row.
+ *
+ * Set to `false` to HIDE the control without deleting it — the runtime keeps
+ * working, it just stays on whatever the host has selected (`local-cli` by
+ * default, which is the one that can write project files). Set back to `true`
+ * to bring the control back; nothing else has to change.
+ *
+ * Hidden rather than removed because the BYOK path is still wired: `submit()`
+ * below still refuses to start a file-editing run on `byok`, and the BYOK
+ * boundary note still renders. If you hide the picker while the runtime is
+ * already `byok`, Send will keep refusing with no visible way to switch back —
+ * so hide it from the Local CLI default, not from a BYOK session.
+ */
+const SHOW_RUNTIME_PICKER = false;
+
 export interface StartDeskProps {
   prompt: string;
   onPromptChange: (value: string) => void;
@@ -535,8 +551,27 @@ export function StartDesk({
             )}
           </div>
 
-          <span className="start-desk__spacer" />
+        </div>
 
+
+        <div className="start-desk__footer">
+          <label>
+            <i className="fa-solid fa-palette" aria-hidden="true" />
+            <span>Design system:</span>
+            {designSystemSlot}
+          </label>
+          {/* Runtime picker. Lives in the last row so it carries the full
+              commit decision alongside Send: what the run builds with, and go.
+              ────────────────────────────────────────────────────────────────
+              SHOW_RUNTIME_PICKER is the on/off switch. Flip it to `true` to
+              bring the Local CLI / BYOK control back — nothing else needs to
+              change, and the runtime itself keeps working either way (it just
+              stays on whatever `runtime` already is, which defaults to Local
+              CLI). A JSX block cannot be commented out with slash-slash or a
+              plain C-style comment, and a JSX brace-comment cannot nest inside
+              a block that already contains one, so a flag is the way to hide
+              this subtree. */}
+          {SHOW_RUNTIME_PICKER && (
           <div className="start-desk__control-wrap start-desk__control-wrap--trailing">
             <button
               type="button"
@@ -582,15 +617,7 @@ export function StartDesk({
               </div>
             )}
           </div>
-
-        </div>
-
-        <div className="start-desk__footer">
-          <label>
-            <i className="fa-solid fa-palette" aria-hidden="true" />
-            <span>Design system:</span>
-            {designSystemSlot}
-          </label>
+          )}
           {/* Send lives in this last row, beside the design-system picker, rather
               than in the controls row above — the row it used to share held the
               context/template/mode controls, and the footer had free space once

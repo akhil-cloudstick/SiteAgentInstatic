@@ -217,7 +217,6 @@ import {
 } from '../comments';
 import { historyWithApiAttachmentContext } from '../api-attachment-context';
 import { filterImplicitProducedFiles } from '../produced-files';
-import { AvatarMenu } from './AvatarMenu';
 import { EntrySettingsMenu } from './EntrySettingsMenu';
 import { HandoffButton } from './HandoffButton';
 import { Icon } from './Icon';
@@ -276,6 +275,7 @@ import {
 import { SHARE_TO_COMMUNITY_PROMPT } from './share-to-community/shareToCommunityPrompt';
 import { CenteredLoader } from './Loading';
 import type { SettingsSection } from './SettingsDialog';
+import { isManagedSession, MANAGED_AI_UNCONFIGURED_MESSAGE } from '../state/managed';
 import { Toast } from './Toast';
 import { FirstArtifactHint } from './FirstArtifactHint';
 import {
@@ -4885,6 +4885,13 @@ export function ProjectView({
           provider_id: byokProtocolToTracking(config.apiProtocol) ?? 'unknown',
           active_execution_mode: executionModeToTracking(config.mode),
         });
+        // A managed tenant owns none of the settings this message would send
+        // them to fix, and the Execution section no longer exists for them.
+        // Say the one useful thing instead: talk to your operator.
+        if (isManagedSession()) {
+          setError(MANAGED_AI_UNCONFIGURED_MESSAGE);
+          return false;
+        }
         setError(BYOK_PROVIDER_REQUIRED_MESSAGE);
         onOpenSettings('execution');
         return false;
@@ -5882,7 +5889,7 @@ export function ProjectView({
         const choice = effectiveSelectedAgentChoice;
         const daemonByokOpenCode = config.agentId === 'byok-opencode';
         if (daemonByokOpenCode && !agentsById.get('byok-opencode')?.available) {
-          handlers.onError(new Error(BYOK_OPENCODE_UNAVAILABLE_MESSAGE));
+          handlers.onError(new Error(isManagedSession() ? MANAGED_AI_UNCONFIGURED_MESSAGE : BYOK_OPENCODE_UNAVAILABLE_MESSAGE));
           return true;
         }
         // v2 analytics: when the active project is a DS workspace
@@ -6038,7 +6045,7 @@ export function ProjectView({
           return true;
         }
         if (!agentsById.get('byok-opencode')?.available) {
-          handlers.onError(new Error(BYOK_OPENCODE_UNAVAILABLE_MESSAGE));
+          handlers.onError(new Error(isManagedSession() ? MANAGED_AI_UNCONFIGURED_MESSAGE : BYOK_OPENCODE_UNAVAILABLE_MESSAGE));
           return true;
         }
         // Mirror the daemon chat-route memory hook for BYOK chats. The
@@ -8640,63 +8647,6 @@ export function ProjectView({
           ? 'dark'
           : 'light';
 
-  // CLI / agent selector lives below the chat conversation (composer footer),
-  // not in the top-right header.
-  const executionControls = (
-    <>
-      <AvatarMenu
-        config={config}
-        agents={agents}
-        daemonLive={daemonLive}
-        onModeChange={onModeChange}
-        onOpen={() => {
-          trackComposerBarClick(analytics.track, {
-            page_name: 'chat_panel',
-            area: 'chat_composer',
-            element: 'agent_selector_open',
-            ...(project?.id ? { project_id: project.id } : {}),
-          });
-        }}
-        onAgentChange={(id) => {
-          trackComposerBarClick(analytics.track, {
-            page_name: 'chat_panel',
-            area: 'chat_composer',
-            element: 'agent_select',
-            agent_id: id,
-            ...(project?.id ? { project_id: project.id } : {}),
-          });
-          onAgentChange(id);
-        }}
-        onAgentModelChange={(agentId, choice) => {
-          trackComposerBarClick(analytics.track, {
-            page_name: 'chat_panel',
-            area: 'chat_composer',
-            element: 'agent_model_select',
-            agent_id: agentId,
-            ...(choice?.model ? { model_id: choice.model } : {}),
-            ...(project?.id ? { project_id: project.id } : {}),
-          });
-          onAgentModelChange(agentId, choice);
-        }}
-        onApiModelChange={(model) => {
-          trackComposerBarClick(analytics.track, {
-            page_name: 'chat_panel',
-            area: 'chat_composer',
-            element: 'agent_model_select',
-            model_id: model,
-            ...(project?.id ? { project_id: project.id } : {}),
-          });
-          onApiModelChange?.(model);
-        }}
-        onOpenSettings={onOpenSettings}
-        onRefreshAgents={onRefreshAgents}
-        placement="up"
-        // Same approved `Agent & model` list as the toolbar's Local CLI
-        // control — two triggers, one menu.
-        referenceMenu
-      />
-    </>
-  );
 
   return (
     <div className="app studio-root">
@@ -8751,23 +8701,13 @@ export function ProjectView({
               variant="toolbar"
             />
           }
-          runtimeSlot={
-            <AvatarMenu
-              config={config}
-              agents={agents}
-              daemonLive={daemonLive}
-              variant="runtime"
-              onModeChange={onModeChange}
-              onAgentChange={onAgentChange}
-              onAgentModelChange={onAgentModelChange}
-              onApiModelChange={onApiModelChange}
-              onOpenSettings={onOpenSettings}
-              onRefreshAgents={onRefreshAgents}
-            />
-          }
           onShareToCms={handleShareToCms}
           shareDisabled={shareToCmsDisabled}
-          menuSlot={(
+          menuSlot={isManagedSession() ? null : (
+            // "Continue in CLI" hands the project to a CLI on the USER's own
+            // machine — a tenant has none, and the menu names every CLI
+            // (OpenCode, Claude, Codex…) while doing it. Dead control plus a
+            // list of tools the tenant never chose, so it does not render here.
             <HandoffButton
               projectId={project.id}
               projectName={project.name}
@@ -8974,7 +8914,6 @@ export function ProjectView({
               }}
               onBack={onBack}
               backLabel={t('project.backToProjects')}
-              composerFooterAccessory={executionControls}
               /* The reference header is two stacked, ellipsised lines — name
                  above type (`Workspace.jsx:501-504`). Renaming moved up to the
                  project toolbar, where the reference puts it. */

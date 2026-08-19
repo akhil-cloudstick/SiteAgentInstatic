@@ -63,6 +63,12 @@ import {
   markFailed,
 } from './memory-extractions.js';
 import { resolveProviderConfig } from './media/config.js';
+import {
+  getManagedModel,
+  isManagedAi,
+  managedGatewayUrl,
+  managedApiKey,
+} from './managed-ai.js';
 import { AIHUBMIX_APP_CODE } from './integrations/aihubmix.js';
 import { spawn } from 'node:child_process';
 import os from 'node:os';
@@ -431,6 +437,26 @@ async function hasUnsupportedMediaProviderConfig(projectRoot) {
 // persists BYOK creds, so this is the only signal we have for that
 // mode).
 async function pickProvider(projectRoot, dataDir, chatAgentId, chatProvider, chatModel) {
+  // Managed (hosted) mode short-circuits the whole resolution chain below.
+  // That chain exists to find a credential the USER configured — a memory
+  // override, a BYOK chat snapshot, an env var, a media-config key — and in
+  // managed mode none of those are the tenant's to set. Worse, the chat
+  // snapshot the web app sends now carries the managed placeholder base URL,
+  // so falling through would point memory extraction at a host that isn't the
+  // gateway. Route it at the operator's model instead, through the same
+  // gateway everything else uses.
+  if (isManagedAi()) {
+    const model = await getManagedModel();
+    if (!model) return null; // not configured yet -> extraction quietly skipped
+    return {
+      kind: 'openai',
+      apiKey: managedApiKey(),
+      model,
+      baseUrl: managedGatewayUrl(),
+      apiVersion: '',
+      credentialSource: 'managed',
+    };
+  }
   const chatProtocol = chatProtocolFromAgentId(chatAgentId);
   const normalizedChatAgentId =
     typeof chatAgentId === 'string' ? chatAgentId.trim().toLowerCase() : '';

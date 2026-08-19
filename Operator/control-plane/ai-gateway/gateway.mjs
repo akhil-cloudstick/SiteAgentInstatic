@@ -20,6 +20,7 @@ import {
   readAiSettingsRaw,
   resolveRoutedModel,
   defaultModelOf,
+  designModelOf,
   publicAiConfig,
   getDefaultGuidance,
 } from '../registry/settings.mjs';
@@ -40,20 +41,37 @@ function readRawBody(req) {
 export async function handleGateway(req, res, pathAfterAi) {
   const slash = pathAfterAi.indexOf('/');
   const token = slash === -1 ? pathAfterAi : pathAfterAi.slice(0, slash);
-  const rest = slash === -1 ? '' : pathAfterAi.slice(slash); // "/v1/chat/completions"
+  let rest = slash === -1 ? '' : pathAfterAi.slice(slash); // "/v1/chat/completions"
 
   const slug = verifyTenantToken(decodeURIComponent(token));
   if (!slug) { res.writeHead(401, { 'Content-Type': 'text/plain' }); return res.end('invalid tenant token'); }
+
+  // Which PRODUCT is calling. The CMS uses /ai/<token>/v1/... ; MMS Design uses
+  // /ai/<token>/design/v1/... . This is a path segment rather than a header on
+  // purpose: OpenDesign's model traffic is emitted by an `opencode` child
+  // process through @ai-sdk/openai-compatible, so its base URL is the one thing
+  // we can pin — its headers are an upstream detail we don't own. A header
+  // would also be spoofable by the sibling CMS, which holds the same token.
+  // The token is "<slug>.<hmac>" (no slash), so the split above still holds.
+  let product = 'cms';
+  if (rest === '/design' || rest.startsWith('/design/')) {
+    product = 'design';
+    rest = rest.slice('/design'.length) || '/';
+  }
 
   // --- Probes (NOT proxied). Served WITHOUT decrypting the OpenRouter key so a
   // config poll never touches the secret (Codex #7). ---
 
   // /model — legacy back-compat: the single default model id. This DOES disclose
   // a model id to the tenant (accepted legacy behavior); /config never does.
+  // MMS Design polls this (via /ai/<token>/design/model) to learn the model the
+  // operator picked, so a Settings change lands on the next run without any
+  // restart. The CMS keeps its historical meaning: the single default model.
   if (rest === '/model' || rest === '/model/') {
     const cfg = await readAiSettingsRaw();
+    const model = product === 'design' ? designModelOf(cfg) : defaultModelOf(cfg);
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    return res.end(JSON.stringify({ model: defaultModelOf(cfg) || '' }));
+    return res.end(JSON.stringify({ model: model || '' }));
   }
 
   // /config — the task-type categories (names + descriptions, NO model ids),
@@ -81,7 +99,11 @@ export async function handleGateway(req, res, pathAfterAi) {
   // would route to the text-only Content model and the image would be refused.
   const requiresVision = String(req.headers['x-instatic-ai-vision'] || '') === '1';
   const cfg = await readAiSettingsRaw();
-  let resolvedModel = resolveRoutedModel(cfg, { classify, categorySlug, requiresVision });
+  // MMS Design runs on ONE operator-set model: no classifier, no categories, and
+  // no vision fallback (its model is required to be multimodal at pick time).
+  let resolvedModel = product === 'design'
+    ? designModelOf(cfg)
+    : resolveRoutedModel(cfg, { classify, categorySlug, requiresVision });
 
   const isJson = !!body && String(req.headers['content-type'] || '').includes('json');
   if (isJson) {
@@ -93,12 +115,17 @@ export async function handleGateway(req, res, pathAfterAi) {
           // omitted `model` — so enforcement can't be bypassed (Codex #1).
           payload.model = resolvedModel;
           body = Buffer.from(JSON.stringify(payload), 'utf8');
-        } else if (payload.model) {
+        } else if (payload.model && product !== 'design') {
           // Nothing configured operator-side: fall back to the tenant's own
-          // model (legacy passthrough).
+          // model (legacy passthrough). NOT for MMS Design — a tenant there has
+          // no model of their own to fall back to, and silently running one the
+          // operator never chose is exactly what this gateway exists to prevent.
           resolvedModel = payload.model;
         } else {
-          // No operator config AND no client model -> fail closed (Codex #13).
+          // No operator config AND no usable client model -> fail closed
+          // (Codex #13). The operator gets the diagnostic here; the tenant only
+          // ever sees the plain "contact your operator" copy.
+          console.log(`[ai-gateway] ${slug} · ${product}: ✗ BLOCKED — no model configured`);
           res.writeHead(503, { 'Content-Type': 'text/plain' });
           return res.end('AI model not configured');
         }
@@ -116,13 +143,18 @@ export async function handleGateway(req, res, pathAfterAi) {
   // logged prominently as "USING MODEL: <id>".
   const isModelCall = rest.endsWith('/chat/completions') || rest.endsWith('/responses');
   if (isModelCall) {
-    if (classify) {
-      console.log(`[ai-gateway] ${slug}: classifier picking category (via ${resolvedModel})`);
+    if (product === 'design') {
+      // One line per turn of the agent loop, so an operator watching this
+      // terminal can confirm every tenant /design call runs on the model they
+      // set — and nothing else.
+      console.log(`[ai-gateway] ${slug} · design: ✦ USING MODEL: ${resolvedModel}  — MMS Design (operator-set)`);
+    } else if (classify) {
+      console.log(`[ai-gateway] ${slug} · cms: classifier picking category (via ${resolvedModel})`);
     } else {
       const route = requiresVision
         ? `category "design" (image attached${categorySlug ? `, text classified as "${categorySlug}"` : ''})`
         : categorySlug ? `category "${categorySlug}"` : 'default category';
-      console.log(`[ai-gateway] ${slug}: ✦ USING MODEL: ${resolvedModel || '(tenant model)'}  — routed to ${route}`);
+      console.log(`[ai-gateway] ${slug} · cms: ✦ USING MODEL: ${resolvedModel || '(tenant model)'}  — routed to ${route}`);
     }
   }
 
@@ -134,7 +166,8 @@ export async function handleGateway(req, res, pathAfterAi) {
         Authorization: `Bearer ${secrets.openrouterKey}`,
         'Content-Type': req.headers['content-type'] || 'application/json',
         'HTTP-Referer': 'http://127.0.0.1',
-        'X-Title': `SiteAgent/${slug}`,
+        // Splits CMS from Design spend per tenant on OpenRouter's activity page.
+        'X-Title': `SiteAgent/${slug}/${product}`,
       },
       body,
     });

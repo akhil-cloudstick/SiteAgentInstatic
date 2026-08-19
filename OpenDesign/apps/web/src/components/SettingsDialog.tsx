@@ -161,6 +161,7 @@ import { RoutinesSection } from './RoutinesSection';
 import { ConnectorsBrowser } from './ConnectorsBrowser';
 import { MemoryModelInline } from './MemoryModelInline';
 import { MemorySection } from './MemorySection';
+import { isManagedSession, MANAGED_SETTINGS_SECTION } from '../state/managed';
 import { ByokConnectionTestControl } from './byok/ByokConnectionTestControl';
 import { ByokKeyField } from './byok/ByokKeyField';
 import { ByokModelField } from './byok/ByokModelField';
@@ -223,6 +224,24 @@ export type SettingsSection =
   // navigate() call so openSettings only owns dialog-bound sections.
   | 'library'
   | 'about';
+
+/**
+ * Sections a managed (hosted) tenant never sees, because each one only
+ * configures the AI runtime the operator owns:
+ *  - execution      — the Local CLI / BYOK fork and the provider key
+ *  - media          — media provider keys, now injected by the control plane
+ *  - critiqueTheater — Design Jury, whose panel is a model picker
+ *
+ * The tokens stay in `SettingsSection` on purpose: `sectionHeader` is a
+ * `Record<SettingsSection, …>` and the type is re-exported to EntryShell,
+ * ChatPane and ProjectView, so deleting them would ripple far past this file
+ * for no behavioural gain.
+ */
+export const MANAGED_HIDDEN_SETTINGS_SECTIONS: ReadonlySet<SettingsSection> = new Set([
+  'execution',
+  'media',
+  'critiqueTheater',
+]);
 
 interface ByokProviderPreset {
   id: string;
@@ -1563,6 +1582,18 @@ export function SettingsDialog({
       : {},
   );
   const [activeSection, setActiveSection] = useState<SettingsSection>(initialSection);
+  // Managed (hosted) session: the operator owns the AI runtime, so the sections
+  // that only exist to configure it — Execution mode, Media providers, Design
+  // Jury's model, the Memory model picker — are removed rather than disabled.
+  // A control a tenant can see but cannot change is worse than no control.
+  const managed = isManagedSession();
+  // A section can still be requested by a caller that predates managed mode (or
+  // a restored route). Land on a section that exists instead of an empty pane.
+  useEffect(() => {
+    if (managed && MANAGED_HIDDEN_SETTINGS_SECTIONS.has(activeSection)) {
+      setActiveSection(MANAGED_SETTINGS_SECTION);
+    }
+  }, [managed, activeSection]);
   const [settingsSidebarCollapsed, setSettingsSidebarCollapsed] = useState(false);
   const [settingsFullscreen, setSettingsFullscreen] = useState(false);
   // Scroll the right-hand content pane back to the top whenever the user
@@ -4084,6 +4115,7 @@ export function SettingsDialog({
             aria-label="Settings sections"
             aria-hidden={settingsSidebarCollapsed ? true : undefined}
           >
+            {managed ? null : (
             <button
               type="button"
               className={`settings-nav-item${activeSection === 'execution' ? ' active' : ''}`}
@@ -4095,6 +4127,7 @@ export function SettingsDialog({
                 <small>{`${t('settings.localCli')} / ${t('settings.modeApiMeta')}`}</small>
               </span>
             </button>
+            )}
             <button
               type="button"
               className={`settings-nav-item${activeSection === 'instructions' ? ' active' : ''}`}
@@ -4117,6 +4150,7 @@ export function SettingsDialog({
                 <small>{t('settings.memoryHint')}</small>
               </span>
             </button>
+            {managed ? null : (
             <button
               type="button"
               className={`settings-nav-item${activeSection === 'media' ? ' active' : ''}`}
@@ -4128,6 +4162,7 @@ export function SettingsDialog({
                 <small>Image / video / audio</small>
               </span>
             </button>
+            )}
             <button
               type="button"
               className={`settings-nav-item${activeSection === 'mcpClient' ? ' active' : ''}`}
@@ -4183,6 +4218,7 @@ export function SettingsDialog({
                 <small>{t('settings.appearanceHint')}</small>
               </span>
             </button>
+            {managed ? null : (
             <button
               type="button"
               className={`settings-nav-item${activeSection === 'critiqueTheater' ? ' active' : ''}`}
@@ -4194,6 +4230,7 @@ export function SettingsDialog({
                 <small>{t('critiqueTheater.settingsNavHint')}</small>
               </span>
             </button>
+            )}
             <button
               type="button"
               className={`settings-nav-item${activeSection === 'notifications' ? ' active' : ''}`}
@@ -4262,7 +4299,7 @@ export function SettingsDialog({
             </button>
           </aside>
           <div className="settings-content" ref={settingsContentRef}>
-          {activeSection === 'execution' ? (
+          {!managed && activeSection === 'execution' ? (
             <>
               <div
                 className="seg-control"
@@ -5530,7 +5567,7 @@ export function SettingsDialog({
             </>
           ) : null}
 
-          {activeSection === 'media' ? (
+          {!managed && activeSection === 'media' ? (
             <MediaProvidersSection
               cfg={cfg}
               setCfg={setCfg}
@@ -5638,7 +5675,7 @@ export function SettingsDialog({
             <AppearanceSection cfg={cfg} setCfg={setCfg} />
           ) : null}
 
-          {activeSection === 'critiqueTheater' ? (
+          {!managed && activeSection === 'critiqueTheater' ? (
             <CritiqueTheaterSection />
           ) : null}
 

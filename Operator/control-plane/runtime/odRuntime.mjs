@@ -57,7 +57,35 @@ function isCompleteBuild(dir) {
   return existsSync(resolve(dir, 'BUILD_ID')) && existsSync(resolve(dir, 'required-server-files.json'));
 }
 
-// tenant: { slug, odPort, instaticUrl? }
+// Media provider id -> the env var OpenDesign reads it from. These names are
+// the FIRST entry of each slot in OpenDesign's own ENV_KEYS table
+// (apps/daemon/src/media/config.ts), and its resolveProviderConfig() checks the
+// environment ahead of any tenant-stored key — so injecting here makes the
+// operator's key win without touching OpenDesign at all. Keep this map in sync
+// with MEDIA_PROVIDER_IDS in registry/settings.mjs.
+const MEDIA_KEY_ENV = {
+  openrouter: 'OD_OPENROUTER_API_KEY',
+  replicate: 'OD_REPLICATE_API_TOKEN',
+  fal: 'OD_FAL_KEY',
+  bfl: 'OD_BFL_API_KEY',
+  elevenlabs: 'OD_ELEVENLABS_API_KEY',
+  google: 'OD_GOOGLE_API_KEY',
+  minimax: 'OD_MINIMAX_API_KEY',
+  kling: 'OD_KLING_API_KEY',
+  aihubmix: 'OD_AIHUBMIX_API_KEY',
+  tavily: 'OD_TAVILY_API_KEY',
+};
+
+function mediaKeyEnv(mediaKeys) {
+  const out = {};
+  for (const [id, key] of Object.entries(mediaKeys || {})) {
+    const name = MEDIA_KEY_ENV[id];
+    if (name && typeof key === 'string' && key.trim()) out[name] = key.trim();
+  }
+  return out;
+}
+
+// tenant: { slug, odPort, instaticUrl?, mediaKeys? }
 // Spawns ONLY this tenant's daemon. The web UI comes from the single shared Next
 // process (startSharedWeb) — see the note above SHARED_WEB_PREFIX.
 export function start(tenant) {
@@ -125,8 +153,19 @@ export function start(tenant) {
     // control-plane's key-hiding gateway (same per-tenant signed token as
     // Instatic). The real provider key NEVER enters the OD process — it stays in
     // the control-plane. OD_MANAGED_AI signals the web app to hide the BYOK UI.
+    //
+    // The `/design` segment is what tells the gateway this traffic is MMS Design
+    // rather than the tenant's CMS, so it resolves the operator's MMS Design
+    // model instead of the CMS category map. It is carried in the base URL (not
+    // a header) because OD's model calls are emitted by an `opencode` child
+    // process whose headers we don't control. See ai-gateway/gateway.mjs.
+    //
+    // This URL embeds a signed tenant token and is therefore a CREDENTIAL: it
+    // must stay inside the daemon process and never be handed to the browser.
     OD_MANAGED_AI: '1',
-    OD_AI_GATEWAY_URL: `${config.publicBaseUrl}/ai/${signTenantToken(slug)}/v1`,
+    OD_AI_GATEWAY_URL: `${config.publicBaseUrl}/ai/${signTenantToken(slug)}/design/v1`,
+    // Operator-owned media provider keys (image / video / speech generation).
+    ...mediaKeyEnv(tenant.mediaKeys),
   };
   // Clear inherited control-plane secrets the child shouldn't see.
   delete env.SETTINGS_ENC_KEY;

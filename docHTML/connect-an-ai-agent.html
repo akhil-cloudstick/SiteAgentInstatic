@@ -1,0 +1,662 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agent Keycards</title>
+<style>
+  /* ─────────────────────────────────────────────────────────────────────────
+     MMS Design System — the palette the Operator console already uses
+     (Operator/ui/src/layouts/Layout.astro): cream ground, navy ink,
+     Approval-Green accent. Fonts are system stacks approximating Nunito /
+     Nunito Sans / Roboto Mono, because font CDNs are blocked here and a
+     silent fallback is worse than a chosen one.
+     ───────────────────────────────────────────────────────────────────── */
+  :root {
+    --bg:        #f8f1df;
+    --panel:     #ffffff;
+    --panel2:    #f2ead3;
+    --ink:       #082a38;
+    --mut:       #44515a;
+    --faint:     #6b7780;
+    --line:      rgba(8,42,56,.16);
+    --line-soft: rgba(8,42,56,.08);
+    --accent:    #1ba957;
+    --accent-dk: #0e8c45;
+    --accent-bg: #e6f6ec;
+    --warn:      #c24a0e;
+    --warn-bg:   #fdf0e6;
+    --bad:       #c23a25;
+    --shadow:    0 6px 24px rgba(8,42,56,.06);
+
+    --sans: ui-rounded, "Segoe UI", system-ui, -apple-system, Roboto, Helvetica, Arial, sans-serif;
+    --mono: ui-monospace, "Cascadia Mono", Consolas, "SF Mono", Menlo, monospace;
+
+    --step--1: clamp(.78rem, .76rem + .1vw, .84rem);
+    --step-0:  clamp(1rem, .97rem + .15vw, 1.08rem);
+    --step-1:  clamp(1.2rem, 1.12rem + .35vw, 1.4rem);
+    --step-2:  clamp(1.5rem, 1.35rem + .7vw, 1.95rem);
+    --step-3:  clamp(2rem, 1.7rem + 1.5vw, 3rem);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg:        #071e28;
+      --panel:     #0d2b37;
+      --panel2:    #113340;
+      --ink:       #eef3f0;
+      --mut:       #a9bcc2;
+      --faint:     #8199a2;
+      --line:      rgba(238,243,240,.18);
+      --line-soft: rgba(238,243,240,.09);
+      --accent:    #3fd07c;
+      --accent-dk: #6fe3a0;
+      --accent-bg: rgba(63,208,124,.13);
+      --warn:      #f0954f;
+      --warn-bg:   rgba(240,149,79,.13);
+      --bad:       #f08268;
+      --shadow:    0 6px 28px rgba(0,0,0,.34);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg:        #071e28;
+    --panel:     #0d2b37;
+    --panel2:    #113340;
+    --ink:       #eef3f0;
+    --mut:       #a9bcc2;
+    --faint:     #8199a2;
+    --line:      rgba(238,243,240,.18);
+    --line-soft: rgba(238,243,240,.09);
+    --accent:    #3fd07c;
+    --accent-dk: #6fe3a0;
+    --accent-bg: rgba(63,208,124,.13);
+    --warn:      #f0954f;
+    --warn-bg:   rgba(240,149,79,.13);
+    --bad:       #f08268;
+    --shadow:    0 6px 28px rgba(0,0,0,.34);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: var(--step-0);
+    line-height: 1.62;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 46rem; margin: 0 auto; padding: 0 1.5rem 6rem; }
+
+  /* ── Masthead ───────────────────────────────────────────────────────── */
+  header.mast {
+    padding: 4.5rem 0 2.5rem;
+    border-bottom: 2px solid var(--ink);
+    margin-bottom: 3rem;
+  }
+  .eyebrow {
+    font-size: var(--step--1);
+    letter-spacing: .13em;
+    text-transform: uppercase;
+    color: var(--mut);
+    font-weight: 700;
+    margin: 0 0 1rem;
+  }
+  h1 {
+    font-size: var(--step-3);
+    line-height: 1.04;
+    font-weight: 800;
+    letter-spacing: -.022em;
+    margin: 0 0 1rem;
+    text-wrap: balance;
+  }
+  .standfirst {
+    font-size: var(--step-1);
+    line-height: 1.45;
+    color: var(--mut);
+    margin: 0 0 2rem;
+    max-width: 34ch;
+    text-wrap: balance;
+  }
+  .console-link {
+    display: flex; flex-wrap: wrap; align-items: center; gap: .75rem;
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 12px; padding: .9rem 1.1rem; box-shadow: var(--shadow);
+  }
+  .console-link .lbl {
+    font-size: var(--step--1); font-weight: 700; letter-spacing: .06em;
+    text-transform: uppercase; color: var(--mut);
+  }
+  .console-link a {
+    font-family: var(--mono); font-size: .85rem; color: var(--accent-dk);
+    text-decoration: none; word-break: break-all; font-weight: 600;
+  }
+  .console-link a:hover { text-decoration: underline; }
+
+  /* ── Sections ───────────────────────────────────────────────────────── */
+  section { margin: 0 0 3.5rem; }
+  h2 {
+    font-size: var(--step-2); font-weight: 800; letter-spacing: -.018em;
+    line-height: 1.15; margin: 0 0 1.25rem; text-wrap: balance;
+  }
+  h3 {
+    font-size: var(--step-1); font-weight: 700; letter-spacing: -.01em;
+    margin: 2.25rem 0 .75rem; text-wrap: balance;
+  }
+  p { margin: 0 0 1.1rem; max-width: 68ch; }
+  strong { font-weight: 700; }
+  a { color: var(--accent-dk); }
+
+  /* ── Numbered steps — a real sequence, so the numbers carry meaning ─── */
+  .step { display: grid; grid-template-columns: auto 1fr; gap: 1.25rem; margin: 0 0 2.75rem; }
+  .step-num {
+    width: 2.6rem; height: 2.6rem; border-radius: 50%;
+    background: var(--ink); color: var(--bg);
+    display: grid; place-items: center;
+    font-size: 1.05rem; font-weight: 800; font-variant-numeric: tabular-nums;
+  }
+  .step-body > :first-child { margin-top: 0; }
+  .step-body h2 { font-size: var(--step-1); margin-bottom: .6rem; }
+  .step-body .once {
+    display: inline-block; font-size: var(--step--1); font-weight: 700;
+    color: var(--mut); letter-spacing: .04em; text-transform: uppercase;
+    margin-left: .5rem; vertical-align: .12em;
+  }
+
+  /* ── Cards / callouts ───────────────────────────────────────────────── */
+  .card {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 14px; padding: 1.35rem 1.5rem; box-shadow: var(--shadow);
+    margin: 0 0 1.4rem;
+  }
+  .card > :first-child { margin-top: 0; }
+  .card > :last-child { margin-bottom: 0; }
+
+  .note, .caution {
+    border-radius: 10px; padding: .9rem 1.1rem; margin: 1.4rem 0;
+    font-size: .95rem;
+  }
+  .note { background: var(--accent-bg); border: 1px solid var(--accent); }
+  .caution { background: var(--warn-bg); border: 1px solid var(--warn); }
+  .note p, .caution p { margin: 0; max-width: none; }
+  .note p + p, .caution p + p { margin-top: .6rem; }
+
+  /* ── Code ───────────────────────────────────────────────────────────── */
+  code {
+    font-family: var(--mono); font-size: .87em;
+    background: var(--panel2); border: 1px solid var(--line-soft);
+    border-radius: 5px; padding: .08em .35em;
+  }
+  pre {
+    background: var(--panel2); border: 1px solid var(--line);
+    border-radius: 10px; padding: 1rem 1.15rem; margin: 0 0 1.4rem;
+    overflow-x: auto; font-family: var(--mono); font-size: .82rem; line-height: 1.65;
+  }
+  pre code { background: none; border: 0; padding: 0; font-size: inherit; }
+  .c { color: var(--faint); }
+
+  /* ── Tables ─────────────────────────────────────────────────────────── */
+  .tw { overflow-x: auto; margin: 0 0 1.5rem; }
+  table { width: 100%; border-collapse: collapse; font-size: .93rem; }
+  th, td { text-align: left; padding: .7rem .8rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th {
+    font-size: var(--step--1); text-transform: uppercase; letter-spacing: .06em;
+    color: var(--mut); font-weight: 700; border-bottom: 2px solid var(--ink);
+    white-space: nowrap;
+  }
+  td code { white-space: nowrap; }
+  tbody tr:last-child td { border-bottom: 0; }
+
+  /* ── Chat transcript — the example is the heart of the page ─────────── */
+  .chat {
+    border-left: 3px solid var(--accent); padding: .25rem 0 .25rem 1.35rem;
+    margin: 0 0 1.5rem; display: flex; flex-direction: column; gap: 1.1rem;
+  }
+  .turn { display: grid; grid-template-columns: 5.5rem 1fr; gap: .9rem; align-items: baseline; }
+  .who {
+    font-size: var(--step--1); font-weight: 800; letter-spacing: .05em;
+    text-transform: uppercase; color: var(--mut);
+  }
+  .turn.ai .who { color: var(--accent-dk); }
+  .says { margin: 0; max-width: none; }
+  .turn.refused .says { color: var(--warn); font-weight: 600; }
+
+  /* ── Recipe list ────────────────────────────────────────────────────── */
+  .recipes { display: grid; gap: 1rem; margin: 0 0 1.5rem; }
+  .recipe {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 12px; padding: 1.1rem 1.25rem; box-shadow: var(--shadow);
+  }
+  .recipe h4 { margin: 0 0 .3rem; font-size: 1.02rem; font-weight: 800; }
+  .recipe p { margin: 0 0 .7rem; font-size: .93rem; color: var(--mut); max-width: none; }
+  .perms { display: flex; flex-wrap: wrap; gap: .35rem; }
+  .perm {
+    font-family: var(--mono); font-size: .74rem; font-weight: 600;
+    background: var(--accent-bg); color: var(--accent-dk);
+    border: 1px solid var(--accent); border-radius: 20px; padding: .12rem .6rem;
+    white-space: nowrap;
+  }
+  .perm.off {
+    background: transparent; color: var(--faint);
+    border-color: var(--line); text-decoration: line-through;
+  }
+
+  /* ── Can / cannot ───────────────────────────────────────────────────── */
+  .never { display: grid; gap: .85rem; margin: 0 0 1.5rem; }
+  .never div {
+    border-left: 3px solid var(--bad); padding-left: 1rem;
+  }
+  .never strong { display: block; }
+  .never span { color: var(--mut); font-size: .95rem; }
+
+  /* ── Client groups — the split that actually predicts which config works ── */
+  .group {
+    border: 1px solid var(--line); border-radius: 14px;
+    padding: 1.25rem 1.5rem 1.5rem; margin: 0 0 1.75rem;
+    background: var(--panel);
+  }
+  .group-label {
+    font-size: var(--step--1); font-weight: 800; letter-spacing: .08em;
+    text-transform: uppercase; color: var(--accent-dk);
+    margin: 0 0 .5rem; padding-bottom: .6rem;
+    border-bottom: 1px solid var(--line); max-width: none;
+  }
+  .group h3:first-of-type { margin-top: 1.1rem; }
+  .group > :last-child { margin-bottom: 0; }
+
+  ul { margin: 0 0 1.2rem; padding-left: 1.2rem; max-width: 68ch; }
+  li { margin-bottom: .45rem; }
+  li::marker { color: var(--accent); }
+
+  hr { border: 0; border-top: 1px solid var(--line); margin: 3.5rem 0; }
+
+  footer {
+    border-top: 2px solid var(--ink); padding-top: 1.75rem;
+    font-size: .93rem; color: var(--mut);
+  }
+  footer p { max-width: 68ch; }
+
+  a:focus-visible, .console-link a:focus-visible {
+    outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 3px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+  @media (max-width: 34rem) {
+    .step { grid-template-columns: 1fr; gap: .6rem; }
+    .turn { grid-template-columns: 1fr; gap: .15rem; }
+  }
+
+  /* ── Console chrome — this page is served inside the Operator, so it keeps
+     a way back rather than dead-ending the reader. ─────────────────────── */
+  .topbar {
+    position: sticky; top: 0; z-index: 10;
+    background: var(--panel); border-bottom: 1px solid var(--line);
+    padding: .8rem 1.5rem;
+  }
+  .topbar-inner {
+    max-width: 46rem; margin: 0 auto;
+    display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+  }
+  .topbar a.back {
+    font-size: .9rem; font-weight: 700; color: var(--ink); text-decoration: none;
+  }
+  .topbar a.back:hover { color: var(--accent-dk); }
+  .topbar .where {
+    font-size: var(--step--1); letter-spacing: .08em; text-transform: uppercase;
+    color: var(--mut); font-weight: 700;
+  }
+  .topbar + .wrap header.mast { padding-top: 3rem; }
+  @media print { .topbar { display: none; } }
+</style>
+</head>
+<body>
+
+<nav class="topbar">
+  <div class="topbar-inner">
+    <a class="back" href="/operator/mcp">&larr; MCP Agents</a>
+    <span class="where">Documentation</span>
+  </div>
+</nav>
+
+<div class="wrap">
+
+<header class="mast">
+  <p class="eyebrow">MMSBUILD · Operator guide</p>
+  <h1>Give an AI a keycard to a client site</h1>
+  <p class="standfirst">It can write pages, draft posts and upload images. You decide exactly what it may touch.</p>
+  <div class="console-link">
+    <span class="lbl">You'll work here</span>
+    <a href="https://siteagent.tailbbb0d2.ts.net/operator/mcp">https://siteagent.tailbbb0d2.ts.net/operator/mcp</a>
+  </div>
+</header>
+
+<section>
+  <h2>What you're actually handing over</h2>
+  <p>A <strong>keycard</strong>. Like a real one, it opens some doors and not others — and you choose which when you make it. If the AI does something you don't like, you cancel the card and it stops working on its very next request.</p>
+  <p>Two things go to whoever runs the AI:</p>
+  <div class="tw">
+    <table>
+      <thead><tr><th>Thing</th><th>What it is</th><th>Example</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Address</strong></td><td>A web link, one per client site</td><td><code>https://…/mcp/acme-dental</code></td></tr>
+        <tr><td><strong>Key</strong></td><td>A long password that decides what the AI may do</td><td><code>mmsmcp_8Kd93jRmQp…</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>That's the entire connection. Open the console link above and you'll find three sections: <strong>Create a key</strong>, <strong>Keys</strong>, and <strong>Endpoint directory</strong>.</p>
+</section>
+
+<hr>
+
+<div class="step">
+  <div class="step-num">1</div>
+  <div class="step-body">
+    <h2>Turn the site on for AI access<span class="once">once per site</span></h2>
+    <p>Scroll to <strong>Endpoint directory</strong> at the bottom. Every client site is listed:</p>
+    <div class="tw">
+      <table>
+        <thead><tr><th>Site</th><th>Bridge</th><th>Keys</th><th></th></tr></thead>
+        <tbody>
+          <tr><td><code>acme-dental</code></td><td>not installed</td><td>0</td><td><strong>Install bridge</strong></td></tr>
+          <tr><td><code>bright-cafe</code></td><td>installed</td><td>2</td><td>Reinstall</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>Press <strong>Install bridge</strong> on the site you want. Wait a few seconds — the Bridge column changes to <strong>installed</strong>. You only do this once per site, ever.</p>
+    <p><strong>What it does:</strong> switches on the part that lets an AI build page layouts properly, using the CMS's own tools instead of editing from outside. Without it the AI can still handle images and site-wide styling, but not pages or posts.</p>
+    <div class="note">
+      <p><strong>"site not running"</strong> means that client's site is stopped. Start it from the Tenants page, then come back.</p>
+    </div>
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-num">2</div>
+  <div class="step-body">
+    <h2>Create a key</h2>
+    <p>Scroll to <strong>Create a key</strong> at the top.</p>
+    <div class="card">
+      <p><strong>Site</strong> — pick the client, e.g. <code>acme-dental</code>. The key works on this site and no other.</p>
+      <p><strong>Label</strong> — a name so you recognise it later, e.g. <code>blog-writer</code>. Just for you.</p>
+      <p><strong>Tables</strong> — blank allows everything. Type <code>posts</code> and the AI can only touch blog posts, never the homepage.</p>
+      <p><strong>Expires in</strong> — blank means never. <code>90</code> means the key dies after 90 days.</p>
+    </div>
+    <p>Then tick the permissions — the part that matters:</p>
+    <div class="tw">
+      <table>
+        <thead><tr><th>Tick</th><th>The AI can</th></tr></thead>
+        <tbody>
+          <tr><td><code>read</code></td><td>Look at pages, posts and content. Change nothing</td></tr>
+          <tr><td><code>create</code></td><td>Make new pages and blog posts — <strong>as drafts</strong></td></tr>
+          <tr><td><code>edit</code></td><td>Change existing content and page layouts</td></tr>
+          <tr><td><code>delete</code></td><td>Move things to Trash (a person can restore them)</td></tr>
+          <tr><td><code>publish</code></td><td><strong>Push work live to the real website</strong></td></tr>
+          <tr><td><code>tables.manage</code></td><td>Create new content collections</td></tr>
+          <tr><td><code>media.read</code></td><td>Browse the image library</td></tr>
+          <tr><td><code>media.write</code></td><td>Upload and edit images</td></tr>
+          <tr><td><code>media.delete</code></td><td>Move images to Trash</td></tr>
+          <tr><td><code>design.edit</code></td><td>Change site-wide colours, fonts and styles</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>Press <strong>Create key</strong>.</p>
+
+    <h3>Copy it now</h3>
+    <p>A green box appears with your key. <strong>This is the only time it is ever shown.</strong> Only a fingerprint is stored, so nobody can read it back later — not even you.</p>
+    <p>Four copy buttons: <strong>Copy key</strong> (the password alone), <strong>Copy endpoint</strong> (the address alone), <strong>Copy command</strong> (a ready-to-paste setup line for Claude Code), and <strong>Copy both</strong> (address and key, for other tools).</p>
+    <div class="note">
+      <p>Lost it? Revoke the key and make a new one. Ten seconds.</p>
+    </div>
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-num">3</div>
+  <div class="step-body">
+    <h2>Connect it to an AI</h2>
+    <p>Every tool needs the same two things. Only the place you type them changes.</p>
+<pre><code>Endpoint:  https://siteagent.tailbbb0d2.ts.net/mcp/acme-dental
+Header:    Authorization: Bearer mmsmcp_8Kd93jRmQp2xVn...</code></pre>
+    <p>Find your tool below. If it isn't listed, check whether it accepts a <strong>URL with custom headers</strong> (Group A) or only a <strong>command</strong> (Group B), and copy the closest example.</p>
+
+    <div class="group">
+      <p class="group-label">Group A · Connects to a URL directly</p>
+
+      <h3>Claude Code</h3>
+      <p>Press <strong>Copy command</strong> on the console and paste it into a terminal:</p>
+<pre><code>claude mcp add mms-cms --transport http \
+  https://siteagent.tailbbb0d2.ts.net/mcp/acme-dental \
+  --header "Authorization: Bearer mmsmcp_8Kd93jRmQp2xVn..."</code></pre>
+      <p>Confirm with <code>claude mcp list</code>. Remove it later with <code>claude mcp remove mms-cms</code>.</p>
+
+      <h3>Cursor</h3>
+      <p><strong>Settings → MCP → Add new MCP server</strong>, then:</p>
+<pre><code>{
+  "mcpServers": {
+    "mms-cms": {
+      "url": "https://siteagent.tailbbb0d2.ts.net/mcp/acme-dental",
+      "headers": { "Authorization": "Bearer mmsmcp_8Kd93jRmQp2xVn..." }
+    }
+  }
+}</code></pre>
+
+      <h3>VS Code — GitHub Copilot</h3>
+      <p>Create <code>.vscode/mcp.json</code> in the project, or run <strong>MCP: Add Server</strong> from the command palette:</p>
+<pre><code>{
+  "servers": {
+    "mms-cms": {
+      "type": "http",
+      "url": "https://siteagent.tailbbb0d2.ts.net/mcp/acme-dental",
+      "headers": { "Authorization": "Bearer mmsmcp_8Kd93jRmQp2xVn..." }
+    }
+  }
+}</code></pre>
+      <p>Then switch Copilot Chat to <strong>Agent</strong> mode — MCP tools don't appear in Ask mode.</p>
+
+      <h3>Windsurf</h3>
+      <p><strong>Settings → Cascade → MCP Servers → Add server</strong>, or edit <code>mcp_config.json</code>:</p>
+<pre><code>{
+  "mcpServers": {
+    "mms-cms": {
+      "serverUrl": "https://siteagent.tailbbb0d2.ts.net/mcp/acme-dental",
+      "headers": { "Authorization": "Bearer mmsmcp_8Kd93jRmQp2xVn..." }
+    }
+  }
+}</code></pre>
+
+      <h3>Cline — VS Code extension</h3>
+      <p><strong>MCP Servers → Configure → Edit Configuration</strong>:</p>
+<pre><code>{
+  "mcpServers": {
+    "mms-cms": {
+      "type": "streamableHttp",
+      "url": "https://siteagent.tailbbb0d2.ts.net/mcp/acme-dental",
+      "headers": { "Authorization": "Bearer mmsmcp_8Kd93jRmQp2xVn..." }
+    }
+  }
+}</code></pre>
+
+      <h3>n8n</h3>
+      <p>Add an <strong>MCP Client</strong> node:</p>
+      <div class="tw">
+        <table>
+          <tbody>
+            <tr><td><strong>Endpoint</strong></td><td><code>https://siteagent.tailbbb0d2.ts.net/mcp/acme-dental</code></td></tr>
+            <tr><td><strong>Server Transport</strong></td><td>HTTP Streamable</td></tr>
+            <tr><td><strong>Authentication</strong></td><td>Header Auth</td></tr>
+            <tr><td><strong>Name</strong></td><td><code>Authorization</code></td></tr>
+            <tr><td><strong>Value</strong></td><td><code>Bearer mmsmcp_8Kd93jRmQp2xVn...</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Connect it to an <strong>AI Agent</strong> node and the tools appear automatically.</p>
+    </div>
+
+    <div class="group">
+      <p class="group-label">Group B · Only runs a command</p>
+      <p>These can't call a URL themselves. <code>mcp-remote</code> bridges the gap — it runs locally and forwards to the endpoint. It comes from npm, so Node must be installed.</p>
+
+      <h3>Claude Desktop</h3>
+      <p><strong>Settings → Developer → Edit Config</strong>, then:</p>
+<pre><code>{
+  "mcpServers": {
+    "mms-cms": {
+      "command": "npx",
+      "args": [
+        "-y", "mcp-remote",
+        "https://siteagent.tailbbb0d2.ts.net/mcp/acme-dental",
+        "--header", "Authorization:${AUTH}"
+      ],
+      "env": { "AUTH": "Bearer mmsmcp_8Kd93jRmQp2xVn..." }
+    }
+  }
+}</code></pre>
+      <p>Restart Claude Desktop. The tools appear under the tools icon in the message box.</p>
+      <div class="note">
+        <p><strong>Why the key sits in <code>env</code>, not <code>args</code>:</strong> the header value contains a space, which breaks argument parsing. Putting it in <code>env</code> and referencing it as <code>${AUTH}</code> is the standard workaround — and it applies to every example in this group.</p>
+      </div>
+
+      <h3>Codex CLI</h3>
+      <p>Edit <code>~/.codex/config.toml</code>:</p>
+<pre><code>[mcp_servers.mms-cms]
+command = "npx"
+args = ["-y", "mcp-remote", "https://siteagent.tailbbb0d2.ts.net/mcp/acme-dental", "--header", "Authorization:${AUTH}"]
+env = { AUTH = "Bearer mmsmcp_8Kd93jRmQp2xVn..." }</code></pre>
+
+      <h3>Any other command-only tool</h3>
+      <p>Same shape everywhere — a command, its arguments, and one environment variable:</p>
+<pre><code>command:  npx
+args:     -y  mcp-remote  https://siteagent.tailbbb0d2.ts.net/mcp/acme-dental  --header  Authorization:${AUTH}
+env:      AUTH = Bearer mmsmcp_8Kd93jRmQp2xVn...</code></pre>
+    </div>
+
+    <div class="group">
+      <p class="group-label">Group C · Web assistants — not supported</p>
+      <p><strong>claude.ai</strong> and <strong>ChatGPT</strong> custom connectors run on the provider's servers and sign in with OAuth. They have no field for a custom header, so they cannot send the key.</p>
+      <p>Use a desktop or CLI tool from the groups above instead. Anyone can connect their own copy of Claude Desktop or Claude Code with the key you give them.</p>
+    </div>
+
+    <h3>Check the connection</h3>
+    <p>Any tool, any language — this asks the endpoint what it can do:</p>
+<pre><code>curl -X POST https://siteagent.tailbbb0d2.ts.net/mcp/acme-dental \
+  -H "Authorization: Bearer mmsmcp_8Kd93jRmQp2xVn..." \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'</code></pre>
+    <p>A working key returns a long list of tools. A bad or revoked key returns <code>"Invalid, revoked, or expired agent key"</code>.</p>
+  </div>
+</div>
+
+<hr>
+
+<section>
+  <h2>What it looks like in use</h2>
+  <p>A key with <code>read</code>, <code>create</code>, <code>edit</code> — but <strong>not</strong> <code>publish</code>:</p>
+  <div class="chat">
+    <div class="turn"><span class="who">Staff</span><p class="says">Write a blog post about our new teeth whitening service.</p></div>
+    <div class="turn ai"><span class="who">Claude</span><p class="says">I've looked at your existing posts to match the style. I've created "Professional Teeth Whitening — What to Expect", about 600 words, saved as a <strong>draft</strong>. It's not live yet.</p></div>
+    <div class="turn"><span class="who">Staff</span><p class="says">Add a photo to it.</p></div>
+    <div class="turn ai"><span class="who">Claude</span><p class="says">Uploaded <code>whitening-chair.jpg</code> and set it as the header image. I've added alt text for accessibility: "Dental hygienist preparing a whitening treatment".</p></div>
+    <div class="turn"><span class="who">Staff</span><p class="says">Great, publish it.</p></div>
+    <div class="turn ai refused"><span class="who">Claude</span><p class="says">I don't have permission to publish. The post is ready in your CMS as a draft — someone with publishing access can review and publish it.</p></div>
+  </div>
+  <p>The AI did the work. A person still decides what goes live. <strong>That's what leaving <code>publish</code> unticked buys you.</strong></p>
+
+  <h3>The same job with <code>publish</code> ticked</h3>
+  <div class="chat">
+    <div class="turn"><span class="who">Staff</span><p class="says">Write a post about teeth whitening and put it live.</p></div>
+    <div class="turn ai"><span class="who">Claude</span><p class="says">Published "Professional Teeth Whitening — What to Expect". It's live at <code>/blog/professional-teeth-whitening</code>.</p></div>
+  </div>
+  <p>No human check. Use this only for content you're happy going out unreviewed.</p>
+</section>
+
+<section>
+  <h2>Recipes</h2>
+  <p>Copy these rather than deciding from scratch each time.</p>
+  <div class="recipes">
+    <div class="recipe">
+      <h4>Content writer</h4>
+      <p>Drafts everything, publishes nothing. The safest place to start.</p>
+      <div class="perms"><span class="perm">read</span><span class="perm">create</span><span class="perm">edit</span><span class="perm">media.read</span><span class="perm">media.write</span><span class="perm off">publish</span></div>
+    </div>
+    <div class="recipe">
+      <h4>Autonomous publisher</h4>
+      <p>Writes and publishes with no human step in between.</p>
+      <div class="perms"><span class="perm">read</span><span class="perm">create</span><span class="perm">edit</span><span class="perm">publish</span><span class="perm">media.read</span><span class="perm">media.write</span></div>
+    </div>
+    <div class="recipe">
+      <h4>Blog-only writer</h4>
+      <p>Same as content writer, but locked to blog posts. Set <strong>Tables</strong> to <code>posts</code>.</p>
+      <div class="perms"><span class="perm">read</span><span class="perm">create</span><span class="perm">edit</span><span class="perm">media.read</span><span class="perm">media.write</span></div>
+    </div>
+    <div class="recipe">
+      <h4>Auditor</h4>
+      <p>Reads the site and reports back. Cannot change anything at all.</p>
+      <div class="perms"><span class="perm">read</span><span class="perm">media.read</span></div>
+    </div>
+    <div class="recipe">
+      <h4>Designer</h4>
+      <p>Adjusts the site-wide look and feel.</p>
+      <div class="perms"><span class="perm">read</span><span class="perm">edit</span><span class="perm">design.edit</span><span class="perm">media.read</span><span class="perm">media.write</span></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>What the AI can do</h2>
+  <p><strong>Looking</strong> — list the site's content types; read any page, post or layout; search; see what's live versus still a draft.</p>
+  <p><strong>Writing</strong> — create pages and posts; edit text and fields; build layouts by adding, moving, duplicating and removing sections; style each section, including how it looks on mobile; move content between collections; delete to Trash.</p>
+  <p><strong>Images</strong> — browse the library; upload; set alt text, captions and tags; organise into folders; replace an image everywhere it's used; delete to Trash and restore.</p>
+  <p><strong>Site-wide design</strong> — read and change colours, fonts, spacing rules and breakpoints.</p>
+  <p><strong>Going live</strong> — publish one item, schedule it for later, or refresh every published page after a site-wide change.</p>
+
+  <h3>What it can never do</h3>
+  <div class="never">
+    <div><strong>Touch users, roles or logins.</strong><span>No such action exists. Even a key with every box ticked cannot create an account, change permissions, or lock anyone out.</span></div>
+    <div><strong>Reach another client's site.</strong><span>A key is bound to one site. Pointed anywhere else, it's rejected.</span></div>
+    <div><strong>Delete anything permanently.</strong><span>Deletes go to Trash, and a person can restore them.</span></div>
+  </div>
+</section>
+
+<section>
+  <h2>Managing keys</h2>
+  <p>The <strong>Keys</strong> section lists every key: label, site, permissions, tables, last used, status.</p>
+  <p><strong>Revoke</strong> stops a key working on its very next request. Use it when the work is finished, someone leaves the project, a key may have leaked, or the AI does something unexpected.</p>
+  <p>There's no undo, and that's deliberate — make a new key instead.</p>
+  <p><strong>Last used</strong> tells you whether a key is still in service. Anything idle for months should probably be revoked.</p>
+</section>
+
+<section>
+  <h2>When something doesn't work</h2>
+  <div class="tw">
+    <table>
+      <thead><tr><th>What you see</th><th>What to do</th></tr></thead>
+      <tbody>
+        <tr><td>"Invalid, revoked, or expired agent key"</td><td>Wrong key, revoked, or past expiry. Also check it's for <em>this</em> site.</td></tr>
+        <tr><td>"This agent key is not valid for that site"</td><td>Right key, wrong address. Match the site name at the end of the URL.</td></tr>
+        <tr><td>The AI says a tool isn't available</td><td>That permission isn't ticked. Make a new key — keys can't be edited, so their power can never quietly grow.</td></tr>
+        <tr><td>"Table not found" when creating content</td><td>The bridge isn't switched on for that site. Endpoint directory → <strong>Install bridge</strong>.</td></tr>
+        <tr><td>Images work but pages don't</td><td>Same cause — the bridge isn't switched on.</td></tr>
+        <tr><td>Connection refused / nothing responds</td><td>That client's site is stopped, or the site name in the address is misspelled.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section>
+  <h2>Good habits</h2>
+  <ul>
+    <li><strong>Start without <code>publish</code>.</strong> Let the AI draft for a week. Read what it produces. Add publishing once you trust it.</li>
+    <li><strong>One key per job.</strong> You can then revoke one without disrupting the rest, and the activity log shows who did what.</li>
+    <li><strong>Use table limits.</strong> A blog-writing AI has no business touching the homepage — set <strong>Tables</strong> to <code>posts</code>.</li>
+    <li><strong>Set an expiry on anything temporary.</strong> A one-month campaign key should expire in 30 days.</li>
+    <li><strong>Treat a key like a password.</strong> Anyone holding it has the access it carries. Don't email it or paste it into a group chat — and keep the console link itself to people who should be handing out access.</li>
+  </ul>
+</section>
+
+<footer>
+  <p>Every step on this page happens at <a href="https://siteagent.tailbbb0d2.ts.net/operator/mcp">siteagent.tailbbb0d2.ts.net/operator/mcp</a>. Replace <code>acme-dental</code> with the client site you're connecting, and <code>mmsmcp_8Kd93jRmQp2xVn...</code> with the key you created.</p>
+</footer>
+
+</div>
+</body>
+</html>

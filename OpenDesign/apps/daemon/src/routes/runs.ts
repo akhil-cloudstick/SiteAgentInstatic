@@ -46,6 +46,11 @@ import {
   deriveLangfuseDeliveryState,
   readTelemetrySinkConfig,
 } from '../langfuse-trace.js';
+import {
+  applyManagedRunAi,
+  ManagedAiUnconfiguredError,
+  MANAGED_AI_UNCONFIGURED_MESSAGE,
+} from '../managed-ai.js';
 import { parseMediaExecutionPolicyInput } from '../media/policy.js';
 import { isManagedProjectCwd } from '../mcp-config.js';
 import {
@@ -221,6 +226,31 @@ interface RunCreateMeta extends JsonRecord {
   message?: string;
   currentPrompt?: string;
   projectMetadata?: ProjectMetadata;
+}
+
+/**
+ * Apply the operator's managed AI selection, or answer the request and return
+ * null when AI hasn't been configured yet.
+ *
+ * A tenant can't act on a provider error, so the "not configured" case is
+ * reported as plain guidance rather than a validation failure naming a model or
+ * a provider — the operator sees the real diagnostic in the gateway's terminal
+ * output. Returns the caller's object unchanged when running standalone.
+ */
+async function applyManagedRunAiOr503<T extends Record<string, unknown>>(
+  meta: T,
+  res: Response,
+  sendApiError: RegisterRunRoutesDeps['http']['sendApiError'],
+): Promise<T | null> {
+  try {
+    return await applyManagedRunAi(meta);
+  } catch (err) {
+    if (err instanceof ManagedAiUnconfiguredError) {
+      sendApiError(res, 503, 'AI_NOT_CONFIGURED', MANAGED_AI_UNCONFIGURED_MESSAGE);
+      return null;
+    }
+    throw err;
+  }
 }
 
 interface RunListFilters {
@@ -668,6 +698,12 @@ export function registerRunRoutes(app: Express, ctx: RegisterRunRoutesDeps) {
         console.warn('[runs] agent id fallback failed', err);
       }
     }
+    // Managed mode overrides agent/model/provider before the completeness check
+    // below, which would otherwise 400 on the placeholder config a tenant browser
+    // sends — the run never reaches startChatRun's own override.
+    const managedMeta = await applyManagedRunAiOr503(meta, res, sendApiError);
+    if (!managedMeta) return;
+    Object.assign(meta, managedMeta);
     if (!hasCompleteByokOpenCodeConfig(meta)) {
       return sendApiError(
         res,
@@ -1593,7 +1629,9 @@ export function registerRunRoutes(app: Express, ctx: RegisterRunRoutesDeps) {
     res.json(body);
   });
 
-  app.post('/api/chat', (req: ApiRequest, res: ApiResponse) => {
+  // async because managed mode resolves the operator's model before the run is
+  // created — same shape as POST /api/runs above.
+  app.post('/api/chat', async (req: ApiRequest, res: ApiResponse) => {
     if (ctx.lifecycle.isDaemonShuttingDown()) {
       return sendApiError(res, 503, 'UPSTREAM_UNAVAILABLE', 'daemon is shutting down');
     }
@@ -1643,12 +1681,17 @@ export function registerRunRoutes(app: Express, ctx: RegisterRunRoutesDeps) {
         return sendApiError(res, 404, 'CONVERSATION_NOT_FOUND', 'conversation not found for project');
       }
     }
-    const meta = {
+    const baseMeta = {
       ...requestBody,
       mediaExecution: mediaExecution.policy,
       toolBundle: toolBundle.bundle,
       ...(chatProject?.metadata ? { projectMetadata: chatProject.metadata } : {}),
     };
+    // See the matching note in POST /api/runs: managed mode must override before
+    // the completeness check, not after it.
+    const managedMeta = await applyManagedRunAiOr503(baseMeta, res, sendApiError);
+    if (!managedMeta) return;
+    const meta = managedMeta;
     if (!hasCompleteByokOpenCodeConfig(meta)) {
       return sendApiError(
         res,

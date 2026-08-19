@@ -40,8 +40,11 @@ export interface ProjectToolbarProps {
   onDelete?: () => void;
   /** The DesignSystemPicker in its `toolbar` variant. */
   designSystemSlot: ReactNode;
-  /** The AvatarMenu in its `runtime` variant. */
-  runtimeSlot: ReactNode;
+  /**
+   * Optional runtime control. Empty in MMSBUILD: the operator owns the model,
+   * so the toolbar has no runtime to switch.
+   */
+  runtimeSlot?: ReactNode;
   onShareToCms: () => void;
   /** True until the project has a page the CMS could import. */
   shareDisabled: boolean;

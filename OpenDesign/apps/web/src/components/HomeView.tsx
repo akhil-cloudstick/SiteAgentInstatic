@@ -85,6 +85,7 @@ import {
   type StartDeskRuntime,
   type StartId,
 } from './start-desk/StartDesk';
+import { DesignSystemPicker } from './DesignSystemPicker';
 import { StartDeskRecentProjects } from './start-desk/StartDeskRecentProjects';
 import { StartDeskToast } from './start-desk/StartDeskToast';
 import { useHubContext } from '../state/hubContext';
@@ -283,7 +284,6 @@ interface Props {
     onboardingEntry: OnboardingEntry;
   }) => boolean | void | Promise<boolean | void>;
   onRecommendationDismiss?: () => void;
-  executionSwitcher?: ReactNode;
   artifactUpgradeSlot?: ReactNode;
 }
 
@@ -357,7 +357,6 @@ export function HomeView({
   recommendation = null,
   onRecommendationStart,
   onRecommendationDismiss,
-  executionSwitcher,
   artifactUpgradeSlot,
 }: Props) {
   const { locale, t } = useI18n();
@@ -2423,18 +2422,20 @@ export function HomeView({
           : {})}
         designSystemName={designSystemId ? selectedDesignSystemTitle : null}
         designSystemSlot={
-          <select
-            value={designSystemId ?? ''}
-            aria-label={t('designSystemPicker.label')}
-            onChange={(event) => handleDesignSystemChange(event.target.value || null)}
-          >
-            <option value="">{t('designSystemPicker.noneTitle')}</option>
-            {designSystemPickerSystems.map((system) => (
-              <option key={system.id} value={system.id}>
-                {system.title}
-              </option>
-            ))}
-          </select>
+          // The same picker the project view uses, in its `footer` variant —
+          // which exists precisely for this slot. It replaces a native
+          // `<select>`, whose open list is drawn by the OS and therefore could
+          // not be themed at all (unreadable in dark mode) and offered no
+          // search over a catalogue this size. This one brings search, the
+          // preset grouping, previews and Create, and matches the control
+          // tenants already know from the project page.
+          <DesignSystemPicker
+            designSystems={designSystemPickerSystems}
+            selectedId={designSystemId ?? null}
+            onChange={handleDesignSystemChange}
+            variant="footer"
+            label={t('designSystemPicker.label')}
+          />
         }
         workingDirSlot={
           <button type="button" onClick={() => void handlePickWorkingDir()}>

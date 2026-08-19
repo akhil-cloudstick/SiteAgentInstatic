@@ -84,6 +84,8 @@ import {
   type TodoItem,
 } from "../runtime/todos";
 import type { Dict } from "../i18n/types";
+import { isManagedSession } from "../state/managed";
+import { MANAGED_AGENT_LABEL } from "../utils/agentLabels";
 import { agentDisplayName, agentIconId, exactAgentDisplayName } from "../utils/agentLabels";
 import { AgentIcon } from "./AgentIcon";
 import { filterImplicitProducedFiles } from "../produced-files";
@@ -1407,6 +1409,11 @@ export function assistantRoleName(
   message: ChatMessage,
   t: TranslateFn
 ): string {
+  // Managed: one product name, whatever the run recorded. Guarded here at the
+  // entry point rather than per-branch, because `message.agentName` is a value
+  // stored on old messages — a session that ran before this change still has
+  // "OpenAI API via OpenCode" saved in its history.
+  if (isManagedSession()) return MANAGED_AGENT_LABEL;
   const fromName = message.agentName?.trim();
   if (fromName) {
     const base = fromName.split(" · ")[0]?.trim() || fromName;
@@ -1424,6 +1431,8 @@ export function assistantRoleLabel(
   message: ChatMessage,
   t: TranslateFn
 ): string {
+  // Managed: no provider, no engine, and no model id appended.
+  if (isManagedSession()) return MANAGED_AGENT_LABEL;
   const model = assistantModelDetail(message);
   const fromName = message.agentName?.trim();
   if (fromName)

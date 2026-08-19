@@ -1,3 +1,4 @@
+import { isManagedSession } from '../state/managed';
 import { isOpenAICompatible } from '../providers/openai-compatible';
 import type { ApiProtocol, AppConfig } from '../types';
 
@@ -31,6 +32,10 @@ export function apiProtocolModelLabel(
   protocol: ApiProtocol | undefined,
   model: string,
 ): string {
+  // Managed: this label is stamped onto stored messages, so guard it at the
+  // source rather than only where it renders — otherwise the provider and model
+  // survive in message history and leak back out through some later surface.
+  if (isManagedSession()) return 'MMS Design';
   const label = `${apiProtocolLabel(protocol)} via OpenCode`;
   const trimmed = model.trim();
   return trimmed ? `${label} · ${trimmed}` : label;

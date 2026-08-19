@@ -9,7 +9,7 @@ import * as rt from '../runtime/tenantRuntime.mjs';
 import * as odrt from '../runtime/odRuntime.mjs';
 import { initTenantSite, attachTenantDomain, deleteTenantSite } from '../deployer/deploy.mjs';
 import { encrypt, decrypt, genPassword, genSecretKeyHex } from '../lib/crypto.mjs';
-import { getSettings } from '../registry/settings.mjs';
+import { getSettings, getSecrets } from '../registry/settings.mjs';
 import config from '../lib/env.mjs';
 
 // The operator's chosen model (from Settings) enables managed AI on each tenant:
@@ -20,6 +20,19 @@ async function operatorAiModel() {
     return (await getSettings()).openrouterModel || '';
   } catch {
     return '';
+  }
+}
+
+// Operator-owned media provider keys (image/video/speech). OpenDesign resolves
+// these from the environment ahead of any tenant-stored value, so injecting them
+// at spawn is all it takes for media generation to work with no tenant setup and
+// no OpenDesign change. Failure is non-fatal: the daemon simply starts without
+// media credentials, exactly as it does today.
+async function operatorMediaKeys() {
+  try {
+    return (await getSecrets()).mediaKeys || {};
+  } catch {
+    return {};
   }
 }
 
@@ -194,7 +207,12 @@ async function runProvisionSaga({ slug, schema, role, dbPassword, secretKey, por
         console.error('[provisioner] shared OpenDesign web build failed (dev fallback):', e.message);
       }
       odrt.startSharedWeb();
-      odrt.start({ slug, odPort, instaticUrl: advanced ? `http://127.0.0.1:${port}` : undefined });
+      odrt.start({
+        slug,
+        odPort,
+        instaticUrl: advanced ? `http://127.0.0.1:${port}` : undefined,
+        mediaKeys: await operatorMediaKeys(),
+      });
       const odHealthy = await odrt.waitHealthy(odPort, 90000);
       await tenants.updateTenant(slug, { od_status: odHealthy ? 'running' : 'failed' });
     } catch (e) {
@@ -414,6 +432,7 @@ export async function resumeAll() {
   const rows = await tenants.listTenants();
   const active = rows.filter((r) => r.status === 'active');
   const aiModel = await operatorAiModel();
+  const mediaKeys = await operatorMediaKeys();
   for (const r of active) {
     // Instatic only for advanced tenants (lite has no Instatic process).
     if (r.tier !== 'lite') {
@@ -421,7 +440,7 @@ export async function resumeAll() {
     }
     if (r.od_port) {
       const instaticUrl = r.tier !== 'lite' ? `http://127.0.0.1:${r.port}` : undefined;
-      try { odrt.start({ slug: r.slug, odPort: r.od_port, instaticUrl }); } catch (e) { console.error(`[provisioner] OD resume ${r.slug} failed:`, e.message); }
+      try { odrt.start({ slug: r.slug, odPort: r.od_port, instaticUrl, mediaKeys }); } catch (e) { console.error(`[provisioner] OD resume ${r.slug} failed:`, e.message); }
     }
   }
   // ONE shared OD web for every tenant resumed above (no-op if already running).

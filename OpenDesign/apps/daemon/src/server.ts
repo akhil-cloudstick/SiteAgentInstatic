@@ -494,6 +494,7 @@ import {
   setToken,
 } from './mcp-tokens.js';
 import { agentCliEnvForAgent, readAppConfig, readPluginEnvKnobs, writeAppConfig } from './app-config.js';
+import { applyManagedRunAi } from './managed-ai.js';
 import { OrbitService, formatLocalProjectTimestamp, renderOrbitTemplateSystemPrompt } from './orbit.js';
 import { buildOrbitNoLiveArtifactSummary } from './orbit-agent-summary.js';
 import {
@@ -4561,6 +4562,12 @@ export async function startServer({
     lifecycle.mark('chat_run_started');
     /** @type {Partial<ChatRequest> & { imagePaths?: string[] }} */
     chatBody = chatBody || {};
+    // Managed (hosted) mode: the operator owns the model, not the tenant. This is
+    // the single funnel every run passes through — POST /api/runs, POST /api/chat,
+    // Orbit digests, the CMS correction loop and routines all land here — so
+    // overriding once covers them all, and whatever a tenant browser asked for
+    // stops mattering from this line on. No-op when running standalone.
+    chatBody = await applyManagedRunAi(chatBody);
     const {
       agentId,
       message,

@@ -438,7 +438,6 @@
    `.resource-modal-backdrop` 100, `.use-everywhere-modal-backdrop`
    920). Popover z-indexes inside the card (1503/1701/…) are local to the
    card's stacking context and only order its own children. */
-.home-hero__input-card:has(.inline-switcher__popover),
 .home-hero__input-card:has(.session-mode-toggle__popover),
 .home-hero__input-card:has(.home-hero__plugin-picker),
 .home-hero__input-card:has(.home-hero__template-menu) {
@@ -1044,40 +1043,6 @@
   z-index: 1701;
   flex-direction: row-reverse;
   align-items: flex-end;
-}
-.home-hero__execution-switcher {
-  display: inline-flex;
-  min-width: 0;
-  flex: 0 1 auto;
-}
-.home-hero__execution-switcher .inline-switcher {
-  min-width: 0;
-  width: 58px;
-  max-width: 58px;
-}
-.home-hero__execution-switcher .inline-switcher__chip {
-  width: 58px;
-  height: 32px;
-  max-width: 58px;
-  justify-content: space-between;
-  padding: 0 8px 0 9px;
-  gap: 4px;
-  border-radius: var(--radius-sm);
-}
-.home-hero__execution-switcher .inline-switcher__chip-icon {
-  width: 20px;
-  height: 20px;
-}
-.home-hero__execution-switcher .inline-switcher__chip-chevron {
-  flex: 0 0 auto;
-}
-.home-hero__execution-switcher .inline-switcher__popover {
-  right: 0;
-  left: auto;
-  z-index: 1503;
-}
-.home-hero__execution-switcher .inline-switcher__agent-grid {
-  grid-template-columns: 1fr;
 }
 .home-hero__tool {
   appearance: none;
@@ -2765,14 +2730,6 @@
     gap: 8px;
     min-width: 0;
     max-width: 100%;
-  }
-  .home-hero__execution-switcher {
-    flex-basis: auto;
-  }
-  .home-hero__execution-switcher .inline-switcher,
-  .home-hero__execution-switcher .inline-switcher__chip {
-    width: 58px;
-    max-width: 58px;
   }
 }
 

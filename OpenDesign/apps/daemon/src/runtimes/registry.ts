@@ -1,59 +1,27 @@
-import { amrAgentDef } from './defs/amr.js';
-import { claudeAgentDef } from './defs/claude.js';
-import { codexAgentDef } from './defs/codex.js';
-import { devinAgentDef } from './defs/devin.js';
-import { opencodeAgentDef } from './defs/opencode.js';
+// Runtime agent registry.
+//
+// MMSBUILD ships MMS Design as a hosted product: the operator sets one provider
+// key and one model in the control-plane Settings panel, and every tenant runs on
+// it. Nobody installs a CLI on the server, and a tenant has no machine of their
+// own in the loop — so the Local CLI agents this registry used to carry (claude,
+// codex, gemini, qwen, cursor-agent, amp, aider, …) were controls that could
+// never resolve to a working runtime here. They have been removed from the
+// product rather than hidden.
+//
+// `byok-opencode` is what remains, and it is NOT a user-facing CLI choice: it is
+// the engine that executes BYOK runs, and it has always been filtered out of the
+// agent list the UI renders (see apps/web/src/utils/visibleAgents.ts). The daemon
+// points it at the operator's AI gateway on every run (see ../managed-ai.ts).
+//
+// Consequence for upstream merges: a new agent definition arriving from
+// nexu-io/open-design will land in defs/ but must be added here deliberately to
+// take effect. That is the intended behaviour, not an oversight.
 import { byokOpenCodeAgentDef } from './defs/byok-opencode.js';
-import { hermesAgentDef } from './defs/hermes.js';
-import { traeCliAgentDef } from './defs/trae-cli.js';
-import { grokBuildAgentDef } from './defs/grok-build.js';
-import { kimiAgentDef } from './defs/kimi.js';
-import { cursorAgentDef } from './defs/cursor-agent.js';
-import { qwenAgentDef } from './defs/qwen.js';
-import { qoderAgentDef } from './defs/qoder.js';
-import { copilotAgentDef } from './defs/copilot.js';
-import { ampAgentDef } from './defs/amp.js';
-import { piAgentDef } from './defs/pi.js';
-import { kiroAgentDef } from './defs/kiro.js';
-import { kiloAgentDef } from './defs/kilo.js';
-import { vibeAgentDef } from './defs/vibe.js';
-import { deepseekAgentDef } from './defs/deepseek.js';
-import { aiderAgentDef } from './defs/aider.js';
-import { antigravityAgentDef } from './defs/antigravity.js';
-import { codebuddyAgentDef } from './defs/codebuddy.js';
-import { reasonixAgentDef } from './defs/reasonix.js';
-import { mimoAgentDef } from './defs/mimo.js';
-import { atomcodeAgentDef } from './defs/atomcode.js';
 import { readLocalAgentProfileDefs as readLocalAgentProfileDefsFromFile } from './local-profiles.js';
 import type { RuntimeAgentDef } from './types.js';
 
 const BASE_AGENT_DEFS: RuntimeAgentDef[] = [
-  amrAgentDef,
-  claudeAgentDef,
-  codexAgentDef,
-  devinAgentDef,
-  opencodeAgentDef,
   byokOpenCodeAgentDef,
-  hermesAgentDef,
-  traeCliAgentDef,
-  grokBuildAgentDef,
-  kimiAgentDef,
-  cursorAgentDef,
-  qwenAgentDef,
-  qoderAgentDef,
-  copilotAgentDef,
-  ampAgentDef,
-  piAgentDef,
-  kiroAgentDef,
-  kiloAgentDef,
-  vibeAgentDef,
-  deepseekAgentDef,
-  aiderAgentDef,
-  antigravityAgentDef,
-  reasonixAgentDef,
-  codebuddyAgentDef,
-  mimoAgentDef,
-  atomcodeAgentDef,
 ];
 
 export function readLocalAgentProfileDefs(

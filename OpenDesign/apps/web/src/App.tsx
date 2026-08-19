@@ -45,6 +45,7 @@ import {
   useIframeKeepAlivePool,
 } from './components/IframeKeepAlivePool';
 import {
+  MANAGED_HIDDEN_SETTINGS_SECTIONS,
   SettingsDialog,
   switchApiProtocolConfig,
   updateCurrentApiProtocolConfig,
@@ -89,7 +90,7 @@ import {
   syncConfigToDaemon,
   syncMediaProvidersToDaemon,
 } from './state/config';
-import { isManagedSession } from './state/managed';
+import { isManagedSession, MANAGED_SETTINGS_SECTION } from './state/managed';
 import { createSilentUpdatePreferenceWriter } from './state/silent-update-preference';
 import { applyAppearanceToDocument } from './state/appearance';
 import { isMacPlatform } from './utils/platform';
@@ -435,7 +436,9 @@ function AppInner() {
   const [workingDirError, setWorkingDirError] = useState<string | null>(null);
   const [projectOpenError, setProjectOpenError] = useState<string | null>(null);
   const [settingsWelcome, setSettingsWelcome] = useState(false);
-  const [settingsInitialSection, setSettingsInitialSection] = useState<SettingsSection>('execution');
+  const [settingsInitialSection, setSettingsInitialSection] = useState<SettingsSection>(
+    isManagedSession() ? MANAGED_SETTINGS_SECTION : 'execution',
+  );
   const [settingsHighlight, setSettingsHighlight] = useState<SettingsHighlight>(null);
   const [integrationInitialTab, setIntegrationInitialTab] = useState<IntegrationTab>('mcp');
   const [daemonLive, setDaemonLive] = useState(false);
@@ -2240,6 +2243,12 @@ function AppInner() {
     section: SettingsSection = 'execution',
     opts?: { highlight?: SettingsHighlight },
   ) => {
+    // Single coercion point for every caller — AvatarMenu, InlineModelSwitcher,
+    // ProjectView and the AMR entry all route through here, so a managed session
+    // can never be sent to a section that no longer renders.
+    if (isManagedSession() && MANAGED_HIDDEN_SETTINGS_SECTIONS.has(section)) {
+      section = MANAGED_SETTINGS_SECTION;
+    }
     if (section === 'composio' || section === 'mcpClient' || section === 'integrations') {
       setIntegrationInitialTab(
         section === 'composio'

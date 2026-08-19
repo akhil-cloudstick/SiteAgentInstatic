@@ -135,7 +135,7 @@ import {
 } from './modelCapabilityTags';
 import { LanguageMenu } from './LanguageMenu';
 import { IntegrationsView, type IntegrationTab } from './IntegrationsView';
-import { InlineModelSwitcher } from './InlineModelSwitcher';
+import { isManagedSession } from '../state/managed';
 // MMS rebrand: enterpriseUrl (Teams chip) removed from the top bar.
 import {
   EntrySettingsMenu,
@@ -375,9 +375,8 @@ interface Props {
   skillsLoading?: boolean;
   designSystemsLoading?: boolean;
   projectsLoading?: boolean;
-  // Execution / model-switching context. Threaded down from `App` so the
-  // top-bar `InlineModelSwitcher` can render the active mode/agent/model
-  // and persist changes through the same callbacks the project view uses.
+  // Execution context. Threaded down from `App` for the views that still need
+  // the active config (project creation, design-system flows).
   config: AppConfig;
   providerModelsCache?: ProviderModelsCache;
   onProviderModelsCacheChange?: Dispatch<SetStateAction<ProviderModelsCache>>;
@@ -996,38 +995,6 @@ export function EntryShell({
     );
   }
 
-  const executionSwitcher = (
-    <InlineModelSwitcher
-      config={config}
-      agents={agents}
-      providerModelsCache={activeProviderModelsCache}
-      onProviderModelsCacheChange={activeSetProviderModelsCache}
-      daemonLive={daemonLive}
-      onModeChange={onModeChange}
-      onAgentChange={onAgentChange}
-      onAgentModelChange={onAgentModelChange}
-      onApiProtocolChange={onApiProtocolChange}
-      onApiModelChange={onApiModelChange}
-      onOpenSettings={onOpenSettings}
-    />
-  );
-  const homeExecutionSwitcher = (
-    <InlineModelSwitcher
-      compact
-      config={config}
-      agents={agents}
-      providerModelsCache={activeProviderModelsCache}
-      onProviderModelsCacheChange={activeSetProviderModelsCache}
-      daemonLive={daemonLive}
-      onModeChange={onModeChange}
-      onAgentChange={onAgentChange}
-      onAgentModelChange={onAgentModelChange}
-      onApiProtocolChange={onApiProtocolChange}
-      onApiModelChange={onApiModelChange}
-      onOpenSettings={onOpenSettings}
-    />
-  );
-
   return (
     <div className="entry-shell entry-shell--no-header">
       {/* The MMSBUILD shared shell — row 1 (Product Hub) and row 2 (MMS Design
@@ -1090,7 +1057,6 @@ export function EntryShell({
                   </>
                 ) : null}
               </a>
-              {view === 'home' ? null : executionSwitcher}
               <button
                 type="button"
                 className="use-everywhere-chip od-tooltip"
@@ -1191,7 +1157,6 @@ export function EntryShell({
                 recommendation={onboardingRec}
                 onRecommendationStart={handleRecommendationStart}
                 onRecommendationDismiss={dismissRecommendation}
-                executionSwitcher={view === 'home' ? homeExecutionSwitcher : undefined}
                 artifactUpgradeSlot={artifactUpgradeSlot}
               />
             </div>

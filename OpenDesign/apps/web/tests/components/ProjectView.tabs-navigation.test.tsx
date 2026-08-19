@@ -97,9 +97,6 @@ vi.mock('../../src/components/AppChromeHeader', () => ({
   ),
 }));
 
-vi.mock('../../src/components/AvatarMenu', () => ({
-  AvatarMenu: () => null,
-}));
 
 vi.mock('../../src/components/FileWorkspace', () => ({
   DESIGN_SYSTEM_TAB: '__design_system__',

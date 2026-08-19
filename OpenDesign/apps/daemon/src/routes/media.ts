@@ -15,6 +15,7 @@ import {
   AIHUBMIX_DEFAULT_BASE_URL,
   type AIHubMixCatalogType,
 } from '../integrations/aihubmix.js';
+import { getManagedModel, isManagedAi } from '../managed-ai.js';
 import { isSandboxModeEnabled } from '../sandbox-mode.js';
 import type { ToolTokenGrant } from '../tool-tokens.js';
 
@@ -474,6 +475,20 @@ export function registerMediaRoutes(app: Express, ctx: RegisterMediaRoutesDeps) 
     }
     try {
       const config = await readAppConfig(RUNTIME_DATA_DIR);
+      // Managed mode: tell the web app the model the operator picked, so its
+      // config overlay is honest about what is running. This is a SIBLING of
+      // `config`, never a field on it — app-config is a persisted, PUT-validated
+      // contract and the managed values must never be written to disk.
+      //
+      // Only the model id crosses this boundary. OD_AI_GATEWAY_URL carries the
+      // signed tenant token and stays in this process.
+      if (isManagedAi()) {
+        res.json({
+          config,
+          managedAi: { managed: true, model: await getManagedModel() },
+        });
+        return;
+      }
       res.json({ config });
     } catch (err: any) {
       res

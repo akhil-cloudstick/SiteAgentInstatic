@@ -11,6 +11,7 @@ import type {
   PetConfig,
 } from '../types';
 import { resolveFixedOriginBaseUrl } from './apiProtocols';
+import { applyManagedAiConfig, setManagedAiModel } from './managed';
 import {
   DEFAULT_ACCENT_COLOR,
   normalizeAccentColor,
@@ -641,7 +642,18 @@ function migrateRetiredKnownProviderModel(
   return true;
 }
 
+/**
+ * Read the saved config, then hand a managed session the operator's runtime.
+ *
+ * The overlay wraps every exit from `loadConfigRaw` — the no-saved-config path,
+ * the migrated path and the parse-failure fallback — so a managed tenant can
+ * never end up on a half-applied execution config, whichever way the read went.
+ */
 export function loadConfig(): AppConfig {
+  return applyManagedAiConfig(loadConfigRaw());
+}
+
+function loadConfigRaw(): AppConfig {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) {
@@ -1085,7 +1097,10 @@ export function mergeDaemonConfig(
   if (daemonConfig.defaultProjectLocationId !== undefined) {
     next.defaultProjectLocationId = daemonConfig.defaultProjectLocationId ?? 'default';
   }
-  return next;
+  // The daemon's app-config.json can still hold execution fields written by an
+  // earlier standalone run of this data dir; re-apply so the merge can't undo
+  // the managed runtime.
+  return applyManagedAiConfig(next);
 }
 
 export function mergeDaemonMediaProviders(
@@ -1175,6 +1190,11 @@ export async function fetchDaemonConfig(): Promise<AppConfigPrefs | null> {
     const res = await fetch('/api/app-config');
     if (!res.ok) return null;
     const data = await res.json();
+    // Managed sessions get the operator's model alongside the config. The
+    // daemon serves it as a sibling key (never a config field) because
+    // app-config is a persisted contract and this value must not be written to
+    // disk. Recording it here means one fetch serves both purposes.
+    if (data?.managedAi?.managed) setManagedAiModel(data.managedAi.model);
     return data?.config ?? null;
   } catch {
     return null;
