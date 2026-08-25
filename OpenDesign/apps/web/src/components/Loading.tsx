@@ -32,7 +32,7 @@ export function Skeleton({ width, height = 14, radius = 6, className }: Skeleton
 }
 
 /**
- * Card-shaped skeleton tuned for a project card grid. Renders a thumb area
+ * Card-shaped skeleton tuned for the DesignsTab grid. Renders a thumb area
  * over the row of meta lines so the empty grid feels like content is
  * arriving rather than missing.
  */

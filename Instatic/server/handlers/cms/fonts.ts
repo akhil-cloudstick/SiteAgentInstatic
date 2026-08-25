@@ -1,14 +1,14 @@
 /**
  * Fonts library endpoints.
  *
- *   GET    /admin/api/cms/fonts/google           — bundled Google Fonts directory (no CDN hit)
- *   POST   /admin/api/cms/fonts/estimate         — sum woff2 `Content-Length` for a selection
- *   POST   /admin/api/cms/fonts/install          — download woff2 files, return a FontEntry
- *   POST   /admin/api/cms/fonts/custom           — assemble a FontEntry from uploaded media fonts
- *   DELETE /admin/api/cms/fonts/family/:family   — remove on-disk font files for a family
+ *   GET    /cms/api/cms/fonts/google           — bundled Google Fonts directory (no CDN hit)
+ *   POST   /cms/api/cms/fonts/estimate         — sum woff2 `Content-Length` for a selection
+ *   POST   /cms/api/cms/fonts/install          — download woff2 files, return a FontEntry
+ *   POST   /cms/api/cms/fonts/custom           — assemble a FontEntry from uploaded media fonts
+ *   DELETE /cms/api/cms/fonts/family/:family   — remove on-disk font files for a family
  *
  * Custom fonts upload their binaries through the media route (`POST
- * /admin/api/cms/media`, `role: 'original'`, font MIMEs already accepted). The
+ * /cms/api/cms/media`, `role: 'original'`, font MIMEs already accepted). The
  * `/fonts/custom` endpoint then resolves each uploaded media asset to a
  * server-trusted `(path, format)` and returns a `FontEntry` for the client to
  * merge into `site.settings.fonts`. No new byte handling — the media pipeline's
@@ -17,7 +17,7 @@
  * The fonts library itself lives inside `site.settings.fonts`, so this REST
  * surface is intentionally narrow: install + uninstall perform on-disk
  * work; the metadata is persisted with the rest of the site settings via
- * `PUT /admin/api/cms/site`. All endpoints are gated by `site.style.edit`
+ * `PUT /cms/api/cms/site`. All endpoints are gated by `site.style.edit`
  * — fonts are typography / visual setup, not content edits.
  */
 import type { DbClient } from '../../db/client'

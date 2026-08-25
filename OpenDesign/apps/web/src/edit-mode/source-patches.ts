@@ -128,19 +128,28 @@ export function applyManualEditPatch(source: string, patch: ManualEditPatch): Ma
   }
 
   if (patch.kind === 'set-text') {
-    // A text element that only wraps inline/phrasing children (e.g. an <h1>
-    // with a styled <span>) edits as plain text — flattening the inline markup
-    // on an actual text change is the intended "text only" behavior. Block
-    // set-text only for real block containers.
-    if (hasElementChildren(el) && !hasOnlyInlineChildren(el)) {
-      return { ok: false, source, error: 'This element contains nested markup. Use the HTML tab instead.' };
+    if (hasElementChildren(el)) {
+      const soleText = findSoleMeaningfulTextNode(el);
+      if (!soleText) {
+        return { ok: false, source, error: 'This element contains nested markup. Use the HTML tab instead.' };
+      }
+      soleText.nodeValue = patch.value;
+    } else {
+      el.textContent = patch.value;
     }
-    el.textContent = patch.value;
   } else if (patch.kind === 'set-link') {
     if (hasElementChildren(el)) {
       const currentText = el.textContent?.trim() ?? '';
       if (patch.text.trim() !== currentText) {
-        return { ok: false, source, error: 'This link contains nested markup. Use the HTML tab to change its label.' };
+        // The label changed on a link that has element children (e.g. an
+        // icon `<span>` beside a label `<span>`). Route the edit to the one
+        // text node that carries the visible label instead of refusing
+        // outright — see findSoleMeaningfulTextNode for the safety bound.
+        const soleText = findSoleMeaningfulTextNode(el);
+        if (!soleText) {
+          return { ok: false, source, error: 'This link contains nested markup. Use the HTML tab to change its label.' };
+        }
+        soleText.nodeValue = patch.text;
       }
     } else {
       el.textContent = patch.text;
@@ -221,105 +230,6 @@ export function readManualEditAttributes(source: string, id: string): Record<str
 export function readManualEditOuterHtml(source: string, id: string): string {
   const doc = parseSource(source);
   return (doc ? findEditableElement(doc, id)?.outerHTML : '') ?? '';
-}
-
-const SYNTHETIC_OD_ID_PREFIXES = ['path-', 'od-', 'dom:', 'pin-', 'file-comment-'];
-
-function isSyntheticOdId(id: string | null | undefined): boolean {
-  if (!id) return true;
-  return SYNTHETIC_OD_ID_PREFIXES.some((prefix) => id.startsWith(prefix));
-}
-
-function slugifyOdId(input: string): string {
-  const base = input
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 40)
-    .replace(/-+$/g, '');
-  return base || 'section';
-}
-
-function uniqueOdId(doc: Document, base: string): string {
-  if (!doc.querySelector(`[data-od-id="${cssEscape(base)}"]`)) return base;
-  for (let n = 2; n < 1000; n += 1) {
-    const candidate = `${base}-${n}`;
-    if (!doc.querySelector(`[data-od-id="${cssEscape(candidate)}"]`)) return candidate;
-  }
-  return `${base}-x`;
-}
-
-function tagFromHtmlHint(htmlHint: string | undefined): string {
-  const match = /^\s*<([a-zA-Z][\w-]*)/.exec(htmlHint ?? '');
-  return match?.[1]?.toLowerCase() ?? '';
-}
-
-function classesFromHtmlHint(htmlHint: string | undefined): string[] {
-  const match = /\sclass\s*=\s*"([^"]*)"/.exec(htmlHint ?? '');
-  const raw = match?.[1];
-  if (!raw) return [];
-  return raw.split(/\s+/).map((c) => c.trim()).filter(Boolean);
-}
-
-export interface EnsureDurableOdIdTarget {
-  elementId: string;
-  selector?: string;
-  htmlHint?: string;
-  text?: string;
-}
-
-export interface EnsureDurableOdIdResult {
-  ok: boolean;
-  source: string;
-  id: string;
-  changed: boolean;
-}
-
-// Annotation/mark mode identifies the marked element with a preview-only
-// synthetic id (e.g. `path-0-2-1`) that is never written to the on-disk file,
-// so the selector handed to the agent matches nothing and it fuzzy-matches the
-// wrong element when component classes repeat. This resolves the marked element
-// in the actual source (the same resolver the manual-edit path uses) and stamps
-// a durable `data-od-id`, returning a selector that truly resolves. It fails
-// safe (ok:false, no write) on any ambiguity so a bad resolve can never corrupt
-// the file or mislabel the wrong element.
-export function ensureDurableOdId(source: string, target: EnsureDurableOdIdTarget): EnsureDurableOdIdResult {
-  const fallback: EnsureDurableOdIdResult = { ok: false, source, id: target.elementId, changed: false };
-  const doc = parseSource(source);
-  if (!doc) return fallback;
-
-  let el = findEditableElement(doc, target.elementId);
-  if (!el && target.selector && !target.selector.startsWith('[data-od-id="path-')) {
-    // Picker/dom-fallback marks carry a real CSS selector; the synthetic
-    // `[data-od-id="path-*"]` selector never matches the file so is skipped.
-    try {
-      el = doc.querySelector(target.selector);
-    } catch {
-      el = null;
-    }
-  }
-  if (!el) return fallback;
-
-  // Positional path/selector resolution can drift (preview normalization,
-  // out-of-band edits). Stamping the wrong element would be worse than the
-  // original bug, so require the opening tag — and every class — from the
-  // snapshot's htmlHint to match the resolved node. If we cannot verify, do
-  // not stamp; the caller then falls back to today's behavior.
-  const expectedTag = tagFromHtmlHint(target.htmlHint);
-  if (!expectedTag || el.tagName.toLowerCase() !== expectedTag) return fallback;
-  const expectedClasses = classesFromHtmlHint(target.htmlHint);
-  if (expectedClasses.some((cls) => !el!.classList.contains(cls))) return fallback;
-
-  const existing = el.getAttribute('data-od-id');
-  if (existing && !isSyntheticOdId(existing)) {
-    // Already durable — reuse it, no write needed (selector already resolves).
-    return { ok: true, source, id: existing, changed: false };
-  }
-
-  const seed = expectedClasses[0] || target.text || el.tagName.toLowerCase();
-  const id = uniqueOdId(doc, slugifyOdId(seed));
-  el.setAttribute('data-od-id', id);
-  return { ok: true, source: serializeSource(doc, source), id, changed: true };
 }
 
 function parseSource(source: string): Document | null {
@@ -698,17 +608,50 @@ function hasElementChildren(el: Element): boolean {
   return Array.from(el.children).some((child) => child.nodeType === 1);
 }
 
-// Inline/phrasing tags a text element may wrap while still editing as plain
-// text. Kept in sync with the bridge's `inlineTextTags` (edit-mode/bridge.ts)
-// so the panel's classification and the save path agree.
-const INLINE_TEXT_TAGS = new Set([
-  'span', 'a', 'strong', 'b', 'em', 'i', 'u', 's', 'small', 'mark', 'sub', 'sup',
-  'br', 'abbr', 'code', 'del', 'ins', 'q', 'cite', 'time', 'wbr', 'bdi', 'bdo', 'kbd', 'var', 'samp',
-]);
-
-function hasOnlyInlineChildren(el: Element): boolean {
-  const children = Array.from(el.children);
-  return children.length > 0 && children.every((child) => INLINE_TEXT_TAGS.has(child.tagName.toLowerCase()));
+/**
+ * The one text node in `el`'s subtree that carries visible (non-whitespace)
+ * text, if — and only if — there is exactly one. An element with element
+ * children can still be a safe target for a flat text edit when every
+ * sibling/descendant besides that single node is decorative (an icon
+ * `<span>`/`<svg>`, empty wrapper markup, or pure whitespace): the new value
+ * has nowhere ambiguous to go, so the caller can overwrite that node in place
+ * and leave the surrounding structure untouched.
+ *
+ * Returns null the moment a second meaningful text node shows up (genuine
+ * mixed inline content like `<p><strong>Nested</strong> copy</p>`) — that
+ * case has no unambiguous target, so the caller must keep refusing the patch
+ * and point the user at the HTML tab instead of guessing which fragment they
+ * meant to change.
+ */
+function findSoleMeaningfulTextNode(el: Element): Text | null {
+  // Walk childNodes/nodeType directly (nodeType 3 = text, 1 = element)
+  // instead of TreeWalker/NodeFilter — this code runs against a parsed
+  // Document that may not come with a full global DOM realm attached.
+  let found: Text | null = null;
+  let ambiguous = false;
+  const visit = (node: Node): void => {
+    if (ambiguous) return;
+    const children = node.childNodes;
+    for (let i = 0; i < children.length && !ambiguous; i++) {
+      const child = children[i]!;
+      if (child.nodeType === 3) {
+        const text = child as unknown as Text;
+        const parentTag = (child.parentElement?.tagName ?? '').toLowerCase();
+        const isInert = parentTag === 'script' || parentTag === 'style' || parentTag === 'template';
+        if (!isInert && (text.nodeValue ?? '').trim() !== '') {
+          if (found) {
+            ambiguous = true;
+            return;
+          }
+          found = text;
+        }
+      } else if (child.nodeType === 1) {
+        visit(child);
+      }
+    }
+  };
+  visit(el);
+  return ambiguous ? null : found;
 }
 
 function setInlineStyles(el: HTMLElement, styles: Partial<ManualEditStyles>): void {

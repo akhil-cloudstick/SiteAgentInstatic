@@ -19,11 +19,13 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   assertValidRuntimeDefInactivityTimeoutMs,
   resolveAcpStageTimeoutMs,
+  resolveChatRunFirstOutputTimeoutMs,
   resolveChatRunInactivityTimeoutMs,
 } from '../../src/server.js';
 import { amrAgentDef } from '../../src/runtimes/defs/amr.js';
 
 const ENV_KEY = 'OD_CHAT_RUN_INACTIVITY_TIMEOUT_MS';
+const FIRST_OUTPUT_ENV_KEY = 'OD_CHAT_RUN_FIRST_OUTPUT_TIMEOUT_MS';
 const TEN_MINUTES_MS = 10 * 60 * 1000;
 const THIRTY_MINUTES_MS = 30 * 60 * 1000;
 const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
@@ -173,9 +175,49 @@ describe('resolveAcpStageTimeoutMs', () => {
   });
 });
 
+describe('resolveChatRunFirstOutputTimeoutMs', () => {
+  const originalEnv = process.env[FIRST_OUTPUT_ENV_KEY];
+
+  afterEach(() => {
+    if (originalEnv === undefined) {
+      delete process.env[FIRST_OUTPUT_ENV_KEY];
+    } else {
+      process.env[FIRST_OUTPUT_ENV_KEY] = originalEnv;
+    }
+  });
+
+  it('stays disabled for runtimes without a first-output deadline', () => {
+    delete process.env[FIRST_OUTPUT_ENV_KEY];
+    expect(resolveChatRunFirstOutputTimeoutMs()).toBe(0);
+  });
+
+  it('uses the runtime default and lets the operator override or disable it', () => {
+    delete process.env[FIRST_OUTPUT_ENV_KEY];
+    expect(resolveChatRunFirstOutputTimeoutMs(120_000)).toBe(120_000);
+
+    process.env[FIRST_OUTPUT_ENV_KEY] = '90000';
+    expect(resolveChatRunFirstOutputTimeoutMs(120_000)).toBe(90_000);
+
+    process.env[FIRST_OUTPUT_ENV_KEY] = '0';
+    expect(resolveChatRunFirstOutputTimeoutMs(120_000)).toBe(0);
+  });
+
+  it('rejects an invalid checked-in runtime default', () => {
+    delete process.env[FIRST_OUTPUT_ENV_KEY];
+    expect(() => resolveChatRunFirstOutputTimeoutMs(-1)).toThrow(
+      /RuntimeAgentDef\.firstOutputTimeoutMs/,
+    );
+  });
+});
+
+
 describe('amrAgentDef.inactivityTimeoutMs', () => {
   it('ships a 30-minute inactivity hint so the outer chat watchdog matches ACP stage timeouts for slow upstream providers', () => {
     expect(amrAgentDef.inactivityTimeoutMs).toBe(THIRTY_MINUTES_MS);
+  });
+
+  it('ships a two-minute absolute first-output deadline', () => {
+    expect(amrAgentDef.firstOutputTimeoutMs).toBe(120_000);
   });
 });
 

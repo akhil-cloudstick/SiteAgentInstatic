@@ -8,9 +8,9 @@
  * does NOT fabricate bytes inside `<artifact>` (it can't — bytes are
  * binary). Instead it shells out to a single command — `od media
  * generate` — that the daemon dispatches per (surface, model). The
- * daemon writes the resulting file into the project, the FileViewer
- * picks it up automatically, and the agent only narrates what it did
- * and references the returned filename.
+ * daemon writes the resulting file into the project and the FileViewer
+ * picks it up automatically. Tool output retains the operational details;
+ * the visible assistant reply stays intentionally product-level.
  *
  * The contract is intentionally tool-name-agnostic: it works on any
  * code-agent CLI that has shell access (Claude Code's Bash, Codex's
@@ -35,6 +35,40 @@ const AUDIO_MUSIC_IDS = fmtList(AUDIO_MODELS_BY_KIND.music.map((m) => m.id));
 const AUDIO_SPEECH_IDS = fmtList(AUDIO_MODELS_BY_KIND.speech.map((m) => m.id));
 const AUDIO_SFX_IDS = fmtList(AUDIO_MODELS_BY_KIND.sfx.map((m) => m.id));
 
+export const MEDIA_USER_REPLY_CONTRACT = `
+### User-facing media completion (load-bearing)
+
+Keep operational details in the tool output and daemon logs. The tool trace
+retains the upstream failure, while the daemon logs a redacted error together
+with the media task id, run id, model, provider, and status. Never copy model
+or provider names, catalogue prefixes, CLI names, environment
+variables, filenames, paths, task ids, stderr, exit codes, credential advice,
+or diagnostic details into the visible assistant reply.
+
+For an image request, the visible assistant reply contains exactly one short,
+localized sentence and nothing else:
+
+- Success: say the localized equivalent of "Image generated". For Simplified
+  Chinese, reply exactly \`图片已生成\`.
+- Refused by a content safety policy — the structured result's error \`code\` is
+  \`safety_rejection\`: say the localized equivalent of "The image was not
+  generated because a content safety policy refused the request". For
+  Simplified Chinese, reply exactly \`图片未生成：内容安全策略拒绝了该请求\`.
+- A structured provider error — the result contains a non-empty error \`code\`
+  and \`message\`: include both safe fields so the user can understand the
+  actual failure. For Simplified Chinese, reply exactly
+  \`图片未生成：{message}（错误代码：{code}）\`, substituting the returned values.
+- Any other failure, including a placeholder/stub outcome: say the localized
+  equivalent of "The image generation service is temporarily unavailable". For
+  Simplified Chinese, reply exactly \`图片生成服务暂时不可用\`.
+
+A provider verdict is not automatically an outage. Use its structured code
+and message without reclassifying either one from wording or HTTP status.
+
+Do not add a filename, model, provider, remediation, retry offer, or follow-up
+question. For a structured provider error, expose only its safe \`message\` and
+\`code\`; retain all other diagnostics in the tool trace for debugging.`;
+
 export function renderMediaGenerationContract(
   mediaExecution?: MediaExecutionPolicy | undefined,
   byokMediaDefaults?: ByokMediaDefaults | undefined,
@@ -51,8 +85,8 @@ export function renderMediaGenerationContract(
 ## Media generation policy (load-bearing — overrides softer wording above)
 
 Open Design-owned media execution is **disabled for this run**. Do not call
-\`"$OD_NODE_BIN" "$OD_BIN" media generate\`, Codex built-in imagegen, OD media
-provider APIs, local renderers, or ad-hoc scripts that create media bytes on
+\`"$OD_NODE_BIN" "$OD_BIN" media generate\`, OD media provider APIs, local
+renderers, or ad-hoc scripts that create media bytes on
 OD's behalf.
 
 External MCP media tools, when explicitly configured for this run, are outside
@@ -172,6 +206,8 @@ Run via your shell tool (Bash on Claude Code, exec on Codex/Gemini, etc.):
   --output <filename> \\
   --prompt "<full prompt>" \\
   [--aspect 1:1|16:9|9:16|4:3|3:4] \\
+  [--quality <tier>]                # vela/* images only; gpt-image-2 accepts low|medium|high
+  [--resolution <res>]              # vela/* images only; e.g. 1K, 2K — must be published for --aspect
   [--length <seconds>]              # video only
   [--duration <seconds>]            # audio only
   [--prompt-influence <0-1>]        # audio:sfx only; higher follows the prompt more closely
@@ -184,6 +220,28 @@ Run via your shell tool (Bash on Claude Code, exec on Codex/Gemini, etc.):
 Always quote the prompt value. Use \`--prompt "<full prompt>"\` (or the
 equivalent safe quoting for your shell) — never splice an unquoted user
 string into the command line.
+
+Quality tiers are priced differently, so treat \`--quality\` as the user's
+call, not yours: pass it only when they asked for a tier, and omit it
+otherwise so the model's own default decides. Same for \`--resolution\` —
+omitting it uses the model's default profile.
+
+A size or tier the user names IS that ask, in any language — "2K", "1k",
+"high quality", "高质量". Map it onto \`--resolution\` / \`--quality\`;
+restating it inside the prompt text does not reach the provider.
+
+Open Design Cloud image and video models use the \`vela/*\` catalogue prefix.
+Always invoke those models through \`"$OD_NODE_BIN" "$OD_BIN" media generate\`.
+Never invoke the \`vela\` CLI directly and never call its remote media API.
+The daemon owns model routing, trusted Workspace attribution, task polling,
+downloads, and final project-file placement.
+
+The product shorthands \`nano-banana\` and \`nano-banana-2\` mean
+\`vela/nano-banana-2\`, and
+\`nano-banana-2-lite\` means \`vela/nano-banana-2-lite\`. Prefer the canonical
+\`vela/*\` ids in commands. Never substitute a Fal model path or the local
+Google Nano Banana provider unless the user explicitly names that different
+provider.
 
 The command prints a single line of JSON describing the written file:
 
@@ -216,10 +274,10 @@ capture. The daemon process is unsandboxed and renders reliably AND
 streams per-line progress to your stderr (so the user sees frame
 counts in chat instead of a silent spinner).
 
-**Default recipe — use \`hyperframes init\`, don't write from scratch.**
+**Default recipe — use Open Design's scaffold, don't write from scratch.**
 For most OD requests ("test video", "5s product reveal", "demo clip"),
 authoring an HF composition from zero costs minutes of model output and
-silent chat-tool time. The init scaffold gives you a valid GSAP-ready
+silent chat-tool time. The scaffold gives you a valid GSAP-ready
 template in under a second; edit only the parts that the user's prompt
 actually changes.
 
@@ -227,8 +285,8 @@ actually changes.
 COMP_REL=".hyperframes-cache/$(date +%s)-$(openssl rand -hex 2)"
 COMP="$OD_PROJECT_DIR/$COMP_REL"
 
-# Pure file copy, no Chrome — works in any agent shell.
-npx hyperframes init "$COMP" --example blank --skip-skills --non-interactive
+# Open Design writes the required files itself; HyperFrames init is never run.
+"$OD_NODE_BIN" "$OD_BIN" media scaffold --project "$OD_PROJECT_ID" --composition-dir "$COMP_REL"
 
 # Edit ONLY $COMP/index.html: tweak data-duration on the root, swap
 # the placeholder palette, add 1–3 clip <div>s, and append matching
@@ -249,26 +307,25 @@ npx hyperframes init "$COMP" --example blank --skip-skills --non-interactive
 The dispatcher streams per-line render progress to your stderr while
 running. Then it prints a one-line JSON
 \`{"file":{"name":...,"size":...,"kind":"video",...}}\` on stdout.
-Quote \`file.name\` in your reply. The chat surfaces the mp4 as a
-download/open chip automatically.
+The chat surfaces the mp4 as a download/open chip automatically. Keep
+\`file.name\` in the tool trace rather than copying it into the visible reply.
 
 Only write the composition HTML from scratch when the user explicitly
 needs something the blank template clearly can't host (multi-comp
 timelines, audio-reactive visuals, TTS-synced captions on an existing
-track). For typical test renders, the init+edit path is the default.
+track). For typical test renders, the scaffold+edit path is the default.
 
-You MAY still run lighter HF subcommands from your own shell:
-\`npx hyperframes lint "$COMP"\`, \`transcribe\`, \`tts\` — none of
+You MAY still run lighter HF subcommands from your own shell through
+\`"$OD_NODE_BIN" "$OD_HYPERFRAMES_BIN"\`: \`lint "$COMP"\`, \`transcribe\`,
+\`tts\` — none of
 these spawn Chrome so the agent-side sandbox doesn't trip them.
 Reserve the daemon dispatch for anything Chrome-bound (\`render\`,
 \`inspect\`, \`preview\`).
 
-If the command fails, surface the command's actual stderr / exit status
-to the user. Do not invent a root cause ("daemon is down", "port is
-blocked", "system refused the socket", etc.) unless the command itself
-reported that exact condition. One failed dispatcher call is enough to
-report the error; do not fan out into alternate execution paths inside
-the same turn.
+If the command fails, retain the command's actual stderr / exit status in the
+tool trace and daemon logs. Do not invent a root cause or copy diagnostic text
+into the visible assistant reply. One failed dispatcher call is enough; do not
+fan out into alternate execution paths inside the same turn.
 
 ### All slow renders: generate → wait loop
 
@@ -335,11 +392,9 @@ always reachable. If your dispatcher attempt prints
 \`failed to reach daemon at http://127.0.0.1:<port>: …\` this is almost
 never the daemon being down — it is your own shell-tool sandbox
 refusing the loopback dial (Codex \`workspace-write\` without
-\`network_access\`, restrictive macOS sandbox profiles, etc.). Quote
-the exact stderr to the user and recommend they check / relax the
-agent's sandbox / network policy. Do not claim "the OD daemon is down"
-unless you have independent evidence (e.g. the daemon's terminal also
-showed it crashed).
+\`network_access\`, restrictive macOS sandbox profiles, etc.). Keep the exact
+stderr in the tool trace and daemon logs. Do not expose the sandbox, loopback,
+daemon, or network-policy diagnosis in the visible assistant reply.
 
 ### Allowed model IDs (per surface)
 
@@ -423,19 +478,22 @@ path is given.
 
    For \`hyperframes-html\`, the discovery turn is the last turn before
    you start authoring. Once the user answers, create the composition
-   with \`npx hyperframes init\` under \`.hyperframes-cache/\`, edit the
+   with \`"$OD_NODE_BIN" "$OD_BIN" media scaffold\` under \`.hyperframes-cache/\`, edit the
    generated \`index.html\`, and dispatch through
    \`"$OD_NODE_BIN" "$OD_BIN" media generate --surface video --model hyperframes-html --composition-dir <rel>\`.
-   Do not run \`npx hyperframes render\` yourself; Chrome-bound rendering
+   Do not run HyperFrames \`render\` yourself; Chrome-bound rendering
    must happen in the daemon process. Do not add a second "plan" or
    "environment check" message first.
-3. **Generate by shell, reply in one short message.** When you invoke
+3. **Generate by shell, then follow the user-facing completion contract.** When you invoke
    \`"$OD_NODE_BIN" "$OD_BIN" media generate\`, do it inside a clearly-labelled tool call.
-   After the command completes, reply with **one brief message** (2–3 sentences max):
-   the filename, the model used, and a single follow-up offer ("Want a different
-   aspect ratio?" / "Try again with more fog?"). Do not write long descriptions,
-   artistic analyses, or multi-paragraph commentary. Speed matters.
-   If it fails, quote the real stderr / exit code and stop there.
+   After the command completes, keep the visible reply product-level. For image
+   requests, use exactly the success/failure wording in the user-facing media
+   completion section below, with no extra sentence.
+    Do not call \`Read\` on the generated image/video/audio file after the
+    dispatcher succeeds. Trust the returned file metadata and filename; reading
+    binary output back into model context can exceed the next provider request
+    limit and is unnecessary for delivery.
+   If it fails, retain the real stderr / exit code in the tool trace and stop.
    Never say "I dispatched the render" / "the generation has started"
    unless the shell command has already been executed.
 4. **Iterate by re-running.** To revise, call \`"$OD_NODE_BIN" "$OD_BIN" media generate\` again
@@ -450,7 +508,7 @@ path is given.
    short, descriptive ones (\`hero-shot.png\`, \`intro-jingle.mp3\`,
    \`teaser-15s.mp4\`) so the user's file list stays readable.
 
-### Detecting and surfacing provider errors
+### Detecting provider errors without exposing internals
 
 Today the dispatcher ships real provider integrations for OpenAI
 (image and speech, with Azure OpenAI auto-detected from the configured
@@ -459,9 +517,10 @@ image/video, Nano Banana image, HyperFrames video, and the MiniMax, FishAudio, a
 Models whose provider path has no renderer still return a configured
 stub/error signal as described below.
 
-The dispatcher tags every outcome explicitly. Treat the failure
-signals below as hard errors and surface them verbatim to the user —
-do **not** narrate a stub as if it were the final result.
+The dispatcher tags every outcome explicitly. Treat the failure signals below
+as hard errors, keep their details in the tool trace and daemon logs, and use
+them only to select the generic visible failure sentence. Never narrate a stub
+as if it were the final result.
 
 1. **HTTP status.** When stubs are disabled (the default release-build
    posture), the dispatcher returns \`503 provider not configured\` for
@@ -480,23 +539,23 @@ do **not** narrate a stub as if it were the final result.
    "keep polling".
 3. **stderr WARN lines.** On exit \`5\` the CLI prints multiple
    \`WARN: …\` lines explaining the failure (provider, reason, the
-   bytes-written stub size). Quote the reason in your reply.
+   bytes-written stub size). Preserve them in the tool trace; do not quote them
+   in the visible reply.
 4. **Response JSON.** The single-line stdout JSON also carries
    \`file.providerError\` (string) and \`file.usedStubFallback\` (bool)
    when a fallback happened, plus \`file.intentionalStub\` (bool) when
    no real renderer is wired up for that provider yet. If
-   \`providerError\` is non-null, tell the user the call failed, point
-   them at Settings → Media to fix the credential, and offer to retry
-   once they confirm.
-   Do not overwrite this with your own diagnosis.
+   \`providerError\` is non-null, classify the result as failed. Do not expose
+   the field value, credential details, or remediation in the visible reply.
 5. **Tiny placeholder PNGs (~67 bytes) / \`[stub]\` providerNote.** A
    1×1 transparent PNG plus a \`providerNote\` that starts with
    \`[stub]\` is the placeholder renderer's signature. If you see one,
    either the integration is pending (\`intentionalStub: true\`) or the
-   provider call failed (\`providerError\` non-null) — surface that
-   distinction in your reply.
+   provider call failed (\`providerError\` non-null). Keep that distinction in
+   diagnostics only; both outcomes use the generic visible failure sentence.
 
-Some long-tail image/video/music providers are still intentional stubs.
-In that case you can narrate the placeholder as expected, but still
-mention to the user that the real provider integration hasn't landed.
+Some long-tail image/video/music providers are still intentional stubs. Treat
+their placeholder outcome as a failure for user-facing completion copy.
+
+${MEDIA_USER_REPLY_CONTRACT}
 `;

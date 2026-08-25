@@ -206,6 +206,18 @@ style-<hash>.css       = collectClassCSS(site)                     ← user-defi
 userStyles-<hash>.css  = collectUserStylesheetCss(site, page)      ← author stylesheets, scoped to this page
 ```
 
+`styleRuleTreeShake.ts` computes the site-wide used class-id set once across
+page and Visual Component trees. A class rule emits only when its id is used
+and every known class dependency in its preserved selector is used. Ambient
+selector fragments emit when at least one selector-list alternative has all of
+its known class dependencies in use; class-free selectors and supported raw
+blocks stay conservative. The editor canvas calls the same selector and
+memoizes the filtered registry by immutable registry identity + used-id
+signature, so large imported utility catalogs do not become large iframe
+stylesheets. A full precompiled Tailwind catalog can therefore remain
+picker-addressable while the `style` bundle contains only selected utilities
+plus global preflight.
+
 Media-library background images are optimized in the same publish pass as
 `<img srcset>`. `mediaPrefetch.ts` collects `/uploads/...` URLs from
 image/media module props, node `inlineStyles.backgroundImage`, and StyleRule
@@ -332,7 +344,8 @@ Plugins inject at four anchors. The order matters — see [docs/features/plugin-
 
 The CSP is modelled as **data**, not a string assembled with regex. `src/core/publisher/cspPlan.ts` owns one `CspPlan` (`Map<directive, Set<source>>`) and the deterministic `serializeCsp` (directives sorted by name, sources sorted within each directive). Every stage contributes to the same plan:
 
-- `createBaseCspPlan` (in `render.ts`) emits the base policy: `default-src 'self'`, restricted `script-src` (`'none'` → `'self'` + importmap `sha256` once any script tag is present), `style-src 'self' 'unsafe-inline'`, `img-src 'self' data: https:`, `frame-src 'none'`, and `worker-src` (`'none'` → `'self' blob:`).
+- `createBaseCspPlan` (in `render.ts`) emits the base policy: `default-src 'self'`, restricted `script-src` (`'none'` → `'self'` + importmap `sha256` once any script tag is present), `style-src 'self' 'unsafe-inline'`, `img-src 'self' data: https:`, `media-src 'self' data: https:`, `frame-src 'none'`, and `worker-src` (`'none'` → `'self' blob:`).
+  - `media-src` deliberately mirrors `img-src`. Both govern passive references that execute nothing, so allowing a remote image while blocking a remote `<video>` would be an arbitrary line. It has to be stated explicitly: an unset `media-src` falls back to `default-src 'self'`, and the only symptom is a video that silently never loads.
 - The server injection pipeline (`server/publish/frontendInjections.ts`) merges plugin `frontend.assets[]` relaxations + elected media-adapter origins into the plan in **one** pass via `rewriteCspMeta` — no second regex pass, no per-directive `RegExp`.
 - The module-JS injector (`injectModuleScripts` in `server/publish/moduleJsBundle.ts`) merges `script-src 'self'` through the same `rewriteCspMeta` helper — only when at least one `/_instatic/module-js/<moduleId>.js` script tag was injected.
 

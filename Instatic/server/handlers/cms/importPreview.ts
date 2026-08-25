@@ -1,7 +1,7 @@
 /**
  * Import preview endpoint.
  *
- *   POST /admin/api/cms/import/preview
+ *   POST /cms/api/cms/import/preview
  *
  * Accepts a `SiteBundle` body and returns a read-only diff (`BundlePreview`)
  * that describes what a subsequent import would do — without actually changing

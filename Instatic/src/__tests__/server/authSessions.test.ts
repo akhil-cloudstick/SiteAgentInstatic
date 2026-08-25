@@ -1,7 +1,7 @@
 /**
  * Integration tests — Account → Sessions endpoints.
  *
- * Exercises GET /admin/api/cms/auth/sessions, DELETE /sessions/:id, and
+ * Exercises GET /cms/api/cms/auth/sessions, DELETE /sessions/:id, and
  * POST /auth/logout-all against a real SQLite test DB. Verifies the
  * cross-user revoke guard, the current-session pin, and the cookie-survives
  * behaviour of "logout all other devices".
@@ -39,7 +39,7 @@ interface SessionListResponse {
 
 async function setup(db: DbClient): Promise<void> {
   const res = await handleCmsRequest(
-    new Request('http://localhost/admin/api/cms/setup', {
+    new Request('http://localhost/cms/api/cms/setup', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ siteName: 'Sessions Test', email: EMAIL, password: PASSWORD }),
@@ -50,7 +50,7 @@ async function setup(db: DbClient): Promise<void> {
 }
 
 async function login(db: DbClient, ip = '203.0.113.10', ua = 'Mozilla/5.0 Chrome/120 Safari/537.36'): Promise<string> {
-  const req = new Request('http://localhost/admin/api/cms/login', {
+  const req = new Request('http://localhost/cms/api/cms/login', {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
@@ -91,7 +91,7 @@ async function injectSession(
 }
 
 async function listSessions(db: DbClient, cookie: string): Promise<SessionListResponse> {
-  const req = new Request('http://localhost/admin/api/cms/auth/sessions', { method: 'GET' })
+  const req = new Request('http://localhost/cms/api/cms/auth/sessions', { method: 'GET' })
   req.headers.set('cookie', cookie)
   const res = await handleCmsRequest(req, db)
   expect(res.status).toBe(200)
@@ -104,7 +104,7 @@ async function listSessions(db: DbClient, cookie: string): Promise<SessionListRe
  * those endpoints call this once after login, then proceed.
  */
 async function openStepUpWindow(db: DbClient, cookie: string): Promise<string> {
-  const req = new Request('http://localhost/admin/api/cms/auth/step-up', {
+  const req = new Request('http://localhost/cms/api/cms/auth/step-up', {
     method: 'POST',
     body: JSON.stringify({ password: PASSWORD }),
     headers: { 'content-type': 'application/json' },
@@ -177,13 +177,13 @@ describe('Account → Sessions endpoints', () => {
 
     // Revoking the current session is rejected with 400 — clients must use /logout.
     const currentTokenHash = await hashSessionToken(cookie.split('=')[1] ?? '')
-    const selfReq = new Request(`http://localhost/admin/api/cms/auth/sessions/${currentTokenHash}`, { method: 'DELETE' })
+    const selfReq = new Request(`http://localhost/cms/api/cms/auth/sessions/${currentTokenHash}`, { method: 'DELETE' })
     selfReq.headers.set('cookie', cookie)
     const selfRes = await handleCmsRequest(selfReq, db)
     expect(selfRes.status).toBe(400)
 
     // Revoking the other session works.
-    const otherReq = new Request(`http://localhost/admin/api/cms/auth/sessions/${other.idHash}`, { method: 'DELETE' })
+    const otherReq = new Request(`http://localhost/cms/api/cms/auth/sessions/${other.idHash}`, { method: 'DELETE' })
     otherReq.headers.set('cookie', cookie)
     const otherRes = await handleCmsRequest(otherReq, db)
     expect(otherRes.status).toBe(200)
@@ -208,7 +208,7 @@ describe('Account → Sessions endpoints', () => {
     const otherSession = await injectSession(db, otherUser.rows[0]!.id, { deviceLabel: 'Other user device' })
 
     // Owner tries to revoke other user's session — must NOT succeed.
-    const req = new Request(`http://localhost/admin/api/cms/auth/sessions/${otherSession.idHash}`, { method: 'DELETE' })
+    const req = new Request(`http://localhost/cms/api/cms/auth/sessions/${otherSession.idHash}`, { method: 'DELETE' })
     req.headers.set('cookie', ownerCookie)
     const res = await handleCmsRequest(req, db)
     expect(res.status).toBe(404)
@@ -234,7 +234,7 @@ describe('Account → Sessions endpoints', () => {
     const before = await listSessions(db, cookie)
     expect(before.sessions).toHaveLength(3)
 
-    const req = new Request('http://localhost/admin/api/cms/auth/logout-all', { method: 'POST' })
+    const req = new Request('http://localhost/cms/api/cms/auth/logout-all', { method: 'POST' })
     req.headers.set('cookie', cookie)
     const res = await handleCmsRequest(req, db)
     expect(res.status).toBe(200)
@@ -250,7 +250,7 @@ describe('Account → Sessions endpoints', () => {
   it('GET /sessions requires authentication', async () => {
     const { db } = testDb
     const res = await handleCmsRequest(
-      new Request('http://localhost/admin/api/cms/auth/sessions', { method: 'GET' }),
+      new Request('http://localhost/cms/api/cms/auth/sessions', { method: 'GET' }),
       db,
     )
     expect(res.status).toBe(401)

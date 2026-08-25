@@ -222,9 +222,13 @@ export function findTextWithoutUniqueClass(html: string): TextOwnerHit[] {
 const TEXT_BEARING_TAG_RE = /^(?:h[1-6]|p|span|small|strong|em|b|i|a|li|blockquote|figcaption|td|th|dt|dd)$/;
 
 /**
- * Descendant selectors that style a text tag directly (`.card strong`). Those
- * import as AMBIENT rules: they render, but editing one changes every element it
- * matches instead of the single element the tenant selected.
+ * Descendant selectors that style a text tag directly (`.card strong`). Instatic
+ * binds a rule to the rightmost CLASS in its selector, so these bind to `.card`
+ * — the ancestor — and never to the text they style. They render correctly, but
+ * the tenant's edit lands on the whole block instead of the run they selected.
+ *
+ * Only a TAG target is reported. `.card .card-note` binds to `card-note`, the
+ * element it actually styles, so it stays per-element editable and passes.
  *
  * Every such selector is reported, with no "does a class-less element exist?"
  * precondition. Deciding that needs a real DOM matcher, which the Operator-side
@@ -584,17 +588,19 @@ export function checkPageCompliance(html: string): ComplianceFinding[] {
     );
   }
 
-  // 16) Text styled through its own class, not a descendant selector. Only a
-  // single bare class imports as an editable rule the tenant can change on ONE
-  // element; `.stat-item strong` imports as an ambient rule, so editing it
-  // restyles every match at once and per-element customisation is impossible.
+  // 16) Text styled through its own class, not a descendant selector. Instatic
+  // binds a rule to the RIGHTMOST CLASS in its selector, so `.stat-item strong`
+  // binds to `stat-item` — never to the text it actually styles. The tenant
+  // selects the <strong> and their edit lands on the whole stat block instead,
+  // making per-element customisation impossible.
   const ambientTextSelectors = findDescendantTextSelectors(styleBlocks, html);
   add(
     'Text styled by its own class (not a descendant selector)',
     ambientTextSelectors.length ? DESCENDANT_TEXT_SELECTOR_STATUS : 'pass',
     ambientTextSelectors.length
-      ? `${ambientTextSelectors.length} rule(s) style a text element through a descendant selector — these import ` +
-        `as AMBIENT rules, so editing one changes every element it matches instead of the one the tenant selected. ` +
+      ? `${ambientTextSelectors.length} rule(s) style a text element through its TAG in a descendant selector — ` +
+        `the rule binds to the nearest CLASS in the selector (\`.stat-item\`), never to the text itself, so the ` +
+        `tenant's edit lands on the whole block instead of the run they selected. ` +
         `Give each of those text elements its own class and move the declarations onto that class ` +
         `(\`.stat-value { … }\`, not \`.stat-item strong { … }\`). Fix every one, not only the examples listed here` +
         `${ambientTextSelectors.length > 10 ? ` (showing 10 of ${ambientTextSelectors.length})` : ''}: ` +
@@ -674,6 +680,48 @@ export function checkPageCompliance(html: string): ComplianceFinding[] {
     } else {
       add('Interactive controls have visible content in the HTML', 'pass');
     }
+  }
+
+  // 19) No non-YouTube <iframe>. A YouTube iframe imports as base.video, which
+  // declares the CSP origins the publisher needs, so `frame-src 'none'` is
+  // lifted on that page. Every OTHER iframe imports as a plain container: the
+  // markup is preserved and it still displays on the CMS canvas, so nothing
+  // looks wrong until the site is live — where frame-src blocks it and the
+  // section renders BLANK, with only the browser console saying why. No
+  // attribute opts a different provider in, so it has to be caught before the
+  // share. Host test mirrors the importer exactly (Instatic htmlImport/rules.ts).
+  {
+    const YOUTUBE_HOSTS = new Set([
+      'youtube.com',
+      'm.youtube.com',
+      'youtube-nocookie.com',
+      'youtu.be',
+    ]);
+    const blockedEmbeds: string[] = [];
+    for (const m of html.matchAll(/<iframe\b[^>]*>/gi)) {
+      const tag = m[0];
+      const srcMatch = tag.match(/\bsrc\s*=\s*(?:"([^"]*)"|'([^']*)')/i);
+      const src = srcMatch?.[1] ?? srcMatch?.[2] ?? '';
+      let isYoutube = false;
+      try {
+        isYoutube = YOUTUBE_HOSTS.has(new URL(src).hostname.toLowerCase().replace(/^www\./, ''));
+      } catch {
+        // Relative or malformed src — not YouTube, exactly as the importer decides.
+      }
+      if (!isYoutube) blockedEmbeds.push(firstLine(tag));
+    }
+    add(
+      'No non-YouTube iframe embeds',
+      blockedEmbeds.length ? 'fail' : 'pass',
+      blockedEmbeds.length
+        ? `${blockedEmbeds.length} iframe(s) are not YouTube, so they render BLANK on the published page ` +
+          `(published pages ship \`frame-src 'none'\` and only a YouTube video block lifts it — the embed still ` +
+          `looks fine on the CMS canvas, which is why this is easy to miss). Use YouTube for video; for a map, ` +
+          `booking or chat widget ship a linked image instead (a static map image or screenshot wrapped in an ` +
+          `<a href> to the real service). Fix every occurrence, not only the examples listed here: ` +
+          `${[...new Set(blockedEmbeds)].slice(0, 6).join(', ')} (see templateRule.md)`
+        : undefined,
+    );
   }
 
   return findings;

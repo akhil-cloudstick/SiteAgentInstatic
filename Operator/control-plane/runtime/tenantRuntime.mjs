@@ -1,13 +1,34 @@
 // TenantRuntime — runs each tenant as a NATIVE Bun Instatic process (no Docker).
 // The control-plane (Node) spawns `bun server/index.ts` with per-tenant env.
-import { spawn } from 'node:child_process';
+import { spawn, execSync } from 'node:child_process';
 import { mkdirSync, createWriteStream, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import config from '../lib/env.mjs';
 import { signTenantToken } from '../lib/crypto.mjs';
+import { isPortOpen, waitPortOpen } from '../lib/ports.mjs';
 
 const isWin = process.platform === 'win32';
 const running = new Map(); // slug -> { child, port, pid, slug }
+
+// ---- readiness ------------------------------------------------------------
+// Same split as OpenDesignRuntime: `running` means "we spawned it", `ready`
+// means "the port answers". Only the second one makes a proxy forward safe.
+//
+// This side also has to survive a real situation seen in production here: a
+// tenant's bun process ORPHANED by a hard kill keeps serving its port across
+// control-plane restarts, while the resumed spawn dies of EADDRINUSE.
+//
+// Adopting that orphan (what this used to do) is NOT safe. It serves, so the
+// port probe calls it ready and the supervisor stops respawning — but it runs
+// whatever code it was started with. The tenant then serves a freshly rebuilt
+// `dist` against an arbitrarily old server, and the version skew surfaces as
+// unexplained 4xx on the CMS API (seen for real: a 17-day-old orphan on :3117
+// answered every `PUT /cms/api/cms/site-document` with a bare 400, which broke
+// site import and could not be fixed by any rebuild or restart). `ensure` now
+// reaps a squatter it did not spawn and brings the tenant up on current code.
+const ready = new Set();
+const inflight = new Map();
+const START_TIMEOUT_MS = Number(process.env.TENANT_START_TIMEOUT_MS || 120_000);
 
 export function tenantPaths(slug) {
   const dir = resolve(config.tenantsDir, slug);
@@ -39,6 +60,64 @@ export function isRunning(slug) {
 
 export function listRunning() {
   return [...running.values()].map((r) => ({ slug: r.slug, port: r.port, pid: r.pid }));
+}
+
+// Has this tenant's Instatic answered its port? Read on the request path.
+export const isReady = (slug) => ready.has(slug);
+
+// Drop a readiness verdict after a failed forward, so the next request re-ensures.
+export function markUnavailable(slug) {
+  ready.delete(slug);
+}
+
+// Kill whatever is LISTENING on a tenant port that this control plane did not
+// spawn. Mirrors odRuntime's reapStaleWebOnPort — the same orphan-squatter
+// failure mode, which on the CMS side stranded a tenant on weeks-old server code.
+function reapPortSquatter(port, slug) {
+  try {
+    if (isWin) {
+      const out = execSync(`netstat -ano -p TCP | findstr LISTENING | findstr :${port}`, { encoding: 'utf8', windowsHide: true });
+      const pids = new Set(out.split(/\r?\n/).map((l) => l.trim().split(/\s+/).pop()).filter((x) => /^\d+$/.test(x) && x !== '0'));
+      for (const pid of pids) {
+        if (Number(pid) === process.pid) continue;
+        console.warn(`[tenant-runtime] ${slug}: reaping orphan pid ${pid} squatting :${port}`);
+        try { execSync(`taskkill /pid ${pid} /T /F`, { stdio: 'ignore', windowsHide: true }); } catch { /* already gone */ }
+      }
+    } else {
+      execSync(`fuser -k ${port}/tcp`, { stdio: 'ignore' });
+    }
+  } catch { /* nothing listening — the normal case */ }
+}
+
+// Guarantee this tenant's instance is coming up; say whether it is usable NOW.
+// Never blocks — the caller shows a waiting page and polls. Same shape as
+// odRuntime.ensure(). tenant: the full params object start() takes.
+export function ensure(tenant) {
+  const slug = tenant?.slug;
+  const port = tenant?.port;
+  if (!slug || !port) return { ready: false, starting: false, error: 'no port for this tenant' };
+  if (ready.has(slug)) return { ready: true };
+  if (inflight.has(slug)) return { ready: false, starting: true };
+
+  const job = (async () => {
+    if (!(await isPortOpen(port))) {
+      start(tenant);
+    } else if (!running.has(slug)) {
+      // Port answers but we never spawned it — reap the orphan (see header) and
+      // start this tenant on the code that is actually on disk.
+      reapPortSquatter(port, slug);
+      for (let i = 0; i < 10 && (await isPortOpen(port)); i += 1) {
+        await new Promise((r) => setTimeout(r, 300));
+      }
+      start(tenant);
+    }
+    const ok = await waitPortOpen(port, START_TIMEOUT_MS);
+    if (ok) ready.add(slug);
+    return ok;
+  })();
+  inflight.set(slug, job);
+  job.catch(() => false).finally(() => { if (inflight.get(slug) === job) inflight.delete(slug); });
+  return { ready: false, starting: true };
 }
 
 // tenant: { slug, port, dbRole, dbPassword, secretKey, aiBaseUrl? }
@@ -105,6 +184,9 @@ export function start(tenant) {
   child.on('exit', (code) => {
     out.write(`\n[runtime] ${slug} exited code=${code} @ ${new Date().toISOString()}\n`);
     running.delete(slug);
+    // Only THIS process stopped serving; an orphan may still hold the port. Let
+    // the next ensure() re-probe rather than asserting the tenant is down.
+    ready.delete(slug);
   });
   // A child that fails to spawn (bad cwd, bun not found, EBUSY, killed) emits
   // an 'error' event. With NO listener Node re-throws it as an uncaught
@@ -114,14 +196,17 @@ export function start(tenant) {
   child.on('error', (err) => {
     out.write(`\n[runtime] ${slug} spawn error: ${err?.message ?? err} @ ${new Date().toISOString()}\n`);
     running.delete(slug);
+    ready.delete(slug);
   });
 
   const rec = { child, port, pid: child.pid, slug };
   running.set(slug, rec);
+  waitPortOpen(port, START_TIMEOUT_MS).then((ok) => { if (ok) ready.add(slug); });
   return rec;
 }
 
 export function stop(slug) {
+  ready.delete(slug);
   const rec = running.get(slug);
   if (!rec) return false;
   try {

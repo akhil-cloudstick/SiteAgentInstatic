@@ -1,10 +1,10 @@
 // Clear a tenant's Instatic CMS to a blank slate — all pages + all design
 // (colours, styles, fonts, scripts) + the media library — plus the PUBLISHED
 // site behind the public funnel URL, with an automatic timestamped backup.
-// The editor draft reads fresh from Postgres, so the CMS editor empties with no
-// restart; the public URL needs the extra steps below.
+// Reload the editor afterwards (hard refresh) — a tab that was open through the
+// clear rebinds to the fresh, empty document.
 //
-// Why the public URL is stubborn: a publish persists the site in THREE places,
+// Why the CMS is stubborn: the editor and the published site persist in FOUR places,
 // none of which a plain Postgres clear touches:
 //   1. DB published rows — `site_snapshots` + `data_row_versions` (the live-render
 //      fallback source). Deleting `data_rows` cascades the versions but leaves
@@ -17,8 +17,21 @@
 //      counter (Layer B; renderCache.ts / publishState.ts). An external wipe
 //      can't evict these — only a publish (version bump) or a process restart
 //      does — so we recycle the tenant through the control-plane.
-// With all three cleared, the public URL 404s (empty site). The published state
-// is derived — a re-publish rebuilds it.
+//   4. The collab CRDT blobs — `collab_documents` (one Yjs state blob per open
+//      doc: `site:default` for the shell + page roster, `page:<rowId>` per page).
+//      This blob, NOT the JSON, is the live-editing source of truth: the relay
+//      (server/collab/relay.ts) hydrates from it on open and re-derives the JSON
+//      back into `data_rows` / `site`. Clear the JSON but leave the blobs and
+//      every page walks straight back into the editor on the next open — which
+//      is exactly what happened before this step existed. The relay's reset seam
+//      only sees writes made through the repositories, never our raw SQL.
+// With all four cleared, the editor opens empty and the public URL 404s. The
+// published state is derived — a re-publish rebuilds it.
+//
+// ORDER MATTERS: the tenant is STOPPED first, then the DB is cleared, then the
+// disk, then it is restarted. A live tenant re-persists its in-memory collab
+// docs on a debounce (so a connected editor tab would write the page back) and
+// holds `published/` open (EBUSY on SMB), so clearing while it runs is racy.
 //
 // Media: `media_assets` is hard-deleted (not soft-deleted like the UI's Trash),
 // which cascades to `media_asset_folders` (asset<->folder membership) and
@@ -90,23 +103,84 @@ writeFileSync(backupPath, JSON.stringify({
 }))
 console.log(`Backup: ${pagesBefore} content row(s) + ${mediaBefore} media asset(s) + site design -> ${backupPath}`)
 
-// 1) delete every content row (pages, posts, components, layouts).
+// 1) STOP the running tenant BEFORE touching the DB. The live tenant process
+// holds every open collab doc in memory and re-persists it (CRDT blob + derived
+// JSON into `data_rows` / `site`) on a debounce, so a DB clear while it runs is
+// racy: any still-connected editor tab writes the old page straight back. It
+// also holds the `published/` tree open, which makes the on-disk delete below
+// fail EBUSY on Windows/SMB. Killing first removes both problems; the tenant is
+// restarted at the end, once the DB and disk are actually empty.
+const cpUrl = `http://127.0.0.1:${config.controlPlanePort}`
+type HealthBody = { running?: Array<{ slug: string; pid: number; port: number }> }
+let tenantWasRunning = false
+let tenantStopped = false
+try {
+  const health = (await fetch(`${cpUrl}/api/health`).then((r) => r.json())) as HealthBody
+  const rec = health.running?.find((r) => r.slug === slug)
+  if (!rec) {
+    // Not running — nothing holds in-memory state; the next start reads the
+    // now-empty DB.
+    tenantStopped = true
+  } else {
+    tenantWasRunning = true
+    // Kill the whole process tree. The control-plane spawns tenants through a
+    // shell on Windows, so taskkill /T reaps the shell + the bun child.
+    if (process.platform === 'win32') {
+      Bun.spawnSync(['taskkill', '/pid', String(rec.pid), '/T', '/F'])
+    } else {
+      try { process.kill(rec.pid, 'SIGTERM') } catch { /* already gone */ }
+    }
+    // Wait for the control-plane's child-exit handler to remove it from the
+    // running set BEFORE asking it to start again — otherwise `startTenant` sees
+    // it as still-running and no-ops, leaving the tenant down.
+    const deadline = Date.now() + 15_000
+    while (Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, 400))
+      const h = (await fetch(`${cpUrl}/api/health`).then((r) => r.json()).catch(() => null)) as HealthBody | null
+      if (h && !h.running?.some((r) => r.slug === slug)) { tenantStopped = true; break }
+    }
+    if (!tenantStopped) throw new Error('tenant process still listed as running 15s after kill')
+  }
+} catch (err) {
+  console.error(
+    `\n⚠️  Could not stop the running tenant via the control-plane at ${cpUrl}:`,
+    err instanceof Error ? err.message : err,
+  )
+  console.error('   Clearing the DB anyway, but a live editor tab can write its cached page back —')
+  console.error('   stop the tenant from the Operator console and re-run this script.')
+}
+
+// 2) delete every content row (pages, posts, components, layouts).
 await sql.unsafe(`delete from "${SCHEMA}".data_rows`)
 
-// 1b) delete every media asset (hard delete — cascades to media_asset_folders +
+// 2b) delete every media asset (hard delete — cascades to media_asset_folders +
 // media_usage_refs) and every folder, so a re-share starts from a truly empty
 // library instead of accumulating on top of old test pushes.
 await sql.unsafe(`delete from "${SCHEMA}".media_assets`)
 await sql.unsafe(`delete from "${SCHEMA}".media_folders`)
 
-// 1c) delete the published site snapshots. Deleting data_rows cascades away
+// 2c) delete the published site snapshots. Deleting data_rows cascades away
 // data_row_versions + published_runtime_assets (FK on delete cascade), but the
 // data_row_versions -> site_snapshots FK is `on delete set null`, so the
 // published SiteDocument rows are orphaned rather than removed. Drop them too so
 // the live-render fallback finds nothing and the library is truly empty.
 await sql.unsafe(`delete from "${SCHEMA}".site_snapshots`)
 
-// 2) reset the site shell to a blank design.
+// 2d) delete the collab CRDT blobs. THIS is what made the first version of this
+// script look like it did nothing: `collab_documents` holds one Yjs state blob
+// per open doc (`site:default` = the whole site shell + page roster,
+// `page:<rowId>` = one page's content) and that blob — not the JSON — is the
+// live-editing SOURCE OF TRUTH (server/collab/relay.ts). On the next open the
+// relay hydrates the doc from the blob and re-derives the JSON back into
+// `data_rows` / `site`, so every page and style deleted above reappears in the
+// editor (and back in the DB). The relay's own reset seam (`attachResetSources`)
+// only fires for writes made THROUGH the repositories; raw SQL like ours is
+// invisible to it, so the blobs must be deleted here. With the row gone the next
+// open seeds an empty doc and mints a fresh CRDT generation — which is also what
+// makes a still-open editor tab rebind instead of pushing its stale state back.
+await sql.unsafe(`delete from "${SCHEMA}".collab_documents`)
+
+// 3) reset the site shell to a blank design.
 const raw = siteRow?.settings_json
   ? (typeof siteRow.settings_json === 'string' ? JSON.parse(siteRow.settings_json) : siteRow.settings_json)
   : { site: {} }
@@ -122,76 +196,12 @@ await sql.unsafe(
   [JSON.stringify(raw)],
 )
 
-// 3) recycle the running tenant so its in-memory published-render cache is
-// dropped. The public URL is served by the long-running tenant process; its
-// render cache (server/publish/renderCache.ts) and publish-version counter
-// (publishState.ts) live in that process's MEMORY. An external DB/disk wipe
-// cannot evict them — only a publish (which bumps the version) or a process
-// restart does. On this deployment the on-disk `current` symlink can't be
-// created (SMB share), so Layer A never serves and the live URL is 100% the
-// in-memory cache: without this bounce the funnel keeps serving the last render
-// even though the DB is now empty. Bounce it via the control-plane: read the
-// running pid from /api/health, kill it, wait for the control-plane to drop it,
-// then POST .../start so it respawns fresh (empty cache, reads the empty DB).
-//
-// This runs BEFORE the on-disk delete below: the live tenant holds the
-// `published/` tree open (its per-request artefact reads), so deleting it first
-// fails EBUSY on Windows/SMB. Killing the process releases the handle.
-const cpUrl = `http://127.0.0.1:${config.controlPlanePort}`
-type HealthBody = { running?: Array<{ slug: string; pid: number; port: number }> }
-let tenantRecycled = false
-let tenantWasRunning = false
-try {
-  const health = (await fetch(`${cpUrl}/api/health`).then((r) => r.json())) as HealthBody
-  const rec = health.running?.find((r) => r.slug === slug)
-  if (!rec) {
-    // Not running — the next start reads the now-empty DB, so there is no live
-    // in-memory cache to flush.
-    tenantRecycled = true
-  } else {
-    tenantWasRunning = true
-    // Kill the whole process tree. The control-plane spawns tenants through a
-    // shell on Windows, so taskkill /T reaps the shell + the bun child.
-    if (process.platform === 'win32') {
-      Bun.spawnSync(['taskkill', '/pid', String(rec.pid), '/T', '/F'])
-    } else {
-      try { process.kill(rec.pid, 'SIGTERM') } catch { /* already gone */ }
-    }
-    // Wait for the control-plane's child-exit handler to remove it from the
-    // running set BEFORE asking it to start again — otherwise `startTenant` sees
-    // it as still-running and no-ops, leaving the tenant down.
-    const deadline = Date.now() + 15_000
-    let gone = false
-    while (Date.now() < deadline) {
-      await new Promise((r) => setTimeout(r, 400))
-      const h = (await fetch(`${cpUrl}/api/health`).then((r) => r.json()).catch(() => null)) as HealthBody | null
-      if (h && !h.running?.some((r) => r.slug === slug)) { gone = true; break }
-    }
-    if (!gone) throw new Error('tenant process still listed as running 15s after kill')
-    // Respawn fresh — the control-plane blocks until it answers HTTP again.
-    const started = (await fetch(`${cpUrl}/api/tenants/${slug}/start`, { method: 'POST' })
-      .then((r) => r.json())) as { healthy?: boolean; port?: number }
-    tenantRecycled = Boolean(started?.healthy)
-    if (!tenantRecycled) {
-      console.error(`\n⚠️  Tenant "${slug}" was bounced but did not report healthy on restart.`)
-      console.error(`   Check ${tenantPaths(slug).log} and start it from the Operator console.`)
-    }
-  }
-} catch (err) {
-  console.error(
-    `\n⚠️  Could not recycle the running tenant via the control-plane at ${cpUrl}:`,
-    err instanceof Error ? err.message : err,
-  )
-  console.error('   The public URL will keep serving the cached site until the tenant restarts.')
-  console.error('   Restart it (Operator console, or `npm run dev` from Operator) to finish clearing the live URL.')
-}
-
 // 4) delete the on-disk published artefacts (Layer A). On a Linux/Docker install
 // the visitor router reads these baked pages through the `current` symlink
 // before ever touching the DB, so leaving them keeps the last publish live until
 // the next one. (On this SMB box no symlink exists, so Layer A is inert and the
-// bounce above already cleared the URL — this still removes the stale slot so a
-// re-publish starts clean.) The path is keyed by tenant SLUG, not the PG schema;
+// tenant stop above already dropped the live render — this still removes the stale
+// slot so a re-publish starts clean.) The path is keyed by tenant SLUG, not the PG schema;
 // `tenantPaths` is the single source of truth for tenant on-disk layout.
 // Deleting the whole `published/` dir removes both slots (a, b) and `current`;
 // the next publish recreates it via `prepareInactiveSlot`. `rm` unlinks the
@@ -219,6 +229,29 @@ if (existsSync(publishedDir)) {
     )
     console.error('   Harmless for the live URL (the tenant was already recycled), but the stale')
     console.error('   slot lingers — delete the folder by hand, or re-run once the file lock clears.')
+  }
+}
+
+// 5) restart the tenant so it comes up against the now-empty DB with an empty
+// in-memory published-render cache (server/publish/renderCache.ts) and publish
+// version counter (publishState.ts). Only started if it was running before —
+// clearing a stopped tenant leaves it stopped.
+let tenantRecycled = tenantStopped && !tenantWasRunning
+if (tenantStopped && tenantWasRunning) {
+  try {
+    const started = (await fetch(`${cpUrl}/api/tenants/${slug}/start`, { method: 'POST' })
+      .then((r) => r.json())) as { healthy?: boolean; port?: number }
+    tenantRecycled = Boolean(started?.healthy)
+    if (!tenantRecycled) {
+      console.error(`\n⚠️  Tenant "${slug}" was bounced but did not report healthy on restart.`)
+      console.error(`   Check ${tenantPaths(slug).log} and start it from the Operator console.`)
+    }
+  } catch (err) {
+    console.error(
+      `\n⚠️  Could not restart tenant "${slug}" via the control-plane:`,
+      err instanceof Error ? err.message : err,
+    )
+    console.error(`   Check ${tenantPaths(slug).log} and start it from the Operator console.`)
   }
 }
 

@@ -10,7 +10,7 @@
  * row the Content canvas draws above its editor, so every action is supplied
  * by the caller.
  */
-import type { SyntheticEvent } from "react";
+import type { Ref, SyntheticEvent } from "react";
 import type { IconComponent } from "pixel-art-icons/types";
 import { Button } from "@ui/components/Button";
 import { cn } from "@ui/cn";
@@ -24,6 +24,10 @@ export interface CanvasNotchAction {
   onClick: () => void;
   /** Renders the action disabled, with this string as the tooltip. */
   disabledReason?: string;
+  /** Anchor ref for an action-owned popover (Content canvas token picker). */
+  buttonRef?: Ref<HTMLButtonElement>;
+  /** Action-owned popover is open: exposed via aria-expanded, tooltip suppressed. */
+  expanded?: boolean;
   /**
    * Marks the reference's leading "+ Insert" action, which reads as the
    * primary affordance (accent-on-tint, inverting on hover) and whose
@@ -57,10 +61,12 @@ export function CanvasNotch({ actions }: CanvasNotchProps) {
               variant="ghost"
               size="sm"
               className={cn(styles.quickButton, isPrimary && styles.insertButton)}
+              ref={action.buttonRef}
               onClick={action.onClick}
               disabled={Boolean(action.disabledReason)}
               aria-label={accessibleName}
-              tooltip={action.disabledReason ?? accessibleName}
+              aria-expanded={action.expanded}
+              tooltip={action.expanded ? undefined : (action.disabledReason ?? accessibleName)}
               data-testid={`canvas-notch-${testIdPart(action.label)}-btn`}
             >
               <ActionIcon size={13} aria-hidden="true" />

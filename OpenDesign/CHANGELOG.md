@@ -22,6 +22,7 @@ in the SiteAgentHub monorepo.
 > `docs/opendesign-upgrade-runbook.md` §1.
 
 _(Entries below this point are upstream's own changelog, which stops at 0.9.0.)_
+- [Fixed] Long speaker notes are now scrollable inside the presenter view instead of being clipped when notes push the layout past the viewport. (#6271)
 
 ## [0.9.0] - 2026-05-29
 

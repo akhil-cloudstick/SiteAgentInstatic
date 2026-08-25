@@ -1,10 +1,10 @@
 /**
  * Plugin record CRUD endpoints.
  *
- *   GET    /admin/api/cms/plugins/:id/resources/:rid/records          — list
- *   POST   /admin/api/cms/plugins/:id/resources/:rid/records          — create
- *   PATCH  /admin/api/cms/plugins/:id/resources/:rid/records/:recId   — update
- *   DELETE /admin/api/cms/plugins/:id/resources/:rid/records/:recId   — delete
+ *   GET    /cms/api/cms/plugins/:id/resources/:rid/records          — list
+ *   POST   /cms/api/cms/plugins/:id/resources/:rid/records          — create
+ *   PATCH  /cms/api/cms/plugins/:id/resources/:rid/records/:recId   — update
+ *   DELETE /cms/api/cms/plugins/:id/resources/:rid/records/:recId   — delete
  *
  * "Resources" are the named, schema-bound tables a plugin's manifest can
  * declare. The dispatcher matches the URL, this handler validates the body

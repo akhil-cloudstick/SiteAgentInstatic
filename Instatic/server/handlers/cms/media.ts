@@ -1,26 +1,26 @@
 /**
  * Media library endpoints — capabilities split per-operation.
  *
- *   GET    /admin/api/cms/media                — list every uploaded asset
+ *   GET    /cms/api/cms/media                — list every uploaded asset
  *                                                  (?trash=1 → trashed items only)
  *                                                  (`media.read`)
- *   POST   /admin/api/cms/media                — upload a new image/video
+ *   POST   /cms/api/cms/media                — upload a new image/video
  *                                                  (multipart `file=`, max 50MB)
  *                                                  (`media.write`)
- *   PATCH  /admin/api/cms/media/:id            — rename / edit metadata
+ *   PATCH  /cms/api/cms/media/:id            — rename / edit metadata
  *                                                  (`media.write`)
- *   DELETE /admin/api/cms/media/:id            — soft delete by default,
+ *   DELETE /cms/api/cms/media/:id            — soft delete by default,
  *                                                  ?purge=1 hard-deletes (only
  *                                                  permitted on already-trashed
  *                                                  assets) and removes the file
  *                                                  (`media.delete`)
- *   POST   /admin/api/cms/media/:id/restore    — restore a soft-deleted asset
+ *   POST   /cms/api/cms/media/:id/restore    — restore a soft-deleted asset
  *                                                  (`media.write`)
- *   POST   /admin/api/cms/media/:id/replace    — overwrite the bytes for an asset
+ *   POST   /cms/api/cms/media/:id/replace    — overwrite the bytes for an asset
  *                                                  (`media.replace` — uniquely
  *                                                  dangerous: silently swaps the
  *                                                  bytes every page references)
- *   POST   /admin/api/cms/media/:id/folders    — add/remove folder memberships
+ *   POST   /cms/api/cms/media/:id/folders    — add/remove folder memberships
  *                                                  body: { add?: string[], remove?: string[] }
  *                                                  (`media.write`)
  *
@@ -54,6 +54,7 @@ import { CMS_API_PREFIX } from './shared'
 import { runRouteTable, type Route, type RouteParams } from './routeTable'
 import {
   EXTENSION_FOR_MIME,
+  MAX_MEDIA_BYTES,
   acceptReplacementMedia,
   acceptUploadedMedia,
   readUploadedFile,
@@ -62,8 +63,6 @@ import {
 import { removeVariantFiles } from './mediaVariants'
 import { dispatchDelete } from './mediaUploadDispatch'
 import { materializeAssetListForClient } from '../../publish/mediaPresentation'
-
-const MAX_MEDIA_BYTES = 50 * 1024 * 1024
 
 const MEDIA_LIBRARY_MIMES = Object.keys(EXTENSION_FOR_MIME) as Array<
   keyof typeof EXTENSION_FOR_MIME

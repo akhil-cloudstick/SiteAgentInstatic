@@ -224,12 +224,18 @@ function hubPage(tenant) {
       <div><h1>Welcome, ${name}</h1><p class="muted">Choose where to work.</p></div>
       <form method="POST" action="/logout" style="margin:0"><button class="logout" style="background:none;border:0;padding:0;width:auto;margin:0" type="submit">Sign out</button></form>
     </div>
+    <!-- The cards link to the hand-off ROUTES, not to a pre-minted token URL.
+         SSO tokens live 120 seconds and these hrefs are stamped when this page
+         renders, so a hub tab left open for three minutes used to hand the tool
+         an expired token — and the OpenDesign daemon answers that with a hard
+         401 rather than bouncing back here. /sso/<tool> mints on click, so the
+         token is always seconds old however long the page has been sitting. -->
     <div class="cards">
-      <a class="card" href="${esc(ssoUrl(tenant, 'od'))}">
+      <a class="card" href="/sso/design">
         <div class="ico">&#127912;</div><h3>MMS Design</h3>
         <div class="muted">Design your website visually. Push it to your CMS when ready.</div>
       </a>
-      <a class="card" href="${esc(ssoUrl(tenant, 'instatic'))}">
+      <a class="card" href="/sso/cms">
         <div class="ico">&#128441;&#65039;</div><h3>MMS CMS</h3>
         <div class="muted">Edit content, publish, and manage your live site.</div>
       </a>

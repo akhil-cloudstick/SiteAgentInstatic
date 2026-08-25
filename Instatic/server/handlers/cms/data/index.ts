@@ -7,17 +7,17 @@
  * how the rest of `server/handlers/cms/*` is organized.
  *
  * URL surface owned by this folder:
- *   /admin/api/cms/data/_meta                     (GET)  ← matched first
- *   /admin/api/cms/data/authors                   (GET)
- *   /admin/api/cms/data/tables                    (GET, POST)
- *   /admin/api/cms/data/tables/:id                (GET, PATCH, DELETE)
- *   /admin/api/cms/data/tables/:id/rows           (GET, POST)
- *   /admin/api/cms/data/tables/:id/loop-preview   (GET)
- *   /admin/api/cms/data/rows/:id                  (GET, PUT, DELETE)
- *   /admin/api/cms/data/rows/:id/publish          (POST)
- *   /admin/api/cms/data/rows/:id/status           (PATCH)
- *   /admin/api/cms/data/rows/:id/author           (PATCH)
- *   /admin/api/cms/data/rows/:id/table            (PATCH)
+ *   /cms/api/cms/data/_meta                     (GET)  ← matched first
+ *   /cms/api/cms/data/authors                   (GET)
+ *   /cms/api/cms/data/tables                    (GET, POST)
+ *   /cms/api/cms/data/tables/:id                (GET, PATCH, DELETE)
+ *   /cms/api/cms/data/tables/:id/rows           (GET, POST)
+ *   /cms/api/cms/data/tables/:id/loop-preview   (GET)
+ *   /cms/api/cms/data/rows/:id                  (GET, PUT, DELETE)
+ *   /cms/api/cms/data/rows/:id/publish          (POST)
+ *   /cms/api/cms/data/rows/:id/status           (PATCH)
+ *   /cms/api/cms/data/rows/:id/author           (PATCH)
+ *   /cms/api/cms/data/rows/:id/table            (PATCH)
  *
  * `_meta` is matched first because the underscore prefix makes it impossible
  * to collide with an id-based route (table ids are nanoid strings, no leading

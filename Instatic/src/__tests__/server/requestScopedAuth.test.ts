@@ -67,7 +67,7 @@ function countingDb(inner: DbClient): { db: DbClient; counts: Counts } {
 
 async function setup(db: DbClient): Promise<void> {
   const res = await handleCmsRequest(
-    new Request('http://localhost/admin/api/cms/setup', {
+    new Request('http://localhost/cms/api/cms/setup', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ siteName: 'Ctx Test', email: EMAIL, password: PASSWORD }),
@@ -78,7 +78,7 @@ async function setup(db: DbClient): Promise<void> {
 }
 
 async function login(db: DbClient): Promise<string> {
-  const req = new Request('http://localhost/admin/api/cms/login', {
+  const req = new Request('http://localhost/cms/api/cms/login', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ email: EMAIL, password: PASSWORD }),
@@ -90,7 +90,7 @@ async function login(db: DbClient): Promise<string> {
 }
 
 async function stepUp(db: DbClient, cookie: string): Promise<string> {
-  const req = new Request('http://localhost/admin/api/cms/auth/step-up', {
+  const req = new Request('http://localhost/cms/api/cms/auth/step-up', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ password: PASSWORD }),
@@ -132,7 +132,7 @@ describe('Request-scoped auth context', () => {
     // the session once; requireStepUp now reuses that AuthUser instead of
     // re-authenticating, so there must be exactly ONE session hydrate.
     const { db: measured, counts } = countingDb(db)
-    const req = new Request('http://localhost/admin/api/cms/users', {
+    const req = new Request('http://localhost/cms/api/cms/users', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
@@ -156,7 +156,7 @@ describe('Request-scoped auth context', () => {
 
     // First authenticated request: one hydrate, one debounced touch.
     const first = countingDb(db)
-    const meReq1 = new Request('http://localhost/admin/api/cms/me', { method: 'GET' })
+    const meReq1 = new Request('http://localhost/cms/api/cms/me', { method: 'GET' })
     meReq1.headers.set('cookie', cookie)
     expect((await handleCmsRequest(meReq1, first.db)).status).toBe(200)
     expect(first.counts.sessionUserSelects).toBe(1)
@@ -165,7 +165,7 @@ describe('Request-scoped auth context', () => {
     // Second request on the same session, well within the debounce window:
     // the session is still hydrated, but the last_seen_at write is skipped.
     const second = countingDb(db)
-    const meReq2 = new Request('http://localhost/admin/api/cms/me', { method: 'GET' })
+    const meReq2 = new Request('http://localhost/cms/api/cms/me', { method: 'GET' })
     meReq2.headers.set('cookie', cookie)
     expect((await handleCmsRequest(meReq2, second.db)).status).toBe(200)
     expect(second.counts.sessionUserSelects).toBe(1)

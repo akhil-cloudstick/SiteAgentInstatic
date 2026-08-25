@@ -1,11 +1,11 @@
 /**
  * Share to CMS — stage a FileMap for the real "Import Site" wizard to run.
  *
- *   POST /admin/api/cms/import/site-html
+ *   POST /cms/api/cms/import/site-html
  *     Body: { files: { "<path>": { base64: "<bytes>", mimeType?: "<type>" }, … } }
  *     Response: { token: "<opaque>" }
  *
- *   GET  /admin/api/cms/import/staged/:token
+ *   GET  /cms/api/cms/import/staged/:token
  *     Response: { files: { ... } } (same shape as the POST body) — single-use,
  *     burned on read.
  *
@@ -43,7 +43,7 @@ const SiteHtmlImportBodySchema = Type.Object({
   ),
 })
 
-/** POST /admin/api/cms/import/site-html — stage a FileMap, return its token. */
+/** POST /cms/api/cms/import/site-html — stage a FileMap, return its token. */
 export async function handleImportSiteHtmlRoute(
   req: Request,
   db: DbClient,
@@ -66,7 +66,7 @@ export async function handleImportSiteHtmlRoute(
   return jsonResponse({ token }, { status: 201 })
 }
 
-/** GET /admin/api/cms/import/staged/:token — single-use fetch for the browser wizard. */
+/** GET /cms/api/cms/import/staged/:token — single-use fetch for the browser wizard. */
 export async function handleStagedImportFetchRoute(
   req: Request,
   db: DbClient,

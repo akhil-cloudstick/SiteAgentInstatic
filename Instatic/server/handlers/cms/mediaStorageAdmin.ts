@@ -1,17 +1,17 @@
 /**
  * Media storage admin endpoints.
  *
- *   GET    /admin/api/cms/media/storage              — list installed adapters,
+ *   GET    /cms/api/cms/media/storage              — list installed adapters,
  *                                                       installed variant delegates,
  *                                                       current per-role elections,
  *                                                       and current variant-delegate
  *                                                       election.
- *   POST   /admin/api/cms/media/storage/elect        — elect an adapter for a role
+ *   POST   /cms/api/cms/media/storage/elect        — elect an adapter for a role
  *                                                       (body: { role, adapterId })
- *   POST   /admin/api/cms/media/storage/delegate     — elect a variant delegate
+ *   POST   /cms/api/cms/media/storage/delegate     — elect a variant delegate
  *                                                       (body: { delegateId })
  *                                                       OR clear it (body: { delegateId: null })
- *   POST   /admin/api/cms/media/storage/verify/:id   — run the adapter's verify()
+ *   POST   /cms/api/cms/media/storage/verify/:id   — run the adapter's verify()
  *                                                       and return its diagnosis
  *
  * All endpoints are gated by the `storage.elect` capability (formerly

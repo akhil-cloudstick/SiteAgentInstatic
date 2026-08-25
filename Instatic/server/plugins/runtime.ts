@@ -211,7 +211,7 @@ export async function handleServerPluginRuntimeRequest(
   db: DbClient,
 ): Promise<Response | null> {
   const url = new URL(req.url)
-  // Pre-rename spelling was `/admin/api/cms`; the admin calls `/cms/api/cms`.
+  // Pre-rename spelling was `/cms/api/cms`; the admin calls `/cms/api/cms`.
   const match = url.pathname.match(/^\/cms\/api\/cms\/plugins\/([^/]+)\/runtime(\/.*)?$/)
   if (!match) return null
 

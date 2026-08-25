@@ -186,7 +186,7 @@ export const RowSlugOverrideSchema = Type.Object({
 export type RowSlugOverride = Static<typeof RowSlugOverrideSchema>
 
 /**
- * Request body accepted by `POST /admin/api/cms/export` (and query string
+ * Request body accepted by `POST /cms/api/cms/export` (and query string
  * equivalent for `GET`). All fields are optional — omitting them produces a
  * full-site export (every table, every row, shell + media + folders + redirects).
  */
@@ -238,7 +238,7 @@ export type BundleImportSelection = Static<typeof BundleImportSelectionSchema>
 // ---------------------------------------------------------------------------
 
 /**
- * Response of `POST /admin/api/cms/export/estimate`. Reports the byte size the
+ * Response of `POST /cms/api/cms/export/estimate`. Reports the byte size the
  * export archive WOULD have for the given `ExportRequest`, computed from the
  * exact same selection logic the real export uses — without reading media
  * files off disk. `bytes` is the stored ZIP size.
@@ -254,7 +254,7 @@ export type ExportEstimate = Static<typeof ExportEstimateSchema>
 // ---------------------------------------------------------------------------
 
 /**
- * Response of `GET /admin/api/cms/export/summary`. Total counts of the
+ * Response of `GET /cms/api/cms/export/summary`. Total counts of the
  * non-table export categories, so the export dialog can label each category
  * ("Media — 24 files") and disable empty ones — independent of the current
  * selection. Data-table row counts come from the workspace, not this endpoint.
@@ -305,7 +305,7 @@ export const BundleRowConflictSchema = Type.Object({
 export type BundleRowConflict = Static<typeof BundleRowConflictSchema>
 
 /**
- * Read-only diff returned by `POST /admin/api/cms/import/preview`.
+ * Read-only diff returned by `POST /cms/api/cms/import/preview`.
  * Shows the operator what would happen before they commit an import.
  */
 export const BundlePreviewSchema = Type.Object({
@@ -332,7 +332,7 @@ export type BundlePreview = Static<typeof BundlePreviewSchema>
 // ---------------------------------------------------------------------------
 
 /**
- * Success response returned by `POST /admin/api/cms/import`.
+ * Success response returned by `POST /cms/api/cms/import`.
  * Counters describe what actually happened, broken down by strategy semantics.
  */
 export const ImportResultSchema = Type.Object({

@@ -10,7 +10,6 @@ import {
   openLayersPanel,
   openSitePanel,
   openSiteEditor,
-  saveDraft,
   setPropValue,
   canvasFrame,
   insertModule,
@@ -104,7 +103,6 @@ test.describe.serial('capability boundaries', () => {
         personaPage.getByText('Styles are read-only for your role'),
       ).toBeVisible()
 
-      await saveDraft(personaPage)
       await personaPage.reload()
       await openNamedPage(personaPage, pageName)
       await expect(
@@ -134,7 +132,6 @@ test.describe.serial('capability boundaries', () => {
       await fontSizeInput.blur()
       await expect(editableText).toHaveCSS('font-size', '23px')
 
-      await saveDraft(personaPage)
       await personaPage.reload()
       await openNamedPage(personaPage, pageName)
       const reloadedText = canvasFrame(personaPage).getByText(contentText, { exact: true })
@@ -160,7 +157,6 @@ test.describe.serial('capability boundaries', () => {
       await insertModule(personaPage, 'text')
       await expect(tree.getByRole('treeitem', { name: 'Text' })).toHaveCount(3)
 
-      await saveDraft(personaPage)
       await personaPage.reload()
       await openNamedPage(personaPage, pageName)
       await openLayersPanel(personaPage)
@@ -1066,7 +1062,6 @@ async function seedCapabilityPage(
   await setPropValue(page, 'text', seededText)
   await insertModule(page, 'text')
   await setPropValue(page, 'text', secondText)
-  await saveDraft(page)
   return pageName
 }
 

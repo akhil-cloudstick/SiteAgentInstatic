@@ -34,6 +34,7 @@ interface NewTableDialogProps {
   onClose: () => void
   onCreate: (input: CreateDataTableInput) => Promise<void>
   tables: DataTable[]
+  variant?: 'table' | 'collection'
 }
 
 /** The reference's two kinds, in its wording. */

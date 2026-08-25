@@ -415,7 +415,7 @@ async function completeStepUp(
   cookie: string,
   loginPhrase = 'long-enough-password',
 ): Promise<string> {
-  const req = new Request('http://localhost/admin/api/cms/auth/step-up', {
+  const req = new Request('http://localhost/cms/api/cms/auth/step-up', {
     method: 'POST',
     body: JSON.stringify({ password: loginPhrase }),
     headers: { 'content-type': 'application/json' },
@@ -431,7 +431,7 @@ async function completeStepUp(
 describe('CMS handlers', () => {
   it('reports setup status', async () => {
     const db = makeFakeDb()
-    const res = await handleCmsRequest(new Request('http://localhost/admin/api/cms/setup/status'), db)
+    const res = await handleCmsRequest(new Request('http://localhost/cms/api/cms/setup/status'), db)
     expect(res.status).toBe(200)
     expect(await json(res)).toEqual({ hasSite: false, hasAdmin: false, hasOwner: false, needsSetup: true })
   })
@@ -441,7 +441,7 @@ describe('CMS handlers', () => {
     // home page seed will be added back in Step 3 as a data_row in the
     // seeded 'pages' data table. For now setup creates the site + owner only.
     const db = makeFakeDb()
-    const res = await handleCmsRequest(new Request('http://localhost/admin/api/cms/setup', {
+    const res = await handleCmsRequest(new Request('http://localhost/cms/api/cms/setup', {
       method: 'POST',
       body: JSON.stringify({ siteName: 'Example', email: 'owner@example.com', password: 'long-enough-password' }),
       headers: { 'content-type': 'application/json' },
@@ -470,7 +470,7 @@ describe('CMS handlers', () => {
       updated_at: new Date().toISOString(),
       deleted_at: null,
     })
-    const res = await handleCmsRequest(new Request('http://localhost/admin/api/cms/setup', {
+    const res = await handleCmsRequest(new Request('http://localhost/cms/api/cms/setup', {
       method: 'POST',
       body: JSON.stringify({ siteName: 'Example', email: 'new@example.com', password: 'long-enough-password' }),
       headers: { 'content-type': 'application/json' },
@@ -480,12 +480,12 @@ describe('CMS handlers', () => {
 
   it('logs in and sets an HttpOnly session cookie', async () => {
     const db = makeFakeDb()
-    await handleCmsRequest(new Request('http://localhost/admin/api/cms/setup', {
+    await handleCmsRequest(new Request('http://localhost/cms/api/cms/setup', {
       method: 'POST',
       body: JSON.stringify({ siteName: 'Example', email: 'owner@example.com', password: 'long-enough-password' }),
       headers: { 'content-type': 'application/json' },
     }), db)
-    const loginReq = new Request('http://localhost/admin/api/cms/login', {
+    const loginReq = new Request('http://localhost/cms/api/cms/login', {
       method: 'POST',
       body: JSON.stringify({ email: 'owner@example.com', password: 'long-enough-password' }),
       headers: { 'content-type': 'application/json' },
@@ -513,12 +513,12 @@ describe('CMS handlers', () => {
     const db = makeFakeDb()
     const email = 'me-owner@example.com'
     loginRateLimit.reset(`unknown|${email}`)
-    await handleCmsRequest(new Request('http://localhost/admin/api/cms/setup', {
+    await handleCmsRequest(new Request('http://localhost/cms/api/cms/setup', {
       method: 'POST',
       body: JSON.stringify({ siteName: 'Example', email, password: 'long-enough-password' }),
       headers: { 'content-type': 'application/json' },
     }), db)
-    const loginRes = await handleCmsRequest(new Request('http://localhost/admin/api/cms/login', {
+    const loginRes = await handleCmsRequest(new Request('http://localhost/cms/api/cms/login', {
       method: 'POST',
       body: JSON.stringify({ email, password: 'long-enough-password' }),
       headers: { 'content-type': 'application/json' },
@@ -526,7 +526,7 @@ describe('CMS handlers', () => {
     expect(loginRes.status).toBe(200)
     const cookie = await completeStepUp(db, (loginRes.headers.get('set-cookie') ?? '').split(';')[0])
 
-    const meReq = new Request('http://localhost/admin/api/cms/me', {
+    const meReq = new Request('http://localhost/cms/api/cms/me', {
       method: 'GET',
     })
     meReq.headers.set('cookie', cookie)
@@ -545,18 +545,18 @@ describe('CMS handlers', () => {
 
   it('keeps owner setup-only when managing users', async () => {
     const db = makeFakeDb()
-    await handleCmsRequest(new Request('http://localhost/admin/api/cms/setup', {
+    await handleCmsRequest(new Request('http://localhost/cms/api/cms/setup', {
       method: 'POST',
       body: JSON.stringify({ siteName: 'Example', email: 'owner-only@example.com', password: 'long-enough-password' }),
       headers: { 'content-type': 'application/json' },
     }), db)
-    const loginRes = await handleCmsRequest(new Request('http://localhost/admin/api/cms/login', {
+    const loginRes = await handleCmsRequest(new Request('http://localhost/cms/api/cms/login', {
       method: 'POST',
       body: JSON.stringify({ email: 'owner-only@example.com', password: 'long-enough-password' }),
       headers: { 'content-type': 'application/json' },
     }), db)
     const cookie = await completeStepUp(db, (loginRes.headers.get('set-cookie') ?? '').split(';')[0])
-    const createReq = new Request('http://localhost/admin/api/cms/users', {
+    const createReq = new Request('http://localhost/cms/api/cms/users', {
       method: 'POST',
       body: JSON.stringify({
         email: 'second-owner@example.com',
@@ -577,19 +577,19 @@ describe('CMS handlers', () => {
 
   it('prevents assigning the owner role after setup and prevents owner self-demotion', async () => {
     const db = makeFakeDb()
-    await handleCmsRequest(new Request('http://localhost/admin/api/cms/setup', {
+    await handleCmsRequest(new Request('http://localhost/cms/api/cms/setup', {
       method: 'POST',
       body: JSON.stringify({ siteName: 'Example', email: 'owner-role@example.com', password: 'long-enough-password' }),
       headers: { 'content-type': 'application/json' },
     }), db)
-    const loginRes = await handleCmsRequest(new Request('http://localhost/admin/api/cms/login', {
+    const loginRes = await handleCmsRequest(new Request('http://localhost/cms/api/cms/login', {
       method: 'POST',
       body: JSON.stringify({ email: 'owner-role@example.com', password: 'long-enough-password' }),
       headers: { 'content-type': 'application/json' },
     }), db)
     const cookie = await completeStepUp(db, (loginRes.headers.get('set-cookie') ?? '').split(';')[0])
 
-    const createReq = new Request('http://localhost/admin/api/cms/users', {
+    const createReq = new Request('http://localhost/cms/api/cms/users', {
       method: 'POST',
       body: JSON.stringify({
         email: 'admin-target@example.com',
@@ -604,7 +604,7 @@ describe('CMS handlers', () => {
     expect(createRes.status).toBe(201)
     const created = await createRes.json() as { user: { id: string } }
 
-    const assignOwnerReq = new Request(`http://localhost/admin/api/cms/users/${created.user.id}`, {
+    const assignOwnerReq = new Request(`http://localhost/cms/api/cms/users/${created.user.id}`, {
       method: 'PATCH',
       body: JSON.stringify({ roleId: 'owner' }),
       headers: { 'content-type': 'application/json' },
@@ -615,7 +615,7 @@ describe('CMS handlers', () => {
     expect(await json(assignOwnerRes)).toEqual({ error: 'Owner role is setup-only' })
 
     const ownerId = String(db.users.find((user) => user.role_id === 'owner')?.id)
-    const selfDemoteReq = new Request(`http://localhost/admin/api/cms/users/${ownerId}`, {
+    const selfDemoteReq = new Request(`http://localhost/cms/api/cms/users/${ownerId}`, {
       method: 'PATCH',
       body: JSON.stringify({ roleId: 'admin' }),
       headers: { 'content-type': 'application/json' },
@@ -632,12 +632,12 @@ describe('CMS handlers', () => {
     // primitive) or DELETE it. Only the Owner themself may mutate the Owner
     // row.
     const db = makeFakeDb()
-    await handleCmsRequest(new Request('http://localhost/admin/api/cms/setup', {
+    await handleCmsRequest(new Request('http://localhost/cms/api/cms/setup', {
       method: 'POST',
       body: JSON.stringify({ siteName: 'Example', email: 'real-owner@example.com', password: 'long-enough-password' }),
       headers: { 'content-type': 'application/json' },
     }), db)
-    const ownerLogin = await handleCmsRequest(new Request('http://localhost/admin/api/cms/login', {
+    const ownerLogin = await handleCmsRequest(new Request('http://localhost/cms/api/cms/login', {
       method: 'POST',
       body: JSON.stringify({ email: 'real-owner@example.com', password: 'long-enough-password' }),
       headers: { 'content-type': 'application/json' },
@@ -645,7 +645,7 @@ describe('CMS handlers', () => {
     const ownerCookie = await completeStepUp(db, (ownerLogin.headers.get('set-cookie') ?? '').split(';')[0])
 
     // Owner creates an admin co-worker.
-    const createAdminReq = new Request('http://localhost/admin/api/cms/users', {
+    const createAdminReq = new Request('http://localhost/cms/api/cms/users', {
       method: 'POST',
       body: JSON.stringify({
         email: 'rogue-admin@example.com',
@@ -659,7 +659,7 @@ describe('CMS handlers', () => {
     const createAdminRes = await handleCmsRequest(createAdminReq, db)
     expect(createAdminRes.status).toBe(201)
 
-    const adminLogin = await handleCmsRequest(new Request('http://localhost/admin/api/cms/login', {
+    const adminLogin = await handleCmsRequest(new Request('http://localhost/cms/api/cms/login', {
       method: 'POST',
       body: JSON.stringify({ email: 'rogue-admin@example.com', password: 'rogue-admin-phrase' }),
       headers: { 'content-type': 'application/json' },
@@ -674,7 +674,7 @@ describe('CMS handlers', () => {
     const ownerHashBefore = db.users.find((user) => user.role_id === 'owner')?.password_hash
 
     // Admin tries to overwrite the Owner's password — must be rejected with 403.
-    const passwordPatchReq = new Request(`http://localhost/admin/api/cms/users/${ownerId}`, {
+    const passwordPatchReq = new Request(`http://localhost/cms/api/cms/users/${ownerId}`, {
       method: 'PATCH',
       body: JSON.stringify({ password: 'attacker-chosen-password' }),
       headers: { 'content-type': 'application/json' },
@@ -688,7 +688,7 @@ describe('CMS handlers', () => {
     expect(db.users.find((user) => user.role_id === 'owner')?.password_hash).toBe(ownerHashBefore)
 
     // Admin tries to rewrite the Owner's email — also rejected.
-    const emailPatchReq = new Request(`http://localhost/admin/api/cms/users/${ownerId}`, {
+    const emailPatchReq = new Request(`http://localhost/cms/api/cms/users/${ownerId}`, {
       method: 'PATCH',
       body: JSON.stringify({ email: 'hijacked@example.com' }),
       headers: { 'content-type': 'application/json' },
@@ -701,7 +701,7 @@ describe('CMS handlers', () => {
     // Admin tries to delete the Owner — rejected with 403, NOT the
     // "last active owner" 409 (we want the row-level guard to fire first
     // so the surface stays closed even if multi-owner is added later).
-    const deleteReq = new Request(`http://localhost/admin/api/cms/users/${ownerId}`, {
+    const deleteReq = new Request(`http://localhost/cms/api/cms/users/${ownerId}`, {
       method: 'DELETE',
     })
     deleteReq.headers.set('cookie', adminCookie)
@@ -712,7 +712,7 @@ describe('CMS handlers', () => {
 
     // The Owner themself may still update their own row (e.g. rotate
     // password) — sanity check we didn't over-rotate.
-    const selfPatchReq = new Request(`http://localhost/admin/api/cms/users/${ownerId}`, {
+    const selfPatchReq = new Request(`http://localhost/cms/api/cms/users/${ownerId}`, {
       method: 'PATCH',
       body: JSON.stringify({ password: 'owner-rotated-password' }),
       headers: { 'content-type': 'application/json' },
@@ -732,12 +732,12 @@ describe('CMS handlers', () => {
   describe('session cookie Secure flag', () => {
     async function loginThen(): Promise<string> {
       const db = makeFakeDb()
-      await handleCmsRequest(new Request('http://localhost/admin/api/cms/setup', {
+      await handleCmsRequest(new Request('http://localhost/cms/api/cms/setup', {
         method: 'POST',
         body: JSON.stringify({ siteName: 'Example', email: 'o@example.com', password: 'long-enough-password' }),
         headers: { 'content-type': 'application/json' },
       }), db)
-      const res = await handleCmsRequest(new Request('http://localhost/admin/api/cms/login', {
+      const res = await handleCmsRequest(new Request('http://localhost/cms/api/cms/login', {
         method: 'POST',
         body: JSON.stringify({ email: 'o@example.com', password: 'long-enough-password' }),
         headers: { 'content-type': 'application/json' },
@@ -767,12 +767,12 @@ describe('CMS handlers', () => {
 
     it('ignores a spoofed X-Forwarded-Proto: https when no https public origin is configured', async () => {
       const db = makeFakeDb()
-      await handleCmsRequest(new Request('http://localhost/admin/api/cms/setup', {
+      await handleCmsRequest(new Request('http://localhost/cms/api/cms/setup', {
         method: 'POST',
         body: JSON.stringify({ siteName: 'Example', email: 'o@example.com', password: 'long-enough-password' }),
         headers: { 'content-type': 'application/json' },
       }), db)
-      const res = await handleCmsRequest(new Request('http://localhost/admin/api/cms/login', {
+      const res = await handleCmsRequest(new Request('http://localhost/cms/api/cms/login', {
         method: 'POST',
         body: JSON.stringify({ email: 'o@example.com', password: 'long-enough-password' }),
         headers: { 'content-type': 'application/json', 'x-forwarded-proto': 'https' },
@@ -784,12 +784,12 @@ describe('CMS handlers', () => {
     it('logout cookie also gets Secure when an https public origin is configured', async () => {
       configurePublicOrigins(['https://cms.example.com'])
       const db = makeFakeDb()
-      await handleCmsRequest(new Request('http://localhost/admin/api/cms/setup', {
+      await handleCmsRequest(new Request('http://localhost/cms/api/cms/setup', {
         method: 'POST',
         body: JSON.stringify({ siteName: 'Example', email: 'o@example.com', password: 'long-enough-password' }),
         headers: { 'content-type': 'application/json' },
       }), db)
-      const loginRes = await handleCmsRequest(new Request('http://localhost/admin/api/cms/login', {
+      const loginRes = await handleCmsRequest(new Request('http://localhost/cms/api/cms/login', {
         method: 'POST',
         body: JSON.stringify({ email: 'o@example.com', password: 'long-enough-password' }),
         headers: { 'content-type': 'application/json' },
@@ -797,7 +797,7 @@ describe('CMS handlers', () => {
       const sessionCookie = (loginRes.headers.get('set-cookie') ?? '')
         .split(';')[0] // just `instatic_admin_session=<token>`
 
-      const logoutRes = await handleCmsRequest(new Request('http://localhost/admin/api/cms/logout', {
+      const logoutRes = await handleCmsRequest(new Request('http://localhost/cms/api/cms/logout', {
         method: 'POST',
         headers: {
           'content-type': 'application/json',
@@ -827,7 +827,7 @@ describe('CMS handlers', () => {
      * environments, so we use that path here.
      */
     function loginRequest(email: string, password: string, ip: string, origin?: string): Request {
-      const req = new Request('http://localhost/admin/api/cms/login', {
+      const req = new Request('http://localhost/cms/api/cms/login', {
         method: 'POST',
         body: JSON.stringify({ email, password }),
         headers: { 'content-type': 'application/json' },
@@ -839,7 +839,7 @@ describe('CMS handlers', () => {
 
     async function makeDbWithAdmin() {
       const db = makeFakeDb()
-      await handleCmsRequest(new Request('http://localhost/admin/api/cms/setup', {
+      await handleCmsRequest(new Request('http://localhost/cms/api/cms/setup', {
         method: 'POST',
         body: JSON.stringify({ siteName: 'X', email: 'owner@example.com', password: 'long-enough-password' }),
         headers: { 'content-type': 'application/json' },

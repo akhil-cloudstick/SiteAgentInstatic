@@ -51,20 +51,20 @@ describe('isStateChangingMethod', () => {
 describe('expectedOrigin', () => {
   it('returns the configured canonical public origin', () => {
     configurePublicOrigins(['https://cms.example.com'])
-    const req = makeReq('http://app:3001/admin/api/cms/login', { method: 'POST' })
+    const req = makeReq('http://app:3001/cms/api/cms/login', { method: 'POST' })
     expect(expectedOrigin(req)).toBe('https://cms.example.com')
   })
 
   it('returns the first configured public origin when several are set', () => {
     configurePublicOrigins(['https://cms.example.com', 'https://www.example.com'])
-    const req = makeReq('http://app:3001/admin/api/cms/login', { method: 'POST' })
+    const req = makeReq('http://app:3001/cms/api/cms/login', { method: 'POST' })
     expect(expectedOrigin(req)).toBe('https://cms.example.com')
   })
 
   it('IGNORES a spoofed X-Forwarded-Host/Proto even from a trusted proxy peer', () => {
     configurePublicOrigins(['https://cms.example.com'])
     configureTrustedProxyCidrs(['172.16.0.0/12'])
-    const req = makeReq('http://app:3001/admin/api/cms/login', {
+    const req = makeReq('http://app:3001/cms/api/cms/login', {
       method: 'POST',
       headers: {
         'x-forwarded-proto': 'https',
@@ -76,7 +76,7 @@ describe('expectedOrigin', () => {
   })
 
   it('falls back to the Host header (with the req.url scheme) when nothing is configured', () => {
-    const req = makeReq('http://internal:3001/admin/api/cms/login', {
+    const req = makeReq('http://internal:3001/cms/api/cms/login', {
       method: 'POST',
       headers: { host: 'cms.example.com' },
     })
@@ -84,13 +84,13 @@ describe('expectedOrigin', () => {
   })
 
   it('falls back to the request URL when no public origin and no Host header are present', () => {
-    const req = makeReq('http://localhost:3001/admin/api/cms/login', { method: 'POST' })
+    const req = makeReq('http://localhost:3001/cms/api/cms/login', { method: 'POST' })
     expect(expectedOrigin(req)).toBe('http://localhost:3001')
   })
 
   it('does not consult forwarded headers in the fallback path either', () => {
     configureTrustedProxyCidrs(['172.16.0.0/12'])
-    const req = makeReq('http://app:3001/admin/api/cms/login', {
+    const req = makeReq('http://app:3001/cms/api/cms/login', {
       method: 'POST',
       headers: {
         host: 'app:3001',
@@ -121,13 +121,13 @@ describe('publicOriginIsHttps', () => {
 
 describe('originAllowed', () => {
   it('allows requests with no Origin header (curl, server-to-server)', () => {
-    const req = makeReq('http://localhost:3001/admin/api/cms/login', { method: 'POST' })
+    const req = makeReq('http://localhost:3001/cms/api/cms/login', { method: 'POST' })
     expect(originAllowed(req)).toBe(true)
   })
 
   it('allows requests whose Origin matches the configured public origin', () => {
     configurePublicOrigins(['https://cms.example.com'])
-    const req = makeReq('http://app:3001/admin/api/cms/login', {
+    const req = makeReq('http://app:3001/cms/api/cms/login', {
       method: 'POST',
       headers: { origin: 'https://cms.example.com' },
     })
@@ -136,11 +136,11 @@ describe('originAllowed', () => {
 
   it('matches against MULTIPLE configured origins (custom + platform domain both pass)', () => {
     configurePublicOrigins(['https://app.onrender.com', 'https://www.example.com'])
-    const platform = makeReq('http://app:3001/admin/api/cms/login', {
+    const platform = makeReq('http://app:3001/cms/api/cms/login', {
       method: 'POST',
       headers: { origin: 'https://app.onrender.com' },
     })
-    const custom = makeReq('http://app:3001/admin/api/cms/login', {
+    const custom = makeReq('http://app:3001/cms/api/cms/login', {
       method: 'POST',
       headers: { origin: 'https://www.example.com' },
     })
@@ -150,7 +150,7 @@ describe('originAllowed', () => {
 
   it('normalizes both sides so a trailing slash / case difference still matches', () => {
     configurePublicOrigins(['https://cms.example.com'])
-    const req = makeReq('http://app:3001/admin/api/cms/login', {
+    const req = makeReq('http://app:3001/cms/api/cms/login', {
       method: 'POST',
       headers: { origin: 'https://CMS.example.com/' },
     })
@@ -158,7 +158,7 @@ describe('originAllowed', () => {
   })
 
   it('allows requests from the localhost dev origin (Vite at :5173)', () => {
-    const req = makeReq('http://localhost:3001/admin/api/cms/login', {
+    const req = makeReq('http://localhost:3001/cms/api/cms/login', {
       method: 'POST',
       headers: { origin: 'http://localhost:5173' },
     })
@@ -172,7 +172,7 @@ describe('originAllowed', () => {
 
   it('rejects requests from a foreign origin', () => {
     configurePublicOrigins(['https://cms.example.com'])
-    const req = makeReq('http://app:3001/admin/api/cms/login', {
+    const req = makeReq('http://app:3001/cms/api/cms/login', {
       method: 'POST',
       headers: { origin: 'https://evil.example.com' },
     })
@@ -182,7 +182,7 @@ describe('originAllowed', () => {
   it('rejects an Origin that only matches a spoofed X-Forwarded-Host from a trusted proxy', () => {
     configurePublicOrigins(['https://cms.example.com'])
     configureTrustedProxyCidrs(['172.16.0.0/12'])
-    const req = makeReq('http://app:3001/admin/api/cms/login', {
+    const req = makeReq('http://app:3001/cms/api/cms/login', {
       method: 'POST',
       headers: {
         'x-forwarded-proto': 'https',
@@ -195,7 +195,7 @@ describe('originAllowed', () => {
   })
 
   it('falls back to the Host header when no public origin is configured', () => {
-    const req = makeReq('http://app:3001/admin/api/cms/login', {
+    const req = makeReq('http://app:3001/cms/api/cms/login', {
       method: 'POST',
       headers: { host: 'cms.example.com', origin: 'http://cms.example.com' },
     })
@@ -206,7 +206,7 @@ describe('originAllowed', () => {
 describe('clientIp', () => {
   it('reads the nearest untrusted XFF entry when the socket peer is trusted', () => {
     configureTrustedProxyCidrs(['10.0.0.0/8'])
-    const req = makeReq('http://app:3001/admin/api/cms/login', {
+    const req = makeReq('http://app:3001/cms/api/cms/login', {
       method: 'POST',
       headers: { 'x-forwarded-for': '203.0.113.7, 10.0.0.1' },
     })
@@ -215,13 +215,13 @@ describe('clientIp', () => {
   })
 
   it('returns null when no XFF header and no socket-IP stamp are present', () => {
-    const req = makeReq('http://localhost:3001/admin/api/cms/login', { method: 'POST' })
+    const req = makeReq('http://localhost:3001/cms/api/cms/login', { method: 'POST' })
     expect(clientIp(req)).toBeNull()
   })
 
   it('trims whitespace around XFF entries', () => {
     configureTrustedProxyCidrs(['10.0.0.0/8'])
-    const req = makeReq('http://app:3001/admin/api/cms/login', {
+    const req = makeReq('http://app:3001/cms/api/cms/login', {
       method: 'POST',
       headers: { 'x-forwarded-for': '  192.0.2.5  , 10.0.0.1' },
     })
@@ -230,14 +230,14 @@ describe('clientIp', () => {
   })
 
   it('falls back to the Bun socket-IP stamp when XFF is absent', () => {
-    const req = makeReq('http://localhost:3001/admin/api/cms/login', { method: 'POST' })
+    const req = makeReq('http://localhost:3001/cms/api/cms/login', { method: 'POST' })
     stampSocketIp(req, '127.0.0.1')
     expect(clientIp(req)).toBe('127.0.0.1')
   })
 
   it('uses XFF over the socket-IP stamp only when the socket peer is trusted', () => {
     configureTrustedProxyCidrs(['10.0.0.0/8'])
-    const req = makeReq('http://app:3001/admin/api/cms/login', {
+    const req = makeReq('http://app:3001/cms/api/cms/login', {
       method: 'POST',
       headers: { 'x-forwarded-for': '203.0.113.7' },
     })
@@ -247,7 +247,7 @@ describe('clientIp', () => {
 
   it('ignores a spoofed leftmost XFF entry preserved by a trusted proxy', () => {
     configureTrustedProxyCidrs(['10.0.0.0/8'])
-    const req = makeReq('http://app:3001/admin/api/cms/login', {
+    const req = makeReq('http://app:3001/cms/api/cms/login', {
       method: 'POST',
       headers: { 'x-forwarded-for': '198.51.100.200, 203.0.113.7' },
     })
@@ -256,7 +256,7 @@ describe('clientIp', () => {
   })
 
   it('ignores spoofed XFF from an untrusted direct client', () => {
-    const req = makeReq('http://localhost:3001/admin/api/cms/login', {
+    const req = makeReq('http://localhost:3001/cms/api/cms/login', {
       method: 'POST',
       headers: { 'x-forwarded-for': '203.0.113.7' },
     })
@@ -267,7 +267,7 @@ describe('clientIp', () => {
   it('is unaffected by configured public origins (CSRF and attribution are independent)', () => {
     configurePublicOrigins(['https://cms.example.com'])
     configureTrustedProxyCidrs(['10.0.0.0/8'])
-    const req = makeReq('http://app:3001/admin/api/cms/login', {
+    const req = makeReq('http://app:3001/cms/api/cms/login', {
       method: 'POST',
       headers: { 'x-forwarded-for': '203.0.113.7, 10.0.0.1' },
     })
@@ -278,13 +278,13 @@ describe('clientIp', () => {
 
 describe('stampSocketIp', () => {
   it('writes the address into a synthetic header that clientIp can read', () => {
-    const req = makeReq('http://localhost:3001/admin/api/cms/login', { method: 'POST' })
+    const req = makeReq('http://localhost:3001/cms/api/cms/login', { method: 'POST' })
     stampSocketIp(req, '::1')
     expect(clientIp(req)).toBe('::1')
   })
 
   it('clears the stamp when the address is null (no peer surfaced)', () => {
-    const req = makeReq('http://localhost:3001/admin/api/cms/login', { method: 'POST' })
+    const req = makeReq('http://localhost:3001/cms/api/cms/login', { method: 'POST' })
     stampSocketIp(req, '127.0.0.1')
     stampSocketIp(req, null)
     expect(clientIp(req)).toBeNull()
@@ -294,7 +294,7 @@ describe('stampSocketIp', () => {
     // A malicious client tries to inject the synthetic header. The boundary
     // must overwrite it with the real peer address (here we model that by
     // passing the real value into stampSocketIp).
-    const req = makeReq('http://localhost:3001/admin/api/cms/login', {
+    const req = makeReq('http://localhost:3001/cms/api/cms/login', {
       method: 'POST',
       headers: { 'x-bun-socket-ip': '198.51.100.1' },
     })
@@ -303,7 +303,7 @@ describe('stampSocketIp', () => {
   })
 
   it('strips any inbound spoof even when no real peer is available', () => {
-    const req = makeReq('http://localhost:3001/admin/api/cms/login', {
+    const req = makeReq('http://localhost:3001/cms/api/cms/login', {
       method: 'POST',
       headers: { 'x-bun-socket-ip': '198.51.100.1' },
     })

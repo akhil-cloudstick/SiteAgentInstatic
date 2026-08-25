@@ -302,7 +302,7 @@ export interface ChangeManifestEntry {
 }
 
 /**
- * Response for `GET /admin/api/cms/dashboard/changes`.
+ * Response for `GET /cms/api/cms/dashboard/changes`.
  *
  *   • `rows`  — newest first, capped at the widget's visible window.
  *   • `total` — how many changes are in this version overall (may exceed

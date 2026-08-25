@@ -1,7 +1,7 @@
 /**
  * Site bundle archive import endpoint.
  *
- *   POST /admin/api/cms/import/archive?strategy=<strategy>
+ *   POST /cms/api/cms/import/archive?strategy=<strategy>
  *
  * Accepts the user-facing ZIP archive emitted by `/cms/api/cms/export`.
  * The manifest is the first stored entry, so the handler can validate the

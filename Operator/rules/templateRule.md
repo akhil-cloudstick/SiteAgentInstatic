@@ -4,6 +4,10 @@ This is the authoritative contract for building a website so it imports into **I
 
 Build to this rule and a page imports pixel-perfect with no manual fixes. Break it and the importer silently drops or blanks part of the page.
 
+> **Verified against: Instatic 0.0.16 · OpenDesign 0.20.0.** Every behaviour below was
+> read off the importer source at these versions. If you upgrade either one, re-check
+> this rule against `Instatic/src/core/htmlImport/` and `Instatic/src/core/siteImport/`.
+
 ---
 
 ## The one thing to understand first (why these rules exist)
@@ -145,6 +149,11 @@ The importer strips your `<script>`s from the **editing canvas**, so any content
 <style>.reveal{animation:fadeUp .6s ease both} @keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:none}}</style>
 ```
 
+### 11. Non-YouTube `<iframe>` embeds
+Vimeo, Google Maps, Calendly, booking and chat widgets. This is the sneakiest failure in this document: the iframe imports cleanly and still displays in the editor, so nothing looks wrong until the site is live. Published pages ship `frame-src 'none'` and **only a YouTube video block lifts it** — every other embed renders **blank**. No attribute opts a different provider in.
+
+✅ Use YouTube when it's video; for anything else ship a **linked image** (a static map image or screenshot wrapped in `<a href>`). See **Video & embeds** below.
+
 ---
 
 ## ✅ What imports perfectly (use freely)
@@ -156,9 +165,76 @@ The importer strips your `<script>`s from the **editing canvas**, so any content
 - `@media` (site breakpoints become responsive overrides; other queries become reusable conditions), `@supports`, `@container`, `@keyframes`.
 - `transition`, `animation`, `transform`, `position: sticky`, `display:grid`/`flex`, gradients, `url()` backgrounds, pseudo-classes/elements, `:has()`.
 
-**Selectors — style each component with a single semantic class.** Only a **single bare class** (`.hero`) becomes an editable/bindable rule the tenant can tweak per element. Compound/descendant/pseudo/element selectors (`.hero .title`, `h1`, `a:hover`) still apply visually but import as **ambient** (global) rules — not per-node editable. **Give every text element its own class and style it through that class** — never reach it with a descendant selector (see "Editability is automatic" below; this is checked and blocks the share).
+**Selectors — style each component with a single semantic class.** A rule becomes editable by **binding to the rightmost class in its selector**: `.hero-title` binds to `hero-title`, `.btn:hover` binds to `btn`, `.stat-item .stat-value` binds to `stat-value`, and `.hero h1` binds to `hero`. A selector with **no class at all** (`h1`, `a:hover`), or whose only classes sit inside a function like `:is(.a, .b)`, imports as an **ambient** (global) rule — it still renders, but no single element owns it, so editing it changes every match at once.
 
-**HTML content** — real semantic elements each become an editable block: `h1`–`h6`, `p`, `a`, `img`, `button`, `ul/ol/li`, `section/div/article/main/header/footer/nav/aside`, inline `svg` (icons), forms & inputs, tables. `id`, `data-*`, `aria-*`, and `role` are preserved (so behavioral scripts keep working).
+Three consequences to build around:
+
+- **A bare `.name` wins the name.** Only one rule per class name is editable. Write `.card { … }` and `.card:hover { … }` and the bare one takes the slot while the variant becomes ambient — exactly what you want.
+- **…but a descendant rule claims the slot when no bare rule exists.** `.card strong { color:red }` with no `.card { … }` anywhere registers as the editable rule *named `card`* — so the tenant selects the card, edits it, and restyles the `<strong>` instead. Always declare the bare class.
+- **Comma lists split.** `.a, .b { … }` becomes two independent editable rules; `.a:hover, .a:focus { … }` stays one rule bound to `a`.
+
+**Give every text element its own class and style it through that class** — never reach it with a descendant selector (see "Editability is automatic" below; this is checked and blocks the share).
+
+- **What makes a rule editable: THE SUBJECT OF THE SELECTOR, not "does it contain a class".** The *subject* is the **last simple selector** — the thing being styled. A rule is an editable class rule **only when its subject is a class**. Everything else imports as an `ambient` rule: not editable, and not reliably applied in the editor canvas.
+
+  | selector | subject | imports as | editable? |
+  |---|---|---|---|
+  | `.section-title { … }` | `.section-title` | class rule `section-title` | ✅ yes |
+  | `h1, h2, h3 { … }` | `h1`/`h2`/`h3` | ambient | ❌ no |
+  | `.feature-card h3 { … }` | `h3` | **binds to `.feature-card`** | ❌ no — styles the card, not the h3 |
+  | `.section--dark .section-title { … }` | `.section-title` | ambient (compound context) | ❌ no |
+  | `.card > .card__title { … }` | `.card__title` | class rule `card__title` | ✅ yes |
+
+  **`.feature-card h3` is the trap.** It *contains* a class, so a naive "does this selector mention a class?" test passes it — but the subject is `h3`, so the declarations land on `.feature-card` and the heading gets nothing. Judging by "contains a class" instead of "subject is a class" is the single most common way a build passes its own review and still imports broken.
+
+- **The class must CARRY the declarations. An empty stub is not compliance.** `.od-title {}` next to `h1, h2, h3 { color: var(--text) }` satisfies nothing: a **bare tag selector imports as an `ambient` rule**, not a class rule, so the colour is neither editable nor reliably applied in the editor canvas — the heading renders with an inherited colour and can come out unreadable, while the same page looks perfect opened directly in a browser. Everything the element needs (`color`, `font-size`, `font-weight`, `font-family`, `line-height`, `letter-spacing`, `margin`) belongs **inside its own class rule**.
+- **Never let a bare tag selector be the only source of a text element's typography or colour.** `h1, h2, h3, h4, h5 { … }`, `p { … }`, `a { … }`, `body { color: … }` may set *inherited defaults* only. Every heading, paragraph, link and label still needs its own class repeating what it actually needs.
+
+  ❌ **Wrong** — the class exists but is empty, so the real styling rides on a tag rule:
+  ```html
+  <h2 class="od-title section-title">On-demand configurations</h2>
+  ```
+  ```css
+  h1, h2, h3, h4, h5 { font-family: var(--font-heading); font-weight: 800; color: var(--text); }
+  .od-title {}          /* ← stub only: nothing to edit, nothing applied */
+  .section-title {}
+  ```
+
+  ✅ **Correct** — the unique class owns the declarations:
+  ```css
+  .od-title {
+    font-family: var(--font-heading);
+    font-size: clamp(1.8rem, 3.5vw, 2.6rem);
+    font-weight: 800;
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+    color: var(--text);
+  }
+  ```
+
+  Compare: `.section-head .section-sub { color: var(--text-soft) }` imports as an **editable class rule** bound to `section-sub` and renders correctly, because the subject of the selector is a class. `h1, h2, … { color: var(--text) }` imports as **ambient** and does not. Same page, same token — the only difference is whether a class is the subject.
+
+#### Prove it — the text-colour audit (run this on EVERY page before handover)
+
+Do not hand over on the strength of "it looks right in a browser": a browser applies tag and descendant rules that the CMS does not. Audit the elements instead.
+
+**The test — per ELEMENT, not per rule.** For every `h1`–`h6`, `p`, `li`, `blockquote`, `td`, `th`, `figcaption` on the page, at least one of the classes in its `class=""` must have a **bare rule** — selector exactly `.thatclass`, nothing else — that declares a concrete `color` **and** `font-family`. If none does, that element is broken on import.
+
+Run it as three deterministic passes over each page's own `<style>` block:
+
+1. **Collect the ambient tags.** Every rule whose selector list is nothing but bare tags (`h1, h2, h3 { … }`, `p { … }`) and that sets a concrete `color`. Record those tag names. These are the tags whose colour will NOT survive import.
+2. **Collect the coloured classes.** Every rule whose selector is **exactly one class and nothing else** (`.section-title { … }` — not `.a .b`, not `.a.b`, not `.a h2`) and that sets a concrete `color` (a value, not `inherit`/`initial`/`unset`/`currentColor`). Record those class names.
+3. **Audit every element** whose tag is in set 1. It passes only if at least one class in its `class=""` is in set 2. Anything else is a defect: fix that element by moving the declarations onto one of its own classes.
+
+Why per-element and not "strip the stylesheet and re-render":
+
+- **The wrong test — this is how a build passes its own review and still imports broken:** "delete every rule with no class *anywhere* in its selector, then re-render". That keeps `.feature-card h3`, so the stripped page looks perfect while the real import is not. A recent 52-page batch shipped on exactly this test: it reported 13 ambient rules and a clean render, and **34 of the 52 pages were still broken**.
+- A compound or descendant rule is **not** a substitute for the bare rule. `.section--dark .section-title { color:#fff }` is a contextual variant; the base colour must still live on bare `.section-title`.
+- Per page, assert **0 failing elements**. Report the per-page count in your handover notes — a pass on the homepage says nothing about the other 51.
+
+**Scale rule:** this is mechanical — run it over the whole batch, never a sample. In a recent 52-page batch the role classes were folded correctly and **34 pages were still broken**, because the fix was applied per role-class instead of per element. At 100–500 pages a sampled check is worthless; only a per-page count is evidence.
+
+**HTML content** — real semantic elements each become an editable block: `h1`–`h6`, `p`, `a`, `img`, `button`, `ul/ol/li`, `section/div/article/main/header/footer/nav/aside`, inline `svg` (icons), forms & inputs, tables, `video` and YouTube embeds. `id`, `data-*`, `aria-*`, and `role` are preserved (so behavioral scripts keep working) — including on `<form>`.
 
 **Behavioral JavaScript survives and re-runs on the published page.** Use it freely for *behavior on markup that already exists*: menu toggles, tabs, accordions, carousels, nav active-state, counters, image swaps that read from the DOM. Use `classList` / `setAttribute` / `aria-*` / `addEventListener`. Prefer plain (classic) `<script>` over ES modules. Load libraries (GSAP, Swiper, Alpine…) from a **CDN `<script>`**, never npm.
 
@@ -196,8 +272,53 @@ Define every brand color as a `:root` custom property and use it via `var(--…)
 
 ### Images
 - Use real `<img src="/images/x.jpg" alt="…">` (and `srcset`) for anything the tenant should see or swap → editable **Image block**, uploaded to `/uploads/…`. Byte-identical images are de-duplicated on re-share (no duplicate uploads).
-- `background-image: url(/images/x.jpg)` works and is self-hosted, but is **not** an editable image (no alt, no media picker). Use it for decorative backgrounds; use `<img>` for content.
+- **A photo is NEVER a `background-image`.** `background-image` may only carry a **gradient, pattern or texture**. Any **photograph, logo, product shot, screenshot or portrait** must be a real `<img>` — a CSS background imports as an un-editable style declaration: no alt, no Image block, no media picker, so the tenant can never swap it. "It sits behind text" does **not** make it decorative.
+- **Full-bleed / banner / hero photos are the trap.** A photo behind heading text is still content. Use an `<img>` positioned to fill, and keep the gradient scrim as CSS:
+  ```html
+  <div class="banner">
+    <img class="banner__bg" src="/images/banner-media.jpg" alt="Media &amp; entertainment">
+    <div class="banner__overlay"></div>   <!-- gradient: CSS is correct here -->
+    <div class="banner__content">…</div>
+  </div>
+  ```
+  ```css
+  .banner            { position: relative; overflow: hidden; isolation: isolate; }
+  .banner__bg        { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: -2; }
+  .banner__overlay   { position: absolute; inset: 0; z-index: -1; background: linear-gradient(90deg, rgba(0,15,43,.95), rgba(0,15,43,.12)); }
+  ```
+  Same rendering, and the tenant gets a normal editable Image block.
+- ❌ Not: `background-image: url(…/photo.jpg)`, `background: … url(…/photo.jpg) center/cover …`, or a `--*-img: url(…/photo.jpg)` token feeding either — on any element, at any breakpoint. ✅ Fine: `background-image: linear-gradient(…)`, repeating patterns, and `.svg` textures/noise.
 - Allowed: **jpg, png, webp, gif, svg** (+ mp4/webm), at a clean web-root path (`/images/…`) with **no** `?query`/`#fragment`, not `data:`. A **real photo URL is fine** — OD saves it into `public/images/` and rewrites the ref before publish (see ❌ §7).
+
+### Video & embeds
+
+- `<video src="/media/clip.mp4" controls>` — or `<video><source src="…"></video>` — imports as a native **Video block**. `autoplay`, `loop`, `muted`, `controls` and `playsinline` are all preserved. `<source>` children are consumed into the block, so they don't survive as separate elements.
+- **YouTube** `<iframe src="https://www.youtube.com/embed/…">` imports as that same native Video block. `youtube.com`, `m.youtube.com`, `youtube-nocookie.com` and `youtu.be` all count, and `?rel=0` / `?playsinline=1` carry across.
+- ❌ **Every other `<iframe>` — Vimeo, Google Maps, Calendly, a booking or chat widget — renders BLANK on the published page.** This one is easy to miss because nothing looks wrong earlier: it imports without complaint and displays in the editor. But published pages ship `frame-src 'none'`, and **only a YouTube video block lifts it**. There is no attribute that opts a different embed in.
+  - ✅ Use YouTube when it's video. For a map, booking or signup widget, ship a **linked image** instead — a static map image or a screenshot wrapped in an `<a href>` to the real service — so the section still says something and still works.
+- Remote `https:` media is fine for `<img>`, `<video>` and `<audio>`: published pages allow `img-src` and `media-src` from `'self'`, `data:` and `https:`.
+
+### Forms
+
+A `<form>` imports as a real Form block, and its safe `data-*` / `aria-*` attributes survive — so a progressive-enhancement script bound to `form[data-…]` keeps working after import.
+
+By default a form stays **custom**: it posts to its own `action` / `method` exactly as you authored it. An imported third-party form never silently becomes a CMS endpoint. To bind one to a CMS data table instead, mark it up:
+
+```html
+<form class="contact-form"
+      data-instatic-form-mode="cms"
+      data-instatic-target-table="contact_submissions"
+      data-instatic-success-message="Thanks — we'll be in touch.">
+  <label class="contact-form-name-label" for="name">Name</label>
+  <input class="contact-form-name" id="name" name="name" type="text" required>
+  <button class="contact-form-submit" type="submit">Send</button>
+</form>
+```
+
+- Use `data-instatic-success-redirect="/thanks.html"` in place of the message to send them to a page instead.
+- The `data-instatic-*` names above are **reserved** — the Form block regenerates them from its own settings, so never reuse them for your own purposes.
+- `<button type="submit|reset|button">` round-trips, so keep the type accurate.
+- On a `<select>`, write `value=""` explicitly on a placeholder option. An `<option>` with **no** `value` attribute takes its own label as the value, which turns "Choose a service" into a real submitted answer.
 
 ### Layer naming — every block must say what it is
 
@@ -330,14 +451,16 @@ Prefer a meaningful unique name where one exists (`.stat-label-departures`); a n
 
 #### 4. Style through that single class — never a descendant selector
 
-Only a **single bare class** (`.stat-value`) imports as an editable rule the tenant can change on one element. A descendant selector (`.stat-item strong`) imports as an **ambient** rule: it still renders correctly, but editing it changes **every** element it matches, so the tenant can't restyle just the one they clicked.
+Declare a **bare class** (`.stat-value`) and put the declarations on it. A descendant selector that reaches a text element through its **tag** (`.stat-item strong`) never binds to that text at all — it binds to `stat-item`, the nearest class in the selector. So the tenant clicks the `<strong>` and the edit lands on the whole stat block instead. They cannot restyle the one run they selected.
 
 ```css
-/* ❌ edits hit all four stat blocks at once */
+/* ❌ binds to `stat-item`, not to the text — edits hit all four stat blocks */
 .stat-item strong { font-size: 22px; color: var(--fg); }
-/* ✅ edits hit exactly the element the tenant selected */
+/* ✅ binds to exactly the element the tenant selected */
 .stat-value { font-size: 22px; color: var(--fg); }
 ```
+
+Reaching one class from another (`.stat-item .stat-value`) *does* bind — to `stat-value` — but still declare the bare `.stat-value { … }` too. Otherwise that descendant rule claims the name, and the tenant's edits only apply while the element stays inside `.stat-item`.
 
 ### Shared blocks — mark anything that repeats: `data-shared="name"`
 
@@ -371,6 +494,19 @@ Keep `<nav>`/`<header>`/`<footer>` structurally identical across pages (they get
 </script>
 ```
 
+### If you use a CMS loop, keep it out of the table
+
+`<instatic-loop>` repeats its inner markup once per row. Author one **inside** a `<table>`, `<tbody>` or `<tr>` and the HTML parser refuses to keep a custom element there: it relocates the loop to just before the table and leaves the `<tr>` children behind. Both halves survive as valid markup, so the import succeeds and every check passes — and the published table carries exactly **one blank row**.
+
+```html
+<!-- ❌ the parser moves the loop out; the table publishes one empty row -->
+<table><tbody>
+  <instatic-loop data-source-id="products"><tr>…</tr></instatic-loop>
+</tbody></table>
+```
+
+Put the loop **around the whole `<table>`**, or render the rows as a list instead. A loop with nothing inside it, or with a `data-source-id` naming no registered source, is now reported at import time rather than quietly publishing an empty section.
+
 ### Page `<head>`
 Only `<title>` is read on import; favicon, meta description/OG, canonical, preload, and theme-color are ignored by the importer (set those in the CMS/publish settings, not relied on from the source).
 
@@ -391,6 +527,8 @@ Don't block their workflow and don't lecture them. Figure out the compliant way 
 - [ ] No modern color function (`oklch/color-mix/…`) bare inside a `background`/`border`/`font` **shorthand** — use a `var(--token)` or the longhand.
 - [ ] Fonts via Google **`/css2`** `<link>` or self-hosted `@font-face` — no `@fontsource`, no other CDNs.
 - [ ] Images are real `<img>` in **jpg/png/webp/gif/svg** (no avif/ico, no `data:`/`?query`) — a local `/images/…` path or a real photo URL (OD saves the file in).
+- [ ] **No `<iframe>` except YouTube** — every other embed (Vimeo, Maps, Calendly, chat widgets) publishes blank under `frame-src 'none'`; ship a linked image instead.
+- [ ] Forms keep their own `action` unless deliberately bound with `data-instatic-form-mode="cms"` + `data-instatic-target-table`; placeholder `<option>`s carry an explicit `value=""`.
 - [ ] **Every section is visible with CSS alone** — no JS-dismissed loading overlay, no `opacity:0`/`visibility:hidden` content revealed only by a JS-added class.
 - [ ] No hashed/`_astro` imports, no SPA hydration root.
 - [ ] JavaScript is **behavior only** on existing markup (menus, tabs, swaps); no `on*=` inline handlers; no asset paths hardcoded in script text.
@@ -399,6 +537,6 @@ Don't block their workflow and don't lecture them. Figure out the compliant way 
 - [ ] **Every text element also has a UNIQUE class, listed first** (`class="stat-label-4 stat-label"`), declared in the CSS even if empty — otherwise editing one label restyles every label sharing that class.
 - [ ] **Every repeated block carries `data-shared="a-name"`** (CTA band, contact strip, repeated card) and its copies are byte-identical — so the tenant edits it once instead of on every page.
 - [ ] **`<header>`/`<nav>`/`<footer>` are byte-identical on every page** — same markup AND same classes (including the unique ones; use reserved `site-chrome-*` names). Only `is-active` may differ. Otherwise they stop being one shared component and each page keeps its own copy.
-- [ ] **Style text through that single class, never a descendant selector** — `.stat-label { }`, not `.stat-item strong { }` (a descendant rule edits every match at once).
+- [ ] **Style text through that single class, never a descendant selector** — `.stat-label { }`, not `.stat-item strong { }` (a tag-targeted descendant binds to the *ancestor* class, so the tenant's edit lands on the wrong block). Every class you style is also declared **bare** somewhere.
 - [ ] **Every structural element carries a meaningful class** (`hero`, `services-grid`, `service-card-title`) — outer sections *and* nested blocks — so the Layers panel never reads "Container". Never rely on `container`/`wrapper`/`row`/`grid` alone.
 - [ ] Effects (animation/3D/filters/carousels) built with CSS + behavioral JS, never content-generating JS.

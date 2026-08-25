@@ -104,6 +104,8 @@ function isVelaChatModelId(modelId: string): boolean {
   // Remove this filter when AMR grows first-class image/video execution.
   const id = modelId.toLowerCase();
   if (id.startsWith('gpt-image-')) return false;
+  if (id.startsWith('nano-banana-')) return false;
+  if (id.startsWith('seedream-')) return false;
   if (id.startsWith('seedance-')) return false;
   if (id.startsWith('doubao-seedance-')) return false;
   if (id.startsWith('veo-')) return false;
@@ -198,43 +200,11 @@ function extractModelMetadata(item: unknown): ModelMetadata | null {
   const metadata = isRecord(item.metadata) ? item.metadata : item;
   const cost = parseModelCost(metadata.cost);
   const capability = parseModelCapability(metadata.capability);
-  const contextWindowTokens = extractPositiveModelLimit(item, [
-    'contextWindowTokens',
-    'context_window_tokens',
-    'context_length',
-    'contextLength',
-    'context',
-  ]);
-  const maxOutputTokens = extractPositiveModelLimit(item, [
-    'maxOutputTokens',
-    'max_output_tokens',
-    'output',
-  ]);
-  if (!cost && !capability && !contextWindowTokens && !maxOutputTokens) return null;
+  if (!cost && !capability) return null;
   return {
     ...(cost ? { cost } : {}),
     ...(capability ? { capability } : {}),
-    ...(contextWindowTokens ? { contextWindowTokens } : {}),
-    ...(maxOutputTokens ? { maxOutputTokens } : {}),
   };
-}
-
-function extractPositiveModelLimit(
-  item: Record<string, unknown>,
-  keys: string[],
-): number | null {
-  const metadata = isRecord(item.metadata) ? item.metadata : null;
-  const limit = isRecord(item.limit) ? item.limit : null;
-  for (const source of [metadata, limit, item]) {
-    if (!source) continue;
-    for (const key of keys) {
-      const value = source[key];
-      if (typeof value === 'number' && Number.isInteger(value) && value > 0) {
-        return value;
-      }
-    }
-  }
-  return null;
 }
 
 function withPriceDerivedCostMetadata(
@@ -494,20 +464,14 @@ function openCodeModelPrice(
 > | null {
   if (!isRecord(model)) return null;
   const inputPriceUsdPerMillion = extractInputPriceUsdPerMillion(model);
+  if (inputPriceUsdPerMillion === undefined) return null;
   const outputPriceUsdPerMillion = extractOutputPriceUsdPerMillion(model);
   const metadata = withPriceDerivedCostMetadata(
     extractModelMetadata(model),
     inputPriceUsdPerMillion,
   );
-  if (
-    inputPriceUsdPerMillion === undefined &&
-    outputPriceUsdPerMillion === undefined &&
-    metadata === null
-  ) {
-    return null;
-  }
   return {
-    ...(inputPriceUsdPerMillion === undefined ? {} : { inputPriceUsdPerMillion }),
+    inputPriceUsdPerMillion,
     ...(outputPriceUsdPerMillion === undefined ? {} : { outputPriceUsdPerMillion }),
     ...(metadata === null ? {} : { metadata }),
   };
@@ -706,4 +670,9 @@ export const amrAgentDef = {
   // provider is still working. Keep the outer chat watchdog aligned with the
   // 30-minute ACP stage timeout so the daemon does not fail the run first.
   inactivityTimeoutMs: 30 * 60 * 1000,
+  // Once the ACP handshake has completed and session/prompt is waiting on the
+  // provider, transport/status heartbeats must not leave the UI in Preparing
+  // indefinitely. Two minutes leaves conservative provider-startup headroom
+  // while still bounding the user's wait and one safe same-run retry.
+  firstOutputTimeoutMs: 2 * 60 * 1000,
 } satisfies RuntimeAgentDef;

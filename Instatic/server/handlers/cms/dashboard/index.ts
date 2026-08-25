@@ -1,14 +1,14 @@
 /**
  * Dashboard stats endpoints — per-domain.
  *
- *   GET /admin/api/cms/dashboard/pages
- *   GET /admin/api/cms/dashboard/posts
- *   GET /admin/api/cms/dashboard/media
- *   GET /admin/api/cms/dashboard/plugins
- *   GET /admin/api/cms/dashboard/storage
- *   GET /admin/api/cms/dashboard/publish-lineup
- *   GET /admin/api/cms/dashboard/activity
- *   GET /admin/api/cms/dashboard/changes
+ *   GET /cms/api/cms/dashboard/pages
+ *   GET /cms/api/cms/dashboard/posts
+ *   GET /cms/api/cms/dashboard/media
+ *   GET /cms/api/cms/dashboard/plugins
+ *   GET /cms/api/cms/dashboard/storage
+ *   GET /cms/api/cms/dashboard/publish-lineup
+ *   GET /cms/api/cms/dashboard/activity
+ *   GET /cms/api/cms/dashboard/changes
  *
  * One endpoint per dashboard widget data domain. Each runs only the
  * queries that domain needs, so:

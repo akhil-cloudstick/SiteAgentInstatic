@@ -1,10 +1,10 @@
 <h1 align="center">Open Design: Açık kaynaklı Claude Design alternatifi</h1>
 
-> 🔥 **Open Design 0.13.0 — _Stay in Flow_ burada.** Uzun tasarım oturumları eskiden her kesintide bozulurdu — bir çalıştırma yerini kaybederdi, model seçici tahmin yürütmenize yol açardı, bir dışa aktarma bir sapma daha gerektirirdi. 0.13.0 oturumu canlı tutar: Codex / OpenCode / Pi / Open Design Cloud çalıştırmalarını turlar boyunca sürdürün, doğru modeli daha hızlı seçin ve ekran görüntüsüyle desteklenen PPTX / PDF dosyalarını uygulamadan çıkmadan teslim edin. [0.13.0'ı indir](https://github.com/nexu-io/open-design/releases) · [Sürüm notları](https://github.com/nexu-io/open-design/releases/tag/open-design-v0.13.0)
+> ⚡ **[Open Design Cloud — resmî model servisi.](https://open-design.ai/zh/pricing/)** Tek bir yüklemeyle Open Design içinde hem agent hem de görsel modelleri kullanın: agent'lar için GPT, Claude ve DeepSeek; görseller için GPT Image 2.0, Seedream 5.0 Pro ve Nano Banana 2.0.
 >
-> ⚡ **Open Design Cloud — resmî model servisi.** Tek bir yüklemeyle GPT, Claude, Gemini ve DeepSeek'i doğrudan Open Design içinde kullanın: 20+ amiral gemisi model, sıfır yapılandırma, gerçek token kullanımına göre faturalandırma. [Open Design Cloud'yi dene](https://open-design.ai/cloud/)
+> 🚀 **[DeepSeek V4 Flash ve V4 Pro artık kullanılabilir.](https://open-design.ai/zh/pricing/)** Prototipler, sunumlar, tasarım sistemleri ve günlük agent görevlerinde üst düzey zekâyı kullanın. Open Design üyeleri her iki modeli de uygulama içinde iki hafta boyunca sınırsız kullanabilir.
 >
-> 🏅 **Open Design Fellow programı artık açık.** Siz de tasarımın açık olması gerektiğine inanıyorsanız — bir Open Design Fellow olun, ürünü çekirdek ekiple birlikte şekillendirin ve daha fazla insanın tasarımın geleceğini tanımlamaya katılmasına yardımcı olun. Ayrıntılar → [`MAINTAINERS.md`](../../MAINTAINERS.md) ve [Discord](https://discord.gg/mHAjSMV6gz).
+> 🧩 **[DeepSeek Harness artık destekleniyor.](https://open-design.ai/zh/agents/deepseek-harness-design/)** DeepSeek'in resmî `dsh` Agent Harness'ini yapılandırılmış düşünme, araç çağrıları, model keşfi, iptal ve oturum devam ettirme özellikleriyle Open Design'a yerel bir runtime olarak bağlayın. Üretilen dosyalar canlı önizleme ve teslimat için Open Design iş akışında kalır.
 
 <p align="center">
   <img src="https://repo-assets.open-design.ai/resources/images/hero.png" alt="Open Design hero banner" width="100%" />
@@ -42,15 +42,15 @@ Aynı zamanda **ajan çağı için Figma alternatifidir** — bir tuval üzerind
 
 ## Ürün turu
 
-Open Design'ın ne olduğuna ve ne yaptığına hızlı bir bakış. **Home**'dan başlayın, tekrar eden iş akışlarını **Automation** ile düzenleyin, **Design System** içinde bir marka sözleşmesi damıtın ve **Plugins** ile **entegrasyonlar** ile genişletin; herhangi bir projenin **Studio**'su içinde, aynı tasarım sistemi prototipler, canlı artifact'ler, HyperFrames, sunum desteleri ve görseller akıtır.
+Open Design'ın temel iş akışına hızlı bir bakış. **Home** üzerinde bir brief ile başlayın, **Plugins** içinde yeniden kullanılabilir becerileri keşfedin ve marka referanslarını bir **Design System** haline getirin. Ardından prototipleri, sunumları, mobil uygulamaları, görselleri, belgeleri ve HyperFrame'leri tek yerde oluşturmak ve geliştirmek için bir projenin **Studio** alanına girin.
 
 ### Temel sayfalar
 
 <table>
 <tr>
 <td valign="top">
-<img src="https://repo-assets.open-design.ai/resources/images/product/home.png" alt="Home page" /><br/>
-<sub><b>Home</b> — genel bakış giriş noktası. Bir beceri ve bir tasarım sistemi seçin, özeti yazın ve her şeyi tek bir yerden başlatın.</sub>
+<img src="../../docs/screenshots/product-tour/home.png" alt="Home" /><br/>
+<sub><b>Home</b> — Bir artifact türü seçin, brief'i girin ve başlamadan önce tasarım sistemini, çalışma dizinini ve modeli ayarlayın.</sub>
 </td>
 </tr>
 </table>
@@ -58,53 +58,52 @@ Open Design'ın ne olduğuna ve ne yaptığına hızlı bir bakış. **Home**'da
 <table>
 <tr>
 <td width="50%" valign="top">
-<img src="https://repo-assets.open-design.ai/resources/images/product/automation.png" alt="Automation page" /><br/>
-<sub><b>Automation</b> — tekrar eden tasarım iş akışlarını yeniden kullanılabilir, zamanlanabilir otomasyonlara dönüştürün.</sub>
+<img src="../../docs/screenshots/product-tour/plugins.png" alt="Plugins" /><br/>
+<sub><b>Plugins</b> — Resmî becerilere kategoriye göre göz atın, katalogda arama yapın ve <code>Try it</code> ile bir iş akışı başlatın.</sub>
 </td>
 <td width="50%" valign="top">
-<img src="https://repo-assets.open-design.ai/resources/images/product/design-system.png" alt="Design System page" /><br/>
-<sub><b>Design System</b> — ekibinizin <code>DESIGN.md</code> dosyasını her çıktıyı şekillendiren bir marka sözleşmesine damıtın.</sub>
-</td>
-</tr>
-<tr>
-<td width="50%" valign="top">
-<img src="https://repo-assets.open-design.ai/resources/images/product/plugin.png" alt="Plugin page" /><br/>
-<sub><b>Plugin</b> — üretimi talep üzerine genişletmek için iş akışı eklentilerine göz atın, yükleyin ve dağıtın.</sub>
-</td>
-<td width="50%" valign="top">
-<img src="https://repo-assets.open-design.ai/resources/images/product/integrations.png" alt="Integrations page" /><br/>
-<sub><b>Integrations</b> — harici sistemleri ve MCP araçlarını bağlayın ve Open Design'ı herhangi bir IDE'den, betikten veya otomasyondan kullanın.</sub>
+<img src="../../docs/screenshots/product-tour/design-system.png" alt="Design System" /><br/>
+<sub><b>Design System</b> — Bir markanın görsel dilini çıkarıp geliştirin, sonucu önizleyin ve aynı workspace içinde onunla üretmeye devam edin.</sub>
 </td>
 </tr>
 </table>
 
 ### Studio — tek projede birçok artifact türü
 
-Bir projenin Studio'su içinde, aynı tasarım sistemi birden çok artifact türü akıtır:
+Bir projenin Studio alanında konuşma, üretilen dosyalar ve canlı önizleme altı artifact türü boyunca bir arada kalır:
 
 <table>
 <tr>
 <td width="50%" valign="top">
-<img src="https://repo-assets.open-design.ai/resources/images/product/studio-prototype.png" alt="Prototype" /><br/>
-<sub><b>Prototype</b> — tasarım sisteminizi okuyan ve yalıtılmış bir iframe içinde işlenen tek sayfalık HTML artifact'leri, anında önizlenebilir ve kaynak olarak indirilebilir.</sub>
+<img src="../../docs/screenshots/product-tour/studio-prototype.png" alt="Prototip" /><br/>
+<sub><b>Prototip</b> — Web deneyimleri üretin veya yeniden oluşturun, render edilen sayfayı inceleyin ve agent ile yerinde yineleyin.</sub>
 </td>
 <td width="50%" valign="top">
-<img src="https://repo-assets.open-design.ai/resources/images/product/studio-hyperframe.png" alt="HyperFrame" /><br/>
-<sub><b>HyperFrame</b> — programatik hareket ve animasyonlu grafikler, gerçek bir MP4'e işlenir (örn. 1920×1080 · 30fps).</sub>
+<img src="../../docs/screenshots/product-tour/studio-deck.png" alt="Sunum" /><br/>
+<sub><b>Sunum</b> — Çok slaytlı sunumlar oluşturun, küçük resimleri ve konuşmacı notlarını inceleyin ve hazır olduğunda dışa aktarın.</sub>
 </td>
 </tr>
 <tr>
 <td width="50%" valign="top">
-<img src="https://repo-assets.open-design.ai/resources/images/product/studio-ppt.png" alt="Deck" /><br/>
-<sub><b>Deck</b> — sayfa sayfa gezebileceğiniz, klavyeyle gezinebileceğiniz ve PPTX / PDF'ye dışa aktarabileceğiniz tanıtım desteleri.</sub>
+<img src="../../docs/screenshots/product-tour/studio-mobile-app.png" alt="Mobil uygulama" /><br/>
+<sub><b>Mobil uygulama</b> — Bir cihaz önizlemesinde mobil arayüzler üretip geliştirin; konuşma, çıktı dosyaları ve sonraki adımlar yanında kalsın.</sub>
 </td>
 <td width="50%" valign="top">
-<img src="https://repo-assets.open-design.ai/resources/images/product/studio-image.png" alt="Image" /><br/>
-<sub><b>Image</b> — yüksek çözünürlüklü üretim ve indirme ile marka düzeyinde görseller ve görsel varlıklar.</sub>
+<img src="../../docs/screenshots/product-tour/studio-image.png" alt="Görsel" /><br/>
+<sub><b>Görsel</b> — Proje konuşmasından görsel varlıklar üretin, sonucu tam boyutta önizleyin, ardından indirin veya açın.</sub>
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+<img src="../../docs/screenshots/product-tour/studio-document.png" alt="Belge" /><br/>
+<sub><b>Belge</b> — Özenli çok sayfalı kılavuzlar ve editoryal belgeler oluşturun, render edilen düzeni inceleyin ve hazır olduğunda dışa aktarın veya paylaşın.</sub>
+</td>
+<td width="50%" valign="top">
+<img src="../../docs/screenshots/product-tour/studio-hyperframe.png" alt="HyperFrame" /><br/>
+<sub><b>HyperFrame</b> — Kodla yönlendirilen hareketli grafikler oluşturun, animasyonu Studio içinde önizleyin ve tamamlanan videoyu dışa aktarın.</sub>
 </td>
 </tr>
 </table>
-
 ---
 
 ## Platform Uyumluluğu
@@ -116,10 +115,10 @@ Bir projenin Studio'su içinde, aynı tasarım sistemi birden çok artifact tür
 | [Claude Code](https://docs.anthropic.com/en/docs/claude-code) | ✅ Destekleniyor | `od mcp install claude` |
 | [Codex CLI](https://github.com/openai/codex) | ✅ Destekleniyor | `od mcp install codex` |
 | [DeepSeek Reasonix](https://github.com/esengine/DeepSeek-Reasonix) | ✅ Destekleniyor | `od mcp install reasonix` |
+| [Raven](https://github.com/EverMind-AI/Raven) | ✅ Destekleniyor | `od mcp install raven` |
 | [Cursor](https://www.cursor.com/cli) | ✅ Destekleniyor | `od mcp install cursor` |
 | [VS Code + GitHub Copilot](https://github.com/features/copilot) | ✅ Destekleniyor | `od mcp install copilot` |
 | [GitHub Copilot CLI](https://github.com/features/copilot/cli) | ✅ Destekleniyor | `od mcp install copilot` |
-| [Gemini CLI](https://github.com/google-gemini/gemini-cli) | ✅ Destekleniyor | `od mcp install gemini` |
 | [OpenCode](https://opencode.ai/) | ✅ Destekleniyor | `od mcp install opencode` |
 | [OpenClaw](https://github.com/openclaw/openclaw) | ✅ Destekleniyor | `od mcp install openclaw` |
 | [Antigravity](https://antigravity.google) | ✅ Destekleniyor | `od mcp install antigravity` |
@@ -152,16 +151,6 @@ Dört temel ürün kategorisi, tümü dizüstü bilgisayarınızda çalışan bi
 Varsayılan çıktı yüzeyi. `DESIGN.md` dosyanızı okuyan ve yalıtılmış bir iframe içinde işlenen tek sayfalık HTML artifact'leri.
 
 <table>
-<tr>
-<td width="50%" valign="top">
-<img src="../../docs/screenshots/01-entry-view.png" alt="Entry view" /><br/>
-<sub><b>Giriş görünümü</b> — bir beceri seçin, bir tasarım sistemi seçin, özeti yazın. Prototipler, panolar, sunum desteleri, mobil uygulamalar, dergi sayfaları için tek bir yüzey.</sub>
-</td>
-<td width="50%" valign="top">
-<img src="../../docs/screenshots/skills/mobile-onboarding.png" alt="Mobile onboarding" /><br/>
-<sub><b>Mobil prototip</b> — piksel hassasiyetinde iPhone 15 Pro çerçevesi, çok ekranlı akışlar. Ajan telefon çerçevesini asla yeniden çizmez; paylaşılan cihaz çerçeveleri <code>assets/frames/</code> içinde yer alır.</sub>
-</td>
-</tr>
 <tr>
 <td width="50%" valign="top">
 <img src="../../docs/screenshots/skills/dating-web.png" alt="Web prototype dating-web" /><br/>
@@ -304,8 +293,8 @@ Open Design'ı GUI'yi hiç açmadan kullanabilirsiniz — Claude Code, Codex, Cu
 ```bash
 # One-line install into the agent you're using:
 od mcp install <agent>
-# <agent> = claude | codex | cursor | copilot | openclaw | antigravity | gemini
-#         | pi | vibe | hermes | cline | kimi | trae | opencode
+# <agent> = claude | codex | reasonix | raven | cursor | copilot | openclaw | antigravity
+#         | pi | vibe | hermes | cline | kimi | kiro | trae | opencode
 ```
 
 Ardından, ajanın içinde:
@@ -681,7 +670,7 @@ Bakımcı kuralları, terfi kriterleri ve çıkış protokolü → [`MAINTAINERS
 Katılan herkese teşekkürler — kod, belge, geri bildirim, keskin bir issue, yeni bir beceri, yeni bir tasarım sistemi.
 
 <a href="https://github.com/nexu-io/open-design/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=nexu-io/open-design&max=500&columns=20&anon=1&cache_bust=2026-07-17" alt="Open Design contributors" />
+  <img src="https://contrib.rocks/image?repo=nexu-io/open-design&max=500&columns=20&anon=1&cache_bust=2026-08-04" alt="Open Design contributors" />
 </a>
 
 ---
@@ -706,9 +695,9 @@ Bu size otuz dakika kazandırdıysa, bir ★ verin. Yıldızlar kira ödemez —
 
 <a href="https://star-history.com/#nexu-io/open-design&Date">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=nexu-io/open-design&type=Date&theme=dark&cache_bust=2026-07-17" />
-    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=nexu-io/open-design&type=Date&cache_bust=2026-07-17" />
-    <img alt="Open Design star history" src="https://api.star-history.com/svg?repos=nexu-io/open-design&type=Date&cache_bust=2026-07-17" />
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=nexu-io/open-design&type=Date&theme=dark&cache_bust=2026-08-04" />
+    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=nexu-io/open-design&type=Date&cache_bust=2026-08-04" />
+    <img alt="Open Design star history" src="https://api.star-history.com/svg?repos=nexu-io/open-design&type=Date&cache_bust=2026-08-04" />
   </picture>
 </a>
 

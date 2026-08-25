@@ -67,6 +67,22 @@ function suppressThemeTransitions(root: HTMLElement): void {
   themeSwapTimer = window.setTimeout(clear, 250);
 }
 
+/**
+ * MMS default theme. Upstream 0.20.0 exports `FORCED_APP_THEME` and coerces
+ * every persisted value to it, because upstream ships light-only. The MMS
+ * re-skin ships both themes, so this is a DEFAULT, not a forcing value.
+ */
+export const DEFAULT_APP_THEME = 'light' as const;
+
+/**
+ * Validate a persisted theme. Unlike upstream's version this PRESERVES a
+ * stored 'dark' / 'system' choice — those are live settings here, not dead data.
+ */
+export function resolveAppTheme(persisted?: AppTheme | null): AppTheme {
+  return persisted === 'light' || persisted === 'dark' || persisted === 'system'
+    ? persisted
+    : DEFAULT_APP_THEME;
+}
 export function applyAppearanceToDocument({
   theme,
   accentColor,

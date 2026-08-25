@@ -51,8 +51,6 @@ const ALLOWLIST: ReadonlyMap<string, string> = new Map([
   // exports. No request handlers live here.
   ['shared.ts', 'Shared request helpers; no handlers.'],
   ['session.ts', 'Session lookup helper; called from auth.ts which gates.'],
-  ['siteDiff.ts', 'Diff validator called from site.ts after that file gates.'],
-  ['pageDiff.ts', 'Diff validator called from pages.ts after that file gates.'],
   // Media upload helpers — `acceptUploadedMedia`, `readUploadedFile`,
   // file-magic sniffing. Always called by an already-gated parent
   // handler (`/me/avatar`, `/media`).
@@ -72,11 +70,11 @@ const ALLOWLIST: ReadonlyMap<string, string> = new Map([
   ['imageVariantWorkerHost.ts', 'Worker host helper; called by gated parent handlers.'],
   // Loop runtime — `/_instatic/loop/...` is a runtime endpoint for published
   // pages, not a CMS admin route. Reached only via the public router.
-  ['loop.ts', 'Published-page runtime endpoint; not a /admin/api/cms/ route.'],
-  ['hole.ts', 'Published-page runtime endpoint; not a /admin/api/cms/ route.'],
+  ['loop.ts', 'Published-page runtime endpoint; not a /cms/api/cms/ route.'],
+  ['hole.ts', 'Published-page runtime endpoint; not a /cms/api/cms/ route.'],
   // Module-JS assets — `/_instatic/module-js/<moduleId>.js` serves published
   // module runtimes to anonymous visitors, same trust model as hole/loop.
-  ['moduleJs.ts', 'Published-page runtime endpoint; not a /admin/api/cms/ route.'],
+  ['moduleJs.ts', 'Published-page runtime endpoint; not a /cms/api/cms/ route.'],
   // Plugins sub-handlers — the dispatcher at plugins/index.ts resolves
   // capability + step-up via `resolvePluginRoutePolicy` and runs the gate
   // before delegating to any of these.
@@ -153,7 +151,7 @@ describe('cms-handlers-capability-gated gate', () => {
       throw new Error(
         `[cms-handlers-capability-gated] handler files don't call any auth gate:\n` +
         violations.map((v) => `  ${v}`).join('\n') +
-        `\n\nEvery /admin/api/cms/** route must gate access via ` +
+        `\n\nEvery /cms/api/cms/** route must gate access via ` +
         `requireCapability(), requireAnyCapability(), requireAuthenticatedUser(), ` +
         `or requireStepUp() so an unauthenticated caller cannot reach the CMS.\n` +
         `If the file is intentionally not gated (helper / dispatcher / shared ` +

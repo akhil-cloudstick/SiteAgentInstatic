@@ -164,9 +164,12 @@ function scanText(html) {
 // Tags that carry tenant-visible copy — the targets rule 16 cares about.
 const TEXT_BEARING_TAG_RE = /^(?:h[1-6]|p|span|small|strong|em|b|i|a|li|blockquote|figcaption|td|th|dt|dd)$/;
 
-// Descendant selectors that style a text tag directly (`.card strong`). Those
-// import as AMBIENT rules: editing one changes every element it matches instead
-// of the single element the tenant selected. Every such selector is reported —
+// Descendant selectors that style a text tag directly (`.card strong`). Instatic
+// binds a rule to the rightmost CLASS in its selector, so these bind to `.card`
+// — the ancestor — and never to the text they style: the tenant's edit lands on
+// the whole block instead of the run they selected. Only a TAG target is
+// reported; `.card .card-note` binds to `card-note`, the element it actually
+// styles, so it stays per-element editable. Every such selector is reported —
 // deciding "does this reach a class-less element?" needs a real DOM matcher we
 // don't have here, and a document-wide regex approximation flags a selector
 // because of an UNRELATED class-less element, leaving a page that stays red no
@@ -223,6 +226,36 @@ function checkPage(html) {
   if (!styleBlocks.trim()) add('CSS inline in <style>', 'WARN', 'No <style> block found — is the CSS inline?');
   else if (extCss.length) add('CSS inline in <style>', 'FAIL', `External stylesheet bundle: ${firstLine(extCss[0])}`);
   else add('CSS inline in <style>', 'PASS');
+
+  // 2b) Styles actually PRESENT for the markup. Rule 2 only proves "no external
+  // link + some <style>" — it cannot tell that the styles themselves survived.
+  // An agent asked to fix rule 2 can satisfy it by DELETING the <link> instead
+  // of inlining the stylesheet's contents, which silently strips every shared
+  // header/nav/footer rule and ships an unstyled page. This catches that.
+  // Skipped while an external stylesheet is still linked (rule 2 already fails,
+  // and we cannot resolve that file's contents here).
+  // Kept in parity with rule 2b in OpenDesign/apps/daemon/src/cms-compliance.ts.
+  if (styleBlocks.trim() && extCss.length === 0) {
+    const used = new Set();
+    for (const m of html.matchAll(/\sclass\s*=\s*"([^"]*)"/gi)) {
+      for (const cls of (m[1] || '').split(/\s+/)) {
+        // Ignore state/utility-ish tokens toggled by JS and templating leftovers.
+        if (cls && cls.length > 2 && !cls.startsWith('is-') && !cls.includes('{')) used.add(cls);
+      }
+    }
+    const undefinedClasses = [...used].filter((c) => !styleBlocks.includes(`.${c}`));
+    // High threshold: a page that merely leans on element/descendant selectors
+    // trips a handful at most, while a page that lost a whole stylesheet trips
+    // dozens. Only the wholesale-loss case should block a share.
+    if (undefinedClasses.length >= 10) {
+      add('Styles present for markup', 'FAIL',
+        `${undefinedClasses.length} classes used in the markup have no CSS in this page ` +
+        `(${undefinedClasses.slice(0, 6).join(', ')}…) — a stylesheet was removed without ` +
+        `inlining its contents; copy the full CSS into the <style> block`);
+    } else {
+      add('Styles present for markup', 'PASS');
+    }
+  }
 
   // 3) Colors as :root custom properties.
   const hasRoot = /:root\s*\{[^}]*--[\w-]+\s*:/.test(styleBlocks);
@@ -314,6 +347,85 @@ function checkPage(html) {
   add('No modern color function in a shorthand', shorthandColorHit ? 'FAIL' : 'PASS',
     shorthandColorHit ? `Modern color function in a shorthand is dropped on import (color lost): ${firstLine(shorthandColorHit[0])} — use a :root var token (background: var(--token)) or the longhand (background-color: …) instead (see templateRule.md)` : '');
 
+  // 11a) Text typography/colour must not live only on a bare TAG selector.
+  // A bare `h1, h2, h3 { color: … }` imports as an `ambient` rule, not a class
+  // rule: it is not editable and does not reliably apply in the editor canvas,
+  // so the heading falls back to an inherited colour and can render unreadable
+  // — while the same file opened directly in a browser looks perfect. Emitting
+  // `.od-title {}` as an empty stub alongside it satisfies the "declare the bare
+  // class" rule on paper and fixes nothing, so the stub is what we detect.
+  // A concrete value only — `color: inherit` / `font: inherit` in a reset is
+  // exactly the inherited default the rule allows, and must not be flagged.
+  const TYPO_PROP_NAMES = new Set(['color', 'font-family', 'font-size', 'font-weight', 'line-height', 'letter-spacing']);
+  const KEYWORD_VALUES = new Set(['inherit', 'initial', 'unset', 'revert', 'currentcolor']);
+  const hasConcreteTypography = (body) => body.split(';').some((decl) => {
+    const at = decl.indexOf(':');
+    if (at < 0) return false;
+    const prop = decl.slice(0, at).trim().toLowerCase();
+    const value = decl.slice(at + 1).trim().toLowerCase();
+    return TYPO_PROP_NAMES.has(prop) && value.length > 0 && !KEYWORD_VALUES.has(value);
+  });
+  // NOTE: must NOT anchor on the previous rule's `}` — a `(^|})`-anchored
+  // pattern consumes that brace, so the next rule has no `}` left to match and
+  // the scan silently reads only every OTHER rule (`.a{}.b{}.c{}.d{}` → a, c).
+  // This regex takes the selector as "everything since the last brace", which
+  // also picks up rules nested inside `@media` blocks; `@` preludes are
+  // filtered out below.
+  const allRules = [...styleBlocks.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+    .map((m) => ({ selector: m[1].replace(/\/\*[\s\S]*?\*\//g, '').trim(), body: m[2] }))
+    .filter((r) => r.selector.length > 0 && !r.selector.startsWith('@') && !r.selector.startsWith('/*'));
+
+  // Tags whose typography is supplied by a bare tag rule (ambient on import).
+  const TEXT_BLOCK_TAG_RE = /^(?:h[1-6]|p|li|blockquote|figcaption|td|th|dt|dd)$/i;
+  const tagsStyledByBareRule = new Set();
+  for (const r of allRules) {
+    const parts = r.selector.split(',').map((s) => s.trim());
+    if (!parts.every((s) => /^[a-z][a-z0-9]*$/i.test(s))) continue;
+    if (!hasConcreteTypography(r.body)) continue;
+    for (const p of parts) if (TEXT_BLOCK_TAG_RE.test(p)) tagsStyledByBareRule.add(p.toLowerCase());
+  }
+
+  // Classes that carry a concrete `color` via their own BARE rule — the only
+  // form that survives as an editable class rule the canvas applies.
+  const classesWithColor = new Set();
+  for (const r of allRules) {
+    const bare = /^\.([A-Za-z0-9_-]+)$/.exec(r.selector);
+    if (!bare) continue;
+    if (r.body.split(';').some((d) => {
+      const at = d.indexOf(':');
+      if (at < 0) return false;
+      return d.slice(0, at).trim().toLowerCase() === 'color'
+        && !KEYWORD_VALUES.has(d.slice(at + 1).trim().toLowerCase())
+        && d.slice(at + 1).trim().length > 0;
+    })) classesWithColor.add(bare[1]);
+  }
+
+  // A bare tag rule is fine on its own — what breaks is an element that RELIES
+  // on it, because that rule imports as `ambient`: not editable, and not
+  // reliably applied in the editor canvas, so the element falls back to an
+  // inherited colour and can render unreadable while the same file looks
+  // correct in a browser. Flag only elements whose own classes carry no colour.
+  const uncoloredTextEls = tagsStyledByBareRule.size === 0 ? [] :
+    scanText(html).owners.filter((o) =>
+      tagsStyledByBareRule.has(o.tag) && !o.classes.some((c) => classesWithColor.has(c)));
+  const emptyStubCount = (styleBlocks.match(/^\s*\.[A-Za-z0-9_-]+\s*\{\s*\}\s*$/gm) || []).length;
+  add('Text typography lives on classes, not bare tag selectors',
+    uncoloredTextEls.length ? 'FAIL' : 'PASS',
+    uncoloredTextEls.length ? `${uncoloredTextEls.length} text element(s) take their colour from a bare tag rule (${[...tagsStyledByBareRule].join(', ')}) with no colour on any of their own classes — that rule imports as ambient, so it is neither editable nor reliably applied in the editor canvas and the text renders with an inherited colour (often unreadable), even though the file looks correct in a browser. Put color/font-* on each element's OWN class${emptyStubCount ? `; ${emptyStubCount} empty stub rule(s) like ".od-title {}" are not compliance — the class must carry the declarations` : ''}. Examples: ${uncoloredTextEls.slice(0, 6).map((o) => `<${o.tag}> "${firstLine(o.text).slice(0, 40)}"`).join(', ')} (see templateRule.md)` : '');
+
+  // 11b) No raster photo delivered as a CSS background. A `background-image`
+  // imports as a plain style declaration, NOT an Image block — no alt, no media
+  // picker — so the tenant can never swap it. The prose rule ("decorative
+  // backgrounds only") lost every argument with a full-bleed banner photo, which
+  // reads as decorative and is not, so it is a hard check now. Gradients,
+  // patterns and .svg textures are legitimate backgrounds and pass; only a
+  // raster photo (jpg/jpeg/png/webp/gif/avif) fails. Covers the shorthand
+  // (`background: … url(x.jpg) …`) and custom-property tokens feeding either.
+  const PHOTO_BG_RE = /(?:^|[;{])\s*(?:background(?:-image)?|--[\w-]*(?:img|image|bg|photo)[\w-]*)\s*:\s*[^;{}]*url\(\s*['"]?[^'")]+\.(?:jpe?g|png|webp|gif|avif)\b/i;
+  const photoBgHit = PHOTO_BG_RE.exec(colorScanCss);
+  add('No photo in a CSS background', photoBgHit ? 'FAIL' : 'PASS',
+    photoBgHit ? `Photo delivered as a CSS background is not an editable image (no alt, no media picker — the tenant cannot swap it): ${firstLine(photoBgHit[0])} — use <img> filled with position:absolute;inset:0;object-fit:cover and keep only the gradient overlay in CSS (see templateRule.md)` : '');
+
   // 12) No @layer / @page / @namespace. The importer drops the ENTIRE @layer block
   // (and @page/@namespace) — every rule inside is silently lost (e.g. compiled
   // Tailwind v4). Write plain, source-ordered CSS.
@@ -400,16 +512,18 @@ function checkPage(html) {
         : '');
   }
 
-  // 16) Text styled through its own class, not a descendant selector. Only a
-  // single bare class imports as an editable rule the tenant can change on ONE
-  // element; `.stat-item strong` imports as an ambient rule, so editing it
-  // restyles every match at once and per-element customisation is impossible.
+  // 16) Text styled through its own class, not a descendant selector. Instatic
+  // binds a rule to the RIGHTMOST CLASS in its selector, so `.stat-item strong`
+  // binds to `stat-item` — never to the text it actually styles. The tenant
+  // selects the <strong> and their edit lands on the whole stat block instead,
+  // making per-element customisation impossible.
   const ambientTextSelectors = findDescendantTextSelectors(styleBlocks, html);
   add('Text styled by its own class (not a descendant selector)',
     ambientTextSelectors.length ? DESCENDANT_TEXT_SELECTOR_STATUS : 'PASS',
     ambientTextSelectors.length
-      ? `${ambientTextSelectors.length} rule(s) style a text element through a descendant selector — these import ` +
-        `as AMBIENT rules, so editing one changes every element it matches instead of the one the tenant selected. ` +
+      ? `${ambientTextSelectors.length} rule(s) style a text element through its TAG in a descendant selector — ` +
+        `the rule binds to the nearest CLASS in the selector (.stat-item), never to the text itself, so the ` +
+        `tenant's edit lands on the whole block instead of the run they selected. ` +
         `Give each of those text elements its own class and move the declarations onto that class ` +
         `(.stat-value { … }, not .stat-item strong { … }). Fix every one, not only the examples listed here` +
         `${ambientTextSelectors.length > 10 ? ` (showing 10 of ${ambientTextSelectors.length})` : ''}: ` +
@@ -430,8 +544,12 @@ function checkPage(html) {
       `${sharedOnlyText.length} text element(s) have no class of their own — every class they carry is also used ` +
       `elsewhere, so restyling one in the CMS restyles them all. Give each its OWN class in addition to any ` +
       `shared role class, unique one first: class="stat-label-4 stat-label", and declare it (.stat-label-4 {}). ` +
+      // Two different counts, so say which is which: the headline counts
+      // ELEMENTS, the example list is de-duplicated by tag+text and so is
+      // usually shorter. "showing 12 of 14" against a headline of 27 reads
+      // like a miscount otherwise.
       `Fix every occurrence, not only the examples listed here` +
-      `${uniqueList.length > shown.length ? ` (showing ${shown.length} of ${uniqueList.length})` : ''}: ` +
+      `${uniqueList.length > shown.length ? ` (showing ${shown.length} of ${uniqueList.length} distinct texts)` : ''}: ` +
       `${shown.join(', ')} (see templateRule.md)`);
   } else {
     add('Every text element has its own unique class', 'PASS');
@@ -467,6 +585,71 @@ function checkPage(html) {
     } else {
       add('Interactive controls have visible content in the HTML', 'PASS');
     }
+  }
+
+  // 19) No non-YouTube <iframe>. A YouTube iframe imports as base.video, which
+  // declares the CSP origins the publisher needs, so `frame-src 'none'` is
+  // lifted on that page. Every OTHER iframe imports as a plain container: the
+  // markup is preserved and it still displays on the CMS canvas, so nothing
+  // looks wrong until the site is live — where frame-src blocks it and the
+  // section renders BLANK. Host test mirrors Instatic's htmlImport/rules.ts.
+  // Kept in parity with rule 19 in OpenDesign/apps/daemon/src/cms-compliance.ts.
+  {
+    const YOUTUBE_HOSTS = new Set(['youtube.com', 'm.youtube.com', 'youtube-nocookie.com', 'youtu.be']);
+    const blockedEmbeds = [];
+    for (const m of html.matchAll(/<iframe\b[^>]*>/gi)) {
+      const tag = m[0];
+      const srcMatch = tag.match(/\bsrc\s*=\s*(?:"([^"]*)"|'([^']*)')/i);
+      const src = (srcMatch && (srcMatch[1] ?? srcMatch[2])) || '';
+      let isYoutube = false;
+      try {
+        isYoutube = YOUTUBE_HOSTS.has(new URL(src).hostname.toLowerCase().replace(/^www\./, ''));
+      } catch {
+        // Relative or malformed src — not YouTube, exactly as the importer decides.
+      }
+      if (!isYoutube) blockedEmbeds.push(firstLine(tag));
+    }
+    add('No non-YouTube iframe embeds', blockedEmbeds.length ? 'FAIL' : 'PASS',
+      blockedEmbeds.length
+        ? `${blockedEmbeds.length} iframe(s) are not YouTube, so they render BLANK on the published page ` +
+          `(published pages ship frame-src 'none' and only a YouTube video block lifts it — the embed still ` +
+          `looks fine on the CMS canvas, which is why this is easy to miss). Use YouTube for video; for a map, ` +
+          `booking or chat widget ship a linked image instead. Fix every occurrence, not only the examples ` +
+          `listed here: ${[...new Set(blockedEmbeds)].slice(0, 6).join(', ')} (see templateRule.md)`
+        : '');
+  }
+
+  // 20) A bare declaration exists for every class the CSS styles. Instatic keeps
+  // ONE editable rule per class name: a bare `.name { … }` wins the slot, but
+  // when none exists a descendant/compound rule (`.card .card-note`, `.btn:hover`)
+  // claims it — so the tenant's edits to that name only apply inside the ancestor,
+  // or only in the hover state. WARN, not FAIL: the page imports and renders
+  // correctly, so this must not block a share. Linter-only (no gate twin).
+  {
+    const css = styleBlocks.replace(/\/\*[\s\S]*?\*\//g, '');
+    const bare = new Set();
+    const claimed = new Map();
+    for (const rule of css.matchAll(/([^{}]+)\{[^{}]*\}/g)) {
+      const selectorList = rule[1] || '';
+      if (selectorList.trim().startsWith('@')) continue;
+      for (const rawSelector of selectorList.split(',')) {
+        const selector = rawSelector.trim().replace(/\s+/g, ' ');
+        if (!selector || selector.includes('(')) continue; // :is()/:has() — ambient anyway
+        const bareMatch = selector.match(/^\.([A-Za-z_][\w-]*)$/);
+        if (bareMatch) { bare.add(bareMatch[1]); continue; }
+        const tokens = [...selector.matchAll(/\.([A-Za-z_][\w-]*)/g)].map((t) => t[1]);
+        const binding = tokens[tokens.length - 1];
+        if (binding && !claimed.has(binding)) claimed.set(binding, selector);
+      }
+    }
+    const orphans = [...claimed].filter(([name]) => !bare.has(name));
+    add('Bare class declared for every styled class', orphans.length ? 'WARN' : 'PASS',
+      orphans.length
+        ? `${orphans.length} class(es) are styled only through a descendant or compound selector with no bare ` +
+          `rule, so that selector claims the editable slot and the tenant's edits apply only in that context. ` +
+          `Add a bare declaration (an empty one is enough): ` +
+          `${orphans.slice(0, 6).map(([n, s]) => `.${n} {} (claimed by "${s}")`).join(', ')}`
+        : '');
   }
 
   return results;

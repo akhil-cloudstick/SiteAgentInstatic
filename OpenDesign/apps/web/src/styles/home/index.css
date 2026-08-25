@@ -10,18 +10,11 @@
 @import './home-hero.css';
 @import './plus-menu.css';
 @import './recent-projects.css';
-/* `plugins-home.css` stays: the preview surfaces it styles (`plugins-home__…`)
-   are still used by the plugin detail modal and the Home hero picker. */
 @import './plugins-home.css';
-/* `plugins-view.css` is gone: the Plugins screen was rebuilt against the
-   approved MMSBUILD reference and now owns its geometry in
-   `components/PluginsScreen.module.css`. */
+@import './plugins-view.css';
+@import './plugin-marketplace-demo.css';
 @import './new-project-modal.css';
-/* `integrations.css` is gone: `/integrations` was rebuilt on the approved
-   MMSBUILD reference screen and owns its geometry in
-   `components/IntegrationsScreen.module.css`. */
+@import './integrations.css';
 @import './marketplace.css';
-/* `tasks.css` is gone: the Automations screen was rebuilt against the approved
-   MMSBUILD reference and now owns its geometry in
-   `components/AutomationsScreen.module.css`. */
+@import './tasks.css';
 @import './use-everywhere.css';

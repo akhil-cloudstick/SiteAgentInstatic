@@ -23,7 +23,7 @@ import {
   trackSettingsPopoverSurfaceView,
 } from '../analytics/events';
 import { createSocialSharePayload } from '../providers/registry';
-import type { AppConfig, AppTheme } from '../types';
+import type { AppConfig } from '../types';
 import { formatDiscordPresenceCount, useDiscordPresence } from './useDiscordPresence';
 import { Icon } from './Icon';
 import { SocialShareGrid } from './SocialShareGrid';
@@ -46,6 +46,9 @@ export type EntrySettingsSection =
   | 'integrations'
   | 'mcpClient'
   | 'language'
+  // Legacy deep-link token: the theme setting is gone (the app ships
+  // light-only) and SettingsDialog folds this into General, but the token stays
+  // accepted so an old link does not become a type error at the call site.
   | 'appearance'
   | 'notifications'
   | 'pet'
@@ -55,19 +58,8 @@ export type EntrySettingsSection =
   | 'memory'
   | 'designSystems';
 
-const ENTRY_THEME_OPTIONS: Array<{
-  value: AppTheme;
-  icon: 'sun-moon' | 'sun' | 'moon';
-  labelKey: 'settings.themeSystem' | 'settings.themeLight' | 'settings.themeDark';
-}> = [
-  { value: 'system', icon: 'sun-moon', labelKey: 'settings.themeSystem' },
-  { value: 'light', icon: 'sun', labelKey: 'settings.themeLight' },
-  { value: 'dark', icon: 'moon', labelKey: 'settings.themeDark' },
-];
-
 interface Props {
   config: AppConfig;
-  onThemeChange: (theme: AppTheme) => void;
   onOpenSettings: (section?: EntrySettingsSection) => void;
   // Fired when the gear trigger is clicked. Used by the in-project header to
   // emit the `artifact_header` / `settings` ui_click; the home/entry shell
@@ -76,44 +68,17 @@ interface Props {
   // The popover is mounted both on the home header and the in-project
   // artifact header; defaults to 'home' so existing call sites stay correct.
   trackingPageName?: 'home' | 'artifact';
-  /**
-   * How the trigger draws itself.
-   *
-   * `gear` is the in-project artifact header's control. `account` is row 1 of
-   * the shared MMSBUILD shell, where this menu IS the account menu: the
-   * approved header ends the utility run with a green-ringed initials disc, and
-   * a second gear beside the shell's own Settings gear would be two glyphs for
-   * two different things. Only the trigger changes — the popover, its contents
-   * and every behaviour below are identical.
-   */
-  triggerVariant?: 'gear' | 'account';
-  /**
-   * Signed-in user, from the Product Hub hand-off. `null` initials is a real
-   * answer — nobody is identified — and the disc falls back to a person glyph
-   * rather than borrowing letters from the tenant.
-   */
-  account?: { name: string | null; initials: string | null };
 }
 
 export function EntrySettingsMenu({
   config,
-  onThemeChange,
   onOpenSettings,
   onTrackTriggerClick,
   trackingPageName,
-  triggerVariant = 'gear',
-  account,
 }: Props) {
   const pageName = trackingPageName ?? 'home';
-  const isAccount = triggerVariant === 'account';
-  const accountInitials = account?.initials?.trim() || '';
   const analytics = useAnalytics();
   const t = useT();
-  // The accessible name says who, when the Hub told us who. Otherwise it names
-  // the destination rather than claiming an identity we do not have.
-  const accountTitle = account?.name
-    ? t('entry.accountMenuNamedAria', { name: account.name })
-    : t('entry.accountMenuAria');
   const { locale, setLocale } = useI18n();
   const discordPresence = useDiscordPresence();
   const [open, setOpen] = useState(false);
@@ -122,7 +87,6 @@ export function EntrySettingsMenu({
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const langListRef = useRef<HTMLDivElement | null>(null);
-  const activeTheme = config.theme ?? 'system';
   const discordOnlineLabel = discordPresence
     ? t('entry.discordOnlineLabel', {
         count: formatDiscordPresenceCount(discordPresence.onlineCount),
@@ -181,7 +145,7 @@ export function EntrySettingsMenu({
   }, [open]);
 
   // surface_view — fire once each time the settings popover opens so the
-  // share / language / appearance funnels have a denominator.
+  // share / language funnels have a denominator.
   useEffect(() => {
     if (!open) return;
     trackSettingsPopoverSurfaceView(analytics.track, {
@@ -211,36 +175,20 @@ export function EntrySettingsMenu({
       <button
         ref={triggerRef}
         type="button"
-        // `mms-shell-avatar` is the shared shell's global contract class for a
-        // product-rendered account control, exactly like `mms-new-project` in
-        // row 2 — the shell owns the disc's every metric so it cannot drift
-        // between MMS Design and MMS-CMS.
-        className={
-          isAccount ? 'mms-shell-avatar od-tooltip' : 'settings-icon-btn od-tooltip'
-        }
+        className="settings-icon-btn od-tooltip"
         onClick={() => {
           onTrackTriggerClick?.();
           setOpen((value) => !value);
         }}
-        title={isAccount ? accountTitle : t('entry.openSettingsTitle')}
-        data-tooltip={isAccount ? accountTitle : t('entry.openSettingsTitle')}
+        title={t('entry.openSettingsTitle')}
+        data-tooltip={t('entry.openSettingsTitle')}
         data-tooltip-placement="bottom"
-        aria-label={isAccount ? accountTitle : t('entry.openSettingsAria')}
+        aria-label={t('entry.openSettingsAria')}
         aria-haspopup="menu"
         aria-expanded={open}
         data-testid="entry-settings-menu-trigger"
       >
-        {isAccount ? (
-          accountInitials ? (
-            <span aria-hidden="true">{accountInitials}</span>
-          ) : (
-            // No identified user: a person glyph rather than initials invented
-            // from a tenant slug. The control still opens the same menu.
-            <i className="fa-solid fa-user" aria-hidden="true" />
-          )
-        ) : (
-          <Icon name="settings" size={17} />
-        )}
+        <Icon name="settings" size={17} />
       </button>
       {open ? (
         <div
@@ -251,7 +199,7 @@ export function EntrySettingsMenu({
         >
           <section className="entry-settings-menu__section">
             <div className="entry-settings-menu__section-title">
-              <Icon name="languages" size={13} />
+              <Icon name="languages" size={14} />
               <span>{t('settings.language')}</span>
             </div>
             <div className="entry-settings-menu__select">
@@ -314,7 +262,7 @@ export function EntrySettingsMenu({
                           {active ? (
                             <Icon
                               name="check"
-                              size={12}
+                              size={14}
                               className="entry-settings-menu__option-check"
                             />
                           ) : null}
@@ -329,39 +277,217 @@ export function EntrySettingsMenu({
 
           <section className="entry-settings-menu__section">
             <div className="entry-settings-menu__section-title">
-              <Icon name="palette" size={13} />
-              <span>{t('settings.appearance')}</span>
+              <Icon name="external-link" size={14} />
+              <span>{t('socialShare.openDesignSection')}</span>
             </div>
-            <div className="entry-settings-menu__theme-row">
-              {ENTRY_THEME_OPTIONS.map((option) => {
-                const active = activeTheme === option.value;
-                return (
-                  <button
-                    key={option.value}
-                    type="button"
-                    role="menuitemradio"
-                    aria-checked={active}
-                    className={`entry-settings-menu__theme${
-                      active ? ' is-active' : ''
-                    }`}
-                    onClick={() => {
-                      trackSettingsPopoverClick(analytics.track, {
-                        page_name: pageName,
-                        area: 'settings_popover',
-                        element: 'appearance',
-                        value: option.value,
-                      });
-                      onThemeChange(option.value);
-                      setOpen(false);
-                    }}
-                  >
-                    <Icon name={option.icon} size={13} />
-                    <span>{t(option.labelKey)}</span>
-                  </button>
-                );
-              })}
-            </div>
+            <SocialShareGrid
+              share={openDesignShare ?? fallbackOpenDesignShare}
+              className="entry-settings-social-share"
+              onShare={(platform) => {
+                trackSettingsPopoverClick(analytics.track, {
+                  page_name: pageName,
+                  area: 'settings_popover',
+                  element: 'share_channel',
+                  channel: platform,
+                });
+              }}
+              onAfterShare={() => setOpen(false)}
+            />
           </section>
+
+          <div className="entry-settings-menu__divider" aria-hidden />
+
+          <a
+            className="entry-settings-menu__item"
+            href={enterpriseUrl(locale)}
+            target="_blank"
+            rel="noreferrer noopener"
+            role="menuitem"
+            onClick={() => {
+              trackSettingsPopoverClick(analytics.track, {
+                page_name: pageName,
+                area: 'settings_popover',
+                element: 'workspace_teams',
+              });
+              setOpen(false);
+            }}
+          >
+            <span className="entry-settings-menu__item-icon" aria-hidden>
+              <Icon name="sparkles" size={14} />
+            </span>
+            <span>{t('entry.workspaceTeamsLabel')}</span>
+            <Icon name="external-link" size={12} className="entry-settings-menu__item-end" />
+          </a>
+          <a
+            className="entry-settings-menu__item"
+            href={DISCORD_URL}
+            target="_blank"
+            rel="noreferrer noopener"
+            role="menuitem"
+            onClick={() => {
+              trackSettingsPopoverClick(analytics.track, {
+                page_name: pageName,
+                area: 'settings_popover',
+                element: 'join_discord',
+              });
+              setOpen(false);
+            }}
+          >
+            <span className="entry-settings-menu__item-icon" aria-hidden>
+              <Icon name="discord" size={14} />
+            </span>
+            <span>{t('entry.discordLabel')}</span>
+            {discordOnlineLabel ? (
+              <span className="entry-settings-menu__item-meta">
+                {discordOnlineLabel}
+              </span>
+            ) : null}
+            <Icon name="external-link" size={14} className="entry-settings-menu__item-end" />
+          </a>
+          <a
+            className="entry-settings-menu__item"
+            href={X_URL}
+            target="_blank"
+            rel="noreferrer noopener"
+            role="menuitem"
+            onClick={() => {
+              trackSettingsPopoverClick(analytics.track, {
+                page_name: pageName,
+                area: 'settings_popover',
+                element: 'follow_x',
+              });
+              setOpen(false);
+            }}
+          >
+            <span
+              className="entry-settings-menu__item-icon entry-settings-menu__x-mark"
+              aria-hidden
+            >
+              X
+            </span>
+            <span>{t('entry.followXLabel')}</span>
+            <Icon name="external-link" size={14} className="entry-settings-menu__item-end" />
+          </a>
+          <a
+            className="entry-settings-menu__item"
+            href={THREADS_URL}
+            target="_blank"
+            rel="noreferrer noopener"
+            role="menuitem"
+            onClick={() => {
+              trackSettingsPopoverClick(analytics.track, {
+                page_name: pageName,
+                area: 'settings_popover',
+                element: 'follow_threads',
+              });
+              setOpen(false);
+            }}
+          >
+            <span
+              className="entry-settings-menu__item-icon entry-settings-menu__x-mark"
+              aria-hidden
+            >
+              @
+            </span>
+            <span>{t('entry.followThreadsLabel')}</span>
+            <Icon name="external-link" size={14} className="entry-settings-menu__item-end" />
+          </a>
+          <a
+            className="entry-settings-menu__item"
+            href={YOUTUBE_URL}
+            target="_blank"
+            rel="noreferrer noopener"
+            role="menuitem"
+            onClick={() => {
+              trackSettingsPopoverClick(analytics.track, {
+                page_name: pageName,
+                area: 'settings_popover',
+                element: 'open_youtube',
+              });
+              setOpen(false);
+            }}
+          >
+            <span
+              className="entry-settings-menu__item-icon entry-settings-menu__x-mark"
+              aria-hidden
+            >
+              YT
+            </span>
+            <span>{t('entry.youtubeLabel')}</span>
+            <Icon name="external-link" size={14} className="entry-settings-menu__item-end" />
+          </a>
+          <a
+            className="entry-settings-menu__item"
+            href={INSTAGRAM_URL}
+            target="_blank"
+            rel="noreferrer noopener"
+            role="menuitem"
+            onClick={() => {
+              trackSettingsPopoverClick(analytics.track, {
+                page_name: pageName,
+                area: 'settings_popover',
+                element: 'follow_instagram',
+              });
+              setOpen(false);
+            }}
+          >
+            <span
+              className="entry-settings-menu__item-icon entry-settings-menu__x-mark"
+              aria-hidden
+            >
+              IG
+            </span>
+            <span>{t('entry.followInstagramLabel')}</span>
+            <Icon name="external-link" size={12} className="entry-settings-menu__item-end" />
+          </a>
+          <a
+            className="entry-settings-menu__item"
+            href={LINKEDIN_URL}
+            target="_blank"
+            rel="noreferrer noopener"
+            role="menuitem"
+            onClick={() => {
+              trackSettingsPopoverClick(analytics.track, {
+                page_name: pageName,
+                area: 'settings_popover',
+                element: 'follow_linkedin',
+              });
+              setOpen(false);
+            }}
+          >
+            <span
+              className="entry-settings-menu__item-icon entry-settings-menu__x-mark"
+              aria-hidden
+            >
+              in
+            </span>
+            <span>{t('entry.followLinkedinLabel')}</span>
+            <Icon name="external-link" size={12} className="entry-settings-menu__item-end" />
+          </a>
+          <a
+            className="entry-settings-menu__item"
+            href={XIAOHONGSHU_URL}
+            target="_blank"
+            rel="noreferrer noopener"
+            role="menuitem"
+            onClick={() => {
+              trackSettingsPopoverClick(analytics.track, {
+                page_name: pageName,
+                area: 'settings_popover',
+                element: 'follow_xiaohongshu',
+              });
+              setOpen(false);
+            }}
+          >
+            <span
+              className="entry-settings-menu__item-icon entry-settings-menu__x-mark"
+              aria-hidden
+            >
+              RED
+            </span>
+            <span>{t('entry.followXiaohongshuLabel')}</span>
+            <Icon name="external-link" size={12} className="entry-settings-menu__item-end" />
+          </a>
 
           <div className="entry-settings-menu__divider" aria-hidden />
 
@@ -381,9 +507,12 @@ export function EntrySettingsMenu({
             }}
           >
             <span className="entry-settings-menu__item-icon" aria-hidden>
-              <Icon name="sliders" size={14} />
+              <Icon name="settings" size={14} />
             </span>
-            <span>Advanced settings</span>
+            <span>{t('avatar.settings')}</span>
+            <span className="entry-settings-menu__item-meta">
+              {t('homeHero.details')}
+            </span>
           </button>
         </div>
       ) : null}

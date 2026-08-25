@@ -173,7 +173,7 @@ describe('serializeRouteRequest — byte-safe route bodies', () => {
     const form = new FormData()
     form.set('file', new File([PNG_BYTES], 'pixel.png', { type: 'image/png' }))
     form.set('label', 'tiny png')
-    const req = new Request('http://localhost/admin/api/cms/plugins/acme.x/runtime/upload', {
+    const req = new Request('http://localhost/cms/api/cms/plugins/acme.x/runtime/upload', {
       method: 'POST',
       body: form,
     })

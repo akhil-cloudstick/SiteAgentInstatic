@@ -2,12 +2,12 @@
  * Self-targeted user mutations — endpoints any authenticated user can call
  * to change their own profile data without needing `users.manage`.
  *
- *   PATCH  /admin/api/cms/me        — update display name and email
- *   POST   /admin/api/cms/me/avatar — upload a new avatar image
- *   DELETE /admin/api/cms/me/avatar — clear the avatar, falling back to the
+ *   PATCH  /cms/api/cms/me        — update display name and email
+ *   POST   /cms/api/cms/me/avatar — upload a new avatar image
+ *   DELETE /cms/api/cms/me/avatar — clear the avatar, falling back to the
  *                                     Gravatar identicon served by the client
  *
- * `GET /admin/api/cms/me` lives in `./auth.ts` because it shares the session
+ * `GET /cms/api/cms/me` lives in `./auth.ts` because it shares the session
  * helpers with login/logout. The avatar endpoints land here so the file
  * stays focused on self-mutation flows (display-name edit, avatar, password
  * change all slot in next to each other).

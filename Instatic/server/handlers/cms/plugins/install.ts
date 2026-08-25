@@ -1,10 +1,10 @@
 /**
  * Plugin install routes — JSON install, zip inspect, zip install, upgrade.
  *
- *   GET    /admin/api/cms/plugins                       — list installed plugins
- *   POST   /admin/api/cms/plugins                       — install from a JSON manifest
- *   POST   /admin/api/cms/plugins/inspect-package       — read a plugin .zip without installing
- *   POST   /admin/api/cms/plugins/package               — install (or upgrade) from a .zip
+ *   GET    /cms/api/cms/plugins                       — list installed plugins
+ *   POST   /cms/api/cms/plugins                       — install from a JSON manifest
+ *   POST   /cms/api/cms/plugins/inspect-package       — read a plugin .zip without installing
+ *   POST   /cms/api/cms/plugins/package               — install (or upgrade) from a .zip
  *
  * The zip-install route is where most of the complexity lives. After
  * inspecting the manifest, it branches into one of three paths:
@@ -68,7 +68,7 @@ import { maybeAutoInstallPluginPack, type PluginPackSummary } from './pack'
 import { sweepStagedPackage } from './staged'
 
 // ---------------------------------------------------------------------------
-// GET / POST /admin/api/cms/plugins  (list + JSON install)
+// GET / POST /cms/api/cms/plugins  (list + JSON install)
 // ---------------------------------------------------------------------------
 
 export async function handlePluginsCollection(
@@ -118,7 +118,7 @@ export async function handlePluginsCollection(
 }
 
 // ---------------------------------------------------------------------------
-// POST /admin/api/cms/plugins/inspect-package
+// POST /cms/api/cms/plugins/inspect-package
 // ---------------------------------------------------------------------------
 
 export async function handleInspectPackage(req: Request): Promise<Response> {
@@ -135,7 +135,7 @@ export async function handleInspectPackage(req: Request): Promise<Response> {
 }
 
 // ---------------------------------------------------------------------------
-// POST /admin/api/cms/plugins/package  (zip install / upgrade)
+// POST /cms/api/cms/plugins/package  (zip install / upgrade)
 // ---------------------------------------------------------------------------
 
 export async function handlePackageInstall(

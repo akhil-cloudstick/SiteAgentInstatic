@@ -1,7 +1,7 @@
 /**
  * Tenant SSO hand-off.
  *
- *   GET /admin/api/cms/sso?token=<signed>
+ *   GET /cms/api/cms/sso?token=<signed>
  *
  * When the SiteAgent control-plane runs this instance for a tenant it sets
  * INSTATIC_SSO_SECRET. The tenant's hub redirects here with a short-lived signed

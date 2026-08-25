@@ -1,8 +1,8 @@
 /**
  * Workspace presence endpoints.
  *
- *   GET  /admin/api/cms/presence/events?scope=site  — SSE roster stream
- *   POST /admin/api/cms/presence/heartbeat          — announce / refresh / leave
+ *   GET  /cms/api/cms/presence/events?scope=site  — SSE roster stream
+ *   POST /cms/api/cms/presence/heartbeat          — announce / refresh / leave
  *
  * Both are gated by `site.read`: presence reveals who is working in the admin,
  * which is exactly the population that already holds that capability.

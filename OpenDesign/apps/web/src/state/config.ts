@@ -11,10 +11,11 @@ import type {
   PetConfig,
 } from '../types';
 import { resolveFixedOriginBaseUrl } from './apiProtocols';
-import { applyManagedAiConfig, setManagedAiModel } from './managed';
 import {
   DEFAULT_ACCENT_COLOR,
+  DEFAULT_APP_THEME,
   normalizeAccentColor,
+  resolveAppTheme,
 } from './appearance';
 import {
   DEFAULT_FAILURE_SOUND_ID,
@@ -23,19 +24,32 @@ import {
 import { randomUUID } from '../utils/uuid';
 
 const STORAGE_KEY = 'open-design:config';
-const CONFIG_MIGRATION_VERSION = 2;
+const CONFIG_MIGRATION_VERSION = 3;
+// Accent values that were the SHIPPED DEFAULT in an earlier build and were
+// persisted verbatim into every install's config. None of them is offered in
+// ACCENT_SWATCHES anymore, so a config still carrying one is a leftover
+// default rather than a deliberate choice — the migration resets it to the
+// current default. (v2 covered the green era; v3 adds the older brick one,
+// which kept long-lived installs off the #5517 accent.) Keep this list in
+// sync with the pre-hydration script in app/layout.tsx.
+const LEGACY_DEFAULT_ACCENT_COLORS = ['#87ea5c', '#c96442'];
+const RETIRED_SECURE_BYOK_KEYS = [
+  'byokProfileId',
+  'byokCredentialConfigured',
+  'byokCredentialTail',
+] as const;
 
 // Hatched out of the box, but tucked away — the user has to go through
 // either the entry-view "adopt a pet" callout or Settings → Pets to
 // summon them. Keeps the workspace quiet for first-run users.
-// Both switches default off so first-run users are not greeted by a
-// surprise sound or a permission prompt; they can opt in from Settings →
-// Notifications when they want it.
+// Completion feedback is useful precisely when a task finishes out of focus,
+// so new installs opt in by default. Explicit saved opt-outs still win through
+// normalizeNotifications' field merge below.
 export const DEFAULT_NOTIFICATIONS: NotificationsConfig = {
-  soundEnabled: false,
+  soundEnabled: true,
   successSoundId: DEFAULT_SUCCESS_SOUND_ID,
   failureSoundId: DEFAULT_FAILURE_SOUND_ID,
-  desktopEnabled: false,
+  desktopEnabled: true,
 };
 
 export const DEFAULT_PET: PetConfig = {
@@ -45,7 +59,7 @@ export const DEFAULT_PET: PetConfig = {
   custom: {
     name: 'Buddy',
     glyph: '🦄',
-    accent: '#1ba957',
+    accent: '#353535',
     greeting: 'Hi! I am here whenever you need me.',
   },
 };
@@ -77,7 +91,7 @@ export const DEFAULT_CONFIG: AppConfig = {
   skillId: null,
   designSystemId: null,
   onboardingCompleted: false,
-  theme: 'system',
+  theme: DEFAULT_APP_THEME,
   accentColor: DEFAULT_ACCENT_COLOR,
   mediaProviders: {},
   composio: {},
@@ -510,14 +524,14 @@ const BYOK_PROVIDER_PRESET_SPECS = [
   { id: 'xai', title: 'xAI', providerLabel: 'xAI' },
   { id: 'together', title: 'Together AI', providerLabel: 'Together AI' },
   { id: 'huggingface', title: 'Hugging Face', providerLabel: 'Hugging Face' },
-  { id: 'qwen', title: '千问', providerLabel: 'Qwen' },
-  { id: 'volcengine', title: '火山引擎', providerLabel: 'Volcengine Ark' },
-  { id: 'qianfan', title: '百度千帆', providerLabel: 'Baidu Qianfan' },
+  { id: 'qwen', title: 'Qwen', providerLabel: 'Qwen' },
+  { id: 'volcengine', title: 'Volcengine Ark', providerLabel: 'Volcengine Ark' },
+  { id: 'qianfan', title: 'Baidu Qianfan', providerLabel: 'Baidu Qianfan' },
   { id: 'vllm', title: 'vLLM', providerLabel: 'vLLM' },
-  { id: 'mimo', title: '小米 MiMo', providerLabel: 'MiMo (Xiaomi) — OpenAI' },
+  { id: 'mimo', title: 'Xiaomi MiMo', providerLabel: 'MiMo (Xiaomi) — OpenAI' },
   { id: 'minimax', title: 'MiniMax', providerLabel: 'MiniMax — Anthropic (CN)' },
   { id: 'moonshot', title: 'Moonshot', providerLabel: 'Moonshot' },
-  { id: 'zhipu', title: '智谱', providerLabel: 'Zhipu' },
+  { id: 'zhipu', title: 'Zhipu AI', providerLabel: 'Zhipu' },
 ] as const;
 
 export const BYOK_PROVIDER_PRESETS: ReadonlyArray<ByokProviderPresetConfig> =
@@ -642,18 +656,7 @@ function migrateRetiredKnownProviderModel(
   return true;
 }
 
-/**
- * Read the saved config, then hand a managed session the operator's runtime.
- *
- * The overlay wraps every exit from `loadConfigRaw` — the no-saved-config path,
- * the migrated path and the parse-failure fallback — so a managed tenant can
- * never end up on a half-applied execution config, whichever way the read went.
- */
 export function loadConfig(): AppConfig {
-  return applyManagedAiConfig(loadConfigRaw());
-}
-
-function loadConfigRaw(): AppConfig {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) {
@@ -672,6 +675,9 @@ function loadConfigRaw(): AppConfig {
     for (const key of DAEMON_OWNED_KEYS) {
       delete (parsed as Record<string, unknown>)[key];
     }
+    for (const key of RETIRED_SECURE_BYOK_KEYS) {
+      delete (parsed as Record<string, unknown>)[key];
+    }
     const parsedHasApiProtocol = Object.prototype.hasOwnProperty.call(
       parsed,
       'apiProtocol',
@@ -686,11 +692,18 @@ function loadConfigRaw(): AppConfig {
       agentCliEnv: { ...(parsed.agentCliEnv ?? {}) },
       agentCliEnvIntent: { ...(parsed.agentCliEnvIntent ?? {}) },
       accentColor: normalizeAccentColor(parsed.accentColor) ?? DEFAULT_CONFIG.accentColor,
+      // Coerce on read, not just on default: the theme setting is gone, but
+      // 'dark' / 'system' is still on disk in every install that ever used it.
+      theme: resolveAppTheme(parsed.theme),
       pet: normalizePet(parsed.pet),
       notifications: normalizeNotifications(parsed.notifications),
       orbit: normalizeOrbit(parsed.orbit),
     };
-
+    // A stored `dark` / `system` theme is dead data now that the app ships
+    // light-only. Flag it so the coerced value is written back once and the old
+    // preference stops existing on disk, instead of being re-coerced forever.
+    // MMS keeps both themes, so a stored `dark` / `system` value is a live
+    // preference — never migrate it away (upstream does, being light-only).
     let migratedConfig = false;
     const parsedMigrationVersion =
       typeof parsed.configMigrationVersion === 'number'
@@ -751,6 +764,10 @@ function loadConfigRaw(): AppConfig {
           ) || migratedConfig;
         }
       }
+      const persistedAccent = normalizeAccentColor(parsed.accentColor);
+      if (persistedAccent != null && LEGACY_DEFAULT_ACCENT_COLORS.includes(persistedAccent)) {
+        merged.accentColor = DEFAULT_CONFIG.accentColor;
+      }
       merged.configMigrationVersion = CONFIG_MIGRATION_VERSION;
     }
 
@@ -767,7 +784,15 @@ function loadConfigRaw(): AppConfig {
     }
 
     if (migratedConfig || downgradedUnsupportedChatProtocol) {
-      saveConfig(merged);
+      // Best-effort re-persist of the migrated / downgraded config. A localStorage
+      // write failure here (quota exceeded, private-mode storage disabled) must not
+      // fall through to the outer catch and discard the valid config we just
+      // parsed — that would silently reset the user to defaults for the session.
+      try {
+        saveConfig(merged);
+      } catch {
+        // keep the parsed config even if it could not be written back
+      }
     }
 
     return merged;
@@ -998,11 +1023,47 @@ function sanitizeAgentCliEnv(agentCliEnv: AppConfig['agentCliEnv']): AppConfig['
 }
 
 export function saveConfig(config: AppConfig): void {
-  const sanitized: AppConfig = { ...config, agentCliEnv: sanitizeAgentCliEnv(config.agentCliEnv) };
+  const sanitized: AppConfig = {
+    ...config,
+    agentCliEnv: sanitizeAgentCliEnv(config.agentCliEnv),
+  };
   for (const key of DAEMON_OWNED_KEYS) {
     delete (sanitized as unknown as Record<string, unknown>)[key];
   }
+  for (const key of RETIRED_SECURE_BYOK_KEYS) {
+    delete (sanitized as unknown as Record<string, unknown>)[key];
+  }
   localStorage.setItem(STORAGE_KEY, JSON.stringify(sanitized));
+}
+
+/**
+ * Onboarding completion is a one-way ratchet: once either side of the
+ * local/daemon pair has recorded it, the merge keeps it.
+ *
+ * `onboardingCompleted` is written from two places that settle at different
+ * times — localStorage flips the instant the user finishes the flow, while the
+ * daemon copy arrives through an asynchronous `PUT /api/app-config` that can
+ * lose a race or fail outright. So a daemon read may legitimately still say
+ * `false` for a user who is already done, and the reverse (daemon `true`,
+ * fresh/cleared localStorage) is equally normal.
+ *
+ * Letting the daemon's copy win unconditionally is not a cosmetic glitch: the
+ * merged config is written straight back to BOTH stores, so a single stale read
+ * permanently re-arms the first-run flow and the user meets onboarding on every
+ * launch from then on.
+ *
+ * The one legitimate way back to `false` is the explicit reset (Settings → run
+ * setup again), which writes `false` to both stores in the same gesture — so by
+ * the time the next merge runs neither side claims completion and the ratchet
+ * has nothing to hold. `buildPersistedConfig` applies the same rule on the
+ * save path; this is its read-path counterpart.
+ */
+function ratchetOnboardingCompleted(
+  local: AppConfig['onboardingCompleted'],
+  daemon: AppConfigPrefs['onboardingCompleted'],
+): AppConfig['onboardingCompleted'] {
+  if (local === true || daemon === true) return true;
+  return daemon != null ? daemon : local;
 }
 
 export function mergeDaemonConfig(
@@ -1012,9 +1073,10 @@ export function mergeDaemonConfig(
   const next = { ...localConfig };
   if (!daemonConfig) return next;
 
-  if (daemonConfig.onboardingCompleted != null) {
-    next.onboardingCompleted = daemonConfig.onboardingCompleted;
-  }
+  next.onboardingCompleted = ratchetOnboardingCompleted(
+    localConfig.onboardingCompleted,
+    daemonConfig.onboardingCompleted,
+  );
   if (daemonConfig.agentId !== undefined) {
     next.agentId = daemonConfig.agentId;
   }
@@ -1097,10 +1159,7 @@ export function mergeDaemonConfig(
   if (daemonConfig.defaultProjectLocationId !== undefined) {
     next.defaultProjectLocationId = daemonConfig.defaultProjectLocationId ?? 'default';
   }
-  // The daemon's app-config.json can still hold execution fields written by an
-  // earlier standalone run of this data dir; re-apply so the merge can't undo
-  // the managed runtime.
-  return applyManagedAiConfig(next);
+  return next;
 }
 
 export function mergeDaemonMediaProviders(
@@ -1190,11 +1249,6 @@ export async function fetchDaemonConfig(): Promise<AppConfigPrefs | null> {
     const res = await fetch('/api/app-config');
     if (!res.ok) return null;
     const data = await res.json();
-    // Managed sessions get the operator's model alongside the config. The
-    // daemon serves it as a sibling key (never a config field) because
-    // app-config is a persisted contract and this value must not be written to
-    // disk. Recording it here means one fetch serves both purposes.
-    if (data?.managedAi?.managed) setManagedAiModel(data.managedAi.model);
     return data?.config ?? null;
   } catch {
     return null;
@@ -1203,10 +1257,17 @@ export async function fetchDaemonConfig(): Promise<AppConfigPrefs | null> {
 
 export async function syncConfigToDaemon(
   config: AppConfig,
-  options?: { throwOnError?: boolean },
+  options?: {
+    throwOnError?: boolean;
+    allowOnboardingReset?: boolean;
+  },
 ): Promise<void> {
   const prefs: AppConfigPrefs = {
-    onboardingCompleted: config.onboardingCompleted,
+    ...(config.onboardingCompleted === true
+      ? { onboardingCompleted: true }
+      : options?.allowOnboardingReset
+        ? { onboardingCompleted: false }
+        : {}),
     agentId: config.agentId,
     agentModels: config.agentModels,
     agentCliEnv: config.agentCliEnv,
@@ -1227,7 +1288,15 @@ export async function syncConfigToDaemon(
   try {
     const response = await fetch('/api/app-config', {
       method: 'PUT',
-      headers: { 'content-type': 'application/json' },
+      headers: {
+        'content-type': 'application/json',
+        ...(prefs.orbit?.workspaceScope
+          ? {
+              'x-od-workspace-id': prefs.orbit.workspaceScope.workspaceId,
+              'x-od-workspace-member-id': prefs.orbit.workspaceScope.workspaceMemberId,
+            }
+          : {}),
+      },
       body: JSON.stringify(prefs),
     });
     if (!response.ok) throw new Error(`Failed to sync app config (${response.status})`);

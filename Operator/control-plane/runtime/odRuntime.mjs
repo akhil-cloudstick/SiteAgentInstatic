@@ -6,9 +6,36 @@ import { mkdirSync, createWriteStream, existsSync, rmSync, readdirSync } from 'n
 import { resolve } from 'node:path';
 import config from '../lib/env.mjs';
 import { signTenantToken } from '../lib/crypto.mjs';
+import { isPortOpen, waitPortOpen } from '../lib/ports.mjs';
 
 const isWin = process.platform === 'win32';
 const running = new Map(); // slug -> { child, port, pid, slug }
+
+// ---- readiness + supervision ---------------------------------------------
+// `running` only means "we spawned a process". It does NOT mean the daemon is
+// LISTENING, and the gap between the two is minutes here: this daemon registers
+// 460 bundled plugins off a network share before it binds. The gateway used to
+// forward into that gap and hand the browser a raw
+// `gateway: upstream unavailable (ECONNREFUSED)`.
+//
+//   ready    — the port has answered at least once, so forwarding is safe. This
+//              is the ONLY thing the request path reads: a Set lookup, no I/O.
+//   inflight — one start+wait per slug no matter how many requests pile up.
+//   params   — what start() was called with, so the supervisor can respawn.
+//   stopping — slugs we killed on purpose; never fight a deliberate stop.
+const ready = new Set();
+const inflight = new Map();
+const lastParams = new Map();
+const supervised = new Map();
+const stopping = new Set();
+
+// A cold daemon needs minutes on this host, so give one wait room to finish
+// instead of thrashing spawns. Callers poll, so this is a ceiling, not a stall.
+const START_TIMEOUT_MS = Number(process.env.OD_START_TIMEOUT_MS || 300_000);
+const WEB_START_TIMEOUT_MS = Number(process.env.OD_WEB_START_TIMEOUT_MS || 180_000);
+// Backoff for UNREQUESTED restarts (a daemon that died on its own). A
+// request-driven ensure() is never gated by this: someone is waiting on a page.
+const RESTART_DELAYS_MS = [2_000, 5_000, 15_000, 30_000, 60_000];
 
 // Per-tenant OD data dir (LOCAL disk — SQLite can't run on the SMB share).
 export function odPaths(slug) {
@@ -18,6 +45,84 @@ export function odPaths(slug) {
 
 export const isRunning = (slug) => running.has(slug);
 export const listRunning = () => [...running.values()].map((r) => ({ slug: r.slug, port: r.port, pid: r.pid }));
+
+// Has this tenant's daemon answered its port? Checked before every forward, so
+// it stays O(1) and free of I/O.
+export const isReady = (slug) => ready.has(slug);
+
+// Forget a readiness verdict. The gateway calls this when a forward fails
+// mid-flight (the daemon died between our check and our dial) so the very next
+// request re-runs ensure() and brings it back, instead of refusing again.
+export function markUnavailable(slug) {
+  ready.delete(slug);
+}
+
+// Why the last start attempt failed, for the waiting page to show.
+export const startError = (slug) => supervised.get(slug)?.why ?? null;
+
+// Guarantee this tenant's daemon is coming up, and report whether it is usable
+// NOW. Deliberately synchronous: the request path must never block on a boot.
+//
+//   { ready: true }                  -> forward immediately
+//   { ready: false, starting: true } -> serve the waiting page; it polls back
+//
+// tenant: { slug, odPort, instaticUrl?, mediaKeys? } — same shape as start().
+export function ensure(tenant) {
+  const slug = tenant?.slug;
+  const odPort = tenant?.odPort;
+  if (!slug || !odPort) return { ready: false, starting: false, error: 'no OpenDesign port for this tenant' };
+  if (ready.has(slug)) return { ready: true };
+  if (inflight.has(slug)) return { ready: false, starting: true, error: startError(slug) };
+
+  const job = (async () => {
+    // ADOPT before spawning. The port may already be served by a daemon we
+    // started that is still warming up, or by one orphaned when the control
+    // plane was killed rather than stopped. A second process on that port dies
+    // of EADDRINUSE and — with the supervisor below — would loop forever.
+    if (!(await isPortOpen(odPort))) {
+      lastParams.set(slug, tenant);
+      start(tenant);
+    }
+    const ok = await waitPortOpen(odPort, START_TIMEOUT_MS);
+    if (ok) {
+      ready.add(slug);
+      clearSupervision(slug);
+    }
+    return ok;
+  })();
+
+  inflight.set(slug, job);
+  job.catch(() => false).finally(() => { if (inflight.get(slug) === job) inflight.delete(slug); });
+  return { ready: false, starting: true, error: startError(slug) };
+}
+
+// A daemon that exited on its own used to stay dead until the next control-plane
+// restart, refusing every /design request in between. Bring it back, with
+// backoff so one that cannot start does not spin.
+function scheduleRestart(slug, why) {
+  if (stopping.has(slug)) return;          // we killed it; not a fault
+  if (!lastParams.has(slug)) return;       // never ours to supervise
+  const sup = supervised.get(slug) || { retries: 0, timer: null };
+  sup.why = why;
+  supervised.set(slug, sup);
+  if (sup.timer) return;
+  // Out of unattended retries: leave it. A request-driven ensure() can still
+  // spawn it, and the waiting page shows `why` rather than spinning forever.
+  if (sup.retries >= RESTART_DELAYS_MS.length) return;
+  const delay = RESTART_DELAYS_MS[sup.retries];
+  sup.retries += 1;
+  sup.timer = setTimeout(() => {
+    sup.timer = null;
+    if (!stopping.has(slug) && !running.has(slug)) ensure(lastParams.get(slug));
+  }, delay);
+  sup.timer.unref?.();
+}
+
+function clearSupervision(slug) {
+  const sup = supervised.get(slug);
+  if (sup?.timer) clearTimeout(sup.timer);
+  supervised.delete(slug);
+}
 
 // The OD web is built ONCE and shared by every tenant: its Next basePath is a
 // fixed, tenant-agnostic `/design`, and the gateway resolves which daemon a request
@@ -91,6 +196,11 @@ function mediaKeyEnv(mediaKeys) {
 export function start(tenant) {
   const { slug, odPort } = tenant;
   if (running.has(slug)) return running.get(slug);
+  // Remember HOW to start this tenant. Every caller (boot resume, provisioning,
+  // ensure()) comes through here, so the supervisor can respawn a daemon that
+  // died without going back to the registry for the decrypted secrets.
+  lastParams.set(slug, tenant);
+  stopping.delete(slug);
 
   const p = odPaths(slug);
   mkdirSync(p.dataDir, { recursive: true });
@@ -183,14 +293,30 @@ export function start(tenant) {
   });
   daemon.stdout.on('data', (d) => out.write(d));
   daemon.stderr.on('data', (d) => out.write(d));
-  daemon.on('exit', (code) => { out.write(`\n[od-runtime] ${slug} daemon exited code=${code} @ ${new Date().toISOString()}\n`); running.delete(slug); });
-  daemon.on('error', (err) => { out.write(`\n[od-runtime] ${slug} daemon spawn error: ${err?.message ?? err}\n`); running.delete(slug); });
+  daemon.on('exit', (code) => {
+    out.write(`\n[od-runtime] ${slug} daemon exited code=${code} @ ${new Date().toISOString()}\n`);
+    running.delete(slug);
+    ready.delete(slug);
+    scheduleRestart(slug, `the design daemon exited (code ${code})`);
+  });
+  daemon.on('error', (err) => {
+    out.write(`\n[od-runtime] ${slug} daemon spawn error: ${err?.message ?? err}\n`);
+    running.delete(slug);
+    ready.delete(slug);
+    scheduleRestart(slug, `the design daemon could not start: ${err?.message ?? err}`);
+  });
 
   // NOTE: no per-tenant web is spawned here any more. ONE shared Next process
   // (startSharedWeb, below) serves every tenant; the gateway routes each request
   // to this daemon using the hub session cookie.
   const rec = { child: daemon, web: null, port: odPort, webPort: sharedWebPort(), pid: daemon.pid, slug };
   running.set(slug, rec);
+  // Watch it up. Boot resume and provisioning call start() directly, so without
+  // this the first request after a restart would always meet an "unready" daemon
+  // and show the waiting page even though it had been booting for minutes.
+  waitPortOpen(odPort, START_TIMEOUT_MS).then((ok) => {
+    if (ok && running.has(slug)) { ready.add(slug); clearSupervision(slug); }
+  });
   return rec;
 }
 
@@ -211,8 +337,35 @@ export function isWebBuilt() {
 // session's own daemon, so this process never needs to know which tenant it is
 // serving — and per-tenant data isolation still lives entirely in the daemons.
 let sharedWeb = null;
+let sharedWebReady = false;
+let sharedWebInflight = null;
 
 export const isSharedWebRunning = () => sharedWeb !== null && !sharedWeb.killed;
+export const isSharedWebReady = () => sharedWebReady;
+
+// The SPA shell carries the same exposure as the daemons: while this ONE process
+// is down, /design refused connections for EVERY tenant at once. Same contract as
+// ensure() — never blocks, and says whether forwarding is safe yet.
+export function ensureSharedWeb() {
+  if (sharedWebReady) return { ready: true };
+  if (sharedWebInflight) return { ready: false, starting: true };
+  const port = sharedWebPort();
+  const job = (async () => {
+    // Adopt a web that is already listening: startSharedWeb() reaps whatever
+    // holds this port, so calling it blindly would kill a healthy shared web.
+    if (!(await isPortOpen(port))) startSharedWeb();
+    const ok = await waitPortOpen(port, WEB_START_TIMEOUT_MS);
+    if (ok) sharedWebReady = true;
+    return ok;
+  })();
+  sharedWebInflight = job;
+  job.catch(() => false).finally(() => { if (sharedWebInflight === job) sharedWebInflight = null; });
+  return { ready: false, starting: true };
+}
+
+export function markSharedWebUnavailable() {
+  sharedWebReady = false;
+}
 
 // Kill anything already listening on the shared web port that we did not spawn.
 // Without this, a leftover per-tenant `next start` from the OLD model (or a web
@@ -282,12 +435,14 @@ export function startSharedWeb() {
   sharedWeb = spawn('node', webArgs, { cwd: webCwd, env: webEnv, shell: isWin, windowsHide: true });
   sharedWeb.stdout.on('data', (d) => out.write(d));
   sharedWeb.stderr.on('data', (d) => out.write(d));
-  sharedWeb.on('exit', (code) => { out.write(`\n[od-runtime] shared web exited code=${code}\n`); sharedWeb = null; });
-  sharedWeb.on('error', (err) => { out.write(`\n[od-runtime] shared web spawn error: ${err?.message ?? err}\n`); sharedWeb = null; });
+  sharedWeb.on('exit', (code) => { out.write(`\n[od-runtime] shared web exited code=${code}\n`); sharedWeb = null; sharedWebReady = false; });
+  sharedWeb.on('error', (err) => { out.write(`\n[od-runtime] shared web spawn error: ${err?.message ?? err}\n`); sharedWeb = null; sharedWebReady = false; });
+  waitPortOpen(webPort, WEB_START_TIMEOUT_MS).then((ok) => { if (ok && sharedWeb) sharedWebReady = true; });
   return sharedWeb;
 }
 
 export function stopSharedWeb() {
+  sharedWebReady = false;
   if (!sharedWeb) return;
   const pid = sharedWeb.pid;
   sharedWeb = null;
@@ -340,6 +495,11 @@ export function buildWeb() {
 }
 
 export function stop(slug) {
+  // Record the intent BEFORE the kill: the exit handler fires asynchronously and
+  // would otherwise read a deliberate stop as a crash and respawn it.
+  stopping.add(slug);
+  clearSupervision(slug);
+  ready.delete(slug);
   const rec = running.get(slug);
   if (!rec) return false;
   for (const pid of [rec.pid, rec.webPid]) {

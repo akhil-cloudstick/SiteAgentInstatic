@@ -317,7 +317,7 @@ async function exportBundle(
   sourceDb: DbClient,
   sourceCookie: string,
 ): Promise<SiteBundle> {
-  const req = new Request('http://localhost/admin/api/cms/export', { method: 'GET' })
+  const req = new Request('http://localhost/cms/api/cms/export', { method: 'GET' })
   req.headers.set('cookie', sourceCookie)
   const res = await handleExportRoute(req, sourceDb)
   expect(res).not.toBeNull()
@@ -390,7 +390,7 @@ describe('with strategies — handler-level roundtrip', () => {
       await runMigrations(targetDb, sqliteMigrations)
       targetCookie = await seedRoundtripAuth(targetDb, 'target-replace@roundtrip.test')
 
-      const req = new Request('http://localhost/admin/api/cms/import?strategy=replace', {
+      const req = new Request('http://localhost/cms/api/cms/import?strategy=replace', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(sourceBundle),
@@ -454,7 +454,7 @@ describe('with strategies — handler-level roundtrip', () => {
       await runMigrations(targetDb, sqliteMigrations)
       targetCookie = await seedRoundtripAuth(targetDb, 'target-merge-add@roundtrip.test')
 
-      const req = new Request('http://localhost/admin/api/cms/import?strategy=merge-add', {
+      const req = new Request('http://localhost/cms/api/cms/import?strategy=merge-add', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(sourceBundle),
@@ -501,7 +501,7 @@ describe('with strategies — handler-level roundtrip', () => {
       await runMigrations(targetDb, sqliteMigrations)
       targetCookie = await seedRoundtripAuth(targetDb, 'target-merge-overwrite@roundtrip.test')
 
-      const req = new Request('http://localhost/admin/api/cms/import?strategy=merge-overwrite', {
+      const req = new Request('http://localhost/cms/api/cms/import?strategy=merge-overwrite', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(sourceBundle),
@@ -570,7 +570,7 @@ describe('with strategies — handler-level roundtrip', () => {
         updatedAt: null,
       })
 
-      const req = new Request('http://localhost/admin/api/cms/import?strategy=merge-overwrite', {
+      const req = new Request('http://localhost/cms/api/cms/import?strategy=merge-overwrite', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(sourceBundle),
@@ -681,7 +681,7 @@ describe('full-site round-trip — folders, membership, redirects', () => {
     })
 
     // --- Export the full bundle (media included so folderIds travel) ---
-    const exportReq = new Request('http://localhost/admin/api/cms/export?includeMedia=1', { method: 'GET' })
+    const exportReq = new Request('http://localhost/cms/api/cms/export?includeMedia=1', { method: 'GET' })
     exportReq.headers.set('cookie', sourceCookie)
     const exportRes = await handleExportRoute(exportReq, sourceDb, { uploadsDir: sourceDir })
     expect(exportRes!.status).toBe(200)
@@ -699,7 +699,7 @@ describe('full-site round-trip — folders, membership, redirects', () => {
     await runMigrations(targetDb, sqliteMigrations)
     const targetCookie = await seedRoundtripAuth(targetDb, 'fullsite-target@roundtrip.test')
 
-    const importReq = new Request('http://localhost/admin/api/cms/import/archive?strategy=replace', {
+    const importReq = new Request('http://localhost/cms/api/cms/import/archive?strategy=replace', {
       method: 'POST',
       headers: { 'content-type': 'application/zip' },
       body: archiveBytes,
@@ -779,7 +779,7 @@ describe('archive import validation', () => {
         [BUNDLE_ARCHIVE_MANIFEST_PATH]: strToU8(JSON.stringify(manifest)),
       }, { level: 0 })
 
-      const req = new Request('http://localhost/admin/api/cms/import/archive?strategy=merge-add', {
+      const req = new Request('http://localhost/cms/api/cms/import/archive?strategy=merge-add', {
         method: 'POST',
         headers: { 'content-type': 'application/zip' },
         body: archiveBytes,
@@ -835,7 +835,7 @@ describe('archive import validation', () => {
         [BUNDLE_ARCHIVE_MANIFEST_PATH]: strToU8(JSON.stringify(manifest)),
       }, { level: 0 })
 
-      const req = new Request('http://localhost/admin/api/cms/import/archive?strategy=replace', {
+      const req = new Request('http://localhost/cms/api/cms/import/archive?strategy=replace', {
         method: 'POST',
         headers: { 'content-type': 'application/zip' },
         body: archiveBytes,
@@ -894,7 +894,7 @@ describe('archive import validation', () => {
         [BUNDLE_ARCHIVE_MANIFEST_PATH]: strToU8(JSON.stringify(manifest)),
       }, { level: 0 })
 
-      const req = new Request('http://localhost/admin/api/cms/import/archive?strategy=merge-add', {
+      const req = new Request('http://localhost/cms/api/cms/import/archive?strategy=merge-add', {
         method: 'POST',
         headers: { 'content-type': 'application/zip' },
         body: archiveBytes,
@@ -989,7 +989,7 @@ describe('archive import validation', () => {
         selection: JSON.stringify(selection),
       })
 
-      const req = new Request(`http://localhost/admin/api/cms/import/archive?${params.toString()}`, {
+      const req = new Request(`http://localhost/cms/api/cms/import/archive?${params.toString()}`, {
         method: 'POST',
         headers: { 'content-type': 'application/zip' },
         body: archiveBytes,

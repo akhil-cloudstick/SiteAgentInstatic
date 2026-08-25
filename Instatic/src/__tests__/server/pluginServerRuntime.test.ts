@@ -279,7 +279,7 @@ async function installPlugin(args: {
   }))
   formData.set('grantedPermissions', JSON.stringify(args.grantedPermissions))
   return await handleCmsRequest(
-    cmsFormRequest('http://localhost/admin/api/cms/plugins/package', formData, { cookie: args.cookie }),
+    cmsFormRequest('http://localhost/cms/api/cms/plugins/package', formData, { cookie: args.cookie }),
     args.db,
     { uploadsDir: args.uploadsDir },
   )
@@ -322,7 +322,7 @@ describe('server plugin runtime SDK', () => {
 
       // Hit the runtime route WITHOUT a session cookie — public routes skip auth.
       const res = await handleCmsRequest(
-        cmsRequest('http://localhost/admin/api/cms/plugins/acme.workflow/runtime/status'),
+        cmsRequest('http://localhost/cms/api/cms/plugins/acme.workflow/runtime/status'),
         db,
         { uploadsDir },
       )
@@ -472,14 +472,14 @@ describe('server plugin runtime SDK', () => {
       expect(install.status).toBe(201)
 
       const before = await handleCmsRequest(
-        cmsRequest('http://localhost/admin/api/cms/plugins/acme.settings-live/runtime/key'),
+        cmsRequest('http://localhost/cms/api/cms/plugins/acme.settings-live/runtime/key'),
         db,
         { uploadsDir },
       )
       expect(await before.json()).toEqual({ key: 'initial' })
 
       const put = await handleCmsRequest(
-        cmsRequest('http://localhost/admin/api/cms/plugins/acme.settings-live/settings', {
+        cmsRequest('http://localhost/cms/api/cms/plugins/acme.settings-live/settings', {
           method: 'PUT',
           body: JSON.stringify({ settings: { apiKey: 'rotated' } }),
           headers: { cookie },
@@ -492,7 +492,7 @@ describe('server plugin runtime SDK', () => {
       // No reload, no restart — the running VM's mirror was pushed, so the
       // already-registered route handler reads the new value immediately.
       const after = await handleCmsRequest(
-        cmsRequest('http://localhost/admin/api/cms/plugins/acme.settings-live/runtime/key'),
+        cmsRequest('http://localhost/cms/api/cms/plugins/acme.settings-live/runtime/key'),
         db,
         { uploadsDir },
       )
@@ -526,7 +526,7 @@ describe('server plugin runtime SDK', () => {
       expect(install.status).toBe(201)
 
       const put = await handleCmsRequest(
-        cmsRequest('http://localhost/admin/api/cms/plugins/acme.settings-dormant/settings', {
+        cmsRequest('http://localhost/cms/api/cms/plugins/acme.settings-dormant/settings', {
           method: 'PUT',
           body: JSON.stringify({ settings: { apiKey: 'rotated' } }),
           headers: { cookie },
@@ -572,7 +572,7 @@ describe('server plugin runtime SDK', () => {
       // The PUT awaits the hook emission, which awaits the in-worker
       // listener — by the time it returns, `observed` has been captured.
       const put = await handleCmsRequest(
-        cmsRequest('http://localhost/admin/api/cms/plugins/acme.settings-hooks/settings', {
+        cmsRequest('http://localhost/cms/api/cms/plugins/acme.settings-hooks/settings', {
           method: 'PUT',
           body: JSON.stringify({ settings: { apiKey: 'rotated' } }),
           headers: { cookie },
@@ -583,7 +583,7 @@ describe('server plugin runtime SDK', () => {
       expect(put.status).toBe(200)
 
       const res = await handleCmsRequest(
-        cmsRequest('http://localhost/admin/api/cms/plugins/acme.settings-hooks/runtime/observed'),
+        cmsRequest('http://localhost/cms/api/cms/plugins/acme.settings-hooks/runtime/observed'),
         db,
         { uploadsDir },
       )

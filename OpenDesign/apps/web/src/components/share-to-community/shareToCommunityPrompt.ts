@@ -1,4 +1,4 @@
-// Trigger prompt for the post-completion "Share to MMS Design" submission
+// Trigger prompt for the post-completion "Share to Open Design" submission
 // action. Mirrors the constraint surface of
 // `home-hero/plugin-authoring.ts`'s `PLUGIN_AUTHORING_PROMPT_TEMPLATE`
 // (no chained shell suggestions, no jq, point user at the plugin-folder
@@ -11,7 +11,7 @@
 // the conversation when the user clicks the button.
 
 export const SHARE_TO_COMMUNITY_PROMPT = [
-  'Package the work I just finished in this project as an MMS Design plugin so I can install it into My plugins and open a PR to the MMS Design community catalog.',
+  'Package the work I just finished in this project as an Open Design plugin so I can install it into My plugins and open a PR to the Open Design community catalog.',
   '',
   'Follow the bundled `od-share-to-community` scenario at `plugins/_official/scenarios/od-share-to-community/SKILL.md` end to end. Do not ask me for fields the project files already answer — read `*.artifact.json`, `brand-spec.md` / `DESIGN.md`, and the generated artifacts in this workspace, then derive the manifest from what you find.',
   '',

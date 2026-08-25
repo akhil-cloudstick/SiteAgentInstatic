@@ -134,19 +134,6 @@ describe('run failure telemetry smoke', () => {
         message: `od-failure-smoke-context ${'large-context '.repeat(10_000)}`,
       },
       {
-        id: 'model_context_budget',
-        agentId: 'claude',
-        config: { agentCliEnv: { claude: { CLAUDE_BIN: path.join(binDir, 'claude-auth') } } },
-        model: 'claude-sonnet-4-5',
-        expectedCode: 'AGENT_PROMPT_TOO_LARGE',
-        expectedCategory: 'prompt_too_large',
-        expectedDetail: 'prompt_too_large',
-        expectedDiagnosticSource: 'error_event',
-        expectedContextBudgetAction: 'blocked',
-        expectStderr: false,
-        message: `od-failure-smoke-model-context ${'x'.repeat(650_000)}`,
-      },
-      {
         id: 'hang_timeout',
         agentId: 'claude',
         config: { agentCliEnv: { claude: { CLAUDE_BIN: path.join(binDir, 'claude-hang') } } },
@@ -164,7 +151,6 @@ describe('run failure telemetry smoke', () => {
         caseId: item.id,
         agentId: item.agentId,
         message: 'message' in item ? item.message : `od-failure-smoke-${item.id}`,
-        ...('model' in item ? { model: item.model } : {}),
       });
       const events = await readRunEvents(run.eventsLogPath);
       const errorCode = deriveRunErrorCode(run);
@@ -188,15 +174,6 @@ describe('run failure telemetry smoke', () => {
       expect(failure?.failure_detail).toBe(item.expectedDetail);
       expect(diagnostics.diagnostic_source).toBe(item.expectedDiagnosticSource);
       expect(diagnostics.stderr_present).toBe(item.expectStderr);
-      if ('expectedContextBudgetAction' in item) {
-        expect(events).toContainEqual(expect.objectContaining({
-          event: 'diagnostic',
-          data: expect.objectContaining({
-            type: 'model_context_budget',
-            action: item.expectedContextBudgetAction,
-          }),
-        }));
-      }
 
       await finalizeAssistantMessage(started.url, run);
       const trace = await ingestion.waitForTrace(run.id);
@@ -204,17 +181,13 @@ describe('run failure telemetry smoke', () => {
         .toContain(trace.body.metadata.error_code);
       expect(trace.body.metadata.failure_category).toBe(item.expectedCategory);
       expect(trace.body.metadata.failure_detail).toBe(item.expectedDetail);
-      if ('expectedContextBudgetAction' in item) {
-        expect(trace.body.metadata.contextBudgetAction).toBe(item.expectedContextBudgetAction);
-        expect(trace.body.metadata.contextWindowTokens).toBe(204_800);
-      }
       if (item.expectStderr) {
         expect(trace.body.metadata.stderr.lineCount).toBeGreaterThan(0);
       } else {
         expect(trace.body.metadata.stderr).toBeUndefined();
       }
     }
-  });
+  }, 60_000);
 
   it('reclassifies upstream + install/env failures end-to-end through a real daemon run (#3408 P1)', async () => {
     // End-to-end proof for the reclassification: a real agent process emits the
@@ -506,7 +479,6 @@ async function createAndWaitForRun(url: string, input: {
   caseId: string;
   agentId: string;
   message: string;
-  model?: string;
 }): Promise<RunStatus> {
   const projectId = `failure_smoke_${input.caseId}_${randomUUID()}`;
   const projectResponse = await fetch(`${url}/api/projects`, {
@@ -531,7 +503,6 @@ async function createAndWaitForRun(url: string, input: {
       assistantMessageId,
       clientRequestId: `client_${input.caseId}_${randomUUID()}`,
       agentId: input.agentId,
-      ...(input.model ? { model: input.model } : {}),
       message: input.message,
       currentPrompt: input.message,
     }),

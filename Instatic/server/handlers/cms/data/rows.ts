@@ -1,14 +1,14 @@
 /**
  * Data-row endpoints.
  *
- *   GET    /admin/api/cms/data/authors                  — list assignable authors
- *   GET    /admin/api/cms/data/rows/:id                 — read a single row
- *   PATCH  /admin/api/cms/data/rows/:id                 — save the draft cells
- *   DELETE /admin/api/cms/data/rows/:id                 — soft delete
- *   POST   /admin/api/cms/data/rows/:id/publish         — publish
- *   PATCH  /admin/api/cms/data/rows/:id/status          — flip between draft/unpublished
- *   PATCH  /admin/api/cms/data/rows/:id/author          — reassign the author
- *   PATCH  /admin/api/cms/data/rows/:id/table           — move row to a new table
+ *   GET    /cms/api/cms/data/authors                  — list assignable authors
+ *   GET    /cms/api/cms/data/rows/:id                 — read a single row
+ *   PATCH  /cms/api/cms/data/rows/:id                 — save the draft cells
+ *   DELETE /cms/api/cms/data/rows/:id                 — soft delete
+ *   POST   /cms/api/cms/data/rows/:id/publish         — publish
+ *   PATCH  /cms/api/cms/data/rows/:id/status          — flip between draft/unpublished
+ *   PATCH  /cms/api/cms/data/rows/:id/author          — reassign the author
+ *   PATCH  /cms/api/cms/data/rows/:id/table           — move row to a new table
  *
  * `handleDataRowRoutes` runs a flat `DATA_ROW_ROUTES` table through the shared
  * `runRouteTable` dispatcher (`../routeTable.ts`); one handler below per
@@ -36,6 +36,7 @@ import {
   updateDataRowTable,
 } from '../../../repositories/data'
 import { publishDataRow, removeDataRowArtefact } from '../../../publish/publishRow'
+import { runPublishFlush } from '../../../publish/publishFlush'
 import { findUserById } from '../../../repositories/users'
 import { slugForTable } from '@core/data/cells'
 import { badRequest, jsonResponse, readValidatedBody } from '../../../http'
@@ -254,6 +255,12 @@ async function handleRowSchedulePost(
   const rowId = params.id
   const user = await requireDataPublisher(req, db)
   if (user instanceof Response) return user
+
+  // Flush the collab relay before reading the row, exactly as `publishDataRow`
+  // does. A page created or edited in the visual editor lives in the relay's
+  // in-memory doc until the persist debounce elapses, so scheduling one right
+  // after creating it would otherwise 404 with "Data row not found".
+  await runPublishFlush()
 
   const currentRow = await loadRowForAccess(db, rowId, user, canPublishDataRow)
   if (currentRow instanceof Response) return currentRow

@@ -1,14 +1,14 @@
 /**
  * Media folder endpoints — capabilities mirror the asset endpoints.
  *
- *   GET    /admin/api/cms/media/folders         — flat list; client builds tree
+ *   GET    /cms/api/cms/media/folders         — flat list; client builds tree
  *                                                  (`media.read` — folder tree
  *                                                  is part of the library view)
- *   POST   /admin/api/cms/media/folders         — { name, parentId? }
+ *   POST   /cms/api/cms/media/folders         — { name, parentId? }
  *                                                  (`media.write`)
- *   PATCH  /admin/api/cms/media/folders/:id     — { name?, parentId?, sortOrder? }
+ *   PATCH  /cms/api/cms/media/folders/:id     — { name?, parentId?, sortOrder? }
  *                                                  (`media.write`)
- *   DELETE /admin/api/cms/media/folders/:id     — cascade removes child folders +
+ *   DELETE /cms/api/cms/media/folders/:id     — cascade removes child folders +
  *                                                  asset membership rows (assets
  *                                                  themselves stay, just become
  *                                                  Uncategorized)

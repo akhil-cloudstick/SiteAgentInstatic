@@ -30,44 +30,6 @@ export function takeDesignSystemAssetSeed(): DesignSystemAssetSeed | null {
   return seed;
 }
 
-// --- Path A2: seed the "Create design system" flow with a full setup ---------
-// The approved MMSBUILD screen collects every creation input in a modal on the
-// Design systems page (`CreateDesignSystemDialog`), not on the create route. The
-// modal therefore stands in for the flow's `setup` + `confirm` steps and parks
-// the collected state here; `DesignSystemFlow` takes it on mount and goes
-// straight to generation.
-//
-// In memory rather than sessionStorage for the same reason as Path A: the seed
-// carries `File` objects, which cannot be serialized. Both consumers live in the
-// same SPA session, so the hand-off survives the route change and a refresh
-// correctly drops it (the create route then renders its own full setup form).
-
-export interface DesignSystemSetupSeed {
-  company: string;
-  designMd: string;
-  sourceUrls: string[];
-  figmaUrls: string[];
-  codeFolders: string[];
-  figFiles: string[];
-  figFileObjects: File[];
-  assetFiles: string[];
-  assetFileObjects: File[];
-  notes: string;
-}
-
-let dsSetupSeed: DesignSystemSetupSeed | null = null;
-
-export function setDesignSystemSetupSeed(seed: DesignSystemSetupSeed | null): void {
-  dsSetupSeed = seed;
-}
-
-/** Consume the design-system setup seed (single-shot). */
-export function takeDesignSystemSetupSeed(): DesignSystemSetupSeed | null {
-  const seed = dsSetupSeed;
-  dsSetupSeed = null;
-  return seed;
-}
-
 // --- Path B: seed an existing project's composer ----------------------------
 // A query + the assets just copied into the project, to pre-fill the chat
 // composer of the target design system's project so the user can review + Send.

@@ -455,7 +455,7 @@ describe('handleExportRoute — POST { tables: [{ tableId: "pages", rowIds: [bog
 describe('handleExportRoute — auth', () => {
   test('returns 401 when no session cookie', async () => {
     // Deliberately no cookie set
-    const req = new Request('http://localhost/admin/api/cms/export', { method: 'GET' })
+    const req = new Request('http://localhost/cms/api/cms/export', { method: 'GET' })
     const res = await handleExportRoute(req, db)
     expect(res!.status).toBe(401)
   })
@@ -496,7 +496,7 @@ describe('handleExportRoute — POST /export/estimate', () => {
   })
 
   test('requires a session (401 without a cookie)', async () => {
-    const req = new Request('http://localhost/admin/api/cms/export/estimate', {
+    const req = new Request('http://localhost/cms/api/cms/export/estimate', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: '{}',

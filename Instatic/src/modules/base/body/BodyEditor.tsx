@@ -18,7 +18,7 @@
 import { use, useEffect } from 'react'
 import type { ModuleComponentProps, NodeWrapperProps as NodeWrapperPropsType } from '@core/module-engine'
 import { applyIframeBodyPresentation } from '@site/canvas/iframeBodyPresentation'
-import { htmlAttributesForReact } from '@modules/base/shared/htmlAttributes'
+import { htmlAttributesForDom } from '@modules/base/shared/htmlAttributes'
 import { CanvasDocumentContext } from '@site/canvas/CanvasContexts'
 
 type BodyProps = { htmlAttributes?: unknown }
@@ -38,7 +38,7 @@ export const BodyEditor = ({
       body,
       mcClassName,
       nodeWrapperProps,
-      htmlAttributesForReact(props.htmlAttributes),
+      htmlAttributesForDom(props.htmlAttributes),
     )
   }, [iframeDocument, mcClassName, nodeWrapperProps, props.htmlAttributes])
 

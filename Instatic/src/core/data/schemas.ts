@@ -346,7 +346,7 @@ export type DataTable = Static<typeof DataTableSchema>
 /**
  * DataTableListItem — `DataTable` enriched with a live row count.
  *
- * Returned by the `GET /admin/api/cms/data/tables` list endpoint.
+ * Returned by the `GET /cms/api/cms/data/tables` list endpoint.
  * `rowCount` is computed server-side (subselect on `data_rows`) and is NOT
  * persisted — do not add `rowCount` to `DataTableSchema` or the bundle schema.
  */
@@ -404,6 +404,14 @@ export const DataRowSchema = Type.Object({
   /** Denormalized from `cells.slug` for fast unique / route lookup. */
   slug: Type.String(),
   status: DataRowStatusSchema,
+  /**
+   * Site-global sync seq stamped by the last transactional save that wrote or
+   * soft-deleted this row (0 = never stamped). Conflict-detection and
+   * delta-reconciliation substrate for multi-admin sync. OPTIONAL because
+   * `DataRowSchema` also validates bundle archives exported before seqs
+   * existed — server reads always populate it.
+   */
+  seq: Type.Optional(Type.Number()),
   authorUserId: NullableUserIdSchema,
   createdByUserId: NullableUserIdSchema,
   updatedByUserId: NullableUserIdSchema,
@@ -586,7 +594,7 @@ const SaveDataRowDraftInputSchema = Type.Object({
 export type SaveDataRowDraftInput = Static<typeof SaveDataRowDraftInputSchema>
 
 // ---------------------------------------------------------------------------
-// DataMeta — lean binding catalog returned by GET /admin/api/cms/data/_meta.
+// DataMeta — lean binding catalog returned by GET /cms/api/cms/data/_meta.
 //
 // A stripped-down view of the data tables + fields, designed for use by
 // the instatic binding picker. Contains only what the picker needs to

@@ -1,9 +1,9 @@
 /**
  * Plugin state-mutation routes — flip enabled, uninstall, restart.
  *
- *   PATCH  /admin/api/cms/plugins/:id              — enable / disable
- *   DELETE /admin/api/cms/plugins/:id[?force=true] — uninstall + delete on-disk assets
- *   POST   /admin/api/cms/plugins/:id/restart      — manual restart for a parked plugin
+ *   PATCH  /cms/api/cms/plugins/:id              — enable / disable
+ *   DELETE /cms/api/cms/plugins/:id[?force=true] — uninstall + delete on-disk assets
+ *   POST   /cms/api/cms/plugins/:id/restart      — manual restart for a parked plugin
  *
  * Every route runs the matching lifecycle hook (`activate`, `deactivate`,
  * `uninstall`), broadcasts the event, and emits one audit record. The
@@ -226,7 +226,7 @@ async function removePluginCompletely(
 }
 
 /**
- * `POST /admin/api/cms/plugins/:id/restart`
+ * `POST /cms/api/cms/plugins/:id/restart`
  *
  * Manual restart for a plugin parked in `lifecycle_status='error'` after
  * its crash budget was exhausted (or whenever the operator wants to bounce

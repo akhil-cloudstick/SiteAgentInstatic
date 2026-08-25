@@ -67,12 +67,20 @@ function makeFakeDb() {
     if (normalized.includes('select id, name, settings_json')) {
       return { rows: siteRow ? [siteRow as Row] : [], rowCount: siteRow ? 1 : 0 }
     }
+    // getDraftSiteSeq — shell conflict-detection base (0 when unstamped)
+    if (normalized.includes('select seq from site')) {
+      return {
+        rows: siteRow ? [{ seq: Number(siteRow.seq ?? 0) } as unknown as Row] : [],
+        rowCount: siteRow ? 1 : 0,
+      }
+    }
     // allocateSiteSeq — the site-document save's sync counter
     if (normalized.includes('update site_sync_state')) {
       return { rows: [{ seq: 1 } as unknown as Row], rowCount: 1 }
     }
     // stampDraftSiteSeq
     if (normalized.includes('update site set seq')) {
+      if (siteRow) siteRow.seq = values[0]
       return { rows: [], rowCount: 1 }
     }
     // listDataRows / listDataRowIdSlugs / listSoftDeletedDataRowIds — this
@@ -155,7 +163,7 @@ function cmsRequest(
 describe('cms site handlers', () => {
   it('requires an admin session for draft site reads', async () => {
     const db = makeFakeDb()
-    const res = await handleCmsRequest(cmsRequest('http://localhost/admin/api/cms/site'), db)
+    const res = await handleCmsRequest(cmsRequest('http://localhost/cms/api/cms/site'), db)
 
     expect(res.status).toBe(401)
   })
@@ -164,7 +172,7 @@ describe('cms site handlers', () => {
     const db = makeFakeDb()
     const cookie = await createCookie(db)
 
-    const save = await handleCmsRequest(cmsRequest('http://localhost/admin/api/cms/site-document', {
+    const save = await handleCmsRequest(cmsRequest('http://localhost/cms/api/cms/site-document', {
       method: 'PUT',
       body: JSON.stringify({
         mode: 'incremental',
@@ -175,6 +183,8 @@ describe('cms site handlers', () => {
         deletedComponentIds: [],
         changedLayouts: [],
         deletedLayoutIds: [],
+        baseSeqs: {},
+        shellBaseSeq: 0,
       }),
       headers: {
         'content-type': 'application/json',
@@ -183,7 +193,7 @@ describe('cms site handlers', () => {
     }), db)
     expect(save.status).toBe(200)
 
-    const load = await handleCmsRequest(cmsRequest('http://localhost/admin/api/cms/site', {
+    const load = await handleCmsRequest(cmsRequest('http://localhost/cms/api/cms/site', {
       headers: { cookie },
     }), db)
     expect(load.status).toBe(200)

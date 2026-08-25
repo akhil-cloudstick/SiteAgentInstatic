@@ -21,7 +21,7 @@ const EMAIL = 'owner@example.com'
 
 async function setup(db: DbClient): Promise<void> {
   const res = await handleCmsRequest(
-    new Request('http://localhost/admin/api/cms/setup', {
+    new Request('http://localhost/cms/api/cms/setup', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ siteName: 'Lockout Test', email: EMAIL, password: PASSWORD }),
@@ -42,7 +42,7 @@ async function login(db: DbClient, opts: LoginOptions = {}): Promise<Response> {
   const password = opts.password ?? PASSWORD
   const ip = opts.ip ?? '203.0.113.10'
   const headers = new Headers({ 'content-type': 'application/json' })
-  const req = new Request('http://localhost/admin/api/cms/login', {
+  const req = new Request('http://localhost/cms/api/cms/login', {
     method: 'POST',
     headers,
     body: JSON.stringify({ email, password }),

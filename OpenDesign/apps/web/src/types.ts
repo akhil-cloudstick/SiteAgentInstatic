@@ -67,6 +67,7 @@ import type {
   PreviewAnnotationStyle,
   PreviewCommentSelectionKind,
   PreviewComment,
+  PreviewCommentAnchorState,
   PreviewCommentAttachment,
   PreviewCommentStatus,
   PreviewCommentTarget,
@@ -87,6 +88,7 @@ import type {
   SkillDetail,
   SkillSummary,
   InstallInput,
+  InstallSkillRequest,
   InstallSkillResponse,
   InstallDesignSystemResponse,
   UninstallResponse,
@@ -344,14 +346,13 @@ export interface PetCustom {
 }
 
 export interface NotificationsConfig {
-  // Master switch for the completion sound. Default false — first-run users
-  // hear nothing until they opt in.
+  // Master switch for the completion sound. Default true; users can opt out.
   soundEnabled: boolean;
   // Sound id played when a turn ends with `runStatus === 'succeeded'`.
   successSoundId: string;
   // Sound id played when a turn ends with `runStatus === 'failed'`.
   failureSoundId: string;
-  // Master switch for the browser Notification API banner. Default false.
+  // Master switch for the browser Notification API banner. Default true.
   desktopEnabled: boolean;
 }
 
@@ -361,6 +362,10 @@ export interface OrbitConfig {
   time: string;
   /** Optional skill id from the examples gallery where scenario === "orbit". */
   templateSkillId?: string | null;
+  workspaceScope?: {
+    workspaceId: string;
+    workspaceMemberId: string;
+  } | null;
 }
 
 export interface PetConfig {
@@ -531,8 +536,6 @@ export type ModelCapability = 'standard' | 'advanced' | 'best_quality';
 export interface ModelMetadata {
   cost?: ModelCost;
   capability?: ModelCapability;
-  contextWindowTokens?: number;
-  maxOutputTokens?: number;
 }
 
 export interface AgentModelOption {
@@ -543,6 +546,8 @@ export interface AgentModelOption {
   inputPriceUsdPerMillion?: number;
   outputPriceUsdPerMillion?: number;
   metadata?: ModelMetadata;
+  additionalSpeedTiers?: string[];
+  serviceTierOptions?: AgentModelOption[];
 }
 
 export type Surface = 'web' | 'image' | 'video' | 'audio';
@@ -616,6 +621,7 @@ export type {
   Project,
   ProjectPlatform,
   PreviewComment,
+  PreviewCommentAnchorState,
   PreviewCommentAttachment,
   PreviewCommentStatus,
   PreviewCommentTarget,
@@ -640,6 +646,7 @@ export type {
   SkillDetail,
   SkillSummary,
   InstallInput,
+  InstallSkillRequest,
   InstallSkillResponse,
   InstallDesignSystemResponse,
   UninstallResponse,

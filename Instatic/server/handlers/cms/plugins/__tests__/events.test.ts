@@ -10,7 +10,7 @@ async function connectPluginEventStream(): Promise<{
 }> {
   const requestController = new AbortController()
   const response = handlePluginEventsStream(new Request(
-    'http://localhost/admin/api/cms/plugins/events',
+    'http://localhost/cms/api/cms/plugins/events',
     { signal: requestController.signal },
   ))
   const reader = response.body!.getReader()

@@ -1,55 +1,74 @@
-# Editor Undo/Redo History
+# Editor undo/redo
 
-How the visual editor captures, stores, and applies undo/redo history using Mutative patch pairs.
+How Cmd+Z works in the visual editor since real-time co-editing landed.
 
-Every undoable mutation captures a `HistoryEntry` — a pair of Mutative patch arrays scoped to the `SiteDocument`. Undo applies the `inverse` patches; redo applies the `forward` patches. Cost is O(change): only the paths the recipe touches are drafted and copied.
+## Where history lives
 
----
+History does **not** live in the Zustand store anymore. It lives in the
+collab binding (`src/admin/pages/site/store/slices/site/collabBinding.ts`)
+as one **`Y.UndoManager` per collab document** — one per page, Visual
+Component, and layout, plus one for the site shell/rosters. The store only
+mirrors availability flags (`canUndo` / `canRedo`) and exposes the `undo` /
+`redo` actions, which delegate to the binding (`site/undoRedoActions.ts`).
 
-## TL;DR
+Because each manager tracks **`LOCAL_ORIGIN` only**, undo is per-editor by
+construction: your Cmd+Z reverts *your* edits, never a peer’s — the
+co-editing invariant.
 
-- History is `_historyPast: HistoryEntry[]` and `_historyFuture: HistoryEntry[]` on the editor store. Max depth: `MAX_HISTORY` (50).
-- Each `HistoryEntry` holds `{ inverse, forward, coalesceKey }` — patch arrays, not full-site clones.
-- `runHistoricMutation` is the single entry point. All six `mutate*` helpers delegate to it.
-- Continuous-input bursts (per-keystroke text/number edits) fold into one entry via `commitHistory` coalescing.
-- Patches are scoped to `site` (`state.site.*`) — editor-local state (selection, zoom, panel visibility) is not undoable.
-- History is in-memory session state — never serialized.
+## The mutation path
 
----
+Every store mutation still runs through `runHistoricMutation`
+(`site/helpers.ts`): the recipe mutates a Mutative draft, the resulting
+site-relative patches are handed to `applyLocalSitePatches` (the binding),
+which translates them into Y operations on the touched docs
+(`@core/collab` `applySitePatchesToDocs`). The Y transaction is what the
+UndoManager captures — the undo stack IS the CRDT edit history.
 
-## Performance
+Undoing pops the doc’s stack; the resulting doc change projects back into
+the store through the binding’s projection path (the same path remote
+peers’ edits use), synchronously flushed so undo repaints immediately.
 
-Per-mutation wall time is flat at ~0.25–0.4 ms regardless of site size:
+## Coalescing (typing bursts)
 
-| Nodes  | Patch-based | structuredClone (old) | Speedup |
-|--------|-------------|----------------------|---------|
-| 500    | 0.25 ms     | 0.76 ms              | 3×      |
-| 5,000  | 0.28 ms     | 8.8 ms               | 31×     |
-| 20,000 | 0.32 ms     | 34 ms                | 106×    |
-| 50,000 | 0.40 ms     | 98 ms                | ~245×   |
+Per-keystroke mutations (text edits, number sliders) pass a stable
+`coalesceKey` such as `props:<nodeId>:<prop>` through the `mutate*` helpers.
+The managers run with an infinite `captureTimeout`; the binding calls
+`stopCapturing()` exactly when the incoming key differs from the previous
+one — so consecutive same-key edits merge into ONE undo step, and any
+non-coalescing mutation, undo/redo, or inline-edit session boundary
+(`collabBreakCoalescing`) starts a fresh step. Typing a word is one Cmd+Z.
 
-A full 50-deep history stores ~240 small patches (KB total) instead of 50 whole-site clones (hundreds of MB).
+## Multi-doc undo groups
 
----
+A single mutation can touch several docs (convert-to-component writes the
+page, the new component, and the site roster; Super Import touches
+everything). The binding records each undoable step as a **group of docIds**
+whose managers captured a new stack item, and `undo()` reverts the whole
+group — one Cmd+Z, one logical mutation, across all its documents. The site
+doc always sorts first in a group so roster reverts project after row-level
+reverts.
 
-## Data model
+## Lifecycle
 
-`src/admin/pages/site/store/slices/site/types.ts`:
+`createSite` / `loadSite` / `clearSite` call `resetCollabDocsFromSite`,
+which rebuilds the doc world for the new document and clears every undo
+manager — history never survives a document swap. In detached mode (tests,
+the pre-connect window) docs seed locally from the loaded site; in connected
+mode every doc rebinds through the provider and the server seeds it.
 
-```ts
-import type { Patches } from 'mutative'
+Editor-local state (selection, zoom, panel visibility) is not undoable —
+only document content flows through the docs.
 
-export interface HistoryEntry {
-  /** Patches that revert this transaction. Applied on undo. */
-  inverse: Patches
-  /** Patches that re-apply this transaction. Applied on redo. */
-  forward: Patches
-  /** Coalescing burst identity, or null. */
-  coalesceKey: string | null
-}
-```
+It is, however, **reconciled**. A projection can remove nodes the editor is
+still pointing at — an undo reverting an insertion, or a peer deleting the
+subtree you had selected. The projection path therefore runs
+`pruneCanvasSelectionDraft` after the new site lands, exactly as a local
+`deleteNode` does: selections are pruned by tree-membership (survivors keep
+theirs, the anchor re-syncs, descendants swept with a subtree drop out), and
+an inline-edit session whose node vanished is closed. This is why selection
+state has one pruning implementation rather than one per write path.
 
-The store holds:
+## Key files
 
 ```ts
 _historyPast:       HistoryEntry[]  // stack — most recent last

@@ -56,7 +56,7 @@ function makeFakeDb() {
     // `requireStepUp` lookup — JSON plugin install (and other sensitive
     // plugin admin endpoints) now require a fresh step-up window. The
     // record CRUD calls themselves don't trigger this, but the test
-    // installs the plugin via POST /admin/api/cms/plugins first, which
+    // installs the plugin via POST /cms/api/cms/plugins first, which
     // does. `createCookie` stamps a far-future expiry.
     if (normalized.includes('select step_up_expires_at') && normalized.includes('from sessions')) {
       const session = sessions.find((s) => String(s.id_hash) === String(values[0]))
@@ -276,7 +276,7 @@ const booksPlugin = {
 describe('CMS plugin resource handlers', () => {
   it('requires an admin session for plugin record access', async () => {
     const res = await handleCmsRequest(
-      cmsRequest('http://localhost/admin/api/cms/plugins/acme.books/resources/books/records'),
+      cmsRequest('http://localhost/cms/api/cms/plugins/acme.books/resources/books/records'),
       makeFakeDb(),
     )
 
@@ -287,7 +287,7 @@ describe('CMS plugin resource handlers', () => {
     const db = makeFakeDb()
     const cookie = await createCookie(db)
 
-    const install = await handleCmsRequest(cmsRequest('http://localhost/admin/api/cms/plugins', {
+    const install = await handleCmsRequest(cmsRequest('http://localhost/cms/api/cms/plugins', {
       method: 'POST',
       headers: { cookie, 'content-type': 'application/json' },
       body: JSON.stringify({ manifest: booksPlugin, grantedPermissions: booksPlugin.permissions }),
@@ -295,7 +295,7 @@ describe('CMS plugin resource handlers', () => {
     expect(install.status).toBe(201)
 
     const create = await handleCmsRequest(cmsRequest(
-      'http://localhost/admin/api/cms/plugins/acme.books/resources/books/records',
+      'http://localhost/cms/api/cms/plugins/acme.books/resources/books/records',
       {
         method: 'POST',
         headers: { cookie, 'content-type': 'application/json' },
@@ -307,7 +307,7 @@ describe('CMS plugin resource handlers', () => {
     expect(createdBody.record.data).toEqual({ title: 'Invisible Cities', author: 'Italo Calvino' })
 
     const list = await handleCmsRequest(cmsRequest(
-      'http://localhost/admin/api/cms/plugins/acme.books/resources/books/records',
+      'http://localhost/cms/api/cms/plugins/acme.books/resources/books/records',
       { headers: { cookie } },
     ), db)
     expect(list.status).toBe(200)
@@ -317,7 +317,7 @@ describe('CMS plugin resource handlers', () => {
     })
 
     const update = await handleCmsRequest(cmsRequest(
-      `http://localhost/admin/api/cms/plugins/acme.books/resources/books/records/${createdBody.record.id}`,
+      `http://localhost/cms/api/cms/plugins/acme.books/resources/books/records/${createdBody.record.id}`,
       {
         method: 'PATCH',
         headers: { cookie, 'content-type': 'application/json' },
@@ -330,7 +330,7 @@ describe('CMS plugin resource handlers', () => {
     })
 
     const remove = await handleCmsRequest(cmsRequest(
-      `http://localhost/admin/api/cms/plugins/acme.books/resources/books/records/${createdBody.record.id}`,
+      `http://localhost/cms/api/cms/plugins/acme.books/resources/books/records/${createdBody.record.id}`,
       { method: 'DELETE', headers: { cookie } },
     ), db)
     expect(remove.status).toBe(200)
@@ -342,14 +342,14 @@ describe('CMS plugin resource handlers', () => {
     const db = makeFakeDb()
     const cookie = await createCookie(db)
 
-    await handleCmsRequest(cmsRequest('http://localhost/admin/api/cms/plugins', {
+    await handleCmsRequest(cmsRequest('http://localhost/cms/api/cms/plugins', {
       method: 'POST',
       headers: { cookie, 'content-type': 'application/json' },
       body: JSON.stringify({ manifest: booksPlugin, grantedPermissions: booksPlugin.permissions }),
     }), db)
 
     const res = await handleCmsRequest(cmsRequest(
-      'http://localhost/admin/api/cms/plugins/acme.books/resources/books/records',
+      'http://localhost/cms/api/cms/plugins/acme.books/resources/books/records',
       {
         method: 'POST',
         headers: { cookie, 'content-type': 'application/json' },

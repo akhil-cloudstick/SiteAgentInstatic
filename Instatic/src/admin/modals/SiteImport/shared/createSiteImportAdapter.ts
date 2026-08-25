@@ -2,7 +2,7 @@
  * createSiteImportAdapter — wires the Super Import pipeline to the editor
  * store and the CMS media upload endpoint.
  *
- * Upload: POST /admin/api/cms/media (same endpoint as the media workspace).
+ * Upload: POST /cms/api/cms/media (same endpoint as the media workspace).
  * Commit: calls useEditorStore.getState().mutateAllPagesAndSite in one
  *         atomic Mutative recipe → single Cmd+Z undo step.
  */

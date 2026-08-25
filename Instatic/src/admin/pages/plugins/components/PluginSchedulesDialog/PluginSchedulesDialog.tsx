@@ -4,7 +4,7 @@
  * (Run now / Pause / Resume).
  *
  * Flow:
- *   1. Open dialog → fetch `GET /admin/api/cms/plugins/:id/schedules`
+ *   1. Open dialog → fetch `GET /cms/api/cms/plugins/:id/schedules`
  *   2. User clicks an action button → wrapped in `runStepUp` so the
  *      server-side step-up requirement (set on run-now / pause / resume
  *      in `server/handlers/cms/plugins/index.ts:requiresStepUp`) becomes

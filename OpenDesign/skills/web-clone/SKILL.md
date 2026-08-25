@@ -16,7 +16,7 @@ triggers:
   - "仿站"
 metadata:
   author: jane (xiaoer)
-  version: "1.6.0"
+  version: "1.6.1"
   use_case: 个人本地复刻/学习网站，沉淀自 website-clones 克隆中枢
 od:
   mode: prototype
@@ -32,7 +32,7 @@ od:
 
 **Open Design 环境准备（跑任何 `scripts/` 前先看）**：
 - 本 skill 的脚本会被 stage 到项目内 `.od-skills/<插件目录>/scripts/`（skill 前言里有确切路径）。文中命令写的 `node scripts/xxx.mjs` 按该路径解析，例如 `node .od-skills/<插件目录>/scripts/recon-site.mjs ...`；`RECON/`、`assets/` 等产物仍写到项目根。
-- 脚本依赖 Playwright。首次在项目里跑之前执行一次 `npm install -D playwright`（在项目根）；本机装有 Chrome 时脚本会自动走 `channel:"chrome"`，无需再下浏览器，否则补一句 `npx playwright install chromium`。**不许因为"环境没配好"就跳过脚本改为目测**——装依赖只要一分钟。
+- 脚本内置基于 Chrome DevTools Protocol 的零依赖控制层，直接复用系统已有的 Chrome、Edge 或 Chromium；无需启动 Electron 客户端，也支持纯 `od` CLI。Agent 沙箱内会通过本地 daemon 创建临时 CDP 会话，避免沙箱阻止 Chrome 子进程。**禁止在用户项目里执行 `npm install playwright` 或下载 Chromium。** 若预检报告没有兼容浏览器，直接说明缺少系统浏览器或通过 `OD_BROWSER_EXECUTABLE_PATH` 指定路径，不要改为目测，也不要反复安装依赖。源码开发环境若已经提供 `OD_PLAYWRIGHT_PACKAGE`，脚本仍兼容该运行时，但它不是产品链路的前置条件。
 
 ## 头号铁律：真源码至上，绝不信 AI 推测的代码
 
@@ -66,7 +66,7 @@ SSL_CERT_FILE=/etc/ssl/cert.pem gh api "search/repositories?q=<关键词>" \
 
 ### Step 2 · 没找到源码 → 浏览器侦察（探针）
 
-使用可用的浏览器自动化能力或 Playwright，跑探针抽信号（框架 / `window.THREE` / canvas 数 / 平滑滚动库 / 字体 / scrollHeight）。截图 1440/768/390 三档 + 侦察 JSON 存 `RECON/`。
+使用内置的零依赖 CDP 浏览器控制层跑探针抽信号（框架 / `window.THREE` / canvas 数 / 平滑滚动库 / 字体 / scrollHeight）。截图 1440/768/390 三档 + 侦察 JSON 存 `RECON/`。
 
 优先用内置脚本跑标准侦察：
 
@@ -106,7 +106,9 @@ node scripts/sourcemap-hunt.mjs \
   --out RECON/sourcemaps
 ```
 
-> 登录态私域站需要使用当前环境里已登录的浏览器上下文；localhost / 无登录公开站优先用 Playwright 探针。
+`--wait` 仅表示页面导航完成后的额外稳定等待，不是导航超时。导航超时只可用 `--navigation-timeout <毫秒>` 调整；同一错误不要通过增大 `--wait` 盲目重试。
+
+> 登录态私域站需要使用当前环境里已登录的浏览器上下文；localhost / 无登录公开站直接用内置 CDP 探针。
 
 ### Step 2.5 · 先给复杂度定级，别盲目承诺
 
@@ -268,7 +270,7 @@ SSL_CERT_FILE=/etc/ssl/cert.pem gh api repos/<u>/<r> | jq '.license'  # + 找 LI
 
 ## 内置脚本
 - `scripts/init-clone.mjs`：初始化克隆项目骨架和 `NOTES.md`。
-- `scripts/recon-site.mjs`：用 Playwright 打开页面并全程滚动，采集框架/资源/DOM 结构/console 错误、关键区块计算色（`palette`）、@font-face 规则与真实加载的字体/图片资源清单，并保存三档截图。
+- `scripts/recon-site.mjs`：用内置 CDP 控制层打开页面并全程滚动，采集框架/资源/DOM 结构/console 错误、关键区块计算色（`palette`）、@font-face 规则与真实加载的字体/图片资源清单，并保存三档截图。
 - `scripts/asset-harvest.mjs`：真浏览器网络栈全程滚动捕获并下载页面真实用到的图片/字体/媒体（含第三方 CDN、防盗链资产），生成 `assets/fonts/fonts.css` 自托管 @font-face 与 originalUrl→localPath 素材清单。
 - `scripts/network-capture.mjs`：捕获 XHR/fetch 请求并保存 JSON/text 响应，给 SPA/SaaS 做本地 fixtures。
 - `scripts/mirror-site.mjs`：真浏览器全程滚动捕获每一个真实请求 → 按路径镜像同源资产（含 JS 运行时 fetch 的 `.sog/.buf/.wasm/.riv`/字体），给静态构建站（Astro/Vite SSG/Hugo）做 1:1 忠实复刻。详见 `references/static-mirror.md`。

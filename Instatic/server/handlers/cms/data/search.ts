@@ -1,7 +1,7 @@
 /**
  * Cross-table data row search endpoint.
  *
- *   GET  /admin/api/cms/data/search?query=<q>&limit=<n>
+ *   GET  /cms/api/cms/data/search?query=<q>&limit=<n>
  *
  * Returns a lightweight list of matching data rows (slug, table info, status)
  * for the spotlight content provider. Full row cells are not returned — callers

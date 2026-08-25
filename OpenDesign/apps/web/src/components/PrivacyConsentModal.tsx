@@ -52,7 +52,15 @@ export function PrivacyConsentModal({ onShare, onDecline }: Props): JSX.Element 
 
       <p className="hint privacy-consent-banner-footer">{t('settings.privacyConsentFooter')}</p>
 
-      {/* MMS rebrand: "Read the privacy policy" link removed. */}
+      <a
+        className="privacy-consent-policy-link"
+        href={PRIVACY_POLICY_URL}
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        <Icon name="external-link" size={14} />
+        <span>{t('settings.privacyConsentPolicyLink')}</span>
+      </a>
 
       <div
         className="privacy-consent-actions"

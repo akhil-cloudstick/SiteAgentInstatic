@@ -223,20 +223,32 @@ export const CmsRuntimePreviewResponseSchema = Type.Object(
   { additionalProperties: true },
 )
 
+export const CmsRuntimeValidationResponseSchema = Type.Object({
+  diagnostics: Type.Array(SiteRuntimeDiagnosticSchema),
+})
+
 // ---------------------------------------------------------------------------
 // cms.ts — envelopes only; inner types are deep
 // ---------------------------------------------------------------------------
 
+/**
+ * Envelope for GET /cms/api/cms/site. `seq` is the shell's sync sequence
+ * number — the client's conflict-detection base for shell changes (absent
+ * only in pre-setup 404 shapes, which return no `site` either).
+ */
 export const CmsSiteEnvelopeSchema = Type.Object(
-  { site: Type.Optional(Type.Unknown()) },
+  {
+    site: Type.Optional(Type.Unknown()),
+    seq: Type.Optional(Type.Number()),
+  },
   { additionalProperties: true },
 )
 
 /**
- * Envelope for PUT /admin/api/cms/site-document — the transactional
- * whole-document save. `seq` is the save's site-global sync sequence number
- * (multi-admin sync substrate; informational to the client until the
- * live-sync plan consumes it for conflict detection).
+ * Envelope for PUT /cms/api/cms/site-document — the transactional
+ * whole-document save. `seq` is the save's site-global sync sequence number:
+ * every row the save wrote or deleted (and the shell, when it changed) is
+ * stamped with it, so the client bumps its base seqs to `seq` on success.
  */
 export const CmsSiteDocumentSaveEnvelopeSchema = Type.Object(
   {
@@ -247,7 +259,7 @@ export const CmsSiteDocumentSaveEnvelopeSchema = Type.Object(
 )
 
 /**
- * Envelope for GET /admin/api/cms/pages.
+ * Envelope for GET /cms/api/cms/pages.
  * Inner items are DataRow objects; validate them at the HTTP boundary before
  * converting through pageFromRow + validatePages in the adapter.
  */
@@ -257,7 +269,7 @@ export const CmsPagesEnvelopeSchema = Type.Object(
 )
 
 /**
- * Envelope for GET /admin/api/cms/components.
+ * Envelope for GET /cms/api/cms/components.
  * Inner items are DataRow objects; validate them at the HTTP boundary before
  * converting through visualComponentFromRow + validateVisualComponents.
  */
@@ -267,7 +279,7 @@ export const CmsComponentsEnvelopeSchema = Type.Object(
 )
 
 /**
- * Envelope for GET /admin/api/cms/layouts.
+ * Envelope for GET /cms/api/cms/layouts.
  * Inner items are DataRow objects; validate them at the HTTP boundary before
  * converting through savedLayoutFromRow + validateSavedLayouts.
  */
@@ -322,7 +334,7 @@ export type CmsFontEstimateDto = Static<typeof CmsFontEstimateEnvelopeSchema>
 // ---------------------------------------------------------------------------
 
 /**
- * Full response body from POST /admin/api/cms/plugins/:id/pack/install.
+ * Full response body from POST /cms/api/cms/plugins/:id/pack/install.
  * Schema is the source of truth; the TS type is derived via Static<>.
  */
 export const CmsPluginPackInstallSummarySchema = Type.Object(
@@ -346,7 +358,7 @@ export const CmsPluginPackInstallSummarySchema = Type.Object(
 export type CmsPluginPackInstallSummary = Static<typeof CmsPluginPackInstallSummarySchema>
 
 /**
- * Envelope for GET /admin/api/cms/plugins/:id/schedules.
+ * Envelope for GET /cms/api/cms/plugins/:id/schedules.
  * CmsPluginScheduleSummary has a `cadence: unknown` field and the per-schedule
  * run arrays are deep; both pass through as Type.Unknown() and are cast at the
  * call site.
@@ -360,7 +372,7 @@ export const CmsPluginSchedulesResponseEnvelopeSchema = Type.Object(
 )
 
 /**
- * Envelope for POST /admin/api/cms/plugins/:id/schedules/:id/run-now.
+ * Envelope for POST /cms/api/cms/plugins/:id/schedules/:id/run-now.
  */
 export const CmsPluginScheduleRunOutcomeEnvelopeSchema = Type.Object(
   {

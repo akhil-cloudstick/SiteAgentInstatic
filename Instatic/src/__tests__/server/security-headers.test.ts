@@ -121,7 +121,7 @@ describe('applySecurityHeaders — admin framing protection', () => {
     )
   })
 
-  it('applies the admin CSP to /admin/api/* (admin API endpoints)', () => {
+  it('applies the admin CSP to /cms/api/* (admin API endpoints)', () => {
     const res = applySecurityHeaders(makeResponse('{}'), '/cms/api/cms/login')
     expect(res.headers.get('x-frame-options')).toBe('DENY')
     expect(res.headers.get('content-security-policy')).toBe(

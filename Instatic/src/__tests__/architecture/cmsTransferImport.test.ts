@@ -157,7 +157,7 @@ function makeImportRequest(
   // The `cookie` header is a forbidden header per WHATWG Fetch spec and is
   // stripped by Bun's Request constructor in test mode. Set it after construction.
   const req = new Request(
-    `http://localhost/admin/api/cms/import?strategy=${strategy}`,
+    `http://localhost/cms/api/cms/import?strategy=${strategy}`,
     {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -444,7 +444,7 @@ describe('handleImportRoute — invalid strategy', () => {
     const cookie = await seedAuth(db)
 
     const bundle = { schemaVersion: 1, exportedAt: new Date().toISOString(), tables: [], rows: [] }
-    const req = new Request('http://localhost/admin/api/cms/import?strategy=wipe-everything', {
+    const req = new Request('http://localhost/cms/api/cms/import?strategy=wipe-everything', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(bundle),
@@ -463,7 +463,7 @@ describe('handleImportRoute — auth', () => {
 
     const bundle = { schemaVersion: 1, exportedAt: new Date().toISOString(), tables: [], rows: [] }
     // Deliberately no cookie set on this request
-    const req = new Request('http://localhost/admin/api/cms/import?strategy=replace', {
+    const req = new Request('http://localhost/cms/api/cms/import?strategy=replace', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(bundle),

@@ -3,16 +3,16 @@
  *
  * Endpoints (all behind the authenticated admin session cookie):
  *
- *   GET    /admin/api/cms/me/preferences/:key
+ *   GET    /cms/api/cms/me/preferences/:key
  *     → 200 { value }          — stored preference
  *     → 200 { value: null }    — never set (caller falls back to default)
  *
- *   PUT    /admin/api/cms/me/preferences/:key
+ *   PUT    /cms/api/cms/me/preferences/:key
  *     body: { value }
  *     → 200 { value }          — upserted, echoed back after validation
  *     → 400 { error }          — unknown key OR value fails per-key schema
  *
- *   DELETE /admin/api/cms/me/preferences/:key
+ *   DELETE /cms/api/cms/me/preferences/:key
  *     → 204                    — reset to default (or already absent)
  *
  * The `:key` is validated against `USER_PREFERENCE_KEYS` (whitelist).

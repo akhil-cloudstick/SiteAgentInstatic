@@ -14,17 +14,11 @@ bottom of their facet rather than topping it by default-usage.
 |---|---|---|
 | `pluginPopularity.generated.ts` | **generated — do not hand-edit** | `id → blended popularity score [0,1]` snapshot + build metadata |
 | `pluginPopularity.ts` | source | accessor + the `comparePluginGalleryOrder` comparator + the policy knobs |
+| `usePluginFacets.ts` → `filtered` | source | grid: master/All keeps visual order; a selected facet re-sorts via the comparator |
 | `visualScore.ts` → `sortByVisualAppeal` | source | master / All browse order (visual appeal), unchanged |
 | `HomeHero.tsx` → `comparePluginPresetOrder` | source | Home rail sort (per-chip) — calls the comparator |
 
-> **The `/plugins` grid is no longer a consumer.** That page was rebuilt on the
-> approved MMSBUILD reference screen (`components/PluginsScreen.tsx`), which has
-> no sort control and no facet-scoped re-ranking, so `usePluginFacets.ts` and
-> `sortOrder.ts` were removed with it. Everything below now describes the Home
-> rail only; the facet-selection behaviour is kept for the record because the
-> comparator still encodes it.
-
-The remaining sort site calls `comparePluginGalleryOrder(aId, bId, aCurationGoverned, bCurationGoverned)`
+Both sort sites call `comparePluginGalleryOrder(aId, bId, aCurationGoverned, bCurationGoverned)`
 first, then fall back to their existing keys (curated priority → featured →
 visual score → title). The comparator applies, in order:
 

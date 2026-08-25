@@ -17,7 +17,11 @@ import { createSitePanelSlice } from './slices/sitePanelSlice'
 import { createClipboardSlice } from './slices/clipboardSlice'
 import { createInlineEditSlice } from './slices/inlineEditSlice'
 import { createLayoutsSlice } from './slices/layoutsSlice'
+// MMS: manual save/dirty tracking. Upstream 0.0.15 moved to always-on collab
+// persistence and dropped its own slice; MMS keeps this one so the site
+// toolbar can still show unsaved state and drive an explicit save.
 import { createSaveTrackingSlice } from './slices/saveTrackingSlice'
+import { initCollabBinding } from './slices/site/collabBinding'
 import { bindPluginRuntimeStoreApi } from '@core/plugins/runtime'
 import { useAdminUi } from '@admin/state/adminUi'
 import { readWorkspaceLayout, workspaceFromPathname } from '@admin/state/workspaceLayoutStorage'
@@ -26,11 +30,11 @@ import { restoreStoredSiteEditorLayout } from '@site/layout/siteEditorLayoutPers
 /**
  * EditorStore — the central Zustand store for the visual editor.
  *
- * Composed of 14 slices (6 canonical Phase 0 + agentSlice + sitePanelSlice + filesSlice + visualComponentsSlice + clipboardSlice + inlineEditSlice + layoutsSlice + saveTrackingSlice):
+ * Composed of 13 slices (6 canonical Phase 0 + agentSlice + sitePanelSlice + filesSlice + visualComponentsSlice + clipboardSlice + inlineEditSlice + layoutsSlice):
  *   - siteSlice:        owns SiteDocument (pages, nodes, breakpoints, settings, classes, files)
  *   - selectionSlice:      selectedNodeId, hoveredNodeId
  *   - canvasSlice:         zoom, pan, activeBreakpointId, canvasMode (Constraint #317)
- *   - uiSlice:             panel visibility, unsaved-changes flag, insert picker
+ *   - uiSlice:             panel visibility, insert picker
  *   - styleRuleSlice:      style-rule (class + ambient) CRUD + node↔class assignment
  *   - filesSlice:          SiteFile CRUD (Contribution #595 / Task #429)
  *   - visualComponentsSlice: VisualComponent CRUD (Contribution #619 / Task #436)
@@ -40,7 +44,6 @@ import { restoreStoredSiteEditorLayout } from '@site/layout/siteEditorLayoutPers
  *   - clipboardSlice:      copy / cut / paste of layer subtrees, persisted editor-wide
  *   - inlineEditSlice:     canvas inline text edit session (double-click to edit)
  *   - layoutsSlice:        user-saved layouts (save / insert / rename / delete)
- *   - saveTrackingSlice:   unsaved-changes flag + patch-derived save-dirty accumulator
  *
  * The combined `EditorStore` type lives in `./types` so each slice can import
  * it without going through this module — that's how the historical
@@ -115,6 +118,11 @@ if (typeof window !== 'undefined') {
 // `executor.ts` can read/write state without statically importing this file
 // (which would re-introduce the executor → store → agentSlice → executor cycle).
 setAgentStoreApi(useEditorStore)
+
+// Hand the collab binding its store handle: local mutation patches flow into
+// the CRDT docs, and remote/undo projections flow back via setState. See
+// ./slices/site/collabBinding.ts.
+initCollabBinding(useEditorStore)
 
 // Wire the adminUi ↔ settings bridge in both directions.
 //   - `bindSettingsBridgeStoreApi` covers adminUi → editor mirroring so

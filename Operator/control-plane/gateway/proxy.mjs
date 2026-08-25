@@ -26,6 +26,9 @@ import config from '../lib/env.mjs';
 import { getTenant } from '../registry/tenants.mjs';
 import { verifyValue } from '../lib/crypto.mjs';
 import * as odRuntime from '../runtime/odRuntime.mjs';
+import * as tenantRuntime from '../runtime/tenantRuntime.mjs';
+import { ensureOdUp, ensureTenantUp } from '../provisioner/provision.mjs';
+import { startingPage } from './starting.mjs';
 
 const HUB_COOKIE = 'sa_hub';
 // Fixed, tenant-agnostic mount point for the ONE shared OpenDesign web build.
@@ -149,6 +152,34 @@ function isFromOdPage(req) {
   }
 }
 
+// Readiness probe the waiting page polls. Answered by the gateway itself, so it
+// must be recognised BEFORE the Referer rule below — a fetch() issued from a
+// waiting page served at /design/sso carries that Referer and would otherwise be
+// rewritten into the OpenDesign web build.
+const READY_PATH = '/_mms/ready';
+
+// Where to send someone once the backend they were waiting for is up.
+//
+// For the design hand-off this is NOT the URL they asked for. That URL carries a
+// signed SSO token with a 120-second TTL, and the daemon answers an expired one
+// with a hard 401 rather than bouncing back to the hub — so replaying it after a
+// two-minute wait is guaranteed to fail. /sso/design mints a fresh token instead.
+function continueUrlFor(req, path, restPath) {
+  if (path.startsWith(OD_PREFIX) && restPath && (restPath === '/sso' || restPath.startsWith('/sso?'))) {
+    const deep = new URL(req.url, 'http://x').searchParams.get('redirect');
+    const safe = typeof deep === 'string' && deep.startsWith('/') && !deep.startsWith('//') ? deep : null;
+    return safe ? `/sso/design?next=${encodeURIComponent(safe)}` : '/sso/design';
+  }
+  return req.url || path;
+}
+
+// A backend that is not up YET (as opposed to one that does not exist). The
+// caller turns this into the waiting page for a navigation, or a 503 with
+// Retry-After for a sub-resource — never into a raw connection error.
+function startingTarget({ tool, continueUrl, state }) {
+  return { starting: { tool, continueUrl, error: state?.starting ? null : (state?.error ?? null) } };
+}
+
 // No usable session on a request that needs one. A top-level navigation gets a
 // 302 to /login carrying where it was headed, so signing in lands the user back
 // on the exact page (mid-edit deep links included) instead of dumping them on the
@@ -237,7 +268,25 @@ function forward(req, res, target) {
     },
   );
   upstream.on('error', (err) => {
-    if (!res.headersSent) res.writeHead(502, { 'content-type': 'text/plain; charset=utf-8' });
+    // The backend went away between our readiness check and this dial. Forget
+    // the readiness verdict so the very next request re-runs ensure() and brings
+    // it back, and show the waiting page rather than the raw socket error that
+    // used to dead-end here.
+    if (target.readySlug) {
+      if (kind === 'instatic') tenantRuntime.markUnavailable(target.readySlug);
+      else odRuntime.markUnavailable(target.readySlug);
+    }
+    if (kind === 'od') odRuntime.markSharedWebUnavailable();
+    if (res.headersSent) { res.end(); return; }
+    if (target.starting || target.continueUrl) {
+      serveStarting(req, res, {
+        tool: kind === 'instatic' ? 'cms' : 'design',
+        continueUrl: target.continueUrl || '/hub',
+        error: null,
+      });
+      return;
+    }
+    res.writeHead(502, { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' });
     res.end(`gateway: upstream unavailable (${err.code || err.message})`);
   });
   req.pipe(upstream);
@@ -272,11 +321,19 @@ async function resolveBackend(req, path) {
       if (!slug) return unauthenticated(req, path);
       const t = await getTenant(slug);
       if (!t?.od_port) return { notFound: 'unknown OpenDesign tenant' };
+      // The daemon is only guaranteed to exist, not to be LISTENING: boot resume
+      // spawns it and it then spends minutes registering plugins off the share.
+      // Make this request responsible for the backend it is about to dial.
+      const state = await ensureOdUp(t);
+      const continueUrl = continueUrlFor(req, path, restPath);
+      if (!state.ready) return startingTarget({ tool: 'design', continueUrl, state });
       return {
         port: t.od_port,
         kind: 'od-daemon',
         prefix: OD_PREFIX,
         rewritePath: req.url.slice(OD_PREFIX.length) || '/',
+        readySlug: t.slug,
+        continueUrl,
       };
     }
     // The SPA document itself. Carry the authorized Product Hub scope into it
@@ -284,7 +341,11 @@ async function resolveBackend(req, path) {
     // destination, and the account avatar shows the signed-in user — the
     // shared-header contract's "context and return" requirement. Assets and
     // client-side route changes never reach here, so this runs once per load.
-    const target = { port: odRuntime.sharedWebPort(), kind: 'od', prefix: OD_PREFIX };
+    // One Next process serves every tenant, so while it is down /design refused
+    // connections for all of them at once. Same treatment as the daemons.
+    const web = odRuntime.ensureSharedWeb();
+    if (!web.ready) return startingTarget({ tool: 'design', continueUrl: req.url || path, state: web });
+    const target = { port: odRuntime.sharedWebPort(), kind: 'od', prefix: OD_PREFIX, continueUrl: req.url || path };
     if (isDocumentRequest(req)) {
       const slug = sessionSlug(req);
       const tenant = slug ? await getTenant(slug) : null;
@@ -304,28 +365,109 @@ async function resolveBackend(req, path) {
       const slug = sessionSlug(req);
       if (slug) {
         const t = await getTenant(slug);
-        if (t?.od_port) return { port: t.od_port, kind: 'od-daemon', prefix: OD_PREFIX, rewritePath: req.url };
+        if (t?.od_port) {
+          const state = await ensureOdUp(t);
+          if (!state.ready) return startingTarget({ tool: 'design', continueUrl: '/sso/design', state });
+          return { port: t.od_port, kind: 'od-daemon', prefix: OD_PREFIX, rewritePath: req.url, readySlug: t.slug, continueUrl: '/sso/design' };
+        }
       }
     } else {
+      const web = odRuntime.ensureSharedWeb();
+      if (!web.ready) return startingTarget({ tool: 'design', continueUrl: '/design', state: web });
       return {
         port: odRuntime.sharedWebPort(),
         kind: 'od',
         prefix: OD_PREFIX,
         rewritePath: `${OD_PREFIX}${req.url}`,
+        continueUrl: '/design',
       };
     }
   }
   const slug = sessionSlug(req);
   if (slug) {
     const t = await getTenant(slug);
-    if (t?.port) return { port: t.port, kind: 'instatic' };
+    if (t?.port) {
+      // Same guarantee as the design side. This one rarely triggers today only
+      // because a tenant's bun process tends to outlive the control plane —
+      // which is luck, not a design, and it hid this whole class of failure.
+      const state = await ensureTenantUp(t);
+      if (!state.ready) return startingTarget({ tool: 'cms', continueUrl: req.url || path, state });
+      return { port: t.port, kind: 'instatic', readySlug: t.slug, continueUrl: req.url || path };
+    }
   }
   return null;
+}
+
+// Serve the "still starting" verdict. A top-level navigation gets the waiting
+// page, which polls READY_PATH and continues on its own. A sub-resource cannot
+// act on an HTML page, so it gets a 503 with Retry-After — which the SPA and the
+// browser both understand, unlike the 502 + raw socket-error text this used to
+// answer with.
+function serveStarting(req, res, starting) {
+  const isDocument = isDocumentRequest(req);
+  if (!isDocument) {
+    res.writeHead(503, {
+      'content-type': 'text/plain; charset=utf-8',
+      'cache-control': 'no-store',
+      'retry-after': '5',
+    });
+    res.end(starting.error || 'backend starting');
+    return;
+  }
+  const body = startingPage(starting);
+  res.writeHead(200, {
+    'content-type': 'text/html; charset=utf-8',
+    'cache-control': 'no-store',
+    'content-length': Buffer.byteLength(body),
+  });
+  res.end(body);
+}
+
+// GET /_mms/ready?tool=design|cms — polled by the waiting page.
+//
+// Scoped to the SIGNED session, exactly like every other route here: it reports
+// only on the tenant whose cookie the request carries, so it cannot be used to
+// probe another tenant's backends. Each poll re-runs ensure(), so a backend that
+// dies again mid-wait is restarted rather than waited on forever.
+async function serveReady(req, res) {
+  const tool = new URL(req.url, 'http://x').searchParams.get('tool') === 'cms' ? 'cms' : 'design';
+  const json = (payload) => {
+    const body = JSON.stringify(payload);
+    res.writeHead(200, {
+      'content-type': 'application/json; charset=utf-8',
+      'cache-control': 'no-store',
+      'content-length': Buffer.byteLength(body),
+    });
+    res.end(body);
+  };
+
+  const slug = sessionSlug(req);
+  if (!slug) { json({ ready: false, signedOut: true }); return; }
+  const tenant = await getTenant(slug);
+  if (!tenant) { json({ ready: false, signedOut: true }); return; }
+
+  if (tool === 'cms') {
+    const state = await ensureTenantUp(tenant);
+    json({ ready: !!state.ready, error: state.ready ? null : (state.error ?? null) });
+    return;
+  }
+  // Design needs BOTH halves: the tenant's own daemon and the shared web shell.
+  const daemon = await ensureOdUp(tenant);
+  const web = odRuntime.ensureSharedWeb();
+  json({
+    ready: !!daemon.ready && !!web.ready,
+    error: daemon.ready ? null : (daemon.error ?? null),
+  });
 }
 
 // HTTP proxy. Returns true if it handled (proxied) the request; false lets the
 // control-plane fall through to its own routes / 404 / login bounce.
 export async function handleGatewayProxy(req, res, method, path) {
+  // Before resolveBackend: this path must not be mistaken for a base-less
+  // OpenDesign sub-resource by the Referer rule (the waiting page that polls it
+  // is served under /design).
+  if (path === READY_PATH) { await serveReady(req, res); return true; }
+
   const target = await resolveBackend(req, path);
   if (!target) return false;
   if (target.redirect) {
@@ -343,6 +485,10 @@ export async function handleGatewayProxy(req, res, method, path) {
     res.end(target.notFound);
     return true;
   }
+  if (target.starting) {
+    serveStarting(req, res, target.starting);
+    return true;
+  }
   forward(req, res, target);
   return true;
 }
@@ -354,7 +500,7 @@ export async function handleGatewayUpgrade(req, socket, head) {
   let target;
   try { target = await resolveBackend(req, path); } catch { target = null; }
   // A redirect/401 verdict is meaningless for a socket upgrade — just refuse it.
-  if (!target || target.notFound || target.redirect || target.status) { socket.destroy(); return; }
+  if (!target || target.notFound || target.redirect || target.status || target.starting) { socket.destroy(); return; }
 
   const headers = { ...req.headers };
   headers.host = `127.0.0.1:${target.port}`;

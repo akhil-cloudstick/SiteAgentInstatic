@@ -80,11 +80,15 @@ describe("mac standalone prebundle policy", () => {
       "better-sqlite3",
       "blake3-wasm",
       "fsevents",
+      "hyperframes",
+      "node-pty",
     ]);
     expect(MAC_PREBUNDLE_POLICIES.daemonSidecar.externals).toEqual([
       "better-sqlite3",
       "blake3-wasm",
       "fsevents",
+      "hyperframes",
+      "node-pty",
     ]);
     expect(MAC_PREBUNDLE_POLICIES.webSidecar.externals).toEqual([]);
     expect(MAC_DAEMON_PREBUNDLE_ESM_REQUIRE_BANNER).toContain("createRequire");
@@ -94,6 +98,9 @@ describe("mac standalone prebundle policy", () => {
     expect(MAC_PREBUNDLE_RUNTIME_DEPENDENCIES).toEqual({
       "better-sqlite3": "12.10.0",
       "blake3-wasm": "2.1.5",
+      "hyperframes": "0.8.1",
+      "node-pty": "1.1.0",
+      "sharp": "0.35.3",
     });
     expect(MAC_PREBUNDLE_COPIED_RUNTIME_DEPENDENCIES).toEqual({ "fsevents": "2.3.3" });
     expect(MAC_PREBUNDLED_DAEMON_CLI_RELATIVE_PATH).toBe("app/prebundled/daemon/daemon-cli.mjs");
@@ -125,6 +132,29 @@ describe("mac standalone prebundle policy", () => {
       expect(Object.keys(result.metafile.inputs).some((input) => input.includes("/node_modules/fsevents/"))).toBe(
         false,
       );
+    },
+  );
+
+  it(
+    "keeps node-pty's native runtime outside daemon bundles",
+    async () => {
+      const workspaceRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
+      const result = await build({
+        banner: { js: MAC_DAEMON_PREBUNDLE_ESM_REQUIRE_BANNER },
+        bundle: true,
+        external: [...MAC_PREBUNDLE_POLICIES.daemonSidecar.externals],
+        format: "esm",
+        logLevel: "silent",
+        metafile: true,
+        platform: "node",
+        entryPoints: [join(workspaceRoot, "apps", "daemon", "src", "terminals.ts")],
+        target: MAC_PREBUNDLE_ESBUILD_TARGET,
+        write: false,
+      });
+
+      expect(
+        Object.keys(result.metafile.inputs).some((input) => input.includes("/node_modules/node-pty/")),
+      ).toBe(false);
     },
   );
 });
@@ -212,7 +242,12 @@ describe("assertMacPrebundleMetafile", () => {
     try {
       await writeFile(
         metafilePath,
-        JSON.stringify({ inputs: { "/repo/node_modules/fsevents/fsevents.js": {} } }),
+        JSON.stringify({
+          inputs: {
+            "/repo/node_modules/fsevents/fsevents.js": {},
+            "/repo/node_modules/node-pty/lib/index.js": {},
+          },
+        }),
         "utf8",
       );
 

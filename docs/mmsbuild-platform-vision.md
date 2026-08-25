@@ -8,7 +8,9 @@ still be able to read it end to end._
 _This file describes the **target**. It says nothing about what is already built. For that, read the
 companion file [`mmsbuild-vision-vs-today.md`](./mmsbuild-vision-vs-today.md), which puts this vision
 side by side with the current code. For the level below this one — how a design becomes a real page
-in the CMS — read [`od-cms-vision.md`](./od-cms-vision.md)._
+in the CMS — read [`od-cms-vision.md`](./od-cms-vision.md). For **how this holds up at scale** —
+one database or many, one build or many, and what stops one customer slowing down the rest — read
+[`mmsbuild-scale-architecture.md`](./mmsbuild-scale-architecture.md)._
 
 ## Name map (product name vs repo name)
 
@@ -515,3 +517,5 @@ Vision items with no path yet are the ones that still need to be built — see
   [`od-cms-compliance.md`](./od-cms-compliance.md); the build rule at
   [`Operator/rules/templateRule.md`](../Operator/rules/templateRule.md)
 - **The poster blocks — engines, hub, ledger** — [`mmsbuild-product-hub-os.md`](./mmsbuild-product-hub-os.md)
+- **Scale, tenancy and isolation** — [`mmsbuild-scale-architecture.md`](./mmsbuild-scale-architecture.md);
+  the data tiers, the cell model and the process lifecycle

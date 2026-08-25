@@ -3,6 +3,10 @@ import react, { reactCompilerPreset } from '@vitejs/plugin-react'
 import babel from '@rolldown/plugin-babel'
 import path from 'path'
 import type { IncomingMessage, ServerResponse } from 'node:http'
+import {
+  proxyLargeDevRequest,
+  shouldBufferLargeDevProxyRequest,
+} from './scripts/lib/largeBodyDevProxy'
 
 const CMS_DEV_SERVER_ORIGIN = `http://localhost:${process.env.PORT ?? '3001'}`
 const FILE_EXTENSION_RE = /\.[a-zA-Z0-9]+$/
@@ -101,6 +105,32 @@ function publicSiteDevProxyPlugin(): Plugin {
   }
 }
 
+/**
+ * Work around a Bun-hosted Vite proxy backpressure deadlock for large request
+ * CMS bodies. Small and non-CMS requests keep using Vite's native proxy,
+ * including streaming AI responses; only known-length CMS bodies of at least
+ * 1 MiB take the bounded buffer-and-forward path.
+ */
+function largeBodyDevProxyPlugin(): Plugin {
+  return {
+    name: 'instatic-large-body-dev-proxy',
+    apply: 'serve',
+
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        if (!shouldBufferLargeDevProxyRequest(req)) {
+          next()
+          return
+        }
+
+        void proxyLargeDevRequest(req, res, CMS_DEV_SERVER_ORIGIN).catch((err) => {
+          next(err)
+        })
+      })
+    },
+  }
+}
+
 // Stable vendor chunk groups for long-term browser caching. Vendor code
 // rarely changes, so isolating it from the app code means returning users
 // re-download only the (small) app chunks when we ship a new build.
@@ -166,6 +196,7 @@ function vendorChunkName(moduleId: string): string | null {
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
+    largeBodyDevProxyPlugin(),
     publicSiteDevProxyPlugin(),
     react(),
     babel({ presets: [reactCompilerPreset()] }),
@@ -234,6 +265,14 @@ export default defineConfig({
         strictExecutionOrder: true,
       },
     },
+  },
+  define: {
+    // The collab WebSocket dials the CMS port directly under `vite dev`
+    // (see the `server.proxy` note and src/admin/pages/site/collab/socketUrl.ts).
+    // Inlined from the same source as the proxy target so the two can never
+    // disagree, rather than introducing an operator-facing env var. Production
+    // builds are same-origin and never read it.
+    'import.meta.env.VITE_CMS_DEV_PORT': JSON.stringify(process.env.PORT ?? '3001'),
   },
   server: {
     fs: {

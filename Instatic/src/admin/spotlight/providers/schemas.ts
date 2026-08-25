@@ -10,7 +10,7 @@
 import { Type } from '@core/utils/typeboxHelpers'
 
 // ─── Media provider ───────────────────────────────────────────────────────────
-// GET /admin/api/cms/media?query=<q>&limit=<n>
+// GET /cms/api/cms/media?query=<q>&limit=<n>
 
 const MediaAssetSummarySchema = Type.Object(
   {
@@ -31,7 +31,7 @@ export const MediaListResponseSchema = Type.Object(
 )
 
 // ─── Data tables provider ─────────────────────────────────────────────────────
-// GET /admin/api/cms/data/tables?query=<q>&limit=<n>
+// GET /cms/api/cms/data/tables?query=<q>&limit=<n>
 
 const DataTableSummarySchema = Type.Object(
   {
@@ -51,7 +51,7 @@ export const DataTablesListResponseSchema = Type.Object(
 )
 
 // ─── Content (data row) provider ─────────────────────────────────────────────
-// GET /admin/api/cms/data/search?query=<q>&limit=<n>
+// GET /cms/api/cms/data/search?query=<q>&limit=<n>
 
 const DataRowSearchEntrySchema = Type.Object(
   {
@@ -72,7 +72,7 @@ export const DataSearchResponseSchema = Type.Object(
 )
 
 // ─── Plugins / plugin pages provider ─────────────────────────────────────────
-// GET /admin/api/cms/plugins
+// GET /cms/api/cms/plugins
 
 const PluginAdminPageSummarySchema = Type.Object(
   {

@@ -1,5 +1,5 @@
 /**
- * Data provider — live data table search via /admin/api/cms/data/tables.
+ * Data provider — live data table search via /cms/api/cms/data/tables.
  *
  * SERVER provider, 150 ms debounce.
  *

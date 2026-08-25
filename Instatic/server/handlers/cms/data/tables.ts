@@ -33,12 +33,12 @@ import {
   softDeleteDataTable,
   updateDataTable,
   createDataRow,
+  getDataRowBySlug,
   listDataRows,
 } from '../../../repositories/data'
 import { normalizeDataTableFields } from '@core/data/fields'
 import { slugForTable } from '@core/data/cells'
 import { slugFromTitle } from '@core/utils/slug'
-import { normalizeRouteBase } from '@core/templates/templateMatching'
 import { fetchPublishedDataRowItems } from '@core/loops/sources/dataRows'
 import { badRequest, jsonResponse, methodNotAllowed, readValidatedBody } from '../../../http'
 import { CMS_API_PREFIX, requestAuditContext } from '../shared'
@@ -85,7 +85,7 @@ function buildTablePatch(
     update.slug = slug
   }
   if (body.routeBase !== undefined) {
-    update.routeBase = normalizeRouteBase(body.routeBase.trim())
+    update.routeBase = body.routeBase
   }
   if (body.singularLabel !== undefined) {
     if (!body.singularLabel.trim()) return { error: 'Singular label is required' }
@@ -209,13 +209,12 @@ async function handleTablesCollection(req: Request, db: DbClient): Promise<Respo
     const singularLabel = body.singularLabel?.trim() || name.replace(/s$/i, '') || name
     const pluralLabel = body.pluralLabel?.trim() || name
     const slug = slugFromTitle(body.slug?.trim() || pluralLabel)
-    const routeBase = normalizeRouteBase(body.routeBase?.trim() || slug)
 
     const table = await createDataTable(db, {
       name,
       slug,
       kind: body.kind === 'postType' ? 'postType' : 'data',
-      routeBase,
+      routeBase: body.routeBase,
       singularLabel,
       pluralLabel,
       primaryFieldId: body.primaryFieldId?.trim() || undefined,
@@ -327,6 +326,20 @@ async function handleTableRows(
     })
     const slug = slugForTable(table, cells)
 
+    // A slug collision is an ordinary, recoverable authoring conflict, but the
+    // unique index raises a driver error that would otherwise surface as an
+    // opaque 500 — leaving the caller (often a script or an MCP connector) to
+    // guess whether it hit a bug or a duplicate. Name it instead.
+    if (slug) {
+      const clash = await getDataRowBySlug(db, tableId, slug)
+      if (clash) {
+        return jsonResponse(
+          { error: `A row with slug "${slug}" already exists in this table.`, conflictRowId: clash.id },
+          { status: 409 },
+        )
+      }
+    }
+
     const row = await createDataRow(db, { tableId, cells, slug }, user.id)
     await emitContentEntryCreated(db, row.id, { kind: 'user', userId: user.id })
     await createAuditEvent(db, {
@@ -384,7 +397,7 @@ async function handleTableLoopPreview(
 // ---------------------------------------------------------------------------
 
 // Built from `CMS_API_PREFIX` rather than spelled out, because these three
-// were left behind at the pre-rename `/admin/api/cms` spelling while the bare
+// were left behind at the pre-rename `/cms/api/cms` spelling while the bare
 // `/data/tables` route above already used the constant — so listing collections
 // worked while listing and creating their rows 404'd. Deriving them removes the
 // possibility of that drifting apart again.

@@ -339,7 +339,7 @@ const mapManifest = {
 describe('CMS plugin handlers', () => {
   it('requires an admin session for plugin listing', async () => {
     const res = await handleCmsRequest(
-      cmsRequest('http://localhost/admin/api/cms/plugins'),
+      cmsRequest('http://localhost/cms/api/cms/plugins'),
       makeFakeDb(),
     )
 
@@ -351,7 +351,7 @@ describe('CMS plugin handlers', () => {
     const cookie = await createCookie(db)
 
     const install = await handleCmsRequest(
-      cmsRequest('http://localhost/admin/api/cms/plugins', {
+      cmsRequest('http://localhost/cms/api/cms/plugins', {
         method: 'POST',
         headers: { cookie, 'content-type': 'application/json' },
         body: JSON.stringify({
@@ -378,7 +378,7 @@ describe('CMS plugin handlers', () => {
     })
 
     const list = await handleCmsRequest(
-      cmsRequest('http://localhost/admin/api/cms/plugins', {
+      cmsRequest('http://localhost/cms/api/cms/plugins', {
         headers: { cookie },
       }),
       db,
@@ -390,7 +390,7 @@ describe('CMS plugin handlers', () => {
     })
 
     const disable = await handleCmsRequest(
-      cmsRequest('http://localhost/admin/api/cms/plugins/local.map', {
+      cmsRequest('http://localhost/cms/api/cms/plugins/local.map', {
         method: 'PATCH',
         headers: { cookie, 'content-type': 'application/json' },
         body: JSON.stringify({ enabled: false }),
@@ -405,7 +405,7 @@ describe('CMS plugin handlers', () => {
     })
 
     const remove = await handleCmsRequest(
-      cmsRequest('http://localhost/admin/api/cms/plugins/local.map', {
+      cmsRequest('http://localhost/cms/api/cms/plugins/local.map', {
         method: 'DELETE',
         headers: { cookie },
       }),
@@ -431,7 +431,7 @@ describe('CMS plugin handlers', () => {
     }
 
     const install = await handleCmsRequest(
-      cmsRequest('http://localhost/admin/api/cms/plugins', {
+      cmsRequest('http://localhost/cms/api/cms/plugins', {
         method: 'POST',
         headers: { cookie, 'content-type': 'application/json' },
         body: JSON.stringify({
@@ -450,7 +450,7 @@ describe('CMS plugin handlers', () => {
 
     const putSettings = async (settings: Record<string, unknown>) =>
       handleCmsRequest(
-        cmsRequest('http://localhost/admin/api/cms/plugins/local.secret/settings', {
+        cmsRequest('http://localhost/cms/api/cms/plugins/local.secret/settings', {
           method: 'PUT',
           headers: { cookie, 'content-type': 'application/json' },
           body: JSON.stringify({ settings }),
@@ -477,7 +477,7 @@ describe('CMS plugin handlers', () => {
     // The plugins LIST payload shows the sentinel too — both on the plugin
     // row and on the admin-page route's settings snapshot.
     const list = await handleCmsRequest(
-      cmsRequest('http://localhost/admin/api/cms/plugins', { headers: { cookie } }),
+      cmsRequest('http://localhost/cms/api/cms/plugins', { headers: { cookie } }),
       db,
     )
     expect(list.status).toBe(200)
@@ -490,7 +490,7 @@ describe('CMS plugin handlers', () => {
 
     // The dedicated settings GET shows the sentinel for the stored secret.
     const get = await handleCmsRequest(
-      cmsRequest('http://localhost/admin/api/cms/plugins/local.secret/settings', {
+      cmsRequest('http://localhost/cms/api/cms/plugins/local.secret/settings', {
         headers: { cookie },
       }),
       db,
@@ -531,7 +531,7 @@ describe('CMS plugin handlers', () => {
     // it must present the sentinel as well. Re-seed a real secret first.
     await putSettings({ apiKey: 'real-secret', mode: 'slow' })
     const disable = await handleCmsRequest(
-      cmsRequest('http://localhost/admin/api/cms/plugins/local.secret', {
+      cmsRequest('http://localhost/cms/api/cms/plugins/local.secret', {
         method: 'PATCH',
         headers: { cookie, 'content-type': 'application/json' },
         body: JSON.stringify({ enabled: false }),
@@ -552,7 +552,7 @@ describe('CMS plugin handlers', () => {
     // the settings GET without breaking the payload.
     secretRow()!.key_fingerprint = 'deadbeefdeadbeef'
     const stale = await handleCmsRequest(
-      cmsRequest('http://localhost/admin/api/cms/plugins/local.secret/settings', {
+      cmsRequest('http://localhost/cms/api/cms/plugins/local.secret/settings', {
         headers: { cookie },
       }),
       db,
@@ -567,7 +567,7 @@ describe('CMS plugin handlers', () => {
 
     // Uninstall cascades the secrets rows.
     const remove = await handleCmsRequest(
-      cmsRequest('http://localhost/admin/api/cms/plugins/local.secret', {
+      cmsRequest('http://localhost/cms/api/cms/plugins/local.secret', {
         method: 'DELETE',
         headers: { cookie },
       }),
@@ -596,7 +596,7 @@ describe('CMS plugin handlers', () => {
     }
 
     const res = await handleCmsRequest(
-      cmsRequest('http://localhost/admin/api/cms/plugins', {
+      cmsRequest('http://localhost/cms/api/cms/plugins', {
         method: 'POST',
         headers: { cookie, 'content-type': 'application/json' },
         body: JSON.stringify({
@@ -618,7 +618,7 @@ describe('CMS plugin handlers', () => {
     const cookie = await createCookie(db)
 
     const res = await handleCmsRequest(
-      cmsRequest('http://localhost/admin/api/cms/plugins', {
+      cmsRequest('http://localhost/cms/api/cms/plugins', {
         method: 'POST',
         headers: { cookie, 'content-type': 'application/json' },
         body: JSON.stringify({ ...mapManifest, id: '../bad' }),
@@ -645,7 +645,7 @@ describe('CMS plugin handlers', () => {
     }
 
     const denied = await handleCmsRequest(
-      cmsRequest('http://localhost/admin/api/cms/plugins', {
+      cmsRequest('http://localhost/cms/api/cms/plugins', {
         method: 'POST',
         headers: { cookie, 'content-type': 'application/json' },
         body: JSON.stringify({ manifest: privilegedManifest, grantedPermissions: ['editor.toolbar'] }),
@@ -657,7 +657,7 @@ describe('CMS plugin handlers', () => {
     expect(db.plugins).toHaveLength(0)
 
     const accepted = await handleCmsRequest(
-      cmsRequest('http://localhost/admin/api/cms/plugins', {
+      cmsRequest('http://localhost/cms/api/cms/plugins', {
         method: 'POST',
         headers: { cookie, 'content-type': 'application/json' },
         body: JSON.stringify({
@@ -696,7 +696,7 @@ describe('CMS plugin handlers', () => {
     // grantedPermissions, so an undeclared grant would silently expand the
     // plugin's capabilities past everything the consent screen showed.
     const res = await handleCmsRequest(
-      cmsRequest('http://localhost/admin/api/cms/plugins', {
+      cmsRequest('http://localhost/cms/api/cms/plugins', {
         method: 'POST',
         headers: { cookie, 'content-type': 'application/json' },
         body: JSON.stringify({
@@ -750,7 +750,7 @@ describe('CMS plugin handlers', () => {
       formData.set('grantedPermissions', JSON.stringify(manifest.permissions))
 
       const install = await handleCmsRequest(
-        cmsFormRequest('http://localhost/admin/api/cms/plugins/package', formData, { cookie }),
+        cmsFormRequest('http://localhost/cms/api/cms/plugins/package', formData, { cookie }),
         db,
         { uploadsDir },
       )
@@ -781,7 +781,7 @@ describe('CMS plugin handlers', () => {
       )).resolves.toContain('activate')
 
       const runtime = await handleCmsRequest(
-        cmsRequest('http://localhost/admin/api/cms/plugins/acme.workflow/runtime/ping', {
+        cmsRequest('http://localhost/cms/api/cms/plugins/acme.workflow/runtime/ping', {
           headers: { cookie },
         }),
         db,
@@ -834,7 +834,7 @@ describe('CMS plugin handlers', () => {
       formData.set('grantedPermissions', JSON.stringify(manifest.permissions))
 
       const install = await handleCmsRequest(
-        cmsFormRequest('http://localhost/admin/api/cms/plugins/package', formData, { cookie }),
+        cmsFormRequest('http://localhost/cms/api/cms/plugins/package', formData, { cookie }),
         db,
         { uploadsDir },
       )
@@ -867,7 +867,7 @@ describe('CMS plugin handlers', () => {
       }
       const echo = await handleCmsRequest(
         {
-          url: 'http://localhost/admin/api/cms/plugins/acme.binary/runtime/echo',
+          url: 'http://localhost/cms/api/cms/plugins/acme.binary/runtime/echo',
           method: 'POST',
           headers: {
             get(name: string) {
@@ -966,7 +966,7 @@ describe('CMS plugin handlers', () => {
       formData.set('grantedPermissions', JSON.stringify(manifest.permissions))
 
       const install = await handleCmsRequest(
-        cmsFormRequest('http://localhost/admin/api/cms/plugins/package', formData, { cookie }),
+        cmsFormRequest('http://localhost/cms/api/cms/plugins/package', formData, { cookie }),
         db,
         { uploadsDir },
       )
@@ -979,7 +979,7 @@ describe('CMS plugin handlers', () => {
 
       attachListener()
       const disable = await handleCmsRequest(
-        cmsRequest('http://localhost/admin/api/cms/plugins/acme.lifecycle', {
+        cmsRequest('http://localhost/cms/api/cms/plugins/acme.lifecycle', {
           method: 'PATCH',
           headers: { cookie, 'content-type': 'application/json' },
           body: JSON.stringify({ enabled: false }),
@@ -994,7 +994,7 @@ describe('CMS plugin handlers', () => {
 
       attachListener()
       const enable = await handleCmsRequest(
-        cmsRequest('http://localhost/admin/api/cms/plugins/acme.lifecycle', {
+        cmsRequest('http://localhost/cms/api/cms/plugins/acme.lifecycle', {
           method: 'PATCH',
           headers: { cookie, 'content-type': 'application/json' },
           body: JSON.stringify({ enabled: true }),
@@ -1009,7 +1009,7 @@ describe('CMS plugin handlers', () => {
 
       attachListener()
       const remove = await handleCmsRequest(
-        cmsRequest('http://localhost/admin/api/cms/plugins/acme.lifecycle', {
+        cmsRequest('http://localhost/cms/api/cms/plugins/acme.lifecycle', {
           method: 'DELETE',
           headers: { cookie },
         }),
@@ -1031,7 +1031,7 @@ describe('CMS plugin handlers', () => {
   })
 
   it('refuses to re-sync a disabled plugin\'s pack into the site', async () => {
-    // Regression: pre-fix, POST /admin/api/cms/plugins/:id/pack/install
+    // Regression: pre-fix, POST /cms/api/cms/plugins/:id/pack/install
     // would happily merge a disabled plugin's bundled VCs / pages / classes
     // into the user's draft site — the opposite of what "disabled" should
     // mean. The endpoint now gates on `plugin.enabled` and returns 400.
@@ -1065,7 +1065,7 @@ describe('CMS plugin handlers', () => {
     })
 
     const res = await handleCmsRequest(
-      cmsRequest('http://localhost/admin/api/cms/plugins/acme.with-pack/pack/install', {
+      cmsRequest('http://localhost/cms/api/cms/plugins/acme.with-pack/pack/install', {
         method: 'POST',
         headers: { cookie },
       }),
@@ -1120,7 +1120,7 @@ describe('CMS plugin handlers', () => {
       formData.set('grantedPermissions', JSON.stringify([]))
 
       const install = await handleCmsRequest(
-        cmsFormRequest('http://localhost/admin/api/cms/plugins/package', formData, { cookie }),
+        cmsFormRequest('http://localhost/cms/api/cms/plugins/package', formData, { cookie }),
         db,
         { uploadsDir },
       )
@@ -1173,7 +1173,7 @@ describe('CMS plugin handlers', () => {
       }))
       formData.set('grantedPermissions', JSON.stringify(['cms.routes']))
       const install = await handleCmsRequest(
-        cmsFormRequest('http://localhost/admin/api/cms/plugins/package', formData, { cookie }),
+        cmsFormRequest('http://localhost/cms/api/cms/plugins/package', formData, { cookie }),
         db,
         { uploadsDir },
       )
@@ -1189,7 +1189,7 @@ describe('CMS plugin handlers', () => {
       // Normal uninstall — the throwing hook must NOT delete anything, and
       // the error must point at the force-remove escape hatch.
       const failed = await handleCmsRequest(
-        cmsRequest('http://localhost/admin/api/cms/plugins/acme.stuck', {
+        cmsRequest('http://localhost/cms/api/cms/plugins/acme.stuck', {
           method: 'DELETE',
           headers: { cookie },
         }),
@@ -1207,7 +1207,7 @@ describe('CMS plugin handlers', () => {
       // Force remove — skips hooks, drops the row, the crash events, and the
       // whole on-disk tree (current AND stale version dirs).
       const forced = await handleCmsRequest(
-        cmsRequest('http://localhost/admin/api/cms/plugins/acme.stuck?force=true', {
+        cmsRequest('http://localhost/cms/api/cms/plugins/acme.stuck?force=true', {
           method: 'DELETE',
           headers: { cookie },
         }),
@@ -1259,7 +1259,7 @@ describe('CMS plugin handlers', () => {
 
     try {
       const failed = await handleCmsRequest(
-        cmsRequest('http://localhost/admin/api/cms/plugins/acme.gone', {
+        cmsRequest('http://localhost/cms/api/cms/plugins/acme.gone', {
           method: 'DELETE',
           headers: { cookie },
         }),
@@ -1271,7 +1271,7 @@ describe('CMS plugin handlers', () => {
       expect(db.plugins).toHaveLength(1)
 
       const forced = await handleCmsRequest(
-        cmsRequest('http://localhost/admin/api/cms/plugins/acme.gone?force=true', {
+        cmsRequest('http://localhost/cms/api/cms/plugins/acme.gone?force=true', {
           method: 'DELETE',
           headers: { cookie },
         }),
@@ -1348,7 +1348,7 @@ describe('CMS plugin handlers', () => {
       }))
       v1FormData.set('grantedPermissions', JSON.stringify(['cms.routes', 'cms.hooks']))
       const installV1 = await handleCmsRequest(
-        cmsFormRequest('http://localhost/admin/api/cms/plugins/package', v1FormData, { cookie }),
+        cmsFormRequest('http://localhost/cms/api/cms/plugins/package', v1FormData, { cookie }),
         db,
         { uploadsDir },
       )
@@ -1366,7 +1366,7 @@ describe('CMS plugin handlers', () => {
       }))
       v2FormData.set('grantedPermissions', JSON.stringify(['cms.routes', 'cms.hooks']))
       const upgrade = await handleCmsRequest(
-        cmsFormRequest('http://localhost/admin/api/cms/plugins/package', v2FormData, { cookie }),
+        cmsFormRequest('http://localhost/cms/api/cms/plugins/package', v2FormData, { cookie }),
         db,
         { uploadsDir },
       )
@@ -1430,7 +1430,7 @@ describe('CMS plugin handlers', () => {
       }))
       v1FormData.set('grantedPermissions', JSON.stringify(['cms.routes']))
       const installV1 = await handleCmsRequest(
-        cmsFormRequest('http://localhost/admin/api/cms/plugins/package', v1FormData, { cookie }),
+        cmsFormRequest('http://localhost/cms/api/cms/plugins/package', v1FormData, { cookie }),
         db,
         { uploadsDir },
       )
@@ -1443,7 +1443,7 @@ describe('CMS plugin handlers', () => {
       }))
       v2FormData.set('grantedPermissions', JSON.stringify(['cms.routes']))
       const upgrade = await handleCmsRequest(
-        cmsFormRequest('http://localhost/admin/api/cms/plugins/package', v2FormData, { cookie }),
+        cmsFormRequest('http://localhost/cms/api/cms/plugins/package', v2FormData, { cookie }),
         db,
         { uploadsDir },
       )
@@ -1487,7 +1487,7 @@ describe('CMS plugin handlers', () => {
       }))
       v2FormData.set('grantedPermissions', JSON.stringify(['cms.routes']))
       const installV2 = await handleCmsRequest(
-        cmsFormRequest('http://localhost/admin/api/cms/plugins/package', v2FormData, { cookie }),
+        cmsFormRequest('http://localhost/cms/api/cms/plugins/package', v2FormData, { cookie }),
         db,
         { uploadsDir },
       )
@@ -1500,7 +1500,7 @@ describe('CMS plugin handlers', () => {
       }))
       v1FormData.set('grantedPermissions', JSON.stringify(['cms.routes']))
       const downgrade = await handleCmsRequest(
-        cmsFormRequest('http://localhost/admin/api/cms/plugins/package', v1FormData, { cookie }),
+        cmsFormRequest('http://localhost/cms/api/cms/plugins/package', v1FormData, { cookie }),
         db,
         { uploadsDir },
       )
@@ -1524,7 +1524,7 @@ describe('CMS plugin handlers', () => {
       apiVersion: 99,
     }
     const res = await handleCmsRequest(
-      cmsRequest('http://localhost/admin/api/cms/plugins', {
+      cmsRequest('http://localhost/cms/api/cms/plugins', {
         method: 'POST',
         headers: { cookie, 'content-type': 'application/json' },
         body: JSON.stringify({
@@ -1607,7 +1607,7 @@ describe('CMS plugin handlers', () => {
       }))
       formData.set('grantedPermissions', JSON.stringify(['cms.routes', 'cms.hooks']))
       const install = await handleCmsRequest(
-        cmsFormRequest('http://localhost/admin/api/cms/plugins/package', formData, { cookie }),
+        cmsFormRequest('http://localhost/cms/api/cms/plugins/package', formData, { cookie }),
         db,
         { uploadsDir },
       )
@@ -1626,7 +1626,7 @@ describe('CMS plugin handlers', () => {
       // POST /restart must reset state and bring the plugin back to active.
       attachListener()
       const restart = await handleCmsRequest(
-        cmsRequest('http://localhost/admin/api/cms/plugins/test.restart/restart', {
+        cmsRequest('http://localhost/cms/api/cms/plugins/test.restart/restart', {
           method: 'POST',
           headers: { cookie, 'content-type': 'application/json' },
         }),
@@ -1690,7 +1690,7 @@ describe('CMS plugin handlers', () => {
       }))
       goodFormData.set('grantedPermissions', JSON.stringify(['cms.routes']))
       const installGood = await handleCmsRequest(
-        cmsFormRequest('http://localhost/admin/api/cms/plugins/package', goodFormData, { cookie }),
+        cmsFormRequest('http://localhost/cms/api/cms/plugins/package', goodFormData, { cookie }),
         db,
         { uploadsDir },
       )
@@ -1715,7 +1715,7 @@ describe('CMS plugin handlers', () => {
       }))
       badFormData.set('grantedPermissions', JSON.stringify(['cms.routes']))
       const installBad = await handleCmsRequest(
-        cmsFormRequest('http://localhost/admin/api/cms/plugins/package', badFormData, { cookie }),
+        cmsFormRequest('http://localhost/cms/api/cms/plugins/package', badFormData, { cookie }),
         db,
         { uploadsDir },
       )
@@ -1724,7 +1724,7 @@ describe('CMS plugin handlers', () => {
       // Trigger plugin B's failing route — host should return 500 with the
       // error message, not crash the process.
       const boom = await handleCmsRequest(
-        cmsRequest('http://localhost/admin/api/cms/plugins/acme.bad/runtime/boom', {
+        cmsRequest('http://localhost/cms/api/cms/plugins/acme.bad/runtime/boom', {
           headers: { cookie },
         }),
         db,
@@ -1737,7 +1737,7 @@ describe('CMS plugin handlers', () => {
       // the isolation. Whether or not B's worker was terminated, A's worker
       // is independent.
       const ping = await handleCmsRequest(
-        cmsRequest('http://localhost/admin/api/cms/plugins/acme.good/runtime/ping', {
+        cmsRequest('http://localhost/cms/api/cms/plugins/acme.good/runtime/ping', {
           headers: { cookie },
         }),
         db,

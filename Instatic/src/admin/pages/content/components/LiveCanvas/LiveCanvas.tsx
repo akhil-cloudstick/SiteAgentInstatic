@@ -5,7 +5,7 @@
  *
  * Flow:
  *   1. Fetch the rendered entry HTML from
- *      `POST /admin/api/cms/data/rows/:id/preview` with the current draft
+ *      `POST /cms/api/cms/data/rows/:id/preview` with the current draft
  *      cells. The server runs the same `publishPage` pipeline as the
  *      public route, so what shows up in the iframe matches what visitors
  *      would see on the published page.

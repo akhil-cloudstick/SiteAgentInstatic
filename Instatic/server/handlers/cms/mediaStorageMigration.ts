@@ -1,7 +1,7 @@
 /**
  * Media storage migration tool.
  *
- *   POST /admin/api/cms/media/storage/migrate
+ *   POST /cms/api/cms/media/storage/migrate
  *     body: { role: 'original' | 'variant', toAdapterId: string }
  *     response: text/event-stream
  *

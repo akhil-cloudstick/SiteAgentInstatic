@@ -5,7 +5,7 @@
  * the providerRunner's 30 s TTL so the HTTP call only fires once per palette
  * session on the first non-empty query).
  *
- * Calls GET /admin/api/cms/plugins which returns all installed plugins with
+ * Calls GET /cms/api/cms/plugins which returns all installed plugins with
  * their manifest.adminPages. Only enabled plugins' pages are surfaced.
  */
 

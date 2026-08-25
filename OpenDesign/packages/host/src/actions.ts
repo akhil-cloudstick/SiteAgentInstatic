@@ -7,6 +7,8 @@ import type {
   OpenDesignHostFailure,
   OpenDesignHostGlobalScope,
   OpenDesignHostPdfPrintOptions,
+  OpenDesignHostPreviewNavigationFailure,
+  OpenDesignHostPreviewNavigationFailureListener,
   OpenDesignHostPickWorkingDirResult,
   OpenDesignHostProjectImportInit,
   OpenDesignHostProjectImportResult,
@@ -168,6 +170,33 @@ export function setHostPetVisible(visible: boolean, scope: OpenDesignHostGlobalS
   }
 }
 
+/** Read the latest Electron-observed preview subframe navigation failure. */
+export function getLatestHostPreviewNavigationFailure(
+  scope: OpenDesignHostGlobalScope = globalThis,
+): OpenDesignHostPreviewNavigationFailure | null {
+  const host = getOpenDesignHost(scope);
+  if (typeof host?.preview?.getLatestNavigationFailure !== "function") return null;
+  try {
+    return host.preview.getLatestNavigationFailure();
+  } catch {
+    return null;
+  }
+}
+
+/** Subscribe to Electron-observed preview subframe navigation failures. */
+export function subscribeHostPreviewNavigationFailure(
+  listener: OpenDesignHostPreviewNavigationFailureListener,
+  scope: OpenDesignHostGlobalScope = globalThis,
+): () => void {
+  const host = getOpenDesignHost(scope);
+  if (typeof host?.preview?.subscribeNavigationFailure !== "function") return () => undefined;
+  try {
+    return host.preview.subscribeNavigationFailure(listener);
+  } catch {
+    return () => undefined;
+  }
+}
+
 /** @internal Run a status-returning updater action and wrap the result. */
 async function runHostUpdaterAction(
   action: OpenDesignHostUpdaterStatusAction,
@@ -208,6 +237,14 @@ export async function downloadHostUpdater(
   scope: OpenDesignHostGlobalScope = globalThis,
 ): Promise<OpenDesignHostUpdaterResult> {
   return await runHostUpdaterAction(OPEN_DESIGN_HOST_UPDATER_ACTIONS.DOWNLOAD, options, scope);
+}
+
+/** Clear the host updater/launcher caches and reset one-shot update state. */
+export async function clearHostUpdaterCache(
+  options?: OpenDesignHostUpdaterActionOptions,
+  scope: OpenDesignHostGlobalScope = globalThis,
+): Promise<OpenDesignHostUpdaterResult> {
+  return await runHostUpdaterAction(OPEN_DESIGN_HOST_UPDATER_ACTIONS.CLEAR_CACHE, options, scope);
 }
 
 /** Trigger a host updater install. */

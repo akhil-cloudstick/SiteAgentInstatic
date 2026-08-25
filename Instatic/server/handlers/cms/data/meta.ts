@@ -1,7 +1,7 @@
 /**
  * Meta endpoint — lean binding catalog for the instatic picker.
  *
- *   GET /admin/api/cms/data/_meta
+ *   GET /cms/api/cms/data/_meta
  *
  * Returns `{ meta: DataMeta }` — a stripped-down view of all data tables and
  * their fields. The underscore prefix guarantees this can never collide with

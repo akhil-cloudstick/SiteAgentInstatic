@@ -97,26 +97,6 @@ describe('resolveAgentResumeContext', () => {
     expect(ctx.invalidationReason).toBeNull();
   });
 
-  it('reads the last persisted effective input size for context rollover decisions', () => {
-    const db = seed();
-    seedMessage(db, 'asst-1', 'assistant');
-    db.prepare('UPDATE messages SET events_json = ? WHERE id = ?').run(
-      JSON.stringify([
-        { kind: 'usage', inputTokens: 2_000, inputTokensEffective: 170_000 },
-      ]),
-      'asst-1',
-    );
-    storeInSyncSession(db);
-
-    const ctx = resolveAgentResumeContext(db, {
-      conversationId: 'conv-1',
-      agentId: 'claude',
-    });
-
-    expect(ctx.isResuming).toBe(true);
-    expect(ctx.storedInputTokens).toBe(170_000);
-  });
-
   it('still resumes when only the current run placeholder is newer (normal follow-up)', () => {
     const db = seed();
     seedMessage(db, 'asst-1', 'assistant');
@@ -203,6 +183,31 @@ describe('resolveAgentResumeContext', () => {
     const ctx = resolveAgentResumeContext(db, { conversationId: 'conv-1', agentId: 'claude' });
     expect(ctx.isResuming).toBe(true);
     expect(ctx.resumeSessionId).toBe('sess-A');
+    expect(ctx.invalidationReason).toBeNull();
+  });
+
+  it('still resumes when a profile session owns a canceled turn', () => {
+    const db = seed();
+    seedMessage(db, 'asst-canceled', 'assistant', 'canceled');
+    upsertAgentSession(db, {
+      conversationId: 'conv-1',
+      agentId: 'deepseek-harness',
+      sessionId: 'harness-session',
+      lastMessageId: 'asst-canceled',
+      model: null,
+      cwd: '/work/proj',
+      stablePromptHash: 'stable-hash',
+    });
+
+    const ctx = resolveAgentResumeContext(db, {
+      conversationId: 'conv-1',
+      agentId: 'deepseek-harness',
+      currentModel: null,
+      currentCwd: '/work/proj',
+    });
+
+    expect(ctx.isResuming).toBe(true);
+    expect(ctx.resumeSessionId).toBe('harness-session');
     expect(ctx.invalidationReason).toBeNull();
   });
 

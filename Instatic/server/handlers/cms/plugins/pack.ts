@@ -9,7 +9,7 @@
  * explicit re-sync trigger from the admin UI; the install flow imports
  * `installPluginPackToSite` directly to auto-install at install time.
  *
- *   POST /admin/api/cms/plugins/:id/pack/install
+ *   POST /cms/api/cms/plugins/:id/pack/install
  */
 import type { DbClient } from '../../../db/client'
 import type { AuthUser } from '../../../repositories/users'
@@ -189,7 +189,7 @@ export async function maybeAutoInstallPluginPack(
 }
 
 // ---------------------------------------------------------------------------
-// Route handler — POST /admin/api/cms/plugins/:id/pack/install
+// Route handler — POST /cms/api/cms/plugins/:id/pack/install
 // ---------------------------------------------------------------------------
 
 export async function handlePluginPackInstall(

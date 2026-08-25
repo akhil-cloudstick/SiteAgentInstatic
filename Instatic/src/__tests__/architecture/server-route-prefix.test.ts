@@ -1,7 +1,7 @@
 /**
  * Architecture Gate — server route matchers use the current API prefix.
  *
- * The admin API was renamed from `/admin/api/...` to `/cms/api/...`. Most
+ * The admin API was renamed from `/cms/api/...` to `/cms/api/...`. Most
  * routes were updated, but several matchers were left spelled out at the old
  * prefix and silently stopped matching — they are regex literals with escaped
  * slashes (`/^\/admin\/api\/cms\/...`), so a plain search for "admin/api/cms"

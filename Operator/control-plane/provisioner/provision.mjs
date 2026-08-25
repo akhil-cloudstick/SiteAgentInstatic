@@ -427,6 +427,41 @@ export async function pointTestFunnel(slug) {
   return { ok: true, slug, url: `${config.testFunnelOrigin}/cms` };
 }
 
+// The env a tenant's OpenDesign daemon needs. Boot resume and the gateway's
+// on-demand ensure both build it here so they can never drift apart.
+function odParams(row, mediaKeys) {
+  return {
+    slug: row.slug,
+    odPort: row.od_port,
+    instaticUrl: row.tier !== 'lite' ? `http://127.0.0.1:${row.port}` : undefined,
+    mediaKeys,
+  };
+}
+
+// --- On-demand backend start (called by the gateway on every proxied request) ---
+//
+// The gateway used to forward straight at a tenant's port and assume something
+// else had started it. Nothing had: daemons were only ever spawned by boot
+// resume and by provisioning, so the minutes after any control-plane restart —
+// and forever after a daemon died — every /design request was answered with a
+// raw `gateway: upstream unavailable (ECONNREFUSED)`. These two make the
+// gateway responsible for the backend it is about to dial.
+//
+// Both are cheap on the hot path: an already-ready backend costs one Set lookup
+// and no I/O, and no DB read for the media keys.
+
+export async function ensureOdUp(row) {
+  if (!row?.od_port) return { ready: false, starting: false, error: 'This workspace has no design daemon.' };
+  if (odrt.isReady(row.slug)) return { ready: true };
+  return odrt.ensure(odParams(row, await operatorMediaKeys()));
+}
+
+export async function ensureTenantUp(row) {
+  if (!row?.port) return { ready: false, starting: false, error: 'This workspace has no CMS instance.' };
+  if (rt.isReady(row.slug)) return { ready: true };
+  return rt.ensure({ ...runtimeParams(row), aiModel: await operatorAiModel() });
+}
+
 // On control-plane boot, bring active tenants back up.
 export async function resumeAll() {
   const rows = await tenants.listTenants();
@@ -439,8 +474,7 @@ export async function resumeAll() {
       try { rt.start({ ...runtimeParams(r), aiModel }); } catch (e) { console.error(`[provisioner] resume ${r.slug} failed:`, e.message); }
     }
     if (r.od_port) {
-      const instaticUrl = r.tier !== 'lite' ? `http://127.0.0.1:${r.port}` : undefined;
-      try { odrt.start({ slug: r.slug, odPort: r.od_port, instaticUrl, mediaKeys }); } catch (e) { console.error(`[provisioner] OD resume ${r.slug} failed:`, e.message); }
+      try { odrt.start(odParams(r, mediaKeys)); } catch (e) { console.error(`[provisioner] OD resume ${r.slug} failed:`, e.message); }
     }
   }
   // ONE shared OD web for every tenant resumed above (no-op if already running).

@@ -1,10 +1,10 @@
 <h1 align="center">Open Design: ทางเลือกโอเพนซอร์สแทน Claude Design</h1>
 
-> 🔥 **Open Design 0.13.0 — _Stay in Flow_ มาแล้ว.** เซสชันออกแบบยาว ๆ เคยสะดุดทุกครั้งที่ถูกขัดจังหวะ — การรันหลุดตำแหน่ง ตัวเลือกโมเดลทำให้ต้องเดา และการส่งออกต้องอ้อมอีกขั้น 0.13.0 ทำให้เซสชันยังคงอยู่ต่อได้: กลับมารันต่อของ Codex / OpenCode / Pi / Open Design Cloud ข้ามเทิร์น เลือกโมเดลที่ใช่ได้เร็วขึ้น และส่งมอบ PPTX / PDF ที่มีภาพหน้าจอรองรับได้โดยไม่ต้องออกจากแอป [ดาวน์โหลด 0.13.0](https://github.com/nexu-io/open-design/releases) · [บันทึกการอัปเดต](https://github.com/nexu-io/open-design/releases/tag/open-design-v0.13.0)
+> ⚡ **[Open Design Cloud — บริการโมเดลอย่างเป็นทางการ.](https://open-design.ai/zh/pricing/)** เติมเงินครั้งเดียวเพื่อใช้ทั้งโมเดล Agent และโมเดลภาพใน Open Design: GPT, Claude และ DeepSeek สำหรับ Agent; GPT Image 2.0, Seedream 5.0 Pro และ Nano Banana 2.0 สำหรับภาพ
 >
-> ⚡ **Open Design Cloud — บริการโมเดลอย่างเป็นทางการ.** เติมเงินครั้งเดียวเพื่อใช้ GPT, Claude, Gemini และ DeepSeek ใน Open Design: โมเดลระดับ flagship กว่า 20 ตัว, ไม่ต้องตั้งค่า, คิดเงินตาม token ที่ใช้จริง. [ลองใช้ Open Design Cloud](https://open-design.ai/cloud/)
+> 🚀 **[DeepSeek V4 Flash และ V4 Pro พร้อมใช้งานแล้ว.](https://open-design.ai/zh/pricing/)** ใช้ความสามารถระดับสูงกับ prototype, deck, design system และงาน Agent ประจำวัน สมาชิก Open Design ใช้ทั้งสองโมเดลแบบไม่จำกัดได้สองสัปดาห์ภายในแอป
 >
-> 🏅 **Open Design Fellow program เปิดรับแล้ว.** ถ้าคุณเชื่อเหมือนกันว่า design ควรเปิดกว้าง มาเป็น Open Design Fellow, ร่วม shape ผลิตภัณฑ์กับ core team และช่วยให้คนมากขึ้นมีส่วนร่วมกำหนดอนาคตของ design. รายละเอียด → [`MAINTAINERS.th.md`](MAINTAINERS.th.md) และ [Discord](https://discord.gg/qhbcCH8Am4).
+> 🧩 **[รองรับ DeepSeek Harness แล้ว.](https://open-design.ai/zh/agents/deepseek-harness-design/)** เชื่อมต่อ `dsh` Agent Harness อย่างเป็นทางการของ DeepSeek เป็น runtime แบบ native ใน Open Design พร้อม structured thinking, tool calls, model discovery, cancellation และ session resume ไฟล์ที่สร้างยังอยู่ใน workflow ของ Open Design เพื่อ live preview และส่งมอบ
 
 <p align="center">
   <img src="https://repo-assets.open-design.ai/resources/images/hero.png" alt="Open Design hero banner" width="100%" />
@@ -42,15 +42,15 @@ Open Design คือสิ่งที่เกิดขึ้นเมื่�
 
 ## ทัวร์ผลิตภัณฑ์
 
-ภาพรวมเร็ว ๆ ว่า Open Design คืออะไรและทำอะไรได้บ้าง. เริ่มจาก **Home**, จัด workflow ซ้ำ ๆ ด้วย **Automation**, กลั่น brand contract ใน **Design System**, และต่อยอดด้วย **Plugins** กับ **integrations**; ภายใน **Studio** ของแต่ละ project, design system เดียวกันจะ stream ออกมาเป็น prototypes, live artifacts, HyperFrames, decks และ images.
+ดู workflow หลักของ Open Design แบบรวดเร็ว เริ่มที่ **Home** ด้วย brief, ค้นหา skill ที่นำกลับมาใช้ซ้ำได้ใน **Plugins** และเปลี่ยนข้อมูลอ้างอิงแบรนด์ให้เป็น **Design System** จากนั้นเข้า **Studio** ของ project เพื่อสร้างและปรับปรุง prototype, deck, mobile app, image, document และ HyperFrame ได้ในที่เดียว
 
 ### หน้าหลัก
 
 <table>
 <tr>
 <td valign="top">
-<img src="https://repo-assets.open-design.ai/resources/images/product/home.png" alt="หน้า Home" /><br/>
-<sub><b>Home</b> — จุดเข้าใช้งานภาพรวม. เลือก skill และ design system, พิมพ์ brief แล้วเริ่มงานทุกอย่างจากที่เดียว.</sub>
+<img src="../../docs/screenshots/product-tour/home.png" alt="Home" /><br/>
+<sub><b>Home</b> — เลือกประเภท artifact, ใส่ brief และกำหนด design system, working directory กับ model ก่อนเริ่มงาน</sub>
 </td>
 </tr>
 </table>
@@ -58,53 +58,52 @@ Open Design คือสิ่งที่เกิดขึ้นเมื่�
 <table>
 <tr>
 <td width="50%" valign="top">
-<img src="https://repo-assets.open-design.ai/resources/images/product/automation.png" alt="หน้า Automation" /><br/>
-<sub><b>Automation</b> — จัด workflow งานออกแบบที่ทำซ้ำให้เป็น automation ที่ reusable และตั้ง schedule ได้.</sub>
+<img src="../../docs/screenshots/product-tour/plugins.png" alt="Plugins" /><br/>
+<sub><b>Plugins</b> — เรียกดู skill อย่างเป็นทางการตามหมวดหมู่ ค้นหาใน catalog และเริ่ม workflow ด้วย <code>Try it</code></sub>
 </td>
 <td width="50%" valign="top">
-<img src="https://repo-assets.open-design.ai/resources/images/product/design-system.png" alt="หน้า Design System" /><br/>
-<sub><b>Design System</b> — กลั่น <code>DESIGN.md</code> ของทีมให้เป็น brand contract ที่ shape ทุก output.</sub>
-</td>
-</tr>
-<tr>
-<td width="50%" valign="top">
-<img src="https://repo-assets.open-design.ai/resources/images/product/plugin.png" alt="หน้า Plugin" /><br/>
-<sub><b>Plugin</b> — browse, install และ distribute workflow plugins เพื่อขยาย generation ตามต้องการ.</sub>
-</td>
-<td width="50%" valign="top">
-<img src="https://repo-assets.open-design.ai/resources/images/product/integrations.png" alt="หน้า Integrations" /><br/>
-<sub><b>Integrations</b> — เชื่อมต่อระบบภายนอกและ MCP tools แล้วใช้ Open Design จาก IDE, script หรือ automation ใดก็ได้.</sub>
+<img src="../../docs/screenshots/product-tour/design-system.png" alt="Design System" /><br/>
+<sub><b>Design System</b> — ดึงและปรับแต่งภาษาภาพของแบรนด์ preview ผลลัพธ์ และสร้างงานต่อด้วยระบบเดียวกันใน workspace เดียว</sub>
 </td>
 </tr>
 </table>
 
 ### Studio — artifact หลายชนิดใน project เดียว
 
-ภายใน Studio ของ project เดียวกัน, design system ชุดเดียวกันสามารถ stream artifact ได้หลายชนิด:
+ใน Studio ของ project การสนทนา ไฟล์ที่สร้าง และ live preview จะอยู่รวมกันสำหรับ artifact หกประเภท:
 
 <table>
 <tr>
 <td width="50%" valign="top">
-<img src="https://repo-assets.open-design.ai/resources/images/product/studio-prototype.png" alt="Prototype" /><br/>
-<sub><b>Prototype</b> — artifact HTML หน้าเดียวที่อ่าน design system ของคุณและ render ใน sandboxed iframe, preview ได้ทันทีและดาวน์โหลด source ได้.</sub>
+<img src="../../docs/screenshots/product-tour/studio-prototype.png" alt="Prototype" /><br/>
+<sub><b>Prototype</b> — สร้างหรือจำลอง web experience ตรวจสอบหน้าที่ render แล้ว และทำงานวนซ้ำกับ Agent ได้ในจุดเดียว</sub>
 </td>
 <td width="50%" valign="top">
-<img src="https://repo-assets.open-design.ai/resources/images/product/studio-hyperframe.png" alt="HyperFrame" /><br/>
-<sub><b>HyperFrame</b> — motion และ animated graphics แบบ programmatic, render เป็น MP4 จริง (เช่น 1920×1080 · 30fps).</sub>
+<img src="../../docs/screenshots/product-tour/studio-deck.png" alt="Deck" /><br/>
+<sub><b>Deck</b> — สร้าง presentation หลายสไลด์ ตรวจสอบ thumbnail และ speaker notes แล้ว export เมื่อพร้อม</sub>
 </td>
 </tr>
 <tr>
 <td width="50%" valign="top">
-<img src="https://repo-assets.open-design.ai/resources/images/product/studio-ppt.png" alt="Deck" /><br/>
-<sub><b>Deck</b> — pitch deck ที่พลิกหน้าได้, ใช้ keyboard นำทางได้ และ export เป็น PPTX / PDF ได้.</sub>
+<img src="../../docs/screenshots/product-tour/studio-mobile-app.png" alt="Mobile app" /><br/>
+<sub><b>Mobile app</b> — สร้างและขัดเกลา mobile interface ใน device preview โดยมีการสนทนา ไฟล์ output และ next-step actions อยู่ข้างกัน</sub>
 </td>
 <td width="50%" valign="top">
-<img src="https://repo-assets.open-design.ai/resources/images/product/studio-image.png" alt="Image" /><br/>
-<sub><b>Image</b> — image และ visual assets ระดับแบรนด์ พร้อม high-resolution generation และ download.</sub>
+<img src="../../docs/screenshots/product-tour/studio-image.png" alt="Image" /><br/>
+<sub><b>Image</b> — สร้าง visual asset จากการสนทนาใน project, preview ผลลัพธ์แบบเต็มขนาด แล้วดาวน์โหลดหรือเปิดไฟล์</sub>
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+<img src="../../docs/screenshots/product-tour/studio-document.png" alt="Document" /><br/>
+<sub><b>Document</b> — สร้าง guide หลายหน้าและ editorial document ที่ขัดเกลาแล้ว ตรวจสอบ layout ที่ render และ export หรือ share เมื่อพร้อม</sub>
+</td>
+<td width="50%" valign="top">
+<img src="../../docs/screenshots/product-tour/studio-hyperframe.png" alt="HyperFrame" /><br/>
+<sub><b>HyperFrame</b> — สร้าง motion graphics ที่ควบคุมด้วย code, preview animation ใน Studio และ export วิดีโอที่เสร็จแล้ว</sub>
 </td>
 </tr>
 </table>
-
 ---
 
 ## ความเข้ากันได้ของแพลตฟอร์ม
@@ -116,10 +115,10 @@ Open Design คือสิ่งที่เกิดขึ้นเมื่�
 | [Claude Code](https://docs.anthropic.com/en/docs/claude-code) | ✅ Supported | `od mcp install claude` |
 | [Codex CLI](https://github.com/openai/codex) | ✅ Supported | `od mcp install codex` |
 | [DeepSeek Reasonix](https://github.com/esengine/DeepSeek-Reasonix) | ✅ Supported | `od mcp install reasonix` |
+| [Raven](https://github.com/EverMind-AI/Raven) | ✅ Supported | `od mcp install raven` |
 | [Cursor](https://www.cursor.com/cli) | ✅ Supported | `od mcp install cursor` |
 | [VS Code + GitHub Copilot](https://github.com/features/copilot) | ✅ Supported | `od mcp install copilot` |
 | [GitHub Copilot CLI](https://github.com/features/copilot/cli) | ✅ Supported | `od mcp install copilot` |
-| [Gemini CLI](https://github.com/google-gemini/gemini-cli) | ✅ Supported | `od mcp install gemini` |
 | [OpenCode](https://opencode.ai/) | ✅ Supported | `od mcp install opencode` |
 | [OpenClaw](https://github.com/openclaw/openclaw) | ✅ Supported | `od mcp install openclaw` |
 | [Antigravity](https://antigravity.google) | ✅ Supported | `od mcp install antigravity` |
@@ -152,16 +151,6 @@ Runtime definitions อยู่ใน [`apps/daemon/src/runtimes/defs/`](../../
 พื้นผิว output เริ่มต้น. Artifact HTML หน้าเดียวที่อ่าน `DESIGN.md` ของคุณและ render ใน sandboxed iframe.
 
 <table>
-<tr>
-<td width="50%" valign="top">
-<img src="../../docs/screenshots/01-entry-view.png" alt="Entry view" /><br/>
-<sub><b>Entry view</b> — เลือก skill, เลือก design system, พิมพ์ brief. พื้นผิวเดียวสำหรับ prototype, dashboard, deck, mobile app และหน้า magazine.</sub>
-</td>
-<td width="50%" valign="top">
-<img src="../../docs/screenshots/skills/mobile-onboarding.png" alt="Mobile onboarding" /><br/>
-<sub><b>Mobile prototype</b> — chrome ของ iPhone 15 Pro แบบ pixel-accurate, flow หลายหน้าจอ. Agent ไม่ต้องวาดกรอบมือถือใหม่ เพราะ shared device frames อยู่ใน <code>assets/frames/</code>.</sub>
-</td>
-</tr>
 <tr>
 <td width="50%" valign="top">
 <img src="../../docs/screenshots/skills/dating-web.png" alt="Web prototype dating-web" /><br/>
@@ -304,8 +293,8 @@ Open Design (OD) คือทางเลือกโอเพนซอร์ส
 ```bash
 # One-line install into the agent you're using:
 curl -fsSL https://open-design.ai/install.sh | sh -s <agent>
-# <agent> = claude | codex | cursor | copilot | openclaw | antigravity | gemini
-#         | pi | vibe | hermes | cline | kimi | trae | opencode
+# <agent> = claude | codex | reasonix | raven | cursor | copilot | openclaw | antigravity
+#         | pi | vibe | hermes | cline | kimi | kiro | trae | opencode
 ```
 
 จากนั้นใน agent:
@@ -324,10 +313,10 @@ cd open-design/deploy
 cp .env.example .env
 echo "OD_API_TOKEN=$(openssl rand -hex 32)" >> .env
 docker compose up -d
-# open http://localhost:7456
+# open http://127.0.0.1:7456
 ```
 
-> **ผู้ใช้ macOS:** ถ้า web UI แสดง `Authorization: Bearer <OD_API_TOKEN> required`, สาเหตุคือ bridge networking ของ Docker Desktop. ดูวิธีแก้ที่ [Docker Desktop on macOS](../../deploy/README.md#docker-desktop-on-macos).
+หากเบราว์เซอร์ขอข้อมูลเข้าสู่ระบบ ให้ใช้ `open-design` เป็นชื่อผู้ใช้ และใช้ค่า `OD_API_TOKEN` จาก `deploy/.env` เป็นรหัสผ่าน ทราฟฟิกผ่าน Docker bridge จะยังมีการยืนยันตัวตนโดยไม่ต้องเปิด host networking
 
 ### 🧑‍💻 รันจาก source
 
@@ -685,7 +674,7 @@ Contribution flow สำหรับ agent, code style และ PR bar แบ�
 ขอบคุณทุกคนที่มีส่วนร่วม — code, docs, feedback, issue ที่คม, skill ใหม่, design system ใหม่.
 
 <a href="https://github.com/nexu-io/open-design/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=nexu-io/open-design&max=500&columns=20&anon=1&cache_bust=2026-07-17" alt="Open Design contributors" />
+  <img src="https://contrib.rocks/image?repo=nexu-io/open-design&max=500&columns=20&anon=1&cache_bust=2026-08-04" alt="Open Design contributors" />
 </a>
 
 ---
@@ -710,9 +699,9 @@ SVG ด้านบน regenerate ทุกวันโดย [`.github/workflow
 
 <a href="https://star-history.com/#nexu-io/open-design&Date">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=nexu-io/open-design&type=Date&theme=dark&cache_bust=2026-07-17" />
-    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=nexu-io/open-design&type=Date&cache_bust=2026-07-17" />
-    <img alt="Open Design star history" src="https://api.star-history.com/svg?repos=nexu-io/open-design&type=Date&cache_bust=2026-07-17" />
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=nexu-io/open-design&type=Date&theme=dark&cache_bust=2026-08-04" />
+    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=nexu-io/open-design&type=Date&cache_bust=2026-08-04" />
+    <img alt="Open Design star history" src="https://api.star-history.com/svg?repos=nexu-io/open-design&type=Date&cache_bust=2026-08-04" />
   </picture>
 </a>
 

@@ -1,9 +1,9 @@
 /**
  * Site bundle export endpoint.
  *
- *   GET  /admin/api/cms/export
- *   POST /admin/api/cms/export
- *   POST /admin/api/cms/export/estimate   → { bytes } (size only, no download)
+ *   GET  /cms/api/cms/export
+ *   POST /cms/api/cms/export
+ *   POST /cms/api/cms/export/estimate   → { bytes } (size only, no download)
  *
  * Returns a ZIP archive that captures a full or partial site state:
  *   - `.instatic/site-bundle.json` with the portable manifest

@@ -51,7 +51,7 @@ export const RowTableBodySchema = Type.Object({
 })
 
 /**
- * Body for POST /admin/api/cms/data/rows/:id/schedule. `at` is an ISO
+ * Body for POST /cms/api/cms/data/rows/:id/schedule. `at` is an ISO
  * datetime — the handler additionally verifies that it parses as a
  * Date AND lies in the future before invoking `scheduleDataRowPublish`.
  * The future-time check lives in the handler (not the schema) so we

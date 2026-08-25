@@ -10,7 +10,6 @@ import {
   openSiteEditor,
   openSitePanel,
   publishDraft,
-  saveDraft,
   setPropValue,
   visitPublicPage,
 } from './helpers'
@@ -310,8 +309,12 @@ test.describe('content', () => {
         await dialog.getByLabel('Name').fill(collectionName)
         await dialog.getByLabel('Singular label').fill('Product')
         await dialog.getByLabel('Plural label').fill(pluralLabel)
-        await dialog.getByLabel('Featured media').setChecked(false)
-        await dialog.getByLabel('SEO fields').setChecked(false)
+        for (const fieldLabel of ['Featured media', 'SEO title', 'SEO description']) {
+          await dialog.getByRole('button', { name: `Delete ${fieldLabel}` }).click()
+          const confirmDialog = page.getByRole('dialog', { name: `Delete field "${fieldLabel}"?` })
+          await confirmDialog.getByRole('button', { name: 'Delete' }).click()
+          await expect(confirmDialog).toBeHidden()
+        }
         await dialog.getByRole('button', { name: 'Create' }).click()
         await completeStepUp(page)
 
@@ -423,7 +426,6 @@ test.describe('content', () => {
       })
 
       await test.step('publish the template and verify the anonymous public post route resolves the custom token', async () => {
-        await saveDraft(page)
         await publishDraft(page)
         await visitPublicPage(browser, {
           path: `/posts/${postSlug}`,
@@ -583,7 +585,6 @@ async function createPublishedPostsTemplate(
   await page.getByRole('option', { name: 'Heading 1', exact: true }).click()
   await expect(page.locator('#ctrl-tag')).toHaveValue('Heading 1')
   await insertModuleViaPicker(page, 'base.outlet')
-  await saveDraft(page)
   await publishDraft(page)
 }
 

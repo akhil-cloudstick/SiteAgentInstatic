@@ -4,10 +4,10 @@
  * Backs the `/cms/media/storage` page. Talks to the four endpoints in
  * `server/handlers/cms/mediaStorageAdmin.ts`:
  *
- *   GET    /admin/api/cms/media/storage            — snapshot
- *   POST   /admin/api/cms/media/storage/elect      — elect adapter per role
- *   POST   /admin/api/cms/media/storage/delegate   — elect / clear variant delegate
- *   POST   /admin/api/cms/media/storage/verify/:id — run adapter.verify()
+ *   GET    /cms/api/cms/media/storage            — snapshot
+ *   POST   /cms/api/cms/media/storage/elect      — elect adapter per role
+ *   POST   /cms/api/cms/media/storage/delegate   — elect / clear variant delegate
+ *   POST   /cms/api/cms/media/storage/verify/:id — run adapter.verify()
  *
  * Schema-validated envelopes follow the same pattern as `cmsPlugins.ts`:
  * the boundary asserts the outer keys exist, the deep types come back as

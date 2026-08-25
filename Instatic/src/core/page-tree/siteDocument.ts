@@ -9,7 +9,7 @@
  *
  * None of those collections are embedded in the shell. The adapter assembles
  * the full `SiteDocument` (shell + pages + visualComponents + layouts) on
- * load; the shell is saved independently on each PUT /admin/api/cms/site call.
+ * load; the shell is saved independently on each PUT /cms/api/cms/site call.
  *
  * Resilience semantics (via parseSiteDocument):
  *   THROWS (no fallback) if missing / wrong type:

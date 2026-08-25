@@ -1,7 +1,7 @@
 /**
  * Integration tests — step-up auth.
  *
- * Exercises POST /admin/api/cms/auth/step-up plus the three sensitive
+ * Exercises POST /cms/api/cms/auth/step-up plus the three sensitive
  * endpoints it gates (DELETE users/:id, DELETE auth/sessions/:id,
  * POST auth/logout-all) against a real SQLite test DB.
  */
@@ -60,7 +60,7 @@ function totpCode(secret: string, now = Date.now()): string {
 
 async function setup(db: DbClient): Promise<void> {
   const res = await handleCmsRequest(
-    new Request('http://localhost/admin/api/cms/setup', {
+    new Request('http://localhost/cms/api/cms/setup', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ siteName: 'StepUp Test', email: EMAIL, password: VALID_LOGIN_PHRASE }),
@@ -71,7 +71,7 @@ async function setup(db: DbClient): Promise<void> {
 }
 
 async function login(db: DbClient): Promise<string> {
-  const req = new Request('http://localhost/admin/api/cms/login', {
+  const req = new Request('http://localhost/cms/api/cms/login', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ email: EMAIL, password: VALID_LOGIN_PHRASE }),
@@ -89,7 +89,7 @@ async function stepUp(
   password: string,
   mfaCode?: string,
 ): Promise<Response> {
-  const req = new Request('http://localhost/admin/api/cms/auth/step-up', {
+  const req = new Request('http://localhost/cms/api/cms/auth/step-up', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ password, ...(mfaCode ? { mfaCode } : {}) }),
@@ -122,7 +122,7 @@ async function enableMfa(db: DbClient, cookie: string): Promise<{ cookie: string
   expect(stepUpRes.status).toBe(200)
   const steppedCookie = cookieFromSetCookie(stepUpRes)
 
-  const enableReq = new Request('http://localhost/admin/api/cms/me/mfa/totp/enable', {
+  const enableReq = new Request('http://localhost/cms/api/cms/me/mfa/totp/enable', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ secret: TOTP_SECRET, code: totpCode(TOTP_SECRET) }),
@@ -141,7 +141,7 @@ async function enableMfa(db: DbClient, cookie: string): Promise<{ cookie: string
 }
 
 async function logoutAll(db: DbClient, cookie: string): Promise<Response> {
-  const req = new Request('http://localhost/admin/api/cms/auth/logout-all', { method: 'POST' })
+  const req = new Request('http://localhost/cms/api/cms/auth/logout-all', { method: 'POST' })
   req.headers.set('cookie', cookie)
   return handleCmsRequest(req, db)
 }
@@ -365,7 +365,7 @@ describe('Step-up auth', () => {
       userAgent: null,
     })
 
-    const req = new Request(`http://localhost/admin/api/cms/auth/sessions/${otherIdHash}`, {
+    const req = new Request(`http://localhost/cms/api/cms/auth/sessions/${otherIdHash}`, {
       method: 'DELETE',
     })
     req.headers.set('cookie', cookie)
@@ -384,7 +384,7 @@ describe('Step-up auth', () => {
     const ownerCookie = await login(db)
     // Create a target admin user via the API.
     const steppedOwnerCookie = await completeStepUp(db, ownerCookie, VALID_LOGIN_PHRASE)
-    const createReq = new Request('http://localhost/admin/api/cms/users', {
+    const createReq = new Request('http://localhost/cms/api/cms/users', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
@@ -405,7 +405,7 @@ describe('Step-up auth', () => {
       set step_up_expires_at = ${new Date(Date.now() - 1000)}
     `
 
-    const deleteReq = new Request(`http://localhost/admin/api/cms/users/${created.user.id}`, {
+    const deleteReq = new Request(`http://localhost/cms/api/cms/users/${created.user.id}`, {
       method: 'DELETE',
     })
     deleteReq.headers.set('cookie', steppedOwnerCookie)
@@ -419,7 +419,7 @@ describe('Step-up auth', () => {
     const { db } = testDb
     const cookie = await login(db)
 
-    const createUserReq = new Request('http://localhost/admin/api/cms/users', {
+    const createUserReq = new Request('http://localhost/cms/api/cms/users', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
@@ -434,7 +434,7 @@ describe('Step-up auth', () => {
     expect(createUserRes.status).toBe(401)
     expect(await createUserRes.json()).toEqual({ error: 'step_up_required' })
 
-    const createRoleReq = new Request('http://localhost/admin/api/cms/roles', {
+    const createRoleReq = new Request('http://localhost/cms/api/cms/roles', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
@@ -454,7 +454,7 @@ describe('Step-up auth', () => {
     const cookie = await login(db)
     const steppedCookie = await completeStepUp(db, cookie, VALID_LOGIN_PHRASE)
 
-    const createUserReq = new Request('http://localhost/admin/api/cms/users', {
+    const createUserReq = new Request('http://localhost/cms/api/cms/users', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
@@ -469,7 +469,7 @@ describe('Step-up auth', () => {
     expect(createUserRes.status).toBe(201)
     const createdUser = await createUserRes.json() as { user: { id: string } }
 
-    const createRoleReq = new Request('http://localhost/admin/api/cms/roles', {
+    const createRoleReq = new Request('http://localhost/cms/api/cms/roles', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
@@ -488,7 +488,7 @@ describe('Step-up auth', () => {
       set step_up_expires_at = ${new Date(Date.now() - 1000)}
     `
 
-    const patchUserReq = new Request(`http://localhost/admin/api/cms/users/${createdUser.user.id}`, {
+    const patchUserReq = new Request(`http://localhost/cms/api/cms/users/${createdUser.user.id}`, {
       method: 'PATCH',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ status: 'suspended' }),
@@ -498,7 +498,7 @@ describe('Step-up auth', () => {
     expect(patchUserRes.status).toBe(401)
     expect(await patchUserRes.json()).toEqual({ error: 'step_up_required' })
 
-    const patchRoleReq = new Request(`http://localhost/admin/api/cms/roles/${createdRole.role.id}`, {
+    const patchRoleReq = new Request(`http://localhost/cms/api/cms/roles/${createdRole.role.id}`, {
       method: 'PATCH',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ capabilities: ['users.manage'] }),
@@ -508,7 +508,7 @@ describe('Step-up auth', () => {
     expect(patchRoleRes.status).toBe(401)
     expect(await patchRoleRes.json()).toEqual({ error: 'step_up_required' })
 
-    const deleteRoleReq = new Request(`http://localhost/admin/api/cms/roles/${createdRole.role.id}`, {
+    const deleteRoleReq = new Request(`http://localhost/cms/api/cms/roles/${createdRole.role.id}`, {
       method: 'DELETE',
     })
     deleteRoleReq.headers.set('cookie', steppedCookie)
@@ -522,7 +522,7 @@ describe('Step-up auth', () => {
     const ownerCookie = await login(db)
     const steppedOwnerCookie = await completeStepUp(db, ownerCookie, VALID_LOGIN_PHRASE)
 
-    const createUserReq = new Request('http://localhost/admin/api/cms/users', {
+    const createUserReq = new Request('http://localhost/cms/api/cms/users', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
@@ -537,7 +537,7 @@ describe('Step-up auth', () => {
     expect(createUserRes.status).toBe(201)
     const created = await createUserRes.json() as { user: { id: string } }
 
-    const targetLoginReq = new Request('http://localhost/admin/api/cms/login', {
+    const targetLoginReq = new Request('http://localhost/cms/api/cms/login', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ email: 'reset-target@example.com', password: VALID_LOGIN_PHRASE }),
@@ -548,7 +548,7 @@ describe('Step-up auth', () => {
     const targetCookie = (targetLogin.headers.get('set-cookie') ?? '').split(';')[0]
     expect(targetCookie.startsWith(`${SESSION_COOKIE_NAME}=`)).toBe(true)
 
-    const resetReq = new Request(`http://localhost/admin/api/cms/users/${created.user.id}`, {
+    const resetReq = new Request(`http://localhost/cms/api/cms/users/${created.user.id}`, {
       method: 'PATCH',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ password: 'new-reset-target-password' }),
@@ -559,7 +559,7 @@ describe('Step-up auth', () => {
     const resetBody = await resetRes.json() as { user: { passwordUpdatedAt: string | null } }
     expect(resetBody.user.passwordUpdatedAt).not.toBeNull()
 
-    const oldSessionReq = new Request('http://localhost/admin/api/cms/me', { method: 'GET' })
+    const oldSessionReq = new Request('http://localhost/cms/api/cms/me', { method: 'GET' })
     oldSessionReq.headers.set('cookie', targetCookie)
     const oldSessionRes = await handleCmsRequest(oldSessionReq, db)
     expect(oldSessionRes.status).toBe(401)

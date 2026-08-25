@@ -113,16 +113,16 @@ describe('Gate SH-5 — validate.ts exports validateVisualComponents', () => {
 
 // ---------------------------------------------------------------------------
 // 6 — /components read handler exists; writes go through the transactional
-//     site-document save (PUT /admin/api/cms/site-document)
+//     site-document save (PUT /cms/api/cms/site-document)
 // ---------------------------------------------------------------------------
 
-describe('Gate SH-6 — /admin/api/cms/components handler exists', () => {
+describe('Gate SH-6 — /cms/api/cms/components handler exists', () => {
   it('server/handlers/cms/components.ts exists', () => {
     // If readFileSync doesn't throw, the file exists
     expect(() => readFileSync(COMPONENTS_HANDLER, 'utf-8')).not.toThrow()
   })
 
-  it('components handler matches /admin/api/cms/components path', () => {
+  it('components handler matches /cms/api/cms/components path', () => {
     const source = readFileSync(COMPONENTS_HANDLER, 'utf-8')
     expect(source).toMatch(/\/components/)
   })

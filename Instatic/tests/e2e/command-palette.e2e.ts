@@ -215,7 +215,7 @@ test.describe('command palette', () => {
       releaseContentSearch = resolve
     })
 
-    await page.route('**/admin/api/cms/data/search?**', async (route) => {
+    await page.route('**/cms/api/cms/data/search?**', async (route) => {
       await contentSearchReleased
       await route.fulfill({
         status: 200,

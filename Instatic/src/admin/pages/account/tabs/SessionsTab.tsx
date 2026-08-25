@@ -4,7 +4,7 @@
  * Lists every live session the current user has across browsers and devices,
  * pinning the *current* one to the top with a "This device" badge. Each
  * other row exposes a "Sign out" action that calls
- * `DELETE /admin/api/cms/auth/sessions/:id`. A "Sign out everywhere else"
+ * `DELETE /cms/api/cms/auth/sessions/:id`. A "Sign out everywhere else"
  * action in the section header revokes every non-current session in one go.
  *
  * Mutable live state — this is the "kick a device out" surface. Past sign-in

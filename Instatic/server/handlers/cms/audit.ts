@@ -1,7 +1,7 @@
 /**
  * Audit log read endpoint (gated by `audit.read`).
  *
- *   GET /admin/api/cms/audit — list the latest audit events in reverse-
+ *   GET /cms/api/cms/audit — list the latest audit events in reverse-
  *                              chronological order. Query filters are not
  *                              implemented; callers get the repository default.
  */

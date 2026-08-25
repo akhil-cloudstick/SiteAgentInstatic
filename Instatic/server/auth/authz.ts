@@ -10,7 +10,7 @@ import type { AuthUser } from '../repositories/users'
  * device, sign out all devices, ...) require the user to have re-entered
  * their password inside their configured window. Stored on the session row
  * as `step_up_expires_at`; cleared automatically by elapse, or refreshed by
- * `POST /admin/api/cms/auth/step-up`.
+ * `POST /cms/api/cms/auth/step-up`.
  */
 interface RequireStepUpOptions {
   policy?: 'user' | 'always'

@@ -1,12 +1,12 @@
 /**
  * Plugin settings endpoints.
  *
- *   GET /admin/api/cms/plugins/:id/settings — return the declared schema +
+ *   GET /cms/api/cms/plugins/:id/settings — return the declared schema +
  *       presented values. Secret fields surface only presence: `'***'` when
  *       an encrypted row exists, `''` when not. Fields whose stored row was
  *       encrypted with a different master key are listed in
  *       `secretsNeedingReentry` so the form can prompt for re-entry.
- *   PUT /admin/api/cms/plugins/:id/settings — validate, then hand off to
+ *   PUT /cms/api/cms/plugins/:id/settings — validate, then hand off to
  *       `persistAndSyncPluginSettings`, which persists (secret fields split
  *       into the encrypted `plugin_secrets` table: `'***'` preserves, a new
  *       value rotates, `''` clears), refreshes the runtime cache, pushes the

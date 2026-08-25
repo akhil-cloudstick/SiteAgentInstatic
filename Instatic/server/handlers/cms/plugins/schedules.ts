@@ -1,22 +1,22 @@
 /**
  * Plugin schedule admin endpoints.
  *
- *   GET    /admin/api/cms/plugins/:id/schedules
+ *   GET    /cms/api/cms/plugins/:id/schedules
  *          → list every schedule the plugin has registered, with recent runs
  *          → `{ schedules: PluginSchedule[]; recent: { [scheduleId]: PluginScheduleRun[] } }`
  *
- *   POST   /admin/api/cms/plugins/:id/schedules/:scheduleId/run-now
+ *   POST   /cms/api/cms/plugins/:id/schedules/:scheduleId/run-now
  *          → fire the handler immediately, bypassing the cadence but
  *            respecting the row-level claim lock so a concurrent tick
  *            cannot fire it twice. Returns the outcome row.
  *
- *   POST   /admin/api/cms/plugins/:id/schedules/:scheduleId/pause
+ *   POST   /cms/api/cms/plugins/:id/schedules/:scheduleId/pause
  *          → flip `paused = true`. The tick stops dispatching until a
  *            `resume` arrives. Independent of the registration-owned
  *            `enabled` flag, so the pause survives server restarts and
  *            plugin re-activations.
  *
- *   POST   /admin/api/cms/plugins/:id/schedules/:scheduleId/resume
+ *   POST   /cms/api/cms/plugins/:id/schedules/:scheduleId/resume
  *          → flip `paused = false`, reset `consecutive_failures = 0`.
  *
  * The list route requires `plugins.read`; the mutating routes

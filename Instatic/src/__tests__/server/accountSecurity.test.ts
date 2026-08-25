@@ -69,7 +69,7 @@ function totpCode(secret: string, now = Date.now()): string {
 
 async function setup(db: DbClient): Promise<void> {
   const res = await handleCmsRequest(
-    new Request('http://localhost/admin/api/cms/setup', {
+    new Request('http://localhost/cms/api/cms/setup', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ siteName: 'Security Test', email: EMAIL, password: PASSWORD }),
@@ -83,7 +83,7 @@ async function login(
   db: DbClient,
   password = PASSWORD,
 ): Promise<{ cookie: string; body: Record<string, unknown> }> {
-  const req = new Request('http://localhost/admin/api/cms/login', {
+  const req = new Request('http://localhost/cms/api/cms/login', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ email: EMAIL, password }),
@@ -105,7 +105,7 @@ function cookieFromSetCookie(res: Response): string {
 }
 
 async function stepUp(db: DbClient, cookie: string): Promise<string> {
-  const req = new Request('http://localhost/admin/api/cms/auth/step-up', {
+  const req = new Request('http://localhost/cms/api/cms/auth/step-up', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ password: PASSWORD }),
@@ -121,7 +121,7 @@ async function enableMfa(
   cookie: string,
 ): Promise<{ secret: string; recoveryCodes: string[] }> {
   const steppedCookie = await stepUp(db, cookie)
-  const startReq = new Request('http://localhost/admin/api/cms/me/mfa/totp/start', {
+  const startReq = new Request('http://localhost/cms/api/cms/me/mfa/totp/start', {
     method: 'POST',
   })
   startReq.headers.set('cookie', steppedCookie)
@@ -131,7 +131,7 @@ async function enableMfa(
   expect(startBody.secret).toMatch(/^[A-Z2-7]+$/)
   expect(startBody.otpauthUrl).toContain(encodeURIComponent(EMAIL))
 
-  const enableReq = new Request('http://localhost/admin/api/cms/me/mfa/totp/enable', {
+  const enableReq = new Request('http://localhost/cms/api/cms/me/mfa/totp/enable', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ secret: startBody.secret, code: totpCode(startBody.secret) }),
@@ -177,7 +177,7 @@ describe('Account security endpoints', () => {
     const { cookie } = await login(db)
     const nextEmail = 'owner-renamed@example.com'
 
-    const blockedReq = new Request('http://localhost/admin/api/cms/me', {
+    const blockedReq = new Request('http://localhost/cms/api/cms/me', {
       method: 'PATCH',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
@@ -192,7 +192,7 @@ describe('Account security endpoints', () => {
     expect(await findUserByEmail(db, nextEmail)).toBeNull()
 
     const steppedCookie = await stepUp(db, cookie)
-    const updateReq = new Request('http://localhost/admin/api/cms/me', {
+    const updateReq = new Request('http://localhost/cms/api/cms/me', {
       method: 'PATCH',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
@@ -220,7 +220,7 @@ describe('Account security endpoints', () => {
     const steppedCookie = await stepUp(db, cookie)
     const displayName = 'A'.repeat(160)
 
-    const updateReq = new Request('http://localhost/admin/api/cms/me', {
+    const updateReq = new Request('http://localhost/cms/api/cms/me', {
       method: 'PATCH',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
@@ -256,7 +256,7 @@ describe('Account security endpoints', () => {
     })
     const steppedCookie = await stepUp(db, cookie)
 
-    const duplicateReq = new Request('http://localhost/admin/api/cms/me', {
+    const duplicateReq = new Request('http://localhost/cms/api/cms/me', {
       method: 'PATCH',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
@@ -297,7 +297,7 @@ describe('Account security endpoints', () => {
     ]
 
     for (const invalidCase of invalidCases) {
-      const invalidReq = new Request('http://localhost/admin/api/cms/me', {
+      const invalidReq = new Request('http://localhost/cms/api/cms/me', {
         method: 'PATCH',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(invalidCase.body),
@@ -320,7 +320,7 @@ describe('Account security endpoints', () => {
     expect(before?.avatarMediaId).toBeNull()
 
     const emptyForm = new FormData()
-    const uploadReq = new Request('http://localhost/admin/api/cms/me/avatar', {
+    const uploadReq = new Request('http://localhost/cms/api/cms/me/avatar', {
       method: 'POST',
       body: emptyForm,
     })
@@ -339,7 +339,7 @@ describe('Account security endpoints', () => {
     const before = await findUserByEmail(db, EMAIL)
     expect(before?.avatarMediaId).toBeNull()
 
-    const removeReq = new Request('http://localhost/admin/api/cms/me/avatar', {
+    const removeReq = new Request('http://localhost/cms/api/cms/me/avatar', {
       method: 'DELETE',
     })
     removeReq.headers.set('cookie', cookie)
@@ -371,7 +371,7 @@ describe('Account security endpoints', () => {
 
       const form = new FormData()
       form.set('file', new File([PNG_1X1], 'avatar.png', { type: 'image/png' }))
-      const uploadReq = new Request('http://localhost/admin/api/cms/me/avatar', {
+      const uploadReq = new Request('http://localhost/cms/api/cms/me/avatar', {
         method: 'POST',
         body: form,
       })
@@ -406,7 +406,7 @@ describe('Account security endpoints', () => {
       userAgent: null,
     })
 
-    const blockedReq = new Request('http://localhost/admin/api/cms/me/password', {
+    const blockedReq = new Request('http://localhost/cms/api/cms/me/password', {
       method: 'PATCH',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ newPassword: NEW_PASSWORD }),
@@ -417,7 +417,7 @@ describe('Account security endpoints', () => {
     expect(await blockedRes.json()).toEqual({ error: 'step_up_required' })
 
     const steppedCookie = await stepUp(db, cookie)
-    const changeReq = new Request('http://localhost/admin/api/cms/me/password', {
+    const changeReq = new Request('http://localhost/cms/api/cms/me/password', {
       method: 'PATCH',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ newPassword: NEW_PASSWORD }),
@@ -442,7 +442,7 @@ describe('Account security endpoints', () => {
     const { db } = testDb
     const { cookie } = await login(db)
 
-    const blockedReq = new Request('http://localhost/admin/api/cms/me/security/step-up', {
+    const blockedReq = new Request('http://localhost/cms/api/cms/me/security/step-up', {
       method: 'PATCH',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ mode: 'disabled', windowMinutes: 30 }),
@@ -453,7 +453,7 @@ describe('Account security endpoints', () => {
     expect(await blockedRes.json()).toEqual({ error: 'step_up_required' })
 
     const steppedCookie = await stepUp(db, cookie)
-    const updateReq = new Request('http://localhost/admin/api/cms/me/security/step-up', {
+    const updateReq = new Request('http://localhost/cms/api/cms/me/security/step-up', {
       method: 'PATCH',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ mode: 'disabled', windowMinutes: 30 }),
@@ -468,14 +468,14 @@ describe('Account security endpoints', () => {
     expect(updateBody.user.stepUpWindowMinutes).toBe(30)
 
     const fresh = await login(db)
-    const logoutAllReq = new Request('http://localhost/admin/api/cms/auth/logout-all', {
+    const logoutAllReq = new Request('http://localhost/cms/api/cms/auth/logout-all', {
       method: 'POST',
     })
     logoutAllReq.headers.set('cookie', fresh.cookie)
     const logoutAllRes = await handleCmsRequest(logoutAllReq, db)
     expect(logoutAllRes.status).toBe(200)
 
-    const reenableReq = new Request('http://localhost/admin/api/cms/me/security/step-up', {
+    const reenableReq = new Request('http://localhost/cms/api/cms/me/security/step-up', {
       method: 'PATCH',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ mode: 'required', windowMinutes: 15 }),
@@ -491,7 +491,7 @@ describe('Account security endpoints', () => {
     const { cookie } = await login(db)
     const steppedCookie = await stepUp(db, cookie)
 
-    const invalidModeReq = new Request('http://localhost/admin/api/cms/me/security/step-up', {
+    const invalidModeReq = new Request('http://localhost/cms/api/cms/me/security/step-up', {
       method: 'PATCH',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ mode: 'optional', windowMinutes: 30 }),
@@ -501,7 +501,7 @@ describe('Account security endpoints', () => {
     expect(invalidModeRes.status).toBe(400)
     expect(await invalidModeRes.json()).toEqual({ error: 'Invalid step-up settings' })
 
-    const invalidWindowReq = new Request('http://localhost/admin/api/cms/me/security/step-up', {
+    const invalidWindowReq = new Request('http://localhost/cms/api/cms/me/security/step-up', {
       method: 'PATCH',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ mode: 'required', windowMinutes: 999 }),
@@ -521,7 +521,7 @@ describe('Account security endpoints', () => {
     const { cookie } = await login(db)
     const steppedCookie = await stepUp(db, cookie)
 
-    const updateReq = new Request('http://localhost/admin/api/cms/me/security/step-up', {
+    const updateReq = new Request('http://localhost/cms/api/cms/me/security/step-up', {
       method: 'PATCH',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ mode: 'required', windowMinutes: 30 }),
@@ -531,7 +531,7 @@ describe('Account security endpoints', () => {
     expect(updateRes.status).toBe(200)
 
     const before = Date.now()
-    const secondStepUpReq = new Request('http://localhost/admin/api/cms/auth/step-up', {
+    const secondStepUpReq = new Request('http://localhost/cms/api/cms/auth/step-up', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ password: PASSWORD }),
@@ -578,13 +578,13 @@ describe('Account security endpoints', () => {
     const pending = await login(db)
     expect(pending.body.mfaRequired).toBe(true)
 
-    const meReq = new Request('http://localhost/admin/api/cms/me', { method: 'GET' })
+    const meReq = new Request('http://localhost/cms/api/cms/me', { method: 'GET' })
     meReq.headers.set('cookie', pending.cookie)
     const meRes = await handleCmsRequest(meReq, db)
     expect(meRes.status).toBe(401)
     expect(await meRes.json()).toEqual({ error: 'mfa_required' })
 
-    const verifyReq = new Request('http://localhost/admin/api/cms/auth/mfa/verify', {
+    const verifyReq = new Request('http://localhost/cms/api/cms/auth/mfa/verify', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ code: totpCode(secret) }),
@@ -596,12 +596,12 @@ describe('Account security endpoints', () => {
     const verifiedCookie = cookieFromSetCookie(verifyRes)
     expect(verifiedCookie).not.toBe(pending.cookie)
 
-    const oldCookieMeReq = new Request('http://localhost/admin/api/cms/me', { method: 'GET' })
+    const oldCookieMeReq = new Request('http://localhost/cms/api/cms/me', { method: 'GET' })
     oldCookieMeReq.headers.set('cookie', pending.cookie)
     const oldCookieMeRes = await handleCmsRequest(oldCookieMeReq, db)
     expect(oldCookieMeRes.status).toBe(401)
 
-    const verifiedMeReq = new Request('http://localhost/admin/api/cms/me', { method: 'GET' })
+    const verifiedMeReq = new Request('http://localhost/cms/api/cms/me', { method: 'GET' })
     verifiedMeReq.headers.set('cookie', verifiedCookie)
     const verifiedMeRes = await handleCmsRequest(verifiedMeReq, db)
     expect(verifiedMeRes.status).toBe(200)
@@ -623,7 +623,7 @@ describe('Account security endpoints', () => {
       where id_hash = ${pendingIdHash}
     `
 
-    const verifyReq = new Request('http://localhost/admin/api/cms/auth/mfa/verify', {
+    const verifyReq = new Request('http://localhost/cms/api/cms/auth/mfa/verify', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ code: totpCode(secret) }),
@@ -634,7 +634,7 @@ describe('Account security endpoints', () => {
     expect(await verifyRes.json()).toEqual({ error: 'Unauthorized' })
     expect(verifyRes.headers.get('set-cookie')).toBeNull()
 
-    const meReq = new Request('http://localhost/admin/api/cms/me', { method: 'GET' })
+    const meReq = new Request('http://localhost/cms/api/cms/me', { method: 'GET' })
     meReq.headers.set('cookie', pending.cookie)
     const meRes = await handleCmsRequest(meReq, db)
     expect(meRes.status).toBe(401)
@@ -649,7 +649,7 @@ describe('Account security endpoints', () => {
     ]
 
     for (const unknownCookie of unknownCookies) {
-      const verifyReq = new Request('http://localhost/admin/api/cms/auth/mfa/verify', {
+      const verifyReq = new Request('http://localhost/cms/api/cms/auth/mfa/verify', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ code: '123456' }),
@@ -660,7 +660,7 @@ describe('Account security endpoints', () => {
       expect(await verifyRes.json()).toEqual({ error: 'Unauthorized' })
       expect(verifyRes.headers.get('set-cookie')).toBeNull()
 
-      const meReq = new Request('http://localhost/admin/api/cms/me', { method: 'GET' })
+      const meReq = new Request('http://localhost/cms/api/cms/me', { method: 'GET' })
       meReq.headers.set('cookie', unknownCookie)
       const meRes = await handleCmsRequest(meReq, db)
       expect(meRes.status).toBe(401)
@@ -677,7 +677,7 @@ describe('Account security endpoints', () => {
     expect(pending.body.mfaRequired).toBe(true)
 
     const postMfa = async (code: string) => {
-      const r = new Request('http://localhost/admin/api/cms/auth/mfa/verify', {
+      const r = new Request('http://localhost/cms/api/cms/auth/mfa/verify', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ code }),
@@ -706,7 +706,7 @@ describe('Account security endpoints', () => {
     const recoveryCode = recoveryCodes[0]!
 
     const pending = await login(db)
-    const verifyReq = new Request('http://localhost/admin/api/cms/auth/mfa/verify', {
+    const verifyReq = new Request('http://localhost/cms/api/cms/auth/mfa/verify', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ code: recoveryCode }),
@@ -720,7 +720,7 @@ describe('Account security endpoints', () => {
     expect(user?.mfaRecoveryCodesRemaining).toBe(9)
 
     const pendingAgain = await login(db)
-    const reuseReq = new Request('http://localhost/admin/api/cms/auth/mfa/verify', {
+    const reuseReq = new Request('http://localhost/cms/api/cms/auth/mfa/verify', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ code: recoveryCode }),

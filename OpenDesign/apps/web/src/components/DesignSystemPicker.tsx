@@ -12,8 +12,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { KeyboardEvent as ReactKeyboardEvent, ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import type { DesignSystemSummary } from '@open-design/contracts';
-import { FaIcon } from '@mms/shell';
+import type { DesignSystemSummary, WorkspaceCollabContext } from '@open-design/contracts';
 import { useI18n } from '../i18n';
 import {
   localizeDesignSystemCategory,
@@ -32,6 +31,10 @@ function isUserSystem(system: DesignSystemSummary): boolean {
   return system.source === 'user' || system.isEditable === true;
 }
 
+function isTeamSystem(system: DesignSystemSummary): boolean {
+  return system.teamShared === true || system.teamSynced === true;
+}
+
 interface PopoverAnchor {
   left: number;
   width: number;
@@ -47,6 +50,8 @@ interface Props {
   designSystems: DesignSystemSummary[];
   selectedId: string | null;
   loading?: boolean;
+  // Read-only viewer of a team-shared project cannot switch the design system.
+  disabled?: boolean;
   onChange: (id: string | null) => void;
   /**
    * Trigger styling only; the popover is identical across variants.
@@ -54,29 +59,31 @@ interface Props {
    *   - 'footer': the home composer input-card footer pill.
    *   - 'home': the borderless trigger in the home composer's row below the
    *     card, sitting flush with the working-directory picker.
-   *   - 'toolbar': the approved Studio project toolbar's design-system
-   *     `SelectButton` (`prototype-reference/src/ui.jsx:255`) — a 185px pill
-   *     with a `fa-layer-group` glyph and a trailing 8px chevron.
-   *   - 'composer': the approved composer's 28px palette icon button
-   *     (`prototype-reference/src/Workspace.jsx:654`).
+   *   - 'icon': a text-free palette icon button matching the composer
+   *     icon row (#5517's in-composer picker).
    */
-  variant?: 'project' | 'footer' | 'home' | 'toolbar' | 'composer';
+  variant?: 'project' | 'footer' | 'home' | 'icon';
   /** Footer variant: visually-hidden label for the trigger button. */
   label?: string;
   /** Hide the recursive "Create" action when the picker is already on create. */
   showCreateAction?: boolean;
+  /** Project-owned identity used for preview reads while shell context catches up. */
+  workspaceContext?: WorkspaceCollabContext | null;
 }
 
 export function DesignSystemPicker({
   designSystems,
   selectedId,
   loading,
+  disabled = false,
   onChange,
   variant = 'project',
   label,
   showCreateAction = true,
+  workspaceContext,
 }: Props) {
   const { locale, t } = useI18n();
+  const triggerDisabled = Boolean(loading || disabled);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [anchor, setAnchor] = useState<PopoverAnchor | null>(null);
@@ -100,6 +107,10 @@ export function DesignSystemPicker({
   // design-system summary. Fetched lazily on first open; a non-brand system
   // (bundled / imported) is absent from the map and keeps the thin preview.
   const brandsByDesignSystem = useBrandsByDesignSystemId(open);
+
+  useEffect(() => {
+    if (disabled) setOpen(false);
+  }, [disabled]);
 
   useEffect(() => {
     if (!open) return;
@@ -194,13 +205,18 @@ export function DesignSystemPicker({
     });
   }, [query, designSystems, locale]);
 
-  // Split the filtered list into the same two groups the Design Systems tab
-  // uses, so the picker reads as "your systems" then "official presets".
-  const { userSystems, officialSystems } = useMemo(() => {
+  // Split the filtered list into the same scopes the Design Systems tab uses:
+  // personal first, then team-shared systems, then official presets.
+  const { userSystems, teamSystems, officialSystems } = useMemo(() => {
     const mine: DesignSystemSummary[] = [];
+    const team: DesignSystemSummary[] = [];
     const official: DesignSystemSummary[] = [];
-    for (const d of filtered) (isUserSystem(d) ? mine : official).push(d);
-    return { userSystems: mine, officialSystems: official };
+    for (const system of filtered) {
+      if (isTeamSystem(system)) team.push(system);
+      else if (isUserSystem(system)) mine.push(system);
+      else official.push(system);
+    }
+    return { userSystems: mine, teamSystems: team, officialSystems: official };
   }, [filtered]);
 
   const selectDesignSystem = (id: string | null) => {
@@ -245,7 +261,7 @@ export function DesignSystemPicker({
               className="project-ds-picker-option-check"
               data-testid={`project-ds-picker-option-${d.id}-check`}
             >
-              <Icon name="check" size={13} strokeWidth={2} />
+              <Icon name="check" size={12} strokeWidth={2} />
             </span>
           ) : null}
         </div>
@@ -352,7 +368,7 @@ export function DesignSystemPicker({
                         className="project-ds-picker-option-check"
                         data-testid="project-ds-picker-option-none-check"
                       >
-                        <Icon name="check" size={13} strokeWidth={2} />
+                        <Icon name="check" size={12} strokeWidth={2} />
                       </span>
                     ) : null}
                   </div>
@@ -367,6 +383,16 @@ export function DesignSystemPicker({
                   </div>
                 ) : null}
                 {userSystems.map(renderOption)}
+                {teamSystems.length > 0 ? (
+                  <div
+                    className="project-ds-picker-group-label"
+                    role="presentation"
+                    data-testid="project-ds-picker-group-team"
+                  >
+                    {t('pluginsView.tab.team')}
+                  </div>
+                ) : null}
+                {teamSystems.map(renderOption)}
                 {officialSystems.length > 0 ? (
                   <div
                     className="project-ds-picker-group-label"
@@ -398,6 +424,7 @@ export function DesignSystemPicker({
                   >
                     <DesignSystemKitPreview
                       system={previewSystem}
+                      workspaceContext={workspaceContext}
                       brandSummary={brandsByDesignSystem.get(previewSystem.id) ?? null}
                       variant="compact"
                       showCover={false}
@@ -410,7 +437,7 @@ export function DesignSystemPicker({
                       data-testid="project-ds-picker-preview-expand"
                       onClick={() => openSystemPreview(previewSystem)}
                     >
-                      <Icon name="eye" size={13} strokeWidth={1.9} />
+                      <Icon name="eye" size={12} strokeWidth={1.9} />
                       <span>{t('designSystemPicker.openPreview')}</span>
                     </button>
                   </div>
@@ -431,9 +458,41 @@ export function DesignSystemPicker({
   const previewModal: ReactNode = previewModalSystem ? (
     <DesignSystemPreviewModal
       system={previewModalSystem}
+      workspaceContext={workspaceContext}
       onClose={() => setPreviewModalSystem(null)}
     />
   ) : null;
+
+  if (variant === 'icon') {
+    return (
+      <div
+        ref={wrapRef}
+        className="composer-ds-icon"
+        data-testid="composer-design-system-picker"
+      >
+        <button
+          ref={triggerRef}
+          type="button"
+          className={`icon-btn composer-ds-icon-trigger od-tooltip${open ? ' is-active' : ''}${selected ? ' is-picked' : ''}`}
+          data-testid="composer-design-system-trigger"
+          aria-haspopup="listbox"
+          aria-expanded={open}
+          aria-label={selected?.title ?? t('designSystemPicker.noneTitle')}
+          data-tooltip={selected?.title ?? t('designSystemPicker.noneTitle')}
+          disabled={loading}
+          title={selected?.title ?? t('designSystemPicker.noneTitle')}
+          onClick={() => setOpen((v) => !v)}
+        >
+          <Icon name="palette" size={16} />
+          {selected ? (
+            <span className="composer-ds-icon-trigger-label">{selected.title}</span>
+          ) : null}
+        </button>
+        {popover}
+        {previewModal}
+      </div>
+    );
+  }
 
   if (variant === 'home') {
     return (
@@ -449,74 +508,17 @@ export function DesignSystemPicker({
           data-testid="home-hero-design-system-trigger"
           aria-haspopup="listbox"
           aria-expanded={open}
-          disabled={loading}
-          title={selected?.title ?? t('designSystemPicker.noneTitle')}
+          disabled={triggerDisabled}
+          title={selected?.title ?? t('newproj.designSystem')}
           onClick={() => setOpen((v) => !v)}
         >
           <Icon name="palette" size={13} className="home-hero__ds-row-trigger-icon" />
           <span className="home-hero__ds-row-trigger-label">
             {loading
               ? t('designSystemPicker.loading')
-              : selected?.title ?? t('designSystemPicker.noneTitle')}
+              : selected?.title ?? t('newproj.designSystem')}
           </span>
           <Icon name="chevron-down" size={11} className="home-hero__ds-row-trigger-chevron" />
-        </button>
-        {popover}
-        {previewModal}
-      </div>
-    );
-  }
-
-  // The approved composer's design-system control: a bare 28px palette button
-  // in the control row (`prototype-reference/src/Workspace.jsx:654`), tinted
-  // green while a system is bound. It owns the same popover as every other
-  // variant, so there is exactly one picker on the screen.
-  if (variant === 'composer') {
-    const composerLabel = loading
-      ? t('designSystemPicker.loading')
-      : selected?.title ?? t('designSystemPicker.noneTitle');
-    return (
-      <div ref={wrapRef} className="composer-menu-anchor studio-ds-composer">
-        <button
-          ref={triggerRef}
-          type="button"
-          className={selected ? 'composer-icon-button active' : 'composer-icon-button'}
-          data-testid="project-ds-picker-trigger"
-          aria-haspopup="listbox"
-          aria-expanded={open}
-          disabled={loading}
-          title={composerLabel}
-          aria-label={composerLabel}
-          onClick={() => setOpen((v) => !v)}
-        >
-          <FaIcon name="palette" size={14} />
-        </button>
-        {popover}
-        {previewModal}
-      </div>
-    );
-  }
-
-  if (variant === 'toolbar') {
-    const toolbarLabel = loading
-      ? t('designSystemPicker.loading')
-      : selected?.title ?? t('designSystemPicker.noneTitle');
-    return (
-      <div ref={wrapRef} className="studio-ds-picker" data-testid="studio-ds-picker">
-        <button
-          ref={triggerRef}
-          type="button"
-          className="select-button"
-          data-testid="studio-ds-picker-trigger"
-          aria-haspopup="listbox"
-          aria-expanded={open}
-          disabled={loading}
-          title={toolbarLabel}
-          onClick={() => setOpen((v) => !v)}
-        >
-          <FaIcon name="layer-group" size={14} />
-          <span>{toolbarLabel}</span>
-          <FaIcon name="chevron-down" size={8} className="fa-chevron-down" />
         </button>
         {popover}
         {previewModal}
@@ -539,7 +541,7 @@ export function DesignSystemPicker({
           data-testid="home-hero-footer-option-designSystem"
           aria-haspopup="listbox"
           aria-expanded={open}
-          disabled={loading}
+          disabled={triggerDisabled}
           onClick={() => setOpen((v) => !v)}
         >
           {triggerSwatches}
@@ -570,7 +572,7 @@ export function DesignSystemPicker({
         aria-haspopup="listbox"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
-        disabled={loading}
+        disabled={triggerDisabled}
         title={selected?.title ?? t('designSystemPicker.select')}
       >
         {triggerSwatches}

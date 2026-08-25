@@ -132,6 +132,20 @@ describe('resolveMediaIdsToPaths (Finding 1)', () => {
       await cleanup()
     }
   })
+
+  it('omits soft-deleted assets', async () => {
+    const { db, cleanup } = await createTestDb()
+    try {
+      await insertMediaAsset(db, 'deleted-media', '/uploads/deleted.png')
+      await db`update media_assets set deleted_at = '2026-08-11T00:00:00.000Z' where id = 'deleted-media'`
+
+      const map = await resolveMediaIdsToPaths(db, ['deleted-media'])
+
+      expect(map.has('deleted-media')).toBe(false)
+    } finally {
+      await cleanup()
+    }
+  })
 })
 
 // ---------------------------------------------------------------------------
@@ -295,6 +309,104 @@ describe('prefetchMediaAssets (Finding 2)', () => {
 
       expect(map.get('gallery-1')?.publicPath).toBe('/uploads/gallery-1.png')
       expect(map.get('/uploads/gallery-1.png')?.id).toBe('gallery-1')
+    } finally {
+      await cleanup()
+    }
+  })
+
+  it('resolves a SCALAR entry media path — the bound `featuredMedia` case', async () => {
+    const { db, cleanup } = await createTestDb()
+    try {
+      await insertMediaAsset(db, 'aid-1', '/uploads/aid-1.png')
+      // The node prop holds the BINDING TOKEN, not a path, so collectMediaPaths
+      // cannot see it. The resolved path lives on the entry.
+      const page = makePageWithImageProp('n1', 'src', '{currentEntry.featuredMedia}')
+      const registry = makeImageRegistry('src')
+
+      const map = await prefetchMediaAssets(
+        page as never,
+        { visualComponents: [] } as never,
+        registry,
+        db,
+        {
+          templateContext: {
+            entryStack: [{
+              id: 'aid-row-1',
+              fields: {
+                featuredMedia: '/uploads/aid-1.png',
+                featuredMediaPath: '/uploads/aid-1.png',
+                // Prose must NOT be dragged into the lookup.
+                honest: 'We would tell you to buy the cheaper one.',
+                model: 'Basic behind-the-ear',
+              },
+            }],
+          },
+        },
+      )
+
+      // Without the asset the image module has no library record, so the
+      // published <img> gets alt="" and no srcset — on every entry route.
+      expect(map.get('/uploads/aid-1.png')?.id).toBe('aid-1')
+    } finally {
+      await cleanup()
+    }
+  })
+
+  it('resolves a scalar media path carried by a LOOP row', async () => {
+    const { db, cleanup } = await createTestDb()
+    try {
+      await insertMediaAsset(db, 'aid-2', '/uploads/aid-2.png')
+      const page = makePageWithImageProp('n1', 'src', '{currentEntry.featuredMedia}')
+      const registry = makeImageRegistry('src')
+
+      const map = await prefetchMediaAssets(
+        page as never,
+        { visualComponents: [] } as never,
+        registry,
+        db,
+        {
+          loopData: new Map([
+            ['loop-1', {
+              items: [{ id: 'row-1', fields: { featuredMedia: '/uploads/aid-2.png' } }],
+              totalItems: 1,
+              pageNumber: 1,
+              hasMore: false,
+            }],
+          ]) as never,
+        },
+      )
+
+      expect(map.get('/uploads/aid-2.png')?.id).toBe('aid-2')
+    } finally {
+      await cleanup()
+    }
+  })
+
+  it('does not treat ordinary scalar text fields as media references', async () => {
+    const { db, cleanup } = await createTestDb()
+    try {
+      await insertMediaAsset(db, 'aid-3', '/uploads/aid-3.png')
+      const page = makePageWithImageProp('n1', 'content', 'no static media path')
+      const registry = { get: () => ({ id: 'base.text', schema: {} }) } as unknown as IModuleRegistry
+
+      const map = await prefetchMediaAssets(
+        page as never,
+        { visualComponents: [] } as never,
+        registry,
+        db,
+        {
+          templateContext: {
+            entryStack: [{
+              id: 'aid-row-3',
+              fields: { model: 'aid-3', honest: 'A model name is not an asset id.' },
+            }],
+          },
+        },
+      )
+
+      // 'aid-3' matches a real asset ID, and must still not be resolved:
+      // scalars qualify by being an upload PATH, never by looking like an id.
+      expect(map.size).toBe(0)
     } finally {
       await cleanup()
     }

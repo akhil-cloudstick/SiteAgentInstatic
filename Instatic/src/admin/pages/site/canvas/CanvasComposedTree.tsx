@@ -32,7 +32,7 @@ import { classNamesForClassIds } from '@core/page-tree'
 import { resolveWrapperTemplates } from '@core/templates'
 import { useEditorStore } from '@site/store/store'
 import { ReadOnlyNodeTree } from '@modules/base/utils/ReadOnlyNodeTree'
-import { htmlAttributesForReact } from '@modules/base/shared/htmlAttributes'
+import { htmlAttributesForDom } from '@modules/base/shared/htmlAttributes'
 import { useResponsiveBackgroundStyle } from '@admin/pages/media/hooks/useResponsiveBackgroundStyle'
 import { NodeRenderer } from './NodeRenderer'
 import { CanvasDocumentContext, CanvasTemplateContext } from './CanvasContexts'
@@ -128,7 +128,7 @@ function IframeBodyPresentationOwner({
     return applyIframeBodyPresentation(body, {
       className,
       style,
-      attributes: htmlAttributesForReact(htmlAttributes),
+      attributes: htmlAttributesForDom(htmlAttributes),
     })
   }, [className, htmlAttributes, iframeDocument, style])
   return null

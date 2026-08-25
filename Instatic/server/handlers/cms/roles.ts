@@ -1,10 +1,10 @@
 /**
  * Role management endpoints (gated by `roles.manage`).
  *
- *   GET    /admin/api/cms/roles      — list every role + its capabilities
- *   POST   /admin/api/cms/roles      — create a custom role
- *   PATCH  /admin/api/cms/roles/:id  — rename / re-describe / re-cap
- *   DELETE /admin/api/cms/roles/:id  — delete a custom role (built-ins
+ *   GET    /cms/api/cms/roles      — list every role + its capabilities
+ *   POST   /cms/api/cms/roles      — create a custom role
+ *   PATCH  /cms/api/cms/roles/:id  — rename / re-describe / re-cap
+ *   DELETE /cms/api/cms/roles/:id  — delete a custom role (built-ins
  *                                       reject inside the repository)
  */
 import type { DbClient } from '../../db/client'

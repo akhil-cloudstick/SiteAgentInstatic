@@ -134,7 +134,7 @@ function bundleRowEntry(id: string, tableId: string, slug: string = ''): DataRow
 function makePreviewRequest(cookie: string, bundle: unknown): Request {
   // The `cookie` header is a forbidden header per WHATWG Fetch spec and is
   // stripped by Bun's Request constructor in test mode. Set it after construction.
-  const req = new Request('http://localhost/admin/api/cms/import/preview', {
+  const req = new Request('http://localhost/cms/api/cms/import/preview', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(bundle),
@@ -457,7 +457,7 @@ describe('handleImportPreviewRoute — auth', () => {
 
     const bundle = { schemaVersion: 1, exportedAt: new Date().toISOString(), tables: [], rows: [] }
     // Deliberately no cookie set on this request
-    const req = new Request('http://localhost/admin/api/cms/import/preview', {
+    const req = new Request('http://localhost/cms/api/cms/import/preview', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(bundle),

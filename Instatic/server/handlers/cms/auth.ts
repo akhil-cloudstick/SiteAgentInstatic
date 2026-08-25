@@ -1,20 +1,20 @@
 /**
  * Authentication endpoints — login, MFA, session lifecycle, step-up.
  *
- *   POST   /admin/api/cms/login              — exchange (email, password) for a session
+ *   POST   /cms/api/cms/login              — exchange (email, password) for a session
  *                                              cookie, after rate-limit + constant-time
  *                                              password verification.
- *   POST   /admin/api/cms/auth/mfa/verify    — complete the second factor for a pending
+ *   POST   /cms/api/cms/auth/mfa/verify    — complete the second factor for a pending
  *                                              session minted by /login.
- *   POST   /admin/api/cms/logout             — revoke the current session row + clear
+ *   POST   /cms/api/cms/logout             — revoke the current session row + clear
  *                                              the cookie.
- *   GET    /admin/api/cms/me                 — return the authenticated user, role, and
+ *   GET    /cms/api/cms/me                 — return the authenticated user, role, and
  *                                              capabilities (used by the admin shell).
- *   GET    /admin/api/cms/auth/sessions      — list this user's live sessions.
- *   DELETE /admin/api/cms/auth/sessions/:id  — revoke one of this user's sessions.
- *   POST   /admin/api/cms/auth/step-up       — open the user's step-up window.
- *   GET    /admin/api/cms/auth/activity      — login attempts for this user.
- *   POST   /admin/api/cms/auth/logout-all    — revoke every other session for this user.
+ *   GET    /cms/api/cms/auth/sessions      — list this user's live sessions.
+ *   DELETE /cms/api/cms/auth/sessions/:id  — revoke one of this user's sessions.
+ *   POST   /cms/api/cms/auth/step-up       — open the user's step-up window.
+ *   GET    /cms/api/cms/auth/activity      — login attempts for this user.
+ *   POST   /cms/api/cms/auth/logout-all    — revoke every other session for this user.
  *
  * Dispatch shape: a flat `AUTH_ROUTES` table maps `(method, pattern)` to a
  * per-route async handler and is run through the shared `runRouteTable`

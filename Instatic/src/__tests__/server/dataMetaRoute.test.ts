@@ -1,5 +1,5 @@
 /**
- * Tests for GET /admin/api/cms/data/_meta.
+ * Tests for GET /cms/api/cms/data/_meta.
  *
  * Uses the createFakeDb pattern from dbTestFake.ts and the session-stub
  * approach from cmsSiteHandlers.test.ts to avoid a real DB connection.
@@ -126,7 +126,7 @@ function makeRequest(path: string, cookie?: string): Request {
 // Tests
 // ---------------------------------------------------------------------------
 
-describe('GET /admin/api/cms/data/_meta', () => {
+describe('GET /cms/api/cms/data/_meta', () => {
   it('returns 401 for unauthenticated requests', async () => {
     // No session query will be issued — auth short-circuits on missing cookie.
     const db = createFakeDb(async (sql) => {

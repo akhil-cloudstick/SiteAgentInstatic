@@ -25,7 +25,7 @@ import { lifecycleErrorMessage } from '../../../server/handlers/cms/plugins/shar
 async function readPublicSite(
   db: Parameters<typeof handleSetupRoutes>[1],
 ): Promise<{ name: string | null; faviconUrl: string | null }> {
-  const req = new Request('http://localhost/admin/api/cms/public-site', { method: 'GET' })
+  const req = new Request('http://localhost/cms/api/cms/public-site', { method: 'GET' })
   const res = await handleSetupRoutes(req, db)
   expect(res).not.toBeNull()
   expect(res!.status).toBe(200)

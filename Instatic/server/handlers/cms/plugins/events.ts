@@ -1,5 +1,5 @@
 /**
- * `GET /admin/api/cms/plugins/events` — Server-Sent Events stream of plugin
+ * `GET /cms/api/cms/plugins/events` — Server-Sent Events stream of plugin
  * lifecycle events.
  *
  * Wired so each connected admin tab gets `crash`, `recovered`, `parked`,

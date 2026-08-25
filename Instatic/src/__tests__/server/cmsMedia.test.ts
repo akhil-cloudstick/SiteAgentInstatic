@@ -368,7 +368,7 @@ describe('CMS media repository', () => {
 describe('CMS media handlers', () => {
   it('requires an admin session for media listing', async () => {
     const res = await handleCmsRequest(
-      cmsRequest('http://localhost/admin/api/cms/media'),
+      cmsRequest('http://localhost/cms/api/cms/media'),
       makeFakeDb(),
     )
 
@@ -385,7 +385,7 @@ describe('CMS media handlers', () => {
 
     try {
       const res = await handleCmsRequest(
-        cmsRequest('http://localhost/admin/api/cms/media', {
+        cmsRequest('http://localhost/cms/api/cms/media', {
           method: 'POST',
           headers: { cookie },
           formData: body,
@@ -433,7 +433,7 @@ describe('CMS media handlers', () => {
 
     try {
       const res = await handleCmsRequest(
-        cmsRequest('http://localhost/admin/api/cms/media', {
+        cmsRequest('http://localhost/cms/api/cms/media', {
           method: 'POST',
           headers: { cookie },
           formData: body,
@@ -469,7 +469,7 @@ describe('CMS media handlers', () => {
 
     try {
       const res = await handleCmsRequest(
-        cmsRequest('http://localhost/admin/api/cms/media', {
+        cmsRequest('http://localhost/cms/api/cms/media', {
           method: 'POST',
           headers: { cookie },
           formData: body,
@@ -512,7 +512,7 @@ describe('CMS media handlers', () => {
 
     try {
       const res = await handleCmsRequest(
-        cmsRequest('http://localhost/admin/api/cms/media', {
+        cmsRequest('http://localhost/cms/api/cms/media', {
           method: 'POST',
           headers: { cookie },
           formData: body,
@@ -551,7 +551,7 @@ describe('CMS media handlers', () => {
 
     try {
       const res = await handleCmsRequest(
-        cmsRequest('http://localhost/admin/api/cms/media', {
+        cmsRequest('http://localhost/cms/api/cms/media', {
           method: 'POST',
           headers: { cookie },
           formData: body,
@@ -585,7 +585,7 @@ describe('CMS media handlers', () => {
     })
 
     const res = await handleCmsRequest(
-      cmsRequest('http://localhost/admin/api/cms/media', {
+      cmsRequest('http://localhost/cms/api/cms/media', {
         headers: { cookie },
       }),
       db,
@@ -613,7 +613,7 @@ describe('CMS media handlers', () => {
     })
 
     const res = await handleCmsRequest(
-      cmsRequest('http://localhost/admin/api/cms/media/asset_1', {
+      cmsRequest('http://localhost/cms/api/cms/media/asset_1', {
         method: 'PATCH',
         headers: { cookie, 'content-type': 'application/json' },
         body: JSON.stringify({ filename: 'Hero renamed.png' }),
@@ -647,7 +647,7 @@ describe('CMS media handlers', () => {
 
     try {
       const res = await handleCmsRequest(
-        cmsRequest('http://localhost/admin/api/cms/media/asset_1', {
+        cmsRequest('http://localhost/cms/api/cms/media/asset_1', {
           method: 'DELETE',
           headers: { cookie },
         }),
@@ -688,7 +688,7 @@ describe('CMS media handlers', () => {
     try {
       // Soft delete first — the purge endpoint requires it (no one-click bypass).
       const soft = await handleCmsRequest(
-        cmsRequest('http://localhost/admin/api/cms/media/asset_1', {
+        cmsRequest('http://localhost/cms/api/cms/media/asset_1', {
           method: 'DELETE',
           headers: { cookie },
         }),
@@ -698,7 +698,7 @@ describe('CMS media handlers', () => {
       expect(soft.status).toBe(200)
 
       const purge = await handleCmsRequest(
-        cmsRequest('http://localhost/admin/api/cms/media/asset_1?purge=1', {
+        cmsRequest('http://localhost/cms/api/cms/media/asset_1?purge=1', {
           method: 'DELETE',
           headers: { cookie },
         }),

@@ -1,3 +1,4 @@
+import type { ProjectKind, SkillSummary } from '@open-design/contracts';
 import type { PluginUseAction } from '../plugins-home/useActions';
 
 export type HomePromptHandoff =
@@ -17,29 +18,22 @@ export type HomePromptHandoff =
     source: 'plugin-use';
     action: PluginUseAction;
     inputs?: Record<string, unknown>;
+    /** Preserve the Home creation type when a template is picked elsewhere. */
+    chipId?: string;
+    projectKind?: ProjectKind;
   }
-  // Skills mirror the two plugin hand-offs, minus the plugin machinery: a skill
-  // is picked (not applied), and authoring one produces a SKILL.md folder rather
-  // than a plugin manifest. Both are reachable from the Plugins screen's Skills
-  // mode, whose cards and Add dialog must land somewhere real.
   | {
     id: number;
-    skillId: string;
+    skill: SkillSummary;
     focus: boolean;
     source: 'skill-use';
-  }
-  | {
-    id: number;
-    prompt: string;
-    focus: boolean;
-    source: 'skill-authoring';
   };
 
 export const PLUGIN_AUTHORING_GOAL_INPUT = 'pluginGoal';
 export const PLUGIN_AUTHORING_DEFAULT_GOAL = "a reusable workflow described by the user's prompt";
 
 export const PLUGIN_AUTHORING_PROMPT_TEMPLATE = [
-  `Create an MMS Design plugin for: {{${PLUGIN_AUTHORING_GOAL_INPUT}}}.`,
+  `Create an Open Design plugin for: {{${PLUGIN_AUTHORING_GOAL_INPUT}}}.`,
   '',
   'Run the agent-assisted plugin authoring flow end to end. Follow docs/plugins-spec.md and produce a folder named generated-plugin with:',
   '- SKILL.md describing the agent behavior and workflow',
@@ -111,35 +105,15 @@ export function createPluginAuthoringHandoff(
   };
 }
 
-// Skill authoring is deliberately a plain composer seed rather than a scripted
-// pipeline: unlike a plugin (manifest, capabilities, pack/install/validate),
-// a skill is a folder with a SKILL.md, and the agent needs the user's subject
-// far more than it needs a procedure.
-export const SKILL_AUTHORING_PROMPT = [
-  'Create a new MMS Design skill for: <describe the workflow>.',
-  '',
-  'Produce a folder named generated-skill containing a SKILL.md with YAML frontmatter',
-  '(`name`, `description` written for activation — "Use this skill when…") followed by an',
-  'explicit workflow with checkpoints and expected outputs. Keep SKILL.md under 500 lines',
-  'and move long API notes, visual rules or exporter details into references/.',
-].join('\n');
-
-export function createSkillAuthoringHandoff(id: number): HomePromptHandoff {
-  return {
-    id,
-    prompt: SKILL_AUTHORING_PROMPT,
-    focus: true,
-    source: 'skill-authoring',
-  };
-}
-
-export function createSkillUseHandoff(id: number, skillId: string): HomePromptHandoff {
-  return {
-    id,
-    skillId,
-    focus: true,
-    source: 'skill-use',
-  };
+/**
+ * Hands a skill picked outside the composer (the 扩展 marketplace) to the home
+ * hero, which selects it exactly as the composer's own skill picker would.
+ */
+export function createSkillUseHandoff(
+  id: number,
+  skill: SkillSummary,
+): HomePromptHandoff {
+  return { id, skill, focus: true, source: 'skill-use' };
 }
 
 export function createPluginUseHandoff(
@@ -148,6 +122,8 @@ export function createPluginUseHandoff(
   options: {
     action?: PluginUseAction;
     inputs?: Record<string, unknown>;
+    chipId?: string;
+    projectKind?: ProjectKind;
   } = {},
 ): HomePromptHandoff {
   return {
@@ -155,7 +131,36 @@ export function createPluginUseHandoff(
     pluginId,
     action: options.action ?? 'use',
     ...(options.inputs ? { inputs: options.inputs } : {}),
+    ...(options.chipId ? { chipId: options.chipId } : {}),
+    ...(options.projectKind ? { projectKind: options.projectKind } : {}),
     focus: true,
     source: 'plugin-use',
   };
+}
+
+/**
+ * A handoff published by a surface that is about to navigate away, for the home
+ * entry to pick up once it mounts.
+ *
+ * `EntryShell` owns `homePromptHandoff` in component state, which is enough for
+ * its own in-place surfaces (the marketplace tab calls `usePluginFromLibrary`
+ * and only switches view). It is not enough for the `/marketplace/<id>` detail
+ * route: `App` renders `PluginDetailView` outside `EntryShell`, so navigating
+ * home unmounts the holder and drops the handoff with it.
+ *
+ * Module scope — deliberately not `window` — so the value survives that unmount
+ * without becoming globally reachable. Reads are destructive: a handoff is a
+ * one-shot instruction, and leaving it behind would re-apply the plugin on the
+ * next visit to home.
+ */
+let pendingHomePromptHandoff: HomePromptHandoff | null = null;
+
+export function stashHomePromptHandoff(handoff: HomePromptHandoff): void {
+  pendingHomePromptHandoff = handoff;
+}
+
+export function takeHomePromptHandoff(): HomePromptHandoff | null {
+  const handoff = pendingHomePromptHandoff;
+  pendingHomePromptHandoff = null;
+  return handoff;
 }

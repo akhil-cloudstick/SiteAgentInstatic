@@ -1,9 +1,9 @@
 /**
  * Client-side persistence layer for site-transfer endpoints:
- *   POST /admin/api/cms/export
- *   POST /admin/api/cms/import/preview
- *   POST /admin/api/cms/import?strategy=<strategy>
- *   POST /admin/api/cms/import/archive?strategy=<strategy>
+ *   POST /cms/api/cms/export
+ *   POST /cms/api/cms/import/preview
+ *   POST /cms/api/cms/import?strategy=<strategy>
+ *   POST /cms/api/cms/import/archive?strategy=<strategy>
  *
  * Export uses a same-origin browser form POST so the browser owns the attachment
  * download stream. Instatic archive import posts the original ZIP Blob to the
@@ -58,7 +58,7 @@ export class SiteBundleParseError extends Error {
 // ---------------------------------------------------------------------------
 
 /**
- * POST /admin/api/cms/export
+ * POST /cms/api/cms/export
  *
  * Starts a native browser attachment download through a hidden form POST. This
  * keeps arbitrary-length `rowIds` arrays out of the URL while avoiding
@@ -113,7 +113,7 @@ export function submitSiteBundleExport(opts: ExportRequest): void {
 // ---------------------------------------------------------------------------
 
 /**
- * POST /admin/api/cms/export/estimate
+ * POST /cms/api/cms/export/estimate
  *
  * Returns the exact byte size the bundle WOULD have for the given request,
  * computed server-side from the same selection logic as the real export (it
@@ -139,7 +139,7 @@ export async function estimateSiteBundle(
 // ---------------------------------------------------------------------------
 
 /**
- * GET /admin/api/cms/export/summary
+ * GET /cms/api/cms/export/summary
  *
  * Total counts of the non-table export categories (media, media folders,
  * redirects), so the export dialog can label each category and disable empty
@@ -160,7 +160,7 @@ export async function getExportSummary(signal?: AbortSignal): Promise<ExportSumm
 // ---------------------------------------------------------------------------
 
 /**
- * POST /admin/api/cms/import/preview
+ * POST /cms/api/cms/import/preview
  *
  * Server validates the bundle and returns a read-only diff against the local
  * site. No DB writes are performed. Use this to show the operator what would
@@ -181,7 +181,7 @@ export async function previewSiteBundle(bundle: SiteBundle): Promise<BundlePrevi
 // ---------------------------------------------------------------------------
 
 /**
- * POST /admin/api/cms/import?strategy=<strategy>
+ * POST /cms/api/cms/import?strategy=<strategy>
  *
  * Applies the bundle to the local instance using the given strategy:
  *   - `replace`         — wipe everything, reimport from bundle (destructive)

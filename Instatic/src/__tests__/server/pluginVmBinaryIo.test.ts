@@ -263,7 +263,7 @@ describe('plugin sandbox: routes — binary bodies', () => {
     try {
       const result = await vm.runRoute('POST:/echo', {
         request: {
-          url: 'http://localhost/admin/api/cms/plugins/acme.binary/runtime/echo',
+          url: 'http://localhost/cms/api/cms/plugins/acme.binary/runtime/echo',
           method: 'POST',
           headers: { 'content-type': 'application/octet-stream' },
           body: bytesToBase64(PNG_BYTES),

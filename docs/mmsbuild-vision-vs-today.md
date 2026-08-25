@@ -10,6 +10,11 @@ how they are kept apart. For the built-vs-not status of the **poster blocks** (r
 engine, knowledge base, event ledger, approvals, reports) there is already a maintained table in
 [`mmsbuild-product-hub-os.md` §7](./mmsbuild-product-hub-os.md). This file does not repeat it._
 
+_For **how the platform scales** — whether each project needs its own database, whether the code is
+copied per customer, and how growth is absorbed without a redesign — read
+[`mmsbuild-scale-architecture.md`](./mmsbuild-scale-architecture.md). It also corrects one claim below:
+each project gets its own **schema**, not its own database._
+
 Legend used throughout: ✅ built and working · 🟡 partly there · ❌ does not exist yet.
 
 ## The headline

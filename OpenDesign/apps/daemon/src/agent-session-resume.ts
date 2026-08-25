@@ -9,6 +9,10 @@ import {
   latestCompletedAssistantMessageId,
   upsertAgentSession,
 } from './db.js';
+import {
+  parseStableSections,
+  type StableSectionHashes,
+} from './prompts/stable-sections.js';
 
 type SqliteDb = Database.Database;
 
@@ -25,45 +29,14 @@ export interface AgentResumeContext {
   isResuming: boolean;
   /** Hash of the stable instruction block last sent on this session, or null. */
   storedStablePromptHash: string | null;
-  /** Effective provider input size recorded on the session's last turn. */
-  storedInputTokens: number | null;
+  /**
+   * Per-section digests behind `storedStablePromptHash`, for naming which input
+   * drifted when the hash no longer matches. Diagnostic only — never an input
+   * to the resume decision.
+   */
+  storedStableSections: StableSectionHashes | null;
   /** Set when a stored session existed but was rejected; see the type. */
   invalidationReason: ResumeInvalidationReason | null;
-}
-
-function readStoredSessionInputTokens(
-  db: SqliteDb,
-  messageId: string | null | undefined,
-): number | null {
-  if (!messageId) return null;
-  const row = db
-    .prepare('SELECT events_json AS eventsJson FROM messages WHERE id = ?')
-    .get(messageId) as { eventsJson?: unknown } | undefined;
-  if (!row || typeof row.eventsJson !== 'string') return null;
-  let events: unknown;
-  try {
-    events = JSON.parse(row.eventsJson);
-  } catch {
-    return null;
-  }
-  if (!Array.isArray(events)) return null;
-  for (let index = events.length - 1; index >= 0; index -= 1) {
-    const event = events[index];
-    if (!event || typeof event !== 'object' || Array.isArray(event)) continue;
-    const usage = event as {
-      kind?: unknown;
-      inputTokens?: unknown;
-      inputTokensEffective?: unknown;
-    };
-    if (usage.kind !== 'usage') continue;
-    const effective = typeof usage.inputTokensEffective === 'number'
-      ? usage.inputTokensEffective
-      : usage.inputTokens;
-    if (typeof effective === 'number' && Number.isFinite(effective) && effective > 0) {
-      return Math.floor(effective);
-    }
-  }
-  return null;
 }
 
 export type CapturedAgentSessionResult = 'stored' | 'cleared' | 'skipped';
@@ -149,9 +122,7 @@ export function resolveAgentResumeContext(
     newSessionId: randomUUID(),
     isResuming: resumable,
     storedStablePromptHash: resumable ? (record?.stablePromptHash ?? null) : null,
-    storedInputTokens: resumable
-      ? readStoredSessionInputTokens(db, record?.lastMessageId)
-      : null,
+    storedStableSections: resumable ? parseStableSections(record?.stablePromptSections) : null,
     invalidationReason,
   };
 }
@@ -171,6 +142,7 @@ export function persistCapturedAgentSession(
     agentId: string;
     sessionId: string | null;
     stablePromptHash?: string | null;
+    stablePromptSections?: string | null;
     // Resume identity (see resolveAgentResumeContext). Must be stored alongside
     // the captured session so the next turn can verify the session is still
     // safe to resume; omitting them leaves a null cursor that the guard treats
@@ -187,6 +159,7 @@ export function persistCapturedAgentSession(
       agentId: input.agentId,
       sessionId: input.sessionId,
       stablePromptHash: input.stablePromptHash ?? null,
+      stablePromptSections: input.stablePromptSections ?? null,
       model: input.model ?? null,
       cwd: input.cwd ?? null,
       lastMessageId: input.lastMessageId ?? null,
@@ -319,7 +292,7 @@ export function isOpencodeResumeFailure(text: string): boolean {
 
 /**
  * Per-agent dispatch for "the session/thread I asked to resume is gone".
- * Generalizes the resume-fallback so every `resumesSessionViaCli` adapter
+ * Generalizes resume-fallback classification so every native-resume adapter
  * routes through one decision point in server.ts. Unknown agents return false
  * (no fallback) — a new resume-capable adapter must opt in here explicitly.
  *
@@ -334,6 +307,9 @@ export function isAgentResumeFailure(
   stderr: string,
   stdout = '',
 ): boolean {
+  if (agentId === 'deepseek-harness') {
+    return /DSH_PROFILE_RESUME_(?:REJECTED|MISMATCH)/.test(`${stderr}\n${stdout}`);
+  }
   if (agentId === 'codex') return isCodexResumeFailure(stderr);
   if (agentId === 'opencode') return isOpencodeResumeFailure(stderr);
   if (agentId === 'amr') {

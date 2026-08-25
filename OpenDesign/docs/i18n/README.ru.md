@@ -1,10 +1,10 @@
 <h1 align="center">Open Design: открытая альтернатива Claude Design</h1>
 
-> 🔥 **Open Design 0.13.0 — _Stay in Flow_ уже здесь.** Раньше долгие сессии дизайна прерывались на каждой заминке — запуск терял своё место, выбор модели заставлял гадать, а экспорт требовал ещё одного обходного пути. 0.13.0 сохраняет сессию живой: возобновляйте запуски Codex / OpenCode / Pi / Open Design Cloud между ходами, быстрее выбирайте нужную модель и передавайте подкреплённые скриншотами PPTX / PDF, не покидая приложение. [Скачать 0.13.0](https://github.com/nexu-io/open-design/releases) · [Примечания к выпуску](https://github.com/nexu-io/open-design/releases/tag/open-design-v0.13.0)
+> ⚡ **[Open Design Cloud — официальный сервис моделей.](https://open-design.ai/zh/pricing/)** Одно пополнение открывает доступ к агентным и графическим моделям в Open Design: GPT, Claude и DeepSeek для агентов; GPT Image 2.0, Seedream 5.0 Pro и Nano Banana 2.0 для изображений.
 >
-> ⚡ **Open Design Cloud — официальный сервис моделей.** Одно пополнение — и GPT, Claude, Gemini и DeepSeek доступны прямо в Open Design: 20+ флагманских моделей, ноль настройки, оплата по реальному расходу токенов. [Попробовать Open Design Cloud](https://open-design.ai/cloud/?utm_source=github&utm_medium=referral&utm_content=readme_try_cloud)
+> 🚀 **[DeepSeek V4 Flash и V4 Pro уже доступны.](https://open-design.ai/zh/pricing/)** Используйте передовой интеллект для прототипов, презентаций, дизайн-систем и повседневных агентных задач. Участники Open Design могут пользоваться обеими моделями без ограничений две недели прямо в приложении.
 >
-> 🏅 **Программа Open Design Fellow теперь открыта.** Если вы тоже верите, что дизайн должен быть открытым — станьте Open Design Fellow, формируйте продукт вместе с основной командой и помогайте большему числу людей участвовать в определении будущего дизайна. Подробности → [`MAINTAINERS.md`](../../MAINTAINERS.md) и [Discord](https://discord.gg/mHAjSMV6gz).
+> 🧩 **[DeepSeek Harness теперь поддерживается.](https://open-design.ai/zh/agents/deepseek-harness-design/)** Подключите официальный Agent Harness `dsh` от DeepSeek к Open Design как нативную среду выполнения со структурированным мышлением, вызовами инструментов, поиском моделей, отменой и возобновлением сессии. Созданные файлы остаются в рабочем процессе Open Design для живого предпросмотра и передачи результата.
 
 <p align="center">
   <img src="https://repo-assets.open-design.ai/resources/images/hero.png" alt="Баннер Open Design: заголовок &quot;Открытая альтернатива Claude Design&quot; на фоне классической сцены с колоннами, фигурами в тогах и цифровым кодом, а также карточками статистики по дизайн-системам, плагинам, кодинг-агентам и медиапровайдерам" width="100%" />
@@ -42,15 +42,15 @@ Open Design превращает этот цикл в **файловую сис�
 
 ## Обзор продукта
 
-Краткий взгляд на то, что такое Open Design и что он делает. Начните с **Home**, организуйте повторяющиеся рабочие процессы с помощью **Automation**, оформите брендовый контракт в **Design System** и расширяйте возможности через **Plugins** и **интеграции**; внутри **Studio** любого проекта та же дизайн-система потоком выдаёт прототипы, живые артефакты, HyperFrames, презентации и изображения.
+Краткий обзор основного рабочего процесса Open Design. Начните с брифа на **Home**, найдите переиспользуемые навыки в **Plugins** и превратите брендовые материалы в **Design System**. Затем перейдите в **Studio** проекта, чтобы создавать и совершенствовать прототипы, презентации, мобильные приложения, изображения, документы и HyperFrame в одном месте.
 
 ### Основные страницы
 
 <table>
 <tr>
 <td valign="top">
-<img src="https://repo-assets.open-design.ai/resources/images/product/home.png" alt="Главная страница" /><br/>
-<sub><b>Home</b> — точка входа с обзором. Выберите навык и дизайн-систему, введите бриф и запустите всё из одного места.</sub>
+<img src="../../docs/screenshots/product-tour/home.png" alt="Home" /><br/>
+<sub><b>Home</b> — Выберите тип артефакта, введите бриф и задайте дизайн-систему, рабочий каталог и модель перед началом работы.</sub>
 </td>
 </tr>
 </table>
@@ -58,53 +58,52 @@ Open Design превращает этот цикл в **файловую сис�
 <table>
 <tr>
 <td width="50%" valign="top">
-<img src="https://repo-assets.open-design.ai/resources/images/product/automation.png" alt="Страница автоматизаций" /><br/>
-<sub><b>Automation</b> — превращайте повторяющиеся дизайн-процессы в переиспользуемые автоматизации с возможностью планирования.</sub>
+<img src="../../docs/screenshots/product-tour/plugins.png" alt="Plugins" /><br/>
+<sub><b>Plugins</b> — Просматривайте официальные навыки по категориям, ищите по каталогу и запускайте рабочий процесс с помощью <code>Try it</code>.</sub>
 </td>
 <td width="50%" valign="top">
-<img src="https://repo-assets.open-design.ai/resources/images/product/design-system.png" alt="Страница дизайн-системы" /><br/>
-<sub><b>Design System</b> — дистиллируйте <code>DESIGN.md</code> вашей команды в брендовый контракт, который формирует каждый результат.</sub>
-</td>
-</tr>
-<tr>
-<td width="50%" valign="top">
-<img src="https://repo-assets.open-design.ai/resources/images/product/plugin.png" alt="Страница плагинов" /><br/>
-<sub><b>Plugin</b> — просматривайте, устанавливайте и распространяйте плагины рабочих процессов, чтобы расширять генерацию по запросу.</sub>
-</td>
-<td width="50%" valign="top">
-<img src="https://repo-assets.open-design.ai/resources/images/product/integrations.png" alt="Страница интеграций" /><br/>
-<sub><b>Integrations</b> — подключайте внешние системы и MCP-инструменты и используйте Open Design из любой IDE, скрипта или автоматизации.</sub>
+<img src="../../docs/screenshots/product-tour/design-system.png" alt="Design System" /><br/>
+<sub><b>Design System</b> — Извлеките и уточните визуальный язык бренда, просмотрите результат и продолжайте создавать с ним в том же рабочем пространстве.</sub>
 </td>
 </tr>
 </table>
 
 ### Studio — множество типов артефактов в одном проекте
 
-Внутри Studio проекта та же дизайн-система выдаёт потоком несколько типов артефактов:
+В Studio проекта беседа, созданные файлы и живой предпросмотр остаются вместе для шести типов артефактов:
 
 <table>
 <tr>
 <td width="50%" valign="top">
-<img src="https://repo-assets.open-design.ai/resources/images/product/studio-prototype.png" alt="Прототип" /><br/>
-<sub><b>Prototype</b> — одностраничные HTML-артефакты, которые читают вашу дизайн-систему и рендерятся в изолированном iframe, с мгновенным предпросмотром и возможностью скачать исходник.</sub>
+<img src="../../docs/screenshots/product-tour/studio-prototype.png" alt="Прототип" /><br/>
+<sub><b>Прототип</b> — Создавайте или реконструируйте веб-интерфейсы, проверяйте отрендеренную страницу и продолжайте итерации с агентом на месте.</sub>
 </td>
 <td width="50%" valign="top">
-<img src="https://repo-assets.open-design.ai/resources/images/product/studio-hyperframe.png" alt="HyperFrame" /><br/>
-<sub><b>HyperFrame</b> — программная анимация и движущаяся графика, отрендеренные в настоящий MP4 (например, 1920×1080 · 30fps).</sub>
+<img src="../../docs/screenshots/product-tour/studio-deck.png" alt="Презентация" /><br/>
+<sub><b>Презентация</b> — Создавайте многостраничные презентации, проверяйте миниатюры и заметки докладчика и экспортируйте готовый результат.</sub>
 </td>
 </tr>
 <tr>
 <td width="50%" valign="top">
-<img src="https://repo-assets.open-design.ai/resources/images/product/studio-ppt.png" alt="Презентация" /><br/>
-<sub><b>Deck</b> — питч-презентации, которые можно листать, листать с клавиатуры и экспортировать в PPTX / PDF.</sub>
+<img src="../../docs/screenshots/product-tour/studio-mobile-app.png" alt="Мобильное приложение" /><br/>
+<sub><b>Мобильное приложение</b> — Создавайте и улучшайте мобильные интерфейсы в предпросмотре устройства, сохраняя рядом беседу, выходные файлы и следующие действия.</sub>
 </td>
 <td width="50%" valign="top">
-<img src="https://repo-assets.open-design.ai/resources/images/product/studio-image.png" alt="Изображение" /><br/>
-<sub><b>Image</b> — изображения и визуальные ассеты брендового уровня с генерацией и скачиванием в высоком разрешении.</sub>
+<img src="../../docs/screenshots/product-tour/studio-image.png" alt="Изображение" /><br/>
+<sub><b>Изображение</b> — Создавайте визуальные материалы из беседы проекта, просматривайте результат в полном размере, затем скачивайте или открывайте его.</sub>
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+<img src="../../docs/screenshots/product-tour/studio-document.png" alt="Документ" /><br/>
+<sub><b>Документ</b> — Создавайте отточенные многостраничные руководства и редакционные документы, проверяйте макет и экспортируйте или делитесь готовым результатом.</sub>
+</td>
+<td width="50%" valign="top">
+<img src="../../docs/screenshots/product-tour/studio-hyperframe.png" alt="HyperFrame" /><br/>
+<sub><b>HyperFrame</b> — Создавайте управляемую кодом анимационную графику, просматривайте анимацию в Studio и экспортируйте готовое видео.</sub>
 </td>
 </tr>
 </table>
-
 ---
 
 ## Совместимость с платформами
@@ -116,10 +115,10 @@ Open Design превращает этот цикл в **файловую сис�
 | [Claude Code](https://docs.anthropic.com/en/docs/claude-code) | ✅ Поддерживается | `od mcp install claude` |
 | [Codex CLI](https://github.com/openai/codex) | ✅ Поддерживается | `od mcp install codex` |
 | [DeepSeek Reasonix](https://github.com/esengine/DeepSeek-Reasonix) | ✅ Поддерживается | `od mcp install reasonix` |
+| [Raven](https://github.com/EverMind-AI/Raven) | ✅ Поддерживается | `od mcp install raven` |
 | [Cursor](https://www.cursor.com/cli) | ✅ Поддерживается | `od mcp install cursor` |
 | [VS Code + GitHub Copilot](https://github.com/features/copilot) | ✅ Поддерживается | `od mcp install copilot` |
 | [GitHub Copilot CLI](https://github.com/features/copilot/cli) | ✅ Поддерживается | `od mcp install copilot` |
-| [Gemini CLI](https://github.com/google-gemini/gemini-cli) | ✅ Поддерживается | `od mcp install gemini` |
 | [OpenCode](https://opencode.ai/) | ✅ Поддерживается | `od mcp install opencode` |
 | [OpenClaw](https://github.com/openclaw/openclaw) | ✅ Поддерживается | `od mcp install openclaw` |
 | [Antigravity](https://antigravity.google) | ✅ Поддерживается | `od mcp install antigravity` |
@@ -152,16 +151,6 @@ Open Design превращает этот цикл в **файловую сис�
 Поверхность вывода по умолчанию. Одностраничные HTML-артефакты, которые читают ваш `DESIGN.md` и рендерятся в изолированном iframe.
 
 <table>
-<tr>
-<td width="50%" valign="top">
-<img src="../../docs/screenshots/01-entry-view.png" alt="Стартовый экран" /><br/>
-<sub><b>Экран входа</b> — выберите навык, выберите дизайн-систему, введите бриф. Одна поверхность для прототипов, дашбордов, презентаций, мобильных приложений, журнальных страниц.</sub>
-</td>
-<td width="50%" valign="top">
-<img src="../../docs/screenshots/skills/mobile-onboarding.png" alt="Мобильный онбординг" /><br/>
-<sub><b>Мобильный прототип</b> — пиксельно точный интерфейс iPhone 15 Pro, многоэкранные потоки. Агент никогда не перерисовывает рамку телефона; общие рамки устройств находятся в <code>assets/frames/</code>.</sub>
-</td>
-</tr>
 <tr>
 <td width="50%" valign="top">
 <img src="../../docs/screenshots/skills/dating-web.png" alt="Веб-прототип dating-web" /><br/>
@@ -304,8 +293,8 @@ Open Design (OD) — это открытая альтернатива. Тот ж
 ```bash
 # Установка одной командой в агент, которым вы пользуетесь:
 od mcp install <agent>
-# <agent> = claude | codex | cursor | copilot | openclaw | antigravity | gemini
-#         | pi | vibe | hermes | cline | kimi | trae | opencode
+# <agent> = claude | codex | reasonix | raven | cursor | copilot | openclaw | antigravity
+#         | pi | vibe | hermes | cline | kimi | kiro | trae | opencode
 
 # Аналогичная установка через hosted shell-скрипт:
 curl -fsSL https://open-design.ai/install.sh | sh -s <agent>
@@ -331,10 +320,10 @@ cd open-design/deploy
 cp .env.example .env
 echo "OD_API_TOKEN=$(openssl rand -hex 32)" >> .env
 docker compose up -d
-# open http://localhost:7456
+# open http://127.0.0.1:7456
 ```
 
-> **Пользователям macOS:** если веб-интерфейс показывает `Authorization: Bearer <OD_API_TOKEN> required`, причина в bridge networking Docker Desktop. Решение описано в разделе [Docker Desktop on macOS](../../deploy/README.md#docker-desktop-on-macos).
+Если браузер запрашивает учётные данные, укажите `open-design` как имя пользователя и значение `OD_API_TOKEN` из `deploy/.env` как пароль. Трафик Docker bridge останется защищённым без включения host networking.
 
 ### 🚀 Развертывание на Sealos
 
@@ -703,7 +692,7 @@ gh pr create --fill
 Спасибо всем, кто принял участие — код, документация, обратная связь, точный issue, новый навык, новая дизайн-система.
 
 <a href="https://github.com/nexu-io/open-design/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=nexu-io/open-design&max=500&columns=20&anon=1&cache_bust=2026-07-17" alt="Контрибьюторы Open Design" />
+  <img src="https://contrib.rocks/image?repo=nexu-io/open-design&max=500&columns=20&anon=1&cache_bust=2026-08-04" alt="Контрибьюторы Open Design" />
 </a>
 
 ---
@@ -728,9 +717,9 @@ SVG выше регенерируется ежедневно через [`.githu
 
 <a href="https://star-history.com/#nexu-io/open-design&Date">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=nexu-io/open-design&type=Date&theme=dark&cache_bust=2026-07-17" />
-    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=nexu-io/open-design&type=Date&cache_bust=2026-07-17" />
-    <img alt="История звёзд Open Design" src="https://api.star-history.com/svg?repos=nexu-io/open-design&type=Date&cache_bust=2026-07-17" />
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=nexu-io/open-design&type=Date&theme=dark&cache_bust=2026-08-04" />
+    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=nexu-io/open-design&type=Date&cache_bust=2026-08-04" />
+    <img alt="История звёзд Open Design" src="https://api.star-history.com/svg?repos=nexu-io/open-design&type=Date&cache_bust=2026-08-04" />
   </picture>
 </a>
 

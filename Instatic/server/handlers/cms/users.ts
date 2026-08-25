@@ -292,7 +292,7 @@ async function handleUserDelete(
 // runs it ONCE up front and threads the resolved actor to each handler as the
 // route table's extra context.
 const USERS_PATH = `${CMS_API_PREFIX}/users`
-// Left behind at the pre-rename `/admin/api/cms` spelling; the admin now calls
+// Left behind at the pre-rename `/cms/api/cms` spelling; the admin now calls
 // `/cms/api/cms` (see CMS_API_PREFIX), so this never matched.
 const USER_ITEM_PATTERN = /^\/cms\/api\/cms\/users\/([^/]+)$/
 

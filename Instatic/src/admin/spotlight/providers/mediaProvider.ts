@@ -1,5 +1,5 @@
 /**
- * Media provider — live media file search via /admin/api/cms/media.
+ * Media provider — live media file search via /cms/api/cms/media.
  *
  * SERVER provider, 150 ms debounce.
  *

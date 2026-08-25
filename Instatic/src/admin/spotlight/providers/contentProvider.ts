@@ -1,5 +1,5 @@
 /**
- * Content provider — live data row search via /admin/api/cms/data/search.
+ * Content provider — live data row search via /cms/api/cms/data/search.
  *
  * SERVER provider, 150 ms debounce.
  *

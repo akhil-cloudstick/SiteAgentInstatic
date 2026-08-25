@@ -194,7 +194,7 @@ export async function setCmsPluginEnabled(
 }
 
 /**
- * DELETE /admin/api/cms/plugins/:id — uninstall a plugin. With `force: true`
+ * DELETE /cms/api/cms/plugins/:id — uninstall a plugin. With `force: true`
  * the server skips the plugin's lifecycle hooks (`deactivate` / `uninstall`)
  * and tears everything down anyway — the escape hatch for a plugin whose
  * uninstall hook throws or whose entry file can no longer load.
@@ -214,7 +214,7 @@ export async function removeCmsPlugin(
 }
 
 /**
- * POST /admin/api/cms/plugins/:id/restart — manually restart a plugin
+ * POST /cms/api/cms/plugins/:id/restart — manually restart a plugin
  * after its worker crashed past the budget. The host resets the per-plugin
  * crash counter, drops historical crash events, terminates any stale
  * worker, then re-loads the entrypoint and runs `activate`. Returns the
@@ -253,7 +253,7 @@ export async function installCmsPluginPack(
 // ---------------------------------------------------------------------------
 // Plugin settings
 //
-// `GET /admin/api/cms/plugins/:id/settings` returns the declared schema +
+// `GET /cms/api/cms/plugins/:id/settings` returns the declared schema +
 // the presented stored values: secret fields surface as `'***'` when an
 // encrypted value is stored and `''` when not, and `secretsNeedingReentry`
 // lists secret fields whose stored value was encrypted with a different

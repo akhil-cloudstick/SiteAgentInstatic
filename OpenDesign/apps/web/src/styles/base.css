@@ -1,91 +1,109 @@
 * { box-sizing: border-box; }
 
+@font-face {
+  font-family: "Albert Sans";
+  src: url("/fonts/AlbertSans-VariableFont_wght.ttf") format("truetype");
+  font-display: swap;
+  font-style: normal;
+  font-weight: 100 900;
+}
+
+@font-face {
+  font-family: "Albert Sans";
+  src: url("/fonts/AlbertSans-Italic-VariableFont_wght.ttf") format("truetype");
+  font-display: swap;
+  font-style: italic;
+  font-weight: 100 900;
+}
+
+@font-face {
+  font-family: "JiduMono Pro";
+  src: url("/fonts/JiduMonoPro-Regular.otf") format("opentype");
+  font-display: swap;
+  font-style: normal;
+  font-weight: 400;
+}
+
 html, body, #root { height: 100%; margin: 0; }
 
 body {
   font-family: var(--sans);
   color: var(--text);
   background: var(--bg-app);
-  font-size: 13.5px;
-  line-height: 1.5;
+  font-size: var(--font-size-14, 14px);
+  line-height: 125%;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
+:root {
+  --font-size-12: 12px;
+  --font-size-13: 13px;
+  --font-size-14: 14px;
+  --font-size-16: 16px;
+  --font-size-18: 18px;
+  --font-size-20: 20px;
+  --font-size-24: 24px;
+  --font-size-28: 28px;
+  --font-size-32: 32px;
+  --font-size-36: 36px;
+  --font-size-48: 48px;
+  --font-size-52: 52px;
+  --font-size-64: 64px;
+  --spacing-2: 2px;
+  --spacing-4: 4px;
+  --spacing-6: 6px;
+  --spacing-8: 8px;
+  --spacing-10: 10px;
+  --spacing-12: 12px;
+  --spacing-16: 16px;
+  --spacing-18: 18px;
+  --spacing-20: 20px;
+  --spacing-22: 22px;
+  --spacing-24: 24px;
+  --spacing-28: 28px;
+  --spacing-32: 32px;
+  --spacing-36: 36px;
+  --spacing-38: 38px;
+  --spacing-42: 42px;
+  --spacing-48: 48px;
+  --spacing-52: 52px;
+  --spacing-58: 58px;
+  --spacing-62: 62px;
+  --spacing-68: 68px;
+}
+
+.numeric,
+code,
+kbd,
+pre,
+.monospace {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Centered row: the dot-matrix loader leads, the label follows. Was a grid
+   with `place-items: center`, which would stack the two children instead. */
 .od-loading-shell {
   min-height: 100vh;
-  display: grid;
-  place-items: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
   color: var(--text-muted);
+  /* Opaque base (not the see-through veil) so the pastel app-wash corner
+     blobs don't bleed through the loading screen. */
   background: var(--bg-app);
-  font: 500 13px/1.4 var(--sans);
+  font: 500 var(--font-size-13)/125% var(--sans);
 }
 
-/* ── Theme swap ───────────────────────────────────────────────────────────
- * While `data-theme` is being changed, nothing animates. Every surface owns a
- * different `transition` duration, so without this a theme flip crossfades
- * block by block — the header, the chat column and the panels each arriving at
- * their own moment, leaving the page visibly half-light for a beat.
- * `applyAppearanceToDocument` sets and clears the attribute around the swap. */
-[data-theme-swapping],
-[data-theme-swapping] *,
-[data-theme-swapping] *::before,
-[data-theme-swapping] *::after {
-  transition: none !important;
-  animation-duration: 0s !important;
-  animation-delay: 0s !important;
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
 }
-
-/* ── Focus ────────────────────────────────────────────────────────────────
- * A pointer press must never leave a ring behind. Several surfaces style
- * `:focus` rather than `:focus-visible`, so clicking a menu trigger, a tab or
- * a toolbar control parked a heavy gold or green outline on it until something
- * else was clicked. `:focus:not(:focus-visible)` is the standard way to keep
- * the indicator for keyboard users and drop it for mouse users, and it is
- * written here — the last global sheet before the app's own — so it applies
- * everywhere rather than being re-fixed per surface.
- *
- * Keyboard focus keeps ONE indicator: a 2px accent ring, no offset jump. */
-:where(a, button, input, textarea, select, summary, [tabindex], [role='button']):focus:not(
-    :focus-visible
-  ) {
-  outline: none;
-  box-shadow: none;
-}
-
-:where(a, button, input, textarea, select, summary, [tabindex], [role='button']):focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--accent) 70%, transparent);
-  outline-offset: 1px;
-  box-shadow: none;
-}
-
-/* ── Scrollbars ───────────────────────────────────────────────────────────
- * One thin, themed bar across the whole app, in both themes. Firefox reads the
- * standard properties; Chromium/WebKit read the pseudo-elements. */
-* {
-  scrollbar-width: thin;
-  scrollbar-color: color-mix(in srgb, var(--text-muted) 45%, transparent) transparent;
-}
-
-::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
-}
-
-::-webkit-scrollbar-track,
-::-webkit-scrollbar-corner {
-  background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-  border: 3px solid transparent;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--text-muted) 40%, transparent);
-  background-clip: content-box;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: color-mix(in srgb, var(--text-muted) 68%, transparent);
-  background-clip: content-box;
-}
-

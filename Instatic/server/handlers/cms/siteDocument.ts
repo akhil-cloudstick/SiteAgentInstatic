@@ -1,7 +1,7 @@
 /**
  * Transactional site-document save.
  *
- *   PUT /admin/api/cms/site-document — persist the WHOLE site document
+ *   PUT /cms/api/cms/site-document — persist the WHOLE site document
  *   (shell + pages + Visual Components + saved layouts) atomically, in ONE
  *   DB transaction. Replaces the four per-collection PUT endpoints, whose
  *   independent commits could tear a save in half (shell committed, pages
@@ -26,11 +26,17 @@
  *      post-save component roster (kept existing + changed in this batch),
  *      so a page referencing a component created in the same save is valid
  *      by construction — no cross-request ordering contract.
- *   2. ONE transaction: allocate the site-global sync seq, write the shell,
- *      then apply components → layouts → pages (deletes first inside each,
- *      freeing slugs; see repositories/data/rows/apply.ts). The repository
- *      calls are `…InTx` functions — nesting `db.transaction` wedges the
- *      SQLite adapter's serialized chain.
+ *   2. ONE transaction: allocate the site-global sync seq (the counter-row
+ *      lock serializes concurrent saves, making the conflict reads exact),
+ *      run the base-seq conflict check (incremental mode — any shipped row
+ *      stored NEWER than the client's base seq throws SaveConflictError,
+ *      rolling everything back into a 409 + conflicts payload), write the
+ *      shell ONLY when its content actually changed (so the shell seq stays
+ *      an honest conflict signal), then apply components → layouts → pages
+ *      (deletes first inside each, freeing slugs; see
+ *      repositories/data/rows/apply.ts). The repository calls are `…InTx`
+ *      functions — nesting `db.transaction` wedges the SQLite adapter's
+ *      serialized chain.
  *   3. Post-commit effects: bump the publish version when a published page
  *      was deleted (never inside the transaction — the publish lock can be
  *      queued behind the transaction chain). This is also the emission point
@@ -47,9 +53,15 @@ import {
   applyDataRowChangesInTx,
   listDataRowIdSlugs,
   listDataRows,
+  listDataRowSeqs,
   type DataRowWrite,
 } from '../../repositories/data'
-import { getDraftSite, saveDraftSite, stampDraftSiteSeq } from '../../repositories/site'
+import {
+  getDraftSite,
+  getDraftSiteSeq,
+  saveDraftSite,
+  stampDraftSiteSeq,
+} from '../../repositories/site'
 import { allocateSiteSeq } from '../../repositories/syncSequence'
 import { pageFromRow, pageToCells } from '../../../src/core/data/pageFromRow'
 import { visualComponentFromRow, visualComponentToCells } from '../../../src/core/data/componentFromRow'
@@ -64,12 +76,21 @@ import { validateSavedLayoutsForPartialWrite } from '@core/persistence/validateL
 import { VisualComponentSchema, vcSlugFromName, type VisualComponent } from '@core/visualComponents'
 import { SavedLayoutSchema, layoutSlugFromName, type SavedLayout } from '@core/layouts'
 import type { Page } from '@core/page-tree'
+import { SaveConflictError, type SaveConflict } from '@core/persistence/saveConflict'
+import { shellsEqual } from '@core/persistence/shellsEqual'
+import {
+  notifyRowWrite,
+  notifyShellWrite,
+  serializeCollabAwareWrite,
+  type RowWriteKind,
+} from '../../repositories/rowWriteEvents'
 import { badRequest, jsonResponse, methodNotAllowed, readValidatedBody } from '../../http'
+import { Value } from '@sinclair/typebox/value'
 import { bumpPublishVersionSerialized } from '../../publish/publishState'
 import { Type, type Static } from '@core/utils/typeboxHelpers'
 import { CMS_API_PREFIX } from './shared'
-import { ForbiddenSiteChangeError, validateSiteWriteDiff } from './siteDiff'
-import { validatePageWriteDiff } from './pageDiff'
+import { ForbiddenSiteChangeError, validateSiteWriteDiff } from '../../writePolicy/siteDiff'
+import { validatePageWriteDiff } from '../../writePolicy/pageDiff'
 
 const SITE_WRITE_CAPABILITIES = [
   'site.structure.edit',
@@ -88,6 +109,23 @@ const SiteDocumentBodySchema = Type.Object({
   deletedComponentIds: Type.Array(Type.String()),
   changedLayouts: Type.Array(SavedLayoutSchema),
   deletedLayoutIds: Type.Array(Type.String()),
+  /**
+   * Conflict detection (incremental mode): rowId → the stored seq the client
+   * last synchronized with, for every changed AND deleted row. Inside the
+   * save transaction, a stored row that is NEWER than its base — or that has
+   * no base entry at all — 409s the whole save with a conflicts payload
+   * (see @core/persistence/saveConflict). Client-created rows have no stored
+   * counterpart and pass by construction. Ignored in replace mode (imports
+   * are deliberate replace-everything operations).
+   */
+  baseSeqs: Type.Record(Type.String(), Type.Number()),
+  /**
+   * The shell seq the client last synchronized with. Checked only when the
+   * incoming shell content actually differs from the stored shell — the
+   * shell is shipped with every save, so an unconditional check would 409
+   * every concurrent save pair. Ignored in replace mode.
+   */
+  shellBaseSeq: Type.Number(),
 }, { additionalProperties: false })
 
 type SiteDocumentBody = Static<typeof SiteDocumentBodySchema>
@@ -143,6 +181,45 @@ function forbiddenStructuralChange(
   return jsonResponse({ error: err.message, kind: err.kind, path: err.path }, { status: 403 })
 }
 
+/**
+ * Describe why a site-document body failed `SiteDocumentBodySchema`.
+ * Returns a 400 message naming the first offending path, so an import or
+ * autosave rejection is actionable instead of a bare "Invalid request body".
+ */
+async function describeInvalidBody(probe: Request): Promise<string> {
+  let text: string
+  try {
+    text = await probe.text()
+  } catch (err) {
+    console.error('[site-document] invalid request body — stream unreadable:', err)
+    return 'Invalid request body — the payload could not be read'
+  }
+  let raw: unknown
+  try {
+    raw = JSON.parse(text)
+  } catch (err) {
+    console.error(
+      `[site-document] invalid request body — not valid JSON (${text.length} bytes received):`,
+      err,
+    )
+    return `Invalid request body — payload was not valid JSON (${text.length} bytes received)`
+  }
+  // Dump the whole picture in one shot: which top-level keys arrived, and
+  // every schema violation — not just the first — so a single failed import
+  // is enough to diagnose.
+  const keys = raw && typeof raw === 'object' ? Object.keys(raw as object) : []
+  const errors = [...Value.Errors(SiteDocumentBodySchema, raw)].map(
+    (e) => `${e.path || '/'}: ${e.message}`,
+  )
+  console.error(
+    `[site-document] invalid request body — ${text.length} bytes, keys: [${keys.join(', ')}]`,
+  )
+  for (const e of errors.slice(0, 25)) console.error('[site-document]   ✗', e)
+  if (errors.length > 25) console.error(`[site-document]   … ${errors.length - 25} more`)
+  const detail = errors[0] ?? 'no field reported'
+  return `Invalid request body (${detail}${errors.length > 1 ? ` +${errors.length - 1} more` : ''})`
+}
+
 export async function handleSiteDocumentRoutes(req: Request, db: DbClient): Promise<Response | null> {
   const url = new URL(req.url)
   if (url.pathname !== `${CMS_API_PREFIX}/site-document`) return null
@@ -151,8 +228,13 @@ export async function handleSiteDocumentRoutes(req: Request, db: DbClient): Prom
   const user = await requireAnyCapability(req, db, SITE_WRITE_CAPABILITIES)
   if (user instanceof Response) return user
 
+  // Keep an untouched copy BEFORE readValidatedBody consumes the stream so a
+  // rejection can name the offending field. A bare 'Invalid request body' is
+  // unactionable on a ~700 KB import payload — the Super Import wizard surfaces
+  // this string verbatim with no way to tell WHICH field failed.
+  const bodyProbe = req.clone()
   const body = await readValidatedBody(req, SiteDocumentBodySchema)
-  if (!body) return badRequest('Invalid request body')
+  if (!body) return badRequest(await describeInvalidBody(bodyProbe))
 
   if (
     body.mode === 'replace' &&
@@ -172,6 +254,13 @@ export async function handleSiteDocumentRoutes(req: Request, db: DbClient): Prom
     const previousShell = await getDraftSite(db)
     const shell = validateSite(body.site)
     validateSiteWriteDiff(previousShell, shell, user.capabilities)
+
+    // The shell ships with EVERY save, changed or not. Detecting "actually
+    // changed" here (CPU work, outside the transaction) lets phase 2 skip the
+    // shell write + seq stamp on row-only saves — which in turn keeps the
+    // shell seq an honest conflict signal (an unconditional stamp would 409
+    // every concurrent save pair on the shell).
+    const shellChanged = previousShell === null || !shellsEqual(previousShell, shell)
 
     const hasAllSiteCaps =
       user.capabilities.includes('site.structure.edit') &&
@@ -306,10 +395,52 @@ export async function handleSiteDocumentRoutes(req: Request, db: DbClient): Prom
 
     let seq = 0
     let deletedPublishedPage = false
-    await db.transaction(async (tx) => {
+    await serializeCollabAwareWrite(async () => {
+      await db.transaction(async (tx) => {
+      // Allocate FIRST: the counter-row UPDATE takes a row lock, so two
+      // concurrent save transactions serialize here (on Postgres as well as
+      // SQLite's fully-serialized chain) — which makes the conflict reads
+      // below exact, not best-effort.
       seq = await allocateSiteSeq(tx)
-      await saveDraftSite(tx, shell, user.id)
-      await stampDraftSiteSeq(tx, seq)
+
+      // Conflict check (incremental mode): any shipped row whose STORED seq
+      // is newer than the client's base — or that the client has no base
+      // entry for — would be a silent overwrite of another admin's work.
+      // Throwing rolls the transaction back, so nothing is written on 409.
+      if (body.mode === 'incremental') {
+        const conflicts: SaveConflict[] = []
+        if (shellChanged) {
+          const storedShellSeq = await getDraftSiteSeq(tx)
+          if (storedShellSeq > body.shellBaseSeq) {
+            conflicts.push({ table: 'site', rowId: 'default', seq: storedShellSeq })
+          }
+        }
+        const rowChecks = [
+          { table: 'pages', ids: [...changedPageIdsRaw, ...pageDeleteIds] },
+          { table: 'components', ids: [...changedComponentIds, ...componentDeleteIds] },
+          { table: 'layouts', ids: [...changedLayoutIds, ...layoutDeleteIds] },
+        ] as const
+        for (const { table, ids } of rowChecks) {
+          // listDataRowSeqs sees soft-deleted rows too: a remote deletion is
+          // a newer write, not absence. Rows with no stored counterpart are
+          // client creations and pass by construction (absent from the result).
+          for (const stored of await listDataRowSeqs(tx, table, ids)) {
+            const base = body.baseSeqs[stored.id]
+            if (base === undefined || stored.seq > base) {
+              conflicts.push({ table, rowId: stored.id, seq: stored.seq })
+            }
+          }
+        }
+        if (conflicts.length > 0) throw new SaveConflictError(conflicts)
+      }
+
+      // Shell write + seq stamp only when the shell content actually changed
+      // — see the shellChanged comment in phase 1.
+      if (shellChanged) {
+        // In-transaction — collab listeners are notified post-commit below.
+        await saveDraftSite(tx, shell, user.id, { collabInternal: true })
+        await stampDraftSiteSeq(tx, seq)
+      }
       // Empty change sets skip their table entirely — a shell-only save
       // issues no row queries inside the transaction.
       if (componentWrites.length > 0 || componentDeleteIds.size > 0) {
@@ -331,14 +462,29 @@ export async function handleSiteDocumentRoutes(req: Request, db: DbClient): Prom
         })
         deletedPublishedPage = pagesResult.deletedPublished
       }
+      })
+
+      // Collab invalidation — this save wrote rows/shell OUTSIDE the relay, so
+      // affected CRDT documents must reset while this ordered write still owns
+      // the lane (post-commit; see rowWriteEvents).
+      if (shellChanged) notifyShellWrite()
+      const writtenGroups: Array<[string, Iterable<string>, RowWriteKind]> = [
+        ['pages', changedPageIdsRaw, 'update'],
+        ['pages', pageDeleteIds, 'delete'],
+        ['components', changedComponentIds, 'update'],
+        ['components', componentDeleteIds, 'delete'],
+        ['layouts', changedLayoutIds, 'update'],
+        ['layouts', layoutDeleteIds, 'delete'],
+      ]
+      for (const [tableId, ids, kind] of writtenGroups) {
+        const rowIds = [...ids]
+        if (rowIds.length > 0) notifyRowWrite({ tableId, rowIds, kind })
+      }
     })
 
-    // ─── Phase 3: post-commit effects ────────────────────────────────────────
-    // Deleting a published page retracts its public route — invalidate the
-    // render cache AFTER the transaction commits (never inside it: the bump
-    // serializes against the publish lock, which itself waits on the
-    // transaction chain). The multi-admin live-sync plan emits its site
-    // events from this point too.
+    // Publish-lock work stays outside the collab-aware lane: publish flushes
+    // need that lane, so acquiring the locks in the opposite order could
+    // deadlock. The database transaction and sync invalidations are complete.
     if (deletedPublishedPage) await bumpPublishVersionSerialized()
 
     return jsonResponse({ ok: true, seq })
@@ -349,6 +495,9 @@ export async function handleSiteDocumentRoutes(req: Request, db: DbClient): Prom
         { error: err.message, kind: err.kind, path: err.path },
         { status: 403 },
       )
+    }
+    if (err instanceof SaveConflictError) {
+      return jsonResponse({ error: err.message, conflicts: err.conflicts }, { status: 409 })
     }
     throw err
   }
