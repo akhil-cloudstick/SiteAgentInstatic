@@ -1806,6 +1806,7 @@ export const fa: Dict = {
   'avatar.amrConsoleMeta': 'موجودی و شارژ',
   'avatar.settings': 'تنظیمات',
   'avatar.backToProjects': 'بازگشت به پروژه‌ها',
+  'avatar.signOut': 'خروج',
   'avatar.metaActive': 'فعال',
   'avatar.metaOffline': 'آفلاین',
   'avatar.metaSelected': 'انتخاب شده',

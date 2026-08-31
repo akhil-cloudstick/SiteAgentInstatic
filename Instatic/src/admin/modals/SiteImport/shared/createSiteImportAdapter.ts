@@ -16,8 +16,31 @@ import {
   uploadCmsMediaAsset,
   type CmsMediaFolder,
 } from '@core/persistence/cmsMedia'
+import {
+  createCmsDataRow,
+  createCmsDataTable,
+  getCmsDataTableBySlug,
+} from '@core/persistence/cmsData'
 import { getErrorMessage } from '@core/utils/errorMessage'
 import { useEditorStore } from '@site/store/store'
+
+/**
+ * Fields every imported collection entry gets.
+ *
+ * `body` is the post itself — it flows into the entry template's
+ * `base.outlet` at render time, which is what makes one template serve every
+ * entry. The SEO pair is included because the publisher now reads row-level SEO;
+ * without these fields every post would share one site-wide title and
+ * description.
+ */
+const COLLECTION_ENTRY_FIELDS = [
+  { id: 'title', label: 'Title', type: 'text' as const, builtIn: true },
+  { id: 'slug', label: 'Slug', type: 'text' as const, builtIn: true },
+  { id: 'body', label: 'Body', type: 'richText' as const, format: 'html' as const, builtIn: true },
+  { id: 'featuredMedia', label: 'Featured image', type: 'media' as const, mediaKind: 'image' as const },
+  { id: 'seoTitle', label: 'SEO title', type: 'text' as const },
+  { id: 'seoDescription', label: 'SEO description', type: 'longText' as const },
+]
 
 interface AdapterCallbacks {
   /** Stable id for the upload session (for logging). */
@@ -137,6 +160,65 @@ export function createSiteImportAdapter(opts: AdapterCallbacks): SiteImportAdapt
   return {
     installGoogleFont(font) {
       return installCmsGoogleFont(font)
+    },
+
+    /**
+     * Create a collection's table and its entry rows.
+     *
+     * Collections live behind the CMS data API rather than in the site
+     * document, so this runs as its own async step outside the store
+     * transaction — see the doc on `SiteImportAdapter.createCollection`.
+     */
+    async createCollection(collection) {
+      // Reuse an existing table with the same slug. A second import of the
+      // same build must update the collection, not create `blog-2` beside it.
+      const existing = await getCmsDataTableBySlug(collection.slug)
+      const table =
+        existing ??
+        (await createCmsDataTable({
+          name: collection.name,
+          slug: collection.slug,
+          // `postType` (not `data`) because entries need their own public URLs —
+          // that routing is exactly what the folder layout asked for.
+          kind: 'postType',
+          fields: COLLECTION_ENTRY_FIELDS,
+        }))
+
+      const createdEntries: { rowId: string; slug: string; title: string }[] = []
+      const failedEntries: { slug: string; message: string }[] = []
+
+      for (const entry of collection.entries) {
+        try {
+          // Created as a DRAFT: an import never publishes. `featuredImageSrc`
+          // has already been rewritten to a media URL by `applyAssetRewrites`.
+          // The row's public slug is denormalised from `cells.slug` by the
+          // repository, so it is set there and nowhere else.
+          const row = await createCmsDataRow(table.id, {
+            cells: {
+              title: entry.title,
+              slug: entry.slug,
+              body: entry.bodyHtml,
+              ...(entry.featuredImageSrc ? { featuredMedia: entry.featuredImageSrc } : {}),
+              ...(entry.seoTitle ? { seoTitle: entry.seoTitle } : {}),
+              ...(entry.seoDescription ? { seoDescription: entry.seoDescription } : {}),
+            },
+          })
+          createdEntries.push({ rowId: row.id, slug: entry.slug, title: entry.title })
+        } catch (err) {
+          // One bad entry must not cost the other 188. Record and continue —
+          // `commitImportPlan` turns each failure into a warning naming the slug.
+          failedEntries.push({ slug: entry.slug, message: getErrorMessage(err, 'row create failed') })
+        }
+      }
+
+      return {
+        slug: collection.slug,
+        name: collection.name,
+        tableId: table.id,
+        reusedExistingTable: existing !== null,
+        createdEntries,
+        failedEntries,
+      }
     },
 
     async uploadAsset({ path, bytes, mimeType }) {

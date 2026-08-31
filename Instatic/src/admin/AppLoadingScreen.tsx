@@ -10,6 +10,10 @@ export function AppLoadingScreen() {
       aria-label={`Loading ${BRAND_NAME}`}
     >
       <BanterLoader />
+      {/* The boxes only say "loading" while they move, and the global
+          reduced-motion reset stops them dead. The label is what survives —
+          see the matching note in index.html's boot loader. */}
+      <p className={styles.label}>{`Loading ${BRAND_NAME}…`}</p>
     </div>
   )
 }

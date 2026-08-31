@@ -5,7 +5,7 @@
 // fixed, tenant-agnostic `/od`, and the gateway routes each request to the right
 // daemon using the hub session cookie. One build serves every tenant — run this
 // once per OpenDesign source upgrade, not once per tenant.
-// See docs/opendesign-shared-web-build.md.
+// See docs/opendesign/opendesign-shared-web-build.md.
 //
 // Safe to run while the control plane is up: it builds into a fresh versioned
 // dir (`.next-prod-shared-<ms>`) and never touches the one currently being

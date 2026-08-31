@@ -1806,6 +1806,7 @@ export const hu: Dict = {
   'avatar.amrConsoleMeta': 'Egyenleg és feltöltés',
   'avatar.settings': 'Beállítások',
   'avatar.backToProjects': 'Vissza a projektekhez',
+  'avatar.signOut': 'Kijelentkezés',
   'avatar.metaActive': 'aktív',
   'avatar.metaOffline': 'offline',
   'avatar.metaSelected': 'kiválasztva',

@@ -20,7 +20,7 @@ Supporting: `01`–`05` (location, root listing, git status/branch/log), `packag
 ## The five things that most change the plan
 
 1. **OpenDesign is a real, connected, first-class spoke.** The current plan
-   (`docs/mmsbuild-project-plan.md`, 2026-07-06) mentions it **once, in passing, in §9**. It is absent
+   (`docs/platform/mmsbuild-project-plan.md`, 2026-07-06) mentions it **once, in passing, in §9**. It is absent
    from the Hub & Spokes diagram. That diagram is materially wrong.
 2. **Design → CMS is solved and idempotent.** One click, verified end-to-end, **no duplicate pages on
    re-share** (match by slug → `overwritePage` → upsert). Phase 2 is largely done.
@@ -37,14 +37,14 @@ Supporting: `01`–`05` (location, root listing, git status/branch/log), `packag
 
 ## ⚠️ Two in-repo docs are stale — do not plan from them
 
-`docs/phase5-share-to-cms-design.md` and the **2026-07-10** CHANGELOG entry describe a **server-side**
+`docs/integration/phase5-share-to-cms-design.md` and the **2026-07-10** CHANGELOG entry describe a **server-side**
 importer. That was built, then **deleted** in commit `9e13bf1` (2026-07-16) — `applyPlan.ts` (-382),
 `classLinking.ts` (-97), `domPolyfill.ts` (-47) removed; `stagedImports.ts` (+59) and
 `useStagedSiteImportHandoff.ts` (+67) added.
 
 The shipped design is a **stage-then-browser-handoff**: OD pushes bytes server-to-server, Instatic
 stages them and returns an opaque single-use token (5-min TTL), OD redirects the *tenant's browser*,
-and the browser runs Instatic's own existing import wizard. `docs/od-cms-vision.md` describes this
+and the browser runs Instatic's own existing import wizard. `docs/integration/od-cms-vision.md` describes this
 correctly.
 
 ## Not included, deliberately
@@ -69,5 +69,5 @@ correctly.
 > Reflect that Open Design and Instatic CMS are now connected and improve design control / CMS control.
 > Read `00-START-HERE.md` first, then `10-integration-summary.md` and `11-questions-answered.md`
 > (Q13 = what to remove, Q14 = what to add). Promote OpenDesign to a first-class spoke in the Hub &
-> Spokes diagram — it is currently absent. Note that `docs/phase5-share-to-cms-design.md` and the
+> Spokes diagram — it is currently absent. Note that `docs/integration/phase5-share-to-cms-design.md` and the
 > 2026-07-10 changelog entry are stale and describe a deleted server-side design.

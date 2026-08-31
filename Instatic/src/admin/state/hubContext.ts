@@ -43,6 +43,18 @@ function snapshot(): HubContextSnapshot {
 }
 
 /**
+ * The cached scope for callers that are not components — Spotlight commands run
+ * from a callback, not a render, so they cannot use the hook.
+ *
+ * Deliberately does not trigger the fetch: anything reaching for this runs long
+ * after the header mounted and armed it. `null` means "no Hub" exactly as it
+ * does for the hook, and callers must treat it as a terminal answer.
+ */
+export function readHubContext(): HubContextSnapshot {
+  return cachedHubContext
+}
+
+/**
  * The store's single write path. The loader below calls it with what the server
  * returned; tests call it directly to place a session in a known Hub scope
  * without standing up a server.

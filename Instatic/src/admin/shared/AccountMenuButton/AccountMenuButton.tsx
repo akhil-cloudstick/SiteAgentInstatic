@@ -10,13 +10,17 @@
  *   │ [OWNER]                      │
  *   ├──────────────────────────────┤
  *   │ Account & security           │  → /cms/account (soft nav)
- *   │ Sign out                     │  → POST /logout, hard reload to /admin
+ *   │ Sign out                     │  → CMS logout, then the HUB's /logout
  *   │ Sign out all devices         │  → POST /auth/logout-all, status inline
  *   └──────────────────────────────┘
  *
- * "Sign out" deliberately uses `window.location.assign` instead of a router
- * navigate — the post-logout flow needs a fresh React app boot so the
- * AdminEntry session check re-runs and the unauth login form is rendered.
+ * "Sign out" ends the HUB session, not just the CMS one. Clearing only
+ * `instatic_admin_session` leaves `sa_hub` alive, and the hub's silent re-SSO
+ * signs the user straight back in — so the sign-out has to land on the hub's
+ * /logout. See `signOutEverywhere` in core/persistence/cmsAuth.ts.
+ *
+ * It deliberately hard-navigates instead of using the router: the post-logout
+ * flow needs a fresh app boot so no session state survives in module memory.
  *
  * "Sign out all devices" preserves the current cookie server-side so the
  * user issuing the action stays signed in here. Status is surfaced inline.
@@ -39,7 +43,8 @@ import { useAuthenticatedAdminUser } from '@admin/sessionContext'
 import { useAdminNavigate } from '@admin/lib/useAdminNavigate'
 import { StepUpCancelledMessage, useStepUp } from '@admin/shared/StepUp'
 import { UserAvatar } from '@admin/shared/UserAvatar'
-import { logoutAllOtherCmsSessions, logoutCms } from '@core/persistence'
+import { useHubContext } from '@admin/state/hubContext'
+import { logoutAllOtherCmsSessions, signOutEverywhere } from '@core/persistence'
 import styles from './AccountMenuButton.module.css'
 import { getErrorMessage } from '@core/utils/errorMessage'
 
@@ -49,6 +54,7 @@ export function AccountMenuButton(): ReactNode {
   const user = useAuthenticatedAdminUser()
   const navigate = useAdminNavigate()
   const { runStepUp } = useStepUp()
+  const hubContext = useHubContext()
   const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState<null | 'logout' | 'logout-all'>(null)
   const [status, setStatus] = useState<{ tone: 'info' | 'error'; message: string } | null>(null)
@@ -67,11 +73,9 @@ export function AccountMenuButton(): ReactNode {
     setBusy('logout')
     setStatus(null)
     try {
-      await logoutCms()
-      // Hard navigation is intentional here — the next request must boot the
-      // admin shell from scratch so the unauth login form renders. A soft
-      // navigate would keep the React tree alive with stale session state.
-      window.location.assign('/cms')
+      // Signs out of the HUB, not just the CMS — clearing only the CMS cookie
+      // leaves `sa_hub` alive, and the hub silently signs the user back in.
+      await signOutEverywhere(hubContext?.hubBaseUrl ?? null)
     } catch (err) {
       console.error('[account-menu] sign out failed:', err)
       setBusy(null)

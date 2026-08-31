@@ -11,7 +11,11 @@
  * would be an open redirect.
  */
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
-import { hubNavigationLinks, hubLinkHref } from '@admin/shared/ProductHubHeader'
+import {
+  hubNavigationLinks,
+  hubLinkHref,
+  HUB_NAVIGATION_CONTRACT,
+} from '@admin/shared/ProductHubHeader'
 import { parseHubContextFromSso, readStoredHubContext } from '../../../server/auth/hubContext'
 
 const HUB = 'https://hub.example.com'
@@ -38,21 +42,27 @@ afterEach(() => {
   else process.env.INSTATIC_HUB_SSO_URL = originalHubSso
 })
 
-describe('role-scoped Hub navigation', () => {
+describe('role-scoped Hub navigation contract', () => {
+  // Asserted against the raw table, not the rendered set: `hubNavigationLinks`
+  // shows only the destinations the Hub actually serves today, so asserting
+  // through it would stop covering these labels the moment one is hidden.
+  const label = (role: Parameters<typeof hubNavigationLinks>[0]) =>
+    HUB_NAVIGATION_CONTRACT[role].map((l) => l.label)
+
   it('gives Operator and Agency the same set, verbatim', () => {
     const expected = ['Home', 'Portfolio', 'Actions', 'Approvals', 'Reports']
-    expect(hubNavigationLinks('operator').map((l) => l.label)).toEqual(expected)
-    expect(hubNavigationLinks('agency').map((l) => l.label)).toEqual(expected)
+    expect(label('operator')).toEqual(expected)
+    expect(label('agency')).toEqual(expected)
   })
 
   it('gives Client the my-scoped set', () => {
-    expect(hubNavigationLinks('client').map((l) => l.label)).toEqual([
+    expect(label('client')).toEqual([
       'Home', 'My Projects', 'My Actions', 'Approvals', 'Reports',
     ])
   })
 
   it('gives Super Admin the platform set', () => {
-    expect(hubNavigationLinks('super-admin').map((l) => l.label)).toEqual([
+    expect(label('super-admin')).toEqual([
       'Home', 'Governance', 'Global Library', 'Intelligence',
       'Knowledge', 'Integrations', 'Health & Audit',
     ])
@@ -60,6 +70,36 @@ describe('role-scoped Hub navigation', () => {
 
   it('resolves links against the Hub origin', () => {
     expect(hubLinkHref(HUB, '/hub/portfolio')).toBe(`${HUB}/hub/portfolio`)
+  })
+})
+
+describe('rendered Hub navigation', () => {
+  const BOTH = { designActive: true, cmsActive: true }
+  const ROLES = ['operator', 'agency', 'client', 'super-admin'] as const
+
+  it('shows only destinations the Hub actually serves', () => {
+    // Home is the one implemented route; Portfolio/Actions/Approvals/Reports
+    // (and the client / super-admin equivalents) fall through the gateway to
+    // the tenant CMS and 404 there, so they stay hidden until they are built.
+    for (const role of ROLES) {
+      expect(hubNavigationLinks(role, BOTH).map((l) => l.path)).toEqual(['/hub'])
+    }
+  })
+
+  it('hides everything when only one product is enabled', () => {
+    // With one product the Hub bounces straight back into it, so Home would
+    // link to the page the user is already on.
+    for (const role of ROLES) {
+      expect(hubNavigationLinks(role, { designActive: false, cmsActive: true })).toEqual([])
+      expect(hubNavigationLinks(role, { designActive: true, cmsActive: false })).toEqual([])
+    }
+  })
+
+  it('treats an older hand-off with no product flags as both-enabled', () => {
+    // Absent means unknown. The routing gate is server-side, and wrongly
+    // hiding navigation is the worse of the two failures.
+    expect(hubNavigationLinks('operator').map((l) => l.path)).toEqual(['/hub'])
+    expect(hubNavigationLinks('operator', {}).map((l) => l.path)).toEqual(['/hub'])
   })
 })
 
@@ -83,6 +123,33 @@ describe('parseHubContextFromSso', () => {
       origin: 'portfolio',
       returnUrl: `${HUB}/hub?tab=portfolio`,
     })
+  })
+
+  it('carries the product flags through the hand-off', () => {
+    const both = parseHubContextFromSso(ssoUrl({
+      hubRole: 'operator',
+      hubDesignActive: '1',
+      hubCmsActive: '1',
+    }))
+    expect(both?.designActive).toBe(true)
+    expect(both?.cmsActive).toBe(true)
+
+    const cmsOnly = parseHubContextFromSso(ssoUrl({
+      hubRole: 'operator',
+      hubDesignActive: '0',
+      hubCmsActive: '1',
+    }))
+    expect(cmsOnly?.designActive).toBe(false)
+    expect(cmsOnly?.cmsActive).toBe(true)
+  })
+
+  it('leaves the product flags absent when the hub did not send them', () => {
+    // A hub that predates the flags must stay distinguishable from one that
+    // explicitly turned a product off — `undefined`, never a guessed `true`.
+    const context = parseHubContextFromSso(ssoUrl({ hubRole: 'operator' }))
+    expect(context).not.toBeNull()
+    expect(context).not.toHaveProperty('designActive')
+    expect(context).not.toHaveProperty('cmsActive')
   })
 
   it('treats absent scope fields as absent rather than substituting defaults', () => {

@@ -21,6 +21,9 @@ import { expandLinkedCssImports } from './cssImports'
 import { extractGoogleFontImports, extractGoogleFontsFromHtmlLinks } from './fontImports'
 import { classifyFiles } from './classifyFiles'
 import { makeHtmlPagePlan } from './htmlPagePlan'
+import { classifyCollections } from './collectionPlan'
+import { extractEntryContent, makeTemplateSource, OUTLET_MARKER_ATTR, OUTLET_MARKER_VALUE } from './collectionEntry'
+import type { ImportFragment } from '@core/htmlImport'
 import { buildAssetPlan, type CssFileResult } from './assetPlan'
 import { partitionLinkedStylesheets } from './stylesheetPlan'
 import { detectCrossSheetClassConflicts } from './classCascades'
@@ -30,11 +33,14 @@ import { createCssPlanState, parseCssSourceIntoPlan } from './planCss'
 import { rewriteNpmCdnModuleImports } from './scriptDependencies'
 import type {
   ClassifiedFile,
+  CollectionCommitPlan,
+  CollectionEntryCommit,
   FileMap,
   ImportPlan,
   ImportWarning,
   ImportGoogleFont,
   ImportScript,
+  NewStyleRule,
   PagePlan,
   StylesheetImportMode,
 } from './types'
@@ -176,9 +182,27 @@ export function buildImportPlan({ fileMap, currentSite, options }: BuildImportPl
 
   // 5. Build asset plan — normalises URLs in node props, CSS values, and kept
   //    stylesheet text; resolves @font-face blocks; collects assets to upload.
-  const { normalizedPagePlans, normalizedStyleRules, styleRuleSources, stylesheets, fonts, assets, warnings: assetWarnings } =
+  const { normalizedPagePlans, normalizedStyleRules: rawStyleRules, styleRuleSources: rawStyleRuleSources, stylesheets, fonts, assets, warnings: assetWarnings } =
     buildAssetPlan(rawPagePlans, publishableCssFileResults, fileMap, rawStylesheetSources)
   warnings.push(...assetWarnings)
+
+  // 5a. Collapse byte-identical rules contributed by different pages. Runs
+  //     AFTER buildAssetPlan so URL rewrites are already applied and two copies
+  //     of the same authored rule really are identical.
+  const { rules: normalizedStyleRules, sources: styleRuleSources } =
+    dedupeIdenticalStyleRules(rawStyleRules, rawStyleRuleSources)
+
+  // 5b. Re-run the bare-selector preference across the WHOLE batch.
+  //     `normalizeParsedBindableClassRules` already runs per parsed source, but
+  //     each page is its own source, so a name can arrive as `kind: 'class'`
+  //     from several pages at once — e.g. bare `.prose-h2` from one page and
+  //     `.prose .prose-h2` from another. Two class-kind rules then share a name
+  //     and whichever the store's name index happens to resolve wins, which is
+  //     how a heading ended up bound to the narrow `.prose .prose-h2` variant
+  //     (colour only, no font-family) instead of its bare rule. Applying the
+  //     same rule globally makes the canonical bare selector win the registry
+  //     slot and demotes the variants to ambient, exactly as within one sheet.
+  demoteNonCanonicalClassDuplicates(normalizedStyleRules)
 
   // 5b. Detect cross-page global sections (nav, header, footer) that appear
   //     structurally identical across ≥2 pages. These will be promoted to
@@ -209,6 +233,7 @@ export function buildImportPlan({ fileMap, currentSite, options }: BuildImportPl
     colors: [...cssPlan.colorsBySlug.values()],
     fontTokens: [...cssPlan.fontTokensByVariable.values()],
     scripts,
+    collections: htmlPhase.collections,
     linkedStylesheets,
     stylesheets,
     conflicts: { ...conflicts, crossSheetClasses },
@@ -221,17 +246,185 @@ export function buildImportPlan({ fileMap, currentSite, options }: BuildImportPl
 }
 
 // ---------------------------------------------------------------------------
+// Phase 1b — collapse duplicate rules contributed by sibling pages
+// ---------------------------------------------------------------------------
+
+/**
+ * Stable signature for a rule's AUTHORED identity — key order in the style bags
+ * depends on parse/merge order, so the keys are sorted rather than relying on
+ * `JSON.stringify` insertion order.
+ */
+function styleRuleIdentity(rule: NewStyleRule): string {
+  const bag = (styles: Record<string, unknown> | undefined): Array<[string, unknown]> =>
+    Object.entries(styles ?? {}).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+  const contexts = Object.entries(rule.contextStyles ?? {})
+    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+    .map(([contextId, styles]) => [contextId, bag(styles as Record<string, unknown>)])
+  return JSON.stringify([rule.kind, rule.name, rule.selector ?? '', bag(rule.styles), contexts])
+}
+
+/**
+ * Collapse byte-identical style rules contributed by different pages.
+ *
+ * The build contract requires every page to inline the whole shared stylesheet,
+ * so an N-page batch hands the importer ~N copies of every shared class. Each
+ * copy used to become its own registry rule, which at 102 pages meant 109k rules
+ * for 9.7k distinct definitions (91% redundant): a ~46 MB site-document save
+ * that stalls the import, and an N-way name collision on every shared class that
+ * destabilises the bare-vs-variant resolution in
+ * `normalizeParsedBindableClassRules`.
+ *
+ * Two rules collapse only when every authored field matches — kind, name,
+ * selector, declarations and per-context declarations. Anything that differs by
+ * so much as one declaration is left alone, so genuinely divergent definitions
+ * still reach `detectCrossSheetClassConflicts` / `detectConflicts` untouched.
+ *
+ * `order` is deliberately excluded from the signature and the FIRST copy's
+ * position is the one kept: identical declarations render identically wherever
+ * they sit, and keeping the earliest copy preserves relative order against every
+ * non-duplicate rule around it.
+ *
+ * `sources` is index-aligned with `rules` (see `buildAssetPlan`) and is filtered
+ * in lockstep; the surviving entry keeps the first contributing page's path.
+ */
+/**
+ * Batch-wide half of `normalizeParsedBindableClassRules`: when one name is
+ * claimed by several `kind: 'class'` rules from DIFFERENT pages, keep the
+ * canonical bare selector as the bindable rule and demote the narrower variants
+ * to ambient.
+ *
+ * Deliberately narrower than the per-sheet normaliser. It only demotes a rule
+ * whose selector is NOT the canonical `.name`, and only when some other rule for
+ * that name IS canonical. Two diverging *bare* definitions (`.btn` in sheet A vs
+ * a different `.btn` in sheet B) are left completely alone — that is a genuine
+ * cross-sheet conflict, owned by `detectCrossSheetClassConflicts`, which needs
+ * both rules to stay class-kind so one can be renamed to `btn-2`.
+ */
+function demoteNonCanonicalClassDuplicates(rules: NewStyleRule[]): void {
+  const canonicalNames = new Set<string>()
+  const classCountByName = new Map<string, number>()
+  for (const rule of rules) {
+    if (rule.kind !== 'class') continue
+    classCountByName.set(rule.name, (classCountByName.get(rule.name) ?? 0) + 1)
+    if (rule.selector === classKindSelector(rule.name)) canonicalNames.add(rule.name)
+  }
+
+  for (let index = 0; index < rules.length; index += 1) {
+    const rule = rules[index]!
+    if (rule.kind !== 'class') continue
+    if ((classCountByName.get(rule.name) ?? 0) < 2) continue
+    if (!canonicalNames.has(rule.name)) continue
+    if (rule.selector === classKindSelector(rule.name)) continue
+    rules[index] = { ...rule, kind: 'ambient', name: rule.selector ?? rule.name }
+  }
+}
+
+function dedupeIdenticalStyleRules(
+  rules: NewStyleRule[],
+  sources: string[],
+): { rules: NewStyleRule[]; sources: string[] } {
+  const seen = new Set<string>()
+  const outRules: NewStyleRule[] = []
+  const outSources: string[] = []
+  for (let index = 0; index < rules.length; index += 1) {
+    const rule = rules[index]!
+    const identity = styleRuleIdentity(rule)
+    if (seen.has(identity)) continue
+    seen.add(identity)
+    outRules.push(rule)
+    outSources.push(sources[index] ?? '')
+  }
+  return { rules: outRules, sources: outSources }
+}
+
+// ---------------------------------------------------------------------------
 // Phase 2 — HTML files → raw PagePlans + inline CSS + page scripts
 // ---------------------------------------------------------------------------
 
 interface HtmlPhaseResult {
   rawPagePlans: PagePlan[]
+  /** Collections implied by the folder layout. Empty for a flat build. */
+  collections: CollectionCommitPlan[]
   /** Per-page CSS harvested from `<style>` blocks, keyed by pagePlan.source. */
   inlineCssByPage: Map<string, string>
   scripts: ImportScript[]
   warnings: ImportWarning[]
   /** Deduplicated external stylesheet hrefs (e.g. Google Fonts CDN links) from all pages' <head>. */
   externalLinkHrefs: string[]
+}
+
+/**
+ * Build the entry-template PagePlan for a collection from one of its entries.
+ *
+ * The template is the entry's own document with the post's region replaced by
+ * an outlet marker, run through the ordinary page pipeline — so it inherits the
+ * delivered header, nav, footer and article styling, and takes part in the CSS,
+ * asset and link phases like any other page. The marked node is then swapped
+ * for `base.outlet`, which is the hole every entry's body renders into.
+ *
+ * Returns null when the marker did not survive the conversion. Returning null
+ * (rather than committing a template with no outlet) is deliberate: a template
+ * without exactly one outlet renders every entry as a blank page, which is
+ * harder to diagnose than a collection that reports it has no template.
+ */
+function makeEntryTemplatePlan(
+  collectionSlug: string,
+  entrySource: string,
+  entryHtml: string,
+  fileMap: FileMap,
+): { pagePlan: PagePlan; inlineCss: string } | null {
+  const templateHtml = makeTemplateSource(entryHtml)
+  if (!templateHtml) return null
+
+  const templatePath = `${collectionSlug}/__entry-template.html`
+  const { pagePlan, inlineCss } = makeHtmlPagePlan(templatePath, templateHtml, fileMap)
+
+  const outletId = findMarkedNodeId(pagePlan.nodeFragment)
+  if (!outletId) return null
+
+  // Swap the marker container for a real outlet. Its children are dropped —
+  // the marker is empty by construction, and an outlet renders the entry body,
+  // not authored children.
+  const node = pagePlan.nodeFragment.nodes[outletId]
+  pagePlan.nodeFragment.nodes[outletId] = {
+    ...node,
+    moduleId: 'base.outlet',
+    props: {},
+    children: [],
+  }
+
+  return {
+    pagePlan: {
+      ...pagePlan,
+      title: `${titleFromSlug(collectionSlug)} entry template`,
+      slug: `${collectionSlug}-entry-template`,
+      template: {
+        enabled: true,
+        target: { kind: 'postTypes', tableSlugs: [collectionSlug] },
+        priority: 0,
+      },
+      source: entrySource === templatePath ? templatePath : templatePath,
+    },
+    inlineCss,
+  }
+}
+
+/** Locate the node `makeTemplateSource` marked, by its preserved attribute. */
+function findMarkedNodeId(fragment: ImportFragment): string | null {
+  for (const id of Object.keys(fragment.nodes)) {
+    const attrs = (fragment.nodes[id].props as { htmlAttributes?: Record<string, unknown> } | undefined)
+      ?.htmlAttributes
+    if (attrs && attrs[OUTLET_MARKER_ATTR] === OUTLET_MARKER_VALUE) return id
+  }
+  return null
+}
+
+function titleFromSlug(slug: string): string {
+  return slug
+    .split('-')
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ')
 }
 
 function collectHtmlPagePlans(classified: ClassifiedFile[], fileMap: FileMap): HtmlPhaseResult {
@@ -249,8 +442,93 @@ function collectHtmlPagePlans(classified: ClassifiedFile[], fileMap: FileMap): H
   }>()
   let nextScriptPriority = 100
 
+  // Read the folder layout BEFORE planning any page. `<folder>/<slug>/index.html`
+  // files become collection entries, not Pages — that routing decision has to
+  // happen here, because once a file has a PagePlan it is a page.
+  const htmlFiles = classified.filter((f) => f.role === 'html')
+  const classification = classifyCollections(htmlFiles.map((f) => f.path))
+  warnings.push(...classification.warnings)
+
+  const entryPaths = new Set<string>()
+  for (const collection of classification.collections) {
+    for (const entry of collection.entries) entryPaths.add(entry.source)
+  }
+
+  const collections: CollectionCommitPlan[] = []
+  const bytesByPath = new Map(htmlFiles.map((f) => [f.path, f.bytes]))
+
+  for (const folder of classification.collections) {
+    const entries: CollectionEntryCommit[] = []
+    for (const entry of folder.entries) {
+      const bytes = bytesByPath.get(entry.source)
+      if (!bytes) continue
+      const content = extractEntryContent(decodeUtf8(bytes))
+      if (!content) {
+        // No identifiable content region — leave it as a Page rather than
+        // inventing a body that would duplicate the site chrome inside the post.
+        warnings.push({
+          kind: 'collection-layout',
+          message:
+            `"${entry.source}" has no <article>, <main> or content container, so it ` +
+            `imports as a Page instead of a "${folder.slug}" entry.`,
+          source: entry.source,
+        })
+        entryPaths.delete(entry.source)
+        continue
+      }
+      entries.push({
+        source: entry.source,
+        slug: entry.slug,
+        title: content.title || titleFromSlug(entry.slug),
+        bodyHtml: content.bodyHtml,
+        featuredImageSrc: content.featuredImageSrc,
+        seoTitle: content.seoTitle,
+        seoDescription: content.seoDescription,
+      })
+    }
+
+    if (entries.length === 0) continue
+
+    // Derive the template from the first entry that yielded content.
+    const templateSourceEntry = entries[0]
+    const templateBytes = bytesByPath.get(templateSourceEntry.source)
+    const template = templateBytes
+      ? makeEntryTemplatePlan(
+          folder.slug,
+          templateSourceEntry.source,
+          decodeUtf8(templateBytes),
+          fileMap,
+        )
+      : null
+
+    if (template) {
+      rawPagePlans.push(template.pagePlan)
+      if (template.inlineCss.trim().length > 0) {
+        inlineCssByPage.set(template.pagePlan.source, template.inlineCss)
+      }
+    } else {
+      warnings.push({
+        kind: 'collection-layout',
+        message:
+          `Could not derive an entry template for "${folder.slug}". The collection and its ` +
+          `${entries.length} entries are still created, but entry URLs return 404 until a ` +
+          `template targeting "${folder.slug}" exists.`,
+        source: templateSourceEntry.source,
+      })
+    }
+
+    collections.push({
+      slug: folder.slug,
+      name: folder.name,
+      templatePageSource: template?.pagePlan.source ?? null,
+      entries,
+    })
+  }
+
   for (const f of classified) {
     if (f.role !== 'html') continue
+    // Entries are content, not pages — their body was lifted above.
+    if (entryPaths.has(f.path)) continue
     const htmlSource = decodeUtf8(f.bytes)
     const { pagePlan, warnings: pageWarnings, inlineCss, externalLinkHrefs: pageExternalHrefs } = makeHtmlPagePlan(f.path, htmlSource, fileMap)
     for (const href of pageExternalHrefs) externalLinkHrefSet.add(href)
@@ -287,7 +565,7 @@ function collectHtmlPagePlans(classified: ClassifiedFile[], fileMap: FileMap): H
     ...script,
     pageSources: [...script.pageSources],
   }))
-  return { rawPagePlans, inlineCssByPage, scripts, warnings, externalLinkHrefs: [...externalLinkHrefSet] }
+  return { rawPagePlans, collections, inlineCssByPage, scripts, warnings, externalLinkHrefs: [...externalLinkHrefSet] }
 }
 
 // ---------------------------------------------------------------------------

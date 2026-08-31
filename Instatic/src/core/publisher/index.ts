@@ -5,8 +5,8 @@
 // import from `@core/publisher`; files inside this module import each other via
 // relative paths and never through this barrel.
 
-export { publishPage } from './render'
-export type { PublishedRuntimePackageImportmap } from './render'
+export { publishPage, documentSeoFromCells } from './render'
+export type { PublishedRuntimePackageImportmap, DocumentSeo } from './render'
 
 export { renderNode, resolveSpecialRenderer, getSpecialRendererModuleIds } from './renderNode'
 

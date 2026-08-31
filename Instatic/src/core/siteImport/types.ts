@@ -87,6 +87,12 @@ type ImportWarningKind =
   | 'asset-upload-failed'
   | 'font-install-failed'
   | 'external-font'
+  /**
+   * A file's position in the folder tree stopped it becoming a collection
+   * entry — nested too deep, or under a reserved folder name. The file still
+   * imports, as a Page; the warning says why it did not become an entry.
+   */
+  | 'collection-layout'
 
 export interface ImportWarning {
   kind: ImportWarningKind
@@ -420,6 +426,79 @@ export interface PagePlan {
    * replacement without needing the original base path.
    */
   nodeFragment: ImportFragment
+  /**
+   * Set when this page is a collection's entry template rather than an
+   * ordinary page. `commitImportPlan` copies it onto the committed row so the
+   * template resolves for its collection.
+   *
+   * A `postTypes` template is matched by target and priority — never by id — so
+   * a collection whose template is missing returns 404 for every entry while
+   * looking perfectly healthy in the admin UI. That failure mode is why the
+   * template is built by the same pass that creates the collection, rather than
+   * left as a step someone has to remember.
+   */
+  template?: PageTemplatePlan
+}
+
+/** Template configuration for a page that renders a collection's entries. */
+export interface PageTemplatePlan {
+  enabled: true
+  target: { kind: 'postTypes'; tableSlugs: string[] }
+  priority: number
+}
+
+/**
+ * A collection implied by the imported folder layout, resolved to everything
+ * needed to create it: the table, its entries, and the template that renders
+ * them.
+ *
+ * Entries carry `bodyHtml` rather than a node tree because a collection entry
+ * is content, not a designed page — its body flows into the template's
+ * `base.outlet` at render time.
+ */
+export interface CollectionCommitPlan {
+  /** Table slug — the folder name (`blog`). */
+  slug: string
+  /** Display name for the created table (`Blog`). */
+  name: string
+  /**
+   * `source` of the PagePlan that carries this collection's entry template.
+   * The template is an ordinary page in `plan.pages`, so it takes part in the
+   * CSS, asset and link-rewriting phases like any other page.
+   */
+  templatePageSource: string | null
+  entries: CollectionEntryCommit[]
+}
+
+/** What `createCollection` actually created, for the import summary. */
+export interface CollectionCommitResult {
+  slug: string
+  name: string
+  tableId: string
+  /** True when an existing table with this slug was reused rather than created. */
+  reusedExistingTable: boolean
+  /** Entries written as drafts. */
+  createdEntries: { rowId: string; slug: string; title: string }[]
+  /**
+   * Entries that could not be written, with the reason. A partial collection is
+   * reported rather than thrown: 16 of 17 posts landing is worth knowing about
+   * precisely, and re-running the import fills the gap.
+   */
+  failedEntries: { slug: string; message: string }[]
+}
+
+export interface CollectionEntryCommit {
+  /** FileMap key the entry was extracted from. Used for link rewriting. */
+  source: string
+  /** Entry slug within the collection (`best-gpus-2026`). */
+  slug: string
+  title: string
+  /** Inner HTML of the post, minus the heading that became `title`. */
+  bodyHtml: string
+  /** FileMap key of the featured image, rewritten to a media URL on commit. */
+  featuredImageSrc: string | null
+  seoTitle: string | null
+  seoDescription: string | null
 }
 
 /** How a slug, rule-name, or token-variable conflict is resolved for a single item. */
@@ -630,6 +709,13 @@ export interface ImportPlan {
    */
   scripts: ImportScript[]
   /**
+   * Collections implied by the folder layout — one per `<folder>/` that holds
+   * `<folder>/<slug>/index.html` entries. Empty for a flat build, which is what
+   * makes the fallback safe: no collection folders means every file imports as
+   * a Page, exactly as it did before this existed.
+   */
+  collections: CollectionCommitPlan[]
+  /**
    * Every top-level stylesheet linked by ≥1 imported page, with the import
    * mode this plan was built with. Drives the wizard's per-sheet mode picker.
    */
@@ -673,6 +759,8 @@ export interface ImportPlan {
  */
 export interface ImportResult {
   pages: { id: string; title: string; slug: string; source: string }[]
+  /** Collections created from the folder layout. Empty for a flat build. */
+  collections: CollectionCommitResult[]
   styleRules: { id: string; selector: string; kind: 'class' | 'ambient' }[]
   /** Fonts imported into the installed font library. */
   fonts: { id: string; family: string }[]

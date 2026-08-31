@@ -111,7 +111,7 @@ export function MmsShellHeader({
   showHubNavWithoutContext = false,
 }: MmsShellHeaderProps) {
   const links = hubContext
-    ? hubNavigationLinks(hubContext.role)
+    ? hubNavigationLinks(hubContext.role, hubContext)
     : showHubNavWithoutContext
       ? hubNavigationLinks('operator')
       : []

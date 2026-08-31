@@ -14,6 +14,12 @@
  *   - `willAdd`      — bundle rows whose id does not exist locally
  *   - `currentLocal` — how many rows the local table currently has
  *
+ * It also reports `unknownFields`: cells the bundle carries for fields the
+ * destination table does not define. The import accepts those cells and stores
+ * them, but nothing ever reads them back, so a bundle can import "cleanly" and
+ * still lose every value it was sent to deliver. Preview is the last point that
+ * mismatch is cheap to fix.
+ *
  * Requires `data.export` capability (paired with the actual export
  * endpoint — preview is the read-only dry-run that precedes import).
  */
@@ -28,6 +34,7 @@ import {
   BundlePreviewSchema,
   type BundlePreview,
   type BundleRowConflict,
+  type BundleUnknownField,
 } from '@core/data/bundleSchema'
 import type { DataRow, DataTable } from '@core/data/schemas'
 import { CMS_API_PREFIX } from './shared'
@@ -53,6 +60,8 @@ export async function handleImportPreviewRoute(
   const localTableIds = new Set(localTables.map((t) => t.id))
 
   const rowConflicts: BundleRowConflict[] = []
+  const unknownFields: BundleUnknownField[] = []
+  const localTablesById = new Map(localTables.map((t) => [t.id, t]))
 
   // For each bundle table, compute the diff against local row ids and active slugs.
   const tableEntries = await Promise.all(
@@ -71,6 +80,12 @@ export async function handleImportPreviewRoute(
       }
       const localRowIds = new Set(localRows.map((r) => r.id))
       rowConflicts.push(...findRowSlugConflicts(table, bundleRowsForTable, localRows))
+      // The destination table's schema wins: a table the bundle also creates
+      // brings its own fields, but importing into an existing table keeps the
+      // local field list, so that is what the cells must match.
+      unknownFields.push(
+        ...findUnknownFields(localTablesById.get(table.id) ?? table, bundleRowsForTable),
+      )
 
       const willReplace = bundleRowIdsForTable.filter((id) => localRowIds.has(id)).length
       const willAdd = bundleRowIdsForTable.filter((id) => !localRowIds.has(id)).length
@@ -95,6 +110,7 @@ export async function handleImportPreviewRoute(
     },
     tables: tableEntries,
     rowConflicts,
+    unknownFields,
     totals: {
       rows: bundle.rows.length,
       mediaFiles: bundle.media?.length ?? 0,
@@ -108,6 +124,35 @@ export async function handleImportPreviewRoute(
   parseValue(BundlePreviewSchema, preview)
 
   return jsonResponse(preview)
+}
+
+/**
+ * Cells in the bundle addressed to fields the destination table does not have.
+ *
+ * The importer writes `cells` verbatim, so these arrive, persist, and are then
+ * invisible to every reader — nothing errors and nothing renders. Counting them
+ * here turns a clean-looking preview into an actionable one: the sender learns
+ * to add the field (or ship the table definition) before committing the import.
+ */
+function findUnknownFields(table: DataTable, bundleRows: DataRow[]): BundleUnknownField[] {
+  const knownFieldIds = new Set(table.fields.map((field) => field.id))
+  const rowCountByFieldId = new Map<string, number>()
+
+  for (const row of bundleRows) {
+    for (const fieldId of Object.keys(row.cells)) {
+      if (knownFieldIds.has(fieldId)) continue
+      rowCountByFieldId.set(fieldId, (rowCountByFieldId.get(fieldId) ?? 0) + 1)
+    }
+  }
+
+  return [...rowCountByFieldId]
+    .map(([fieldId, rowCount]) => ({
+      tableId: table.id,
+      tableName: table.name,
+      fieldId,
+      rowCount,
+    }))
+    .toSorted((a, b) => b.rowCount - a.rowCount || a.fieldId.localeCompare(b.fieldId))
 }
 
 function findRowSlugConflicts(

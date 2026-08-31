@@ -93,6 +93,11 @@ export type {
   // shared components
   GlobalSectionCandidate,
   SharedBlockCandidate,
+  // collections (folder-layout split)
+  PageTemplatePlan,
+  CollectionCommitPlan,
+  CollectionEntryCommit,
+  CollectionCommitResult,
 } from './types'
 
 // ── Error classes (callers need instanceof checks) ────────────────────────────
@@ -104,3 +109,6 @@ export {
   TooManyFilesError,
   PathTraversalError,
 } from './types'
+
+export { classifyCollections } from './collectionPlan'
+export type { CollectionFolderPlan, CollectionEntryPlan } from './collectionPlan'

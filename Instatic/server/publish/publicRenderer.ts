@@ -1,8 +1,9 @@
 import '../../src/modules/base'
 import '@core/loops/sources'
 import { registry } from '@core/module-engine'
-import { publishPage } from '@core/publisher'
+import { publishPage, documentSeoFromCells } from '@core/publisher'
 import { buildRouteFrame } from '@core/templates/contextFrames'
+import { getDataRow } from '../repositories/data/rows'
 import { buildPublishedSiteCssBundle } from './siteCssBundle'
 import { buildPublishedSiteModuleJsMap } from './moduleJsBundle'
 import { resolveTemplateChain, resolveNotFoundTemplate, composeTemplateChain } from '@core/templates'
@@ -11,7 +12,7 @@ import { prefetchLoopData, publishedDataRowToLoopItem } from './loopPrefetch'
 import { prefetchMediaAssets } from './mediaPrefetch'
 import { getPublishVersion } from './publishState'
 import type { Page } from '@core/page-tree'
-import type { SiteCssBundle } from '@core/publisher'
+import type { DocumentSeo, SiteCssBundle } from '@core/publisher'
 import type { PublishedDataRow } from '@core/data/schemas'
 import type { DbClient } from '../db/client'
 import type { PublishedPageSnapshot } from '../repositories/publish'
@@ -90,6 +91,7 @@ async function renderMergedTemplate(
   snapshot: PublishedPageSnapshot,
   templateContext: TemplateRenderDataContext | undefined,
   ctx: RenderPublishedSnapshotContext,
+  seo?: DocumentSeo,
 ): Promise<{ html: string; jsModuleIds: string[]; publishVersion: number; cssBundle: SiteCssBundle }> {
   const publishVersion = ctx.publishVersion ?? getPublishVersion()
   const moduleJsMap = buildPublishedSiteModuleJsMap(snapshot.site, registry)
@@ -110,12 +112,34 @@ async function renderMergedTemplate(
     mediaAssets,
     loopEndpointBaseUrl: LOOP_ENDPOINT_BASE_URL,
     publishVersion,
+    ...(seo ? { seo } : {}),
   })
   // Per-page injection set = candidates from the render (emitted ∪ hole
   // subtrees) ∩ the site module-JS map — over-inclusive candidates from
   // unbaked holes are filtered down to modules that actually ship JS.
   const jsModuleIds = published.jsModuleIds.filter((id) => moduleJsMap.has(id))
   return { html: published.html, jsModuleIds, publishVersion, cssBundle }
+}
+
+/**
+ * Read a `pages` row's SEO cells for the document head.
+ *
+ * A collection entry carries its cells into the render on the entry stack, but
+ * a page does not: `SiteDocument.pages[]` is a page *tree* (id, slug, title,
+ * nodes, template) and never held the row's `seoTitle` / `canonicalUrl` /
+ * `jsonLd`. Those values were authorable and stored but reached no published
+ * `<head>` at all. The row is the only place they exist, so the page path reads
+ * it here and passes the result to `publishPage` as an explicit override.
+ *
+ * Reads the live row rather than a published copy because `pages` has no
+ * published-cell store — the snapshot is the published artefact and carries the
+ * tree only. During a bake that is exactly the row being published; on the live
+ * fallback path an unpublished SEO edit can appear one publish early, which is
+ * the lesser fault against a page emitting no canonical at all.
+ */
+async function readPageSeo(ctx: RenderPublishedSnapshotContext, pageRowId: string): Promise<DocumentSeo | undefined> {
+  const row = await getDataRow(ctx.db, pageRowId)
+  return row ? documentSeoFromCells(row.cells) : undefined
 }
 
 export async function renderPublishedSnapshot(
@@ -138,7 +162,13 @@ export async function renderPublishedSnapshot(
     ? { entryStack: [], route: buildRouteFrame(ctx.url.toString()) }
     : undefined
 
-  const rendered = await renderMergedTemplate(merged, snapshot, templateContext, ctx)
+  const rendered = await renderMergedTemplate(
+    merged,
+    snapshot,
+    templateContext,
+    ctx,
+    await readPageSeo(ctx, snapshot.pageRowId),
+  )
   return { ...rendered, pageId: snapshot.pageRowId, slug: page.slug, siteId: snapshot.site.id }
 }
 
@@ -163,6 +193,9 @@ export async function renderPublishedNotFound(
     ? { entryStack: [], route: buildRouteFrame(ctx.url.toString()) }
     : undefined
 
+  // No page SEO here on purpose: a 404 body is served at whatever URL missed,
+  // so a canonical or og:url resolved from the template row would point a
+  // crawler at the error page as if it were a real document.
   const rendered = await renderMergedTemplate(merged, snapshot, templateContext, ctx)
   return { ...rendered, pageId: page.id, slug: page.slug, siteId: snapshot.site.id }
 }

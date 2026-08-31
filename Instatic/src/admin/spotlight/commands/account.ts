@@ -4,7 +4,8 @@
  * Sign out (destructive), navigate to account settings sections.
  */
 
-import { logoutCms } from '@core/persistence'
+import { signOutEverywhere } from '@core/persistence'
+import { readHubContext } from '@admin/state/hubContext'
 import type { Command } from '../types'
 
 export function getAccountCommands(): Command[] {
@@ -35,8 +36,9 @@ export function getAccountCommands(): Command[] {
       run: async (ctx) => {
         ctx.closeSpotlight()
         try {
-          await logoutCms()
-          window.location.assign('/cms')
+          // Hub-wide, exactly as the account menu's Sign out — a CMS-only
+          // logout is silently undone by the hub's re-SSO.
+          await signOutEverywhere(readHubContext()?.hubBaseUrl ?? null)
         } catch (err) {
           console.error('[spotlight] sign out failed:', err)
         }

@@ -1806,6 +1806,7 @@ export const id: Dict = {
   'avatar.amrConsoleMeta': 'Balance & recharge',
   'avatar.settings': 'Pengaturan',
   'avatar.backToProjects': 'Kembali ke proyek',
+  'avatar.signOut': 'Keluar',
   'avatar.metaActive': 'aktif',
   'avatar.metaOffline': 'offline',
   'avatar.metaSelected': 'dipilih',

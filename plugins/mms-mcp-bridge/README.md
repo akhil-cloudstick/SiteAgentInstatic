@@ -3,7 +3,7 @@
 The headless content backend for the MMS MCP gateway. **This is not an MCP server** — agents
 never connect to it. The Operator control-plane calls it over capability-gated internal routes.
 
-Full design and setup: [`docs/mms-mcp.md`](../../docs/mms-mcp.md).
+Full design and setup: [`docs/connector/mms-mcp.md`](docs/connector/mms-mcp.md).
 
 ## Why it exists
 

@@ -76,8 +76,8 @@ Validated by importing a real Astro replica (**AtlasInfra**, built per `template
 
 **`Afternoon`** — Tenant workflow clarified + `templateRule.md` created
 - Locked the two Tenant site-building paths: **(A)** build from scratch in Instatic; **(B)** import a Site Replica.
-- Path B use case: a client has an old website with no developer — someone (Operator, developer, AI agent — not SiteAgent's concern) rebuilds it following `docs/templateRule.md`, hands the `dist/` folder to the Tenant, and the Tenant imports it into Instatic for full editing.
-- Created **`docs/templateRule.md`**: the build standard for Site Replicas — Astro static output, CSS inlined in HTML (`assetsInlineLimit: 1048576`, `cssCodeSplit: false`), JS libraries from CDN, all images in `public/` as plain `<img>` tags, `data-sa` markers on editable content.
+- Path B use case: a client has an old website with no developer — someone (Operator, developer, AI agent — not SiteAgent's concern) rebuilds it following `Operator/rules/templateRule.md`, hands the `dist/` folder to the Tenant, and the Tenant imports it into Instatic for full editing.
+- Created **`Operator/rules/templateRule.md`**: the build standard for Site Replicas — Astro static output, CSS inlined in HTML (`assetsInlineLimit: 1048576`, `cssCodeSplit: false`), JS libraries from CDN, all images in `public/` as plain `<img>` tags, `data-sa` markers on editable content.
 - Updated `UserFlow.md` (Flow 4 rewritten), `CONTEXT.md` (new terms: templateRule.md, Site Replica, Tenant site paths).
 
 ## 2026-06-30

@@ -62,6 +62,19 @@ export interface HubContext {
   origin: string | null
   /** Absolute URL of the exact Hub view to return to. Always Hub-origin. */
   returnUrl: string
+  /**
+   * Which products the operator has enabled platform-wide.
+   *
+   * The shell needs these to know whether a Product Hub is worth linking to at
+   * all: with only one product enabled the Hub immediately bounces back into
+   * that same product, so `Home` would be a link to where you already are.
+   *
+   * Optional so a hand-off that predates these fields keeps compiling; absent
+   * means "unknown", which is treated as enabled — the routing gate is
+   * server-side, and a hidden link is the worse failure of the two.
+   */
+  designActive?: boolean
+  cmsActive?: boolean
 }
 
 /** Light/dark, as the product persists it. The shell only reads and toggles. */

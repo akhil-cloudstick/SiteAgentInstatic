@@ -1924,6 +1924,7 @@ export const zhTW: Dict = {
   "avatar.amrConsoleMeta": "餘額與儲值",
   "avatar.settings": "設定",
   "avatar.backToProjects": "返回專案列表",
+  "avatar.signOut": "登出",
   "avatar.metaActive": "使用中",
   "avatar.metaOffline": "未執行",
   "avatar.metaSelected": "已選",

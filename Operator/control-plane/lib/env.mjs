@@ -78,6 +78,12 @@ export const config = {
   // The control-plane opens the funnel itself on boot (once listening) and closes
   // it on shutdown, so restart = live. Set GATEWAY_FUNNEL=0 to manage it by hand.
   gatewayFunnelEnabled: process.env.GATEWAY_FUNNEL !== '0',
+  // Connector MCP: shares the ONE public gateway origin on a path, rather than
+  // burning the last spare funnel port. Only 443 / 8443 / 10000 are funnel-able
+  // and 443 + 10000 are already taken, so a second funnel would spend the last
+  // one on a service that does not need its own origin.
+  connectorMcpPort: Number(process.env.CONNECTOR_MCP_PORT || 8787),
+  connectorMcpEnabled: process.env.CONNECTOR_MCP !== '0',
   // The Astro operator console (proxied under /operator). `astro dev`/`preview`.
   operatorConsolePort: Number(process.env.OPERATOR_CONSOLE_PORT || 3000),
   encKey,

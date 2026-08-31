@@ -49,9 +49,15 @@ export interface CmsServerEvents {
   [key: string]: Record<string, unknown>
 }
 
+// `publish.headers` used to be declared here. It was never applied: no
+// `applyFilter('publish.headers', …)` call existed anywhere in the host, so a
+// plugin registering it silently did nothing. It is also not implementable as
+// designed — published sites are uploaded to static hosting, which serves
+// response headers from a `_headers` file in the deployed directory, not from
+// the CMS process. Response headers are the deployer's job; the declaration is
+// gone so nothing gets built against it again.
 export interface CmsServerFilters {
   'publish.html': string
-  'publish.headers': Record<string, string>
   /**
    * Cell-bag run through every registered handler before persistence.
    * Plugins can validate, normalize, or auto-fill — e.g. extract a meta
@@ -77,7 +83,6 @@ export interface CmsServerFilters {
  */
 export interface CmsServerFilterContexts {
   'publish.html': { siteId: string; pageId: string; slug: string }
-  'publish.headers': { siteId: string; pageId: string; slug: string }
   'content.entry.cells': {
     tableSlug: string
     entryId: string

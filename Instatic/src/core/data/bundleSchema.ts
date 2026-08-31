@@ -305,6 +305,25 @@ export const BundleRowConflictSchema = Type.Object({
 export type BundleRowConflict = Static<typeof BundleRowConflictSchema>
 
 /**
+ * A cell the bundle carries for a field the destination table does not define.
+ *
+ * The import stores cells verbatim, so an unknown key is accepted, written and
+ * then never rendered — the same stored-but-invisible failure that hid per-row
+ * SEO. Preview is the only moment the sender can still catch it, so it reports
+ * the mismatch instead of returning a clean diff over data that will not work.
+ */
+export const BundleUnknownFieldSchema = Type.Object({
+  tableId: Type.String(),
+  tableName: Type.String(),
+  /** Field id present on bundle rows but absent from the destination table. */
+  fieldId: Type.String(),
+  /** How many rows in the bundle carry a cell for it. */
+  rowCount: Type.Number(),
+})
+
+export type BundleUnknownField = Static<typeof BundleUnknownFieldSchema>
+
+/**
  * Read-only diff returned by `POST /cms/api/cms/import/preview`.
  * Shows the operator what would happen before they commit an import.
  */
@@ -316,6 +335,11 @@ export const BundlePreviewSchema = Type.Object({
   }),
   tables: Type.Array(BundlePreviewTableEntrySchema),
   rowConflicts: Type.Optional(Type.Array(BundleRowConflictSchema)),
+  /**
+   * Cells addressed to fields the destination table does not define. Empty on a
+   * clean bundle; non-empty means those values would import and stay invisible.
+   */
+  unknownFields: Type.Optional(Type.Array(BundleUnknownFieldSchema)),
   totals: Type.Object({
     rows: Type.Number(),
     mediaFiles: Type.Number(),

@@ -65,6 +65,10 @@ function parseHubContext(raw: unknown): HubContext | null {
     site: asScope(value.site),
     origin: asScope(value.origin),
     returnUrl,
+    // Absent stays absent: the shell reads a missing flag as "unknown, assume
+    // enabled", so coercing it to a boolean here would erase that distinction.
+    ...(typeof value.designActive === 'boolean' ? { designActive: value.designActive } : {}),
+    ...(typeof value.cmsActive === 'boolean' ? { cmsActive: value.cmsActive } : {}),
   };
 }
 

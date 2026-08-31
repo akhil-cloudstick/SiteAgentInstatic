@@ -20,7 +20,7 @@
 
 import type { PageNode } from '@core/page-tree'
 import type { ImportFragment } from '@core/htmlImport'
-import type { ImportPlan, ImportStylesheet, NewStyleRule, ImportFontFamily } from './types'
+import type { CollectionCommitPlan, ImportPlan, ImportStylesheet, NewStyleRule, ImportFontFamily } from './types'
 
 // ---------------------------------------------------------------------------
 // Props that may carry normalised FileMap keys in page nodes
@@ -52,6 +52,7 @@ export function applyAssetRewrites(
       nodeFragment: rewriteFragment(p.nodeFragment, rewriteMap),
     })),
     styleRules: plan.styleRules.map((r) => rewriteRule(r, rewriteMap)),
+    collections: (plan.collections ?? []).map((c) => rewriteCollection(c, rewriteMap)),
     fonts: (plan.fonts ?? []).map((f) => rewriteFontFamily(f, rewriteMap)),
     stylesheets: (plan.stylesheets ?? []).map((s) => rewriteStylesheet(s, rewriteMap)),
     globalSections: plan.globalSections?.map((s) => ({
@@ -261,4 +262,40 @@ function rewriteUrlsInCssValue(
 function isStringRecord(value: unknown): value is Record<string, string> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false
   return Object.values(value).every((entry) => typeof entry === 'string')
+}
+
+/**
+ * Rewrite FileMap paths to media URLs inside a collection's entries.
+ *
+ * An entry's body is HTML, not a node tree, so its `<img src>` values are not
+ * reached by `rewriteFragment`. Without this pass every image in every post
+ * points at a bundle-relative path that does not exist on the served site — the
+ * posts import, and every picture in them is broken.
+ *
+ * Longest-path-first so a shorter path that is a prefix of a longer one cannot
+ * corrupt it (`img/a.png` inside `img/a.png.webp`).
+ */
+function rewriteCollection(
+  collection: CollectionCommitPlan,
+  rewriteMap: Record<string, string>,
+): CollectionCommitPlan {
+  const paths = Object.keys(rewriteMap).sort((a, b) => b.length - a.length)
+  if (paths.length === 0) return collection
+
+  const rewriteHtml = (html: string): string => {
+    let out = html
+    for (const path of paths) out = out.split(path).join(rewriteMap[path]!)
+    return out
+  }
+
+  return {
+    ...collection,
+    entries: collection.entries.map((entry) => ({
+      ...entry,
+      bodyHtml: rewriteHtml(entry.bodyHtml),
+      featuredImageSrc: entry.featuredImageSrc
+        ? (rewriteMap[entry.featuredImageSrc] ?? rewriteHtml(entry.featuredImageSrc))
+        : null,
+    })),
+  }
 }

@@ -24,6 +24,7 @@
 import http from 'node:http';
 import config from '../lib/env.mjs';
 import { getTenant } from '../registry/tenants.mjs';
+import { readActiveProducts } from '../registry/settings.mjs';
 import { verifyValue } from '../lib/crypto.mjs';
 import * as odRuntime from '../runtime/odRuntime.mjs';
 import * as tenantRuntime from '../runtime/tenantRuntime.mjs';
@@ -34,6 +35,12 @@ const HUB_COOKIE = 'sa_hub';
 // Fixed, tenant-agnostic mount point for the ONE shared OpenDesign web build.
 // It must match the Next basePath in odRuntime.buildWeb()/startSharedWeb().
 const OD_PREFIX = '/design';
+// Connector MCP mount. Same origin, same port as everything else — only the
+// path differs. Tailscale Funnel allows just 443 / 8443 / 10000, and 443 (this
+// gateway) plus 10000 (tenant test funnel) are already spoken for, so giving the
+// connector its own funnel would spend the last spare port on a service that
+// does not need its own origin.
+const CONNECTOR_PREFIX = '/connector-mcp';
 
 // Resolve the tenant slug from the signed hub session cookie (same cookie
 // hub.mjs issues on login). Returns null when there is no valid session.
@@ -88,10 +95,17 @@ function userFromTenant(tenant) {
   return { name, initials: initials || name.slice(0, 2).toUpperCase() };
 }
 
-function hubContextFor(tenant) {
+async function hubContextFor(tenant) {
   const client = titleFromSlug(tenant?.slug) || null;
+  const products = await readActiveProducts();
   return {
-    hubBaseUrl: `${config.gatewayOrigin}/hub`,
+    // The ORIGIN, not the origin + '/hub'. The shared header appends hub-relative
+    // paths to this (hubLinkHref), so including '/hub' here produced '/hub/hub'.
+    // Instatic's own producer (server/auth/hubContext.ts) has always sent the
+    // bare origin; this is the side that disagreed.
+    hubBaseUrl: config.gatewayOrigin,
+    designActive: products.design,
+    cmsActive: products.cms,
     role: 'operator',
     user: userFromTenant(tenant),
     client,
@@ -295,6 +309,23 @@ function forward(req, res, target) {
 // Pick the backend port for a request, or null if the control-plane should
 // handle it (login/hub/operator/api) or 404 it. Shared by HTTP + upgrade paths.
 async function resolveBackend(req, path) {
+  // Connector MCP. Checked before everything else because it is a fixed,
+  // tenant-agnostic mount: it carries no hub cookie and must never fall through
+  // to the Instatic catch-all. The connector authenticates callers itself with a
+  // bearer token, so the gateway does not gate it — it only routes.
+  if (config.connectorMcpEnabled && (path === CONNECTOR_PREFIX || path.startsWith(CONNECTOR_PREFIX + '/'))) {
+    const rest = (req.url || path).slice(CONNECTOR_PREFIX.length) || '/';
+    return {
+      port: config.connectorMcpPort,
+      kind: 'connector-mcp',
+      prefix: CONNECTOR_PREFIX,
+      // `/connector-mcp` is the JSON-RPC endpoint; `/connector-mcp/health` is
+      // the probe. Anything else keeps its sub-path. The `?` case matters: a
+      // query on the bare mount slices to `?x=1`, which is not a path and makes
+      // the upstream request fail in a way that reads like the backend is down.
+      rewritePath: rest === '/' ? '/mcp' : rest.startsWith('?') ? '/mcp' + rest : rest,
+    };
+  }
   // Operator console (Astro, served with base=/operator). No auth — open access.
   if (path === '/operator' || path.startsWith('/operator/')) {
     return { port: config.operatorConsolePort, kind: 'operator' };
@@ -311,6 +342,11 @@ async function resolveBackend(req, path) {
   // isolation boundary — a request can only ever reach the daemon of the tenant
   // whose session cookie it carries.
   if (path === OD_PREFIX || path.startsWith(`${OD_PREFIX}/`)) {
+    // The hub decides where a tenant LANDS; this is what makes the decision
+    // stick. Without it, typing /design straight into the address bar reaches
+    // the product the operator turned off. Returning null 404s it, exactly as
+    // an unprovisioned tenant already does.
+    if (!(await readActiveProducts()).design) return null;
     const restPath = path.slice(OD_PREFIX.length) || '/';
     if (isDaemonPath(restPath)) {
       const slug = sessionSlug(req);
@@ -351,7 +387,7 @@ async function resolveBackend(req, path) {
       const tenant = slug ? await getTenant(slug) : null;
       // No session, or a session whose tenant is gone: inject nothing. The app
       // then renders its no-Hub shape rather than a stale or borrowed scope.
-      if (tenant) target.injectHead = hubContextScript(hubContextFor(tenant));
+      if (tenant) target.injectHead = hubContextScript(await hubContextFor(tenant));
     }
     return target;
   }
@@ -361,6 +397,7 @@ async function resolveBackend(req, path) {
   // (Sec-Fetch-Dest: document) — clicking from OD back to /hub or /login must
   // still reach the control-plane, not get pushed to OD.
   if (isFromOdPage(req) && req.headers['sec-fetch-dest'] !== 'document') {
+    if (!(await readActiveProducts()).design) return null;
     if (isDaemonPath(path)) {
       const slug = sessionSlug(req);
       if (slug) {
@@ -383,6 +420,10 @@ async function resolveBackend(req, path) {
       };
     }
   }
+  // The catch-all reaches Instatic, so this is the CMS's equivalent of the
+  // /design gate above — it also covers a bare `/`, which lands here rather
+  // than at /hub for a signed-in tenant.
+  if (!(await readActiveProducts()).cms) return null;
   const slug = sessionSlug(req);
   if (slug) {
     const t = await getTenant(slug);

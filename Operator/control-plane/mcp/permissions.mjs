@@ -8,7 +8,7 @@
 //              narrowing.
 //
 // This gate is the ONLY ceiling on an agent. The gateway signs into a tenant as
-// the owner over hub SSO, so the CMS itself imposes none — see docs/mms-mcp.md.
+// the owner over hub SSO, so the CMS itself imposes none — see docs/connector/mms-mcp.md.
 // It therefore runs twice: filtering `tools/list`, and again inside
 // `tools/call` so a client that hard-codes a tool name it never saw listed is
 // still refused.

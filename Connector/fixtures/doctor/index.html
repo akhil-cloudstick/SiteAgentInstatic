@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Connector doctor fixture</title>
+  <link rel="stylesheet" href="./styles.css">
+  <style>
+    .doctor-inline { text-transform: uppercase; }
+  </style>
+</head>
+<body>
+  <div class="doctor-page">
+    <h1 class="doctor-heading">Doctor fixture</h1>
+
+    <p class="doctor-inline">Plain text with <strong>nested</strong> and <em>inline</em> markup.</p>
+
+    <section class="doctor-card">
+      <ul>
+        <li>First item</li>
+        <li>Second item with a <a href="/somewhere">link</a></li>
+      </ul>
+    </section>
+
+    <img src="./doctor.png" alt="A fixture image">
+
+    <instatic-outlet data-tag="main"></instatic-outlet>
+
+    <instatic-loop
+      data-source-id="data.rows"
+      data-table-id="posts"
+      data-order-by="publishedAt"
+      data-direction="desc"
+      data-limit="10"
+      data-tag="div">
+      <article class="doctor-card">
+        <h2>Looped entry</h2>
+      </article>
+    </instatic-loop>
+  </div>
+</body>
+</html>

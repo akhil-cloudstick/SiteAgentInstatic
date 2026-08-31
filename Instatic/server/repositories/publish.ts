@@ -101,7 +101,7 @@ export interface PersistSitePublishInput {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function canonicalJson(value: unknown): string {
+export function canonicalJson(value: unknown): string {
   if (Array.isArray(value)) {
     return `[${value.map(canonicalJson).join(',')}]`
   }
@@ -120,8 +120,41 @@ function canonicalJson(value: unknown): string {
  * it — equality is observationally identical to comparing the canonical JSON
  * strings, without fetching or parsing any stored snapshot.
  */
-function siteContentHash(site: SiteDocument): string {
+export function siteContentHash(site: SiteDocument): string {
   return createHash('sha256').update(canonicalJson(site)).digest('hex')
+}
+
+/**
+ * Canonical content hash of a data row, used as the publish precondition.
+ *
+ * The input is deliberately narrow: only the fields that can change the
+ * released route or the public output of the row. Everything the publish itself
+ * produces is excluded — `status`, `seq`, publisher identity, every timestamp,
+ * and `activeVersionId` — because including them would make the hash change as
+ * a result of publishing, which defeats the point of comparing before it.
+ *
+ * `authorUserId` IS included: it can appear in rendered output through author
+ * bindings, so a silent reassignment between approval and release is a real
+ * content change.
+ */
+export function dataRowContentHash(row: {
+  id: string
+  tableId: string
+  slug: string
+  cells: unknown
+  authorUserId?: string | null
+}): string {
+  return createHash('sha256')
+    .update(
+      canonicalJson({
+        rowId: row.id,
+        tableId: row.tableId,
+        slug: row.slug,
+        cells: row.cells,
+        authorUserId: row.authorUserId ?? null,
+      }),
+    )
+    .digest('hex')
 }
 
 /**

@@ -32,7 +32,7 @@ import {
 import { addImportedColorTokens, overwriteImportedColorTokens } from './importedColorTokens'
 import { addImportedFonts, addImportedFontTokens, addInstalledFontEntries, overwriteImportedFontTokens } from './importedFonts'
 import type { SiteMutationResult, SiteSliceHelpers, SiteSliceRecipe } from './types'
-import type { SiteImportTransaction } from '@core/siteImport'
+import type { PageTemplatePlan, SiteImportTransaction } from '@core/siteImport'
 
 /**
  * Compute a node's depth in a tree by walking the O(1) `parentId` pointer up
@@ -355,7 +355,7 @@ export function buildSiteHelpers(
       const allocateStyleRuleOrder = createStyleRuleOrderAllocator(site.styleRules)
 
       const helpers: SiteImportTransaction = {
-        addPage({ id: pageId, title, slug, nodeFragment }: { id?: string; title: string; slug: string; nodeFragment: ImportFragment }): string {
+        addPage({ id: pageId, title, slug, nodeFragment, template }: { id?: string; title: string; slug: string; nodeFragment: ImportFragment; template?: PageTemplatePlan }): string {
           // addPage creates a fresh base.body root, normalises the slug, and
           // pushes the page onto site.pages. We then graft the fragment nodes
           // in as children of that root — same logical step as insertImportedNodes.
@@ -363,6 +363,10 @@ export function buildSiteHelpers(
           // Honour a caller-supplied id so the importer can pre-mint page ids
           // and rewrite internal links to `cms:page:<id>` before committing.
           if (pageId) page.id = pageId
+          // A collection's entry template. Templates resolve by target + priority,
+          // never by id, so this is what makes the collection's entries render
+          // at all — without it every entry URL 404s.
+          if (template) page.template = template
           applyImportedBodyAttributes(
             page.nodes[page.rootNodeId]!,
             nodeFragment,

@@ -1,0 +1,105 @@
+{
+  "approval": {
+    "schemaVersion": 1,
+    "approvalId": "ap-sample-0001",
+    "status": "approved",
+    "context": {
+      "organizationId": "org-sample",
+      "clientId": "client-sample",
+      "projectId": "proj-sample",
+      "tenantId": "tenant-sample",
+      "domain": "example.com"
+    },
+    "source": {
+      "snapshotId": "snap-sample-0001",
+      "snapshotSha256": "16a0eeb0791b6c92451fd284dd9f599e0a7dbe7f6ebea6e2d2d06c7f74aec112",
+      "sourceManifestId": "srcman-0001",
+      "sourceManifestVersion": 1,
+      "sourceManifestSha256": "b3ee679b29126b80b3ac36f493939b17da6f2d006382ad52343cbd9d1392b404"
+    },
+    "cms": {
+      "logicalContractSha256": "43556b1bb52d36e0cf9db749e9eeeb329ff3fcfd9470b44da72a33dc11950951",
+      "bindingManifestId": "bm-sample-0001",
+      "bindingManifestVersion": 1,
+      "bindingManifestSha256": "53d1d8e9c9a41f51ac72830237fdff0e2406aba3b8c716c78e2b965f7b402b0c",
+      "documentSha256": "43cc23fa52b87b4cc1d02b5b114154151d6adddb17c9fddc06b027fa99e24008",
+      "rowsDigestSha256": "1c6a4042764b8556f97c365efa0041ad2b25795bb4b74727576af76f5ad14382",
+      "mediaDigestSha256": "b8b10413d7decd0945ef09b52926aee9b30bcdc13a753e0ef8af034476469302"
+    },
+    "release": {
+      "releaseManifestSha256": "66b8ea182c8147fb7f78ec4f67b01266912d940863696d67f3816ec9fce2f2a0",
+      "connectorLockSha256": "9108668679c0f3c5ba7afcdb57b634251f6580762c236c14ba0e7f5c7ef732bb",
+      "releaseRecipeSha256": "7fdd348e69990c0ce84fba0b314212a2438c036cbbc79643b530da6f82d0cdce",
+      "targetBaselineSha256": "61bbfb2c2ffd5f43a33087d0b7cdba9526d8e70a23b939ef80e4c6b4463cfa20"
+    },
+    "attestations": [
+      {
+        "role": "operator",
+        "accountId": "operator@example.com",
+        "signedAt": "2026-08-27T09:00:00Z"
+      },
+      {
+        "role": "client",
+        "accountId": "client@example.com",
+        "signedAt": "2026-08-27T09:05:00Z"
+      }
+    ]
+  },
+  "observed": {
+    "snapshotSha256": "16a0eeb0791b6c92451fd284dd9f599e0a7dbe7f6ebea6e2d2d06c7f74aec112",
+    "documentSha256": "43cc23fa52b87b4cc1d02b5b114154151d6adddb17c9fddc06b027fa99e24008",
+    "rowsDigestSha256": "1c6a4042764b8556f97c365efa0041ad2b25795bb4b74727576af76f5ad14382",
+    "mediaDigestSha256": "b8b10413d7decd0945ef09b52926aee9b30bcdc13a753e0ef8af034476469302",
+    "logicalContractSha256": "43556b1bb52d36e0cf9db749e9eeeb329ff3fcfd9470b44da72a33dc11950951",
+    "releaseRecipeSha256": "7fdd348e69990c0ce84fba0b314212a2438c036cbbc79643b530da6f82d0cdce",
+    "connectorLockSha256": "9108668679c0f3c5ba7afcdb57b634251f6580762c236c14ba0e7f5c7ef732bb",
+    "targetBaselineSha256": "61bbfb2c2ffd5f43a33087d0b7cdba9526d8e70a23b939ef80e4c6b4463cfa20",
+    "bindingManifestId": "bm-sample-0001",
+    "bindingManifestVersion": 1,
+    "bindingManifestSha256": "53d1d8e9c9a41f51ac72830237fdff0e2406aba3b8c716c78e2b965f7b402b0c",
+    "projectId": "proj-sample",
+    "tenantId": "tenant-sample",
+    "domain": "example.com"
+  },
+  "releaseManifest": {
+    "schemaVersion": 1,
+    "rows": [
+      {
+        "rowId": "post-0001",
+        "expectedRowHash": "44894358378e7b714939a31071109e6795480309a5ddfe81e522e86fd0318a44"
+      },
+      {
+        "rowId": "post-0002",
+        "expectedRowHash": "88d27232a0520db2034879670570e34660e43aa9b3b3fee35c61f885867c17e0"
+      }
+    ],
+    "media": [
+      {
+        "mediaId": "media-0001",
+        "byteSha256": "0f4636c78f65d3639ece5a064b5ae753e3408614a14fb18ab4d7540d2c248543"
+      }
+    ]
+  },
+  "_rows": [
+    {
+      "id": "post-0001",
+      "tableId": "posts",
+      "slug": "welcome",
+      "cells": {
+        "title": "Welcome",
+        "body": "# Welcome\n\nFirst post."
+      },
+      "authorUserId": null
+    },
+    {
+      "id": "post-0002",
+      "tableId": "posts",
+      "slug": "second-post",
+      "cells": {
+        "title": "Second post",
+        "body": "# Second\n\nMore text."
+      },
+      "authorUserId": null
+    }
+  ]
+}

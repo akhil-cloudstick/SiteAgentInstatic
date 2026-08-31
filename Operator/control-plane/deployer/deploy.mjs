@@ -1,7 +1,7 @@
 // Publish Deployer — ships a tenant's baked static site to Cloudflare Pages via wrangler.
 // Instatic bakes fully-static pages to <uploads>/published/current/ at publish time.
 import { spawn } from 'node:child_process';
-import { existsSync, mkdirSync, writeFileSync, realpathSync, statSync } from 'node:fs';
+import { existsSync, mkdirSync, writeFileSync, realpathSync, statSync, rmSync } from 'node:fs';
 import { resolve } from 'node:path';
 import * as tenants from '../registry/tenants.mjs';
 import { getSecrets } from '../registry/settings.mjs';
@@ -179,10 +179,18 @@ export async function initTenantSite(slug) {
   // Ensure the Pages project exists (idempotent — ignore "already exists").
   await runWrangler(['pages', 'project', 'create', project, '--production-branch=main'], env);
 
-  // Write + Direct-Upload the placeholder page.
+  // Write + Direct-Upload the placeholder page. A placeholder is never content
+  // worth indexing, so it ships with the same root files as a real deploy —
+  // otherwise the very first thing a crawler sees on a brand-new tenant URL is
+  // an unguarded page.
   const dir = resolve(rt.tenantPaths(slug).dir, 'placeholder');
   mkdirSync(dir, { recursive: true });
   writeFileSync(resolve(dir, 'index.html'), placeholderHtml(slug));
+  try {
+    writeRootFiles(dir, { ...row, search_indexing: false });
+  } catch (e) {
+    console.error(`[deploy] root files for ${slug} placeholder could not be written:`, e.message);
+  }
 
   const { code, out } = await runWrangler(
     ['pages', 'deploy', dir, `--project-name=${project}`, '--branch=main', '--commit-dirty=true'], env);
@@ -216,6 +224,55 @@ function deploySucceeded(code, out) {
   return code === 0 || /Deployment complete|Success! Uploaded/i.test(out || '');
 }
 
+// Write the root files Cloudflare serves but the CMS cannot produce.
+//
+// Instatic bakes page HTML and nothing else: there is no robots.txt handling
+// anywhere in it, which is why /robots.txt on a deployed tenant used to return
+// the homepage HTML, and no way for it to set response headers on a static
+// Pages deploy (the `publish.headers` plugin filter is declared but never
+// invoked, and a header set inside the CMS would not survive Direct Upload
+// regardless). Cloudflare Pages does read `_headers` from the uploaded
+// directory, so the control plane is the only place these can come from.
+//
+// Written on EVERY deploy rather than once: the deploy dir is a publish slot
+// that Instatic wipes and rebuilds, so anything we leave there is temporary by
+// design. Rewriting each time is idempotent and self-healing.
+//
+// `search_indexing` is false unless somebody deliberately set it, so the
+// crawler-blocking pair is what a site gets by default.
+function writeRootFiles(dir, row) {
+  const indexable = row.search_indexing === true;
+  const site = row.custom_domain || row.pages_url || '';
+
+  // robots.txt — always written. When indexing is off this is the primary
+  // control, because `_headers` only applies on Cloudflare while robots.txt
+  // travels with the directory to any static host.
+  const robots = indexable
+    ? `User-agent: *\nAllow: /\n${site ? `\nSitemap: ${site.replace(/\/$/, '')}/sitemap.xml\n` : ''}`
+    : 'User-agent: *\nDisallow: /\n';
+  writeFileSync(resolve(dir, 'robots.txt'), robots, 'utf8');
+
+  // _headers — Cloudflare Pages applies these to every response. X-Robots-Tag
+  // is the half a crawler honours even when it never fetches robots.txt, and it
+  // covers non-HTML assets that carry no meta tag at all. Only written when
+  // indexing is off; an indexable site gets no header block from us.
+  const headersPath = resolve(dir, '_headers');
+  if (!indexable) {
+    writeFileSync(headersPath, '/*\n  X-Robots-Tag: noindex, nofollow\n', 'utf8');
+  } else if (existsSync(headersPath)) {
+    // Flag flipped on since the last deploy — the stale noindex header would
+    // otherwise keep the site out of the index it was just opened to.
+    rmSync(headersPath, { force: true });
+  }
+
+  // llms.txt — the emerging convention for stating how AI crawlers may use a
+  // site. Same posture as robots.txt: closed unless deliberately opened.
+  const llms = indexable
+    ? `# ${row.display_name || row.slug}\n\n${site ? `${site}\n\n` : ''}This site's published content may be used for indexing and retrieval.\n`
+    : `# ${row.display_name || row.slug}\n\nThis deployment is not public content. Do not index, crawl, or train on it.\n`;
+  writeFileSync(resolve(dir, 'llms.txt'), llms, 'utf8');
+}
+
 export async function deployTenant(slug) {
   const row = await tenants.getTenant(slug);
   if (!row) throw new Error(`Unknown tenant: ${slug}`);
@@ -240,6 +297,16 @@ export async function deployTenant(slug) {
 
   // Ensure the Pages project exists (idempotent — ignore "already exists").
   await runWrangler(['pages', 'project', 'create', project, '--production-branch=main'], env);
+
+  // robots.txt / _headers / llms.txt — the CMS cannot emit these, so they are
+  // written into the upload directory here. Never fatal: a deploy that ships
+  // without them is worse than one that ships with them, but far better than
+  // no deploy at all.
+  try {
+    writeRootFiles(dir, row);
+  } catch (e) {
+    console.error(`[deploy] root files for ${slug} could not be written:`, e.message);
+  }
 
   // Direct Upload the baked folder (resolved past the current -> slot symlink).
   const { code, out } = await runWrangler(

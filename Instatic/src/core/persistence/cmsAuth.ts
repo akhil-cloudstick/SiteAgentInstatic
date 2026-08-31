@@ -567,3 +567,70 @@ export async function logoutAllOtherCmsSessions(
   })
   return body.revokedCount
 }
+
+/**
+ * Every browser-side key either product writes. Swept by PREFIX, not by an
+ * explicit list, so a key added later is covered without anyone remembering to
+ * update this. `Instatic/docs/reference/persistence-keys.md` catalogues them.
+ */
+const TENANT_SCOPED_STORAGE_PREFIXES = [
+  'instatic-',
+  'spotlight:',
+  'open-design:',
+  'od:',
+  'od.',
+]
+
+/**
+ * Forget everything the signed-in tenant left in this browser.
+ *
+ * Every tenant is served from the SAME origin — the hub cookie swaps the backend,
+ * not the browser's storage — and not one of these keys is namespaced by tenant.
+ * So without this, tenant B inherits tenant A's editor layout, recent commands
+ * and (the one that actually moves content) `instatic-clipboard-v1`, which holds
+ * real page-tree nodes and style rules: copy a section as A, sign in as B, paste,
+ * and A's content is now in B's site.
+ *
+ * Best-effort by design: storage can throw (Safari private mode, a disabled
+ * store), and a failure here must never block the sign-out that follows it.
+ */
+export function clearTenantScopedStorage(): void {
+  for (const store of [globalThis.localStorage, globalThis.sessionStorage]) {
+    try {
+      if (!store) continue
+      const doomed = Object.keys(store).filter((key) =>
+        TENANT_SCOPED_STORAGE_PREFIXES.some((prefix) => key.startsWith(prefix)),
+      )
+      // Collected first: removing while iterating the live key list skips entries.
+      for (const key of doomed) store.removeItem(key)
+    } catch {
+      // Ignore — see the note above.
+    }
+  }
+}
+
+/**
+ * Sign out of EVERYTHING, not just the CMS.
+ *
+ * `logoutCms()` alone is a no-op in a hub deployment: it revokes the CMS session
+ * row and clears `instatic_admin_session`, but the hub's own `sa_hub` cookie
+ * survives — and `sa_hub` is what routes the request. The next page load is
+ * bounced to /sso/cms, the hub still recognises the cookie, mints a fresh SSO
+ * token, and the user is signed straight back in as the same tenant. So the
+ * final navigation has to land on the hub's /logout, which expires all three
+ * cookies (`sa_hub`, `instatic_admin_session`, `od_session`).
+ *
+ * `hubBaseUrl` is null for a standalone install, which has no hub in front of it
+ * — there the CMS logout IS the whole sign-out and '/cms' is the right landing.
+ */
+export async function signOutEverywhere(
+  hubBaseUrl: string | null,
+  fetchImpl: FetchLike = globalThis.fetch.bind(globalThis),
+  basePath = '/cms/api/cms',
+): Promise<void> {
+  await logoutCms(fetchImpl, basePath)
+  clearTenantScopedStorage()
+  // Hard navigation, never a soft one: the point is to discard the whole React
+  // tree along with any session state still held in module memory.
+  globalThis.location.assign(hubBaseUrl ? `${hubBaseUrl}/logout` : '/cms')
+}

@@ -12,14 +12,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Vendored fork upgraded **v0.14.0 → v0.16.1**, adopting 5 upstream releases:
 0.14.1, 0.15.0, 0.15.1, 0.16.0 and 0.16.1. The MMS/SiteAgent layer (Share-to-CMS,
 tenant SSO, gateway base-path, capture proxy, annotate/edit-mode, MMS theme and
-branding) was re-applied on top — see `docs/opendesign-0.16.1-upgrade-report.md`
+branding) was re-applied on top — see `docs/upgrades/opendesign-0.16.1-upgrade-report.md`
 in the SiteAgentHub monorepo.
 
 > **Note on version numbers:** upstream's own `package.json` lags its release
 > tags (it reads `0.15.1` at tag `v0.16.1`, and `0.12.1` at `v0.13.0`). The field
 > above is set to the **tag** version deliberately. Do not "correct" it back, and
 > never use it to identify the vendored baseline — see
-> `docs/opendesign-upgrade-runbook.md` §1.
+> `docs/upgrades/opendesign-upgrade-runbook.md` §1.
 
 _(Entries below this point are upstream's own changelog, which stops at 0.9.0.)_
 - [Fixed] Long speaker notes are now scrollable inside the presenter view instead of being clipped when notes push the layout past the viewport. (#6271)

@@ -9,6 +9,7 @@ import { resolve } from 'node:path';
 import config from '../lib/env.mjs';
 import { getTenant } from '../registry/tenants.mjs';
 import { validateLogin, acceptInvite, findByInviteToken } from '../registry/tenantUsers.mjs';
+import { readActiveProducts } from '../registry/settings.mjs';
 import { signValue, verifyValue } from '../lib/crypto.mjs';
 
 const SESSION_COOKIE = 'sa_hub';
@@ -123,18 +124,27 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => (
 // today (slug, ports, tier — no client or project record), so we send the scope
 // we actually hold. The CMS treats every absent field as absent rather than
 // substituting a default, so partial scope degrades cleanly.
-function hubContextParams(tenant, origin) {
+// `products` also rides along so the shared header knows whether a Product Hub
+// even exists to link back to. Stamping it on the hand-off (rather than polling
+// for it) is what keeps the header honest: the flags are written by the very
+// redirect that applied them, so the nav can never disagree with the routing
+// decision that produced this session.
+function hubContextParams(tenant, origin, products) {
   const params = new URLSearchParams();
   params.set('hubRole', 'operator');
   params.set('hubSite', tenant.slug);
   params.set('hubOrigin', origin);
   params.set('hubReturnUrl', `${config.gatewayOrigin}/hub`);
+  if (products) {
+    params.set('hubDesignActive', products.design ? '1' : '0');
+    params.set('hubCmsActive', products.cms ? '1' : '0');
+  }
   return params.toString();
 }
 
 // Short-lived signed SSO hand-off URL for a tool. The tool validates the token
 // (server-side) and mints its own session — see Phase 3 (OD) / Phase 4 (Instatic).
-export function ssoUrl(tenant, target) {
+export function ssoUrl(tenant, target, products) {
   const token = signValue({ sub: tenant.slug, target, kind: 'sso' }, SSO_TTL_SEC);
   // All hand-offs go through the public gateway origin (funnel :443), not the
   // tenant's localhost port, so the URLs work for a remote client.
@@ -142,12 +152,12 @@ export function ssoUrl(tenant, target) {
     // Root path -> the gateway's session-routed catch-all forwards it to THIS
     // tenant's Instatic (the request carries the sa_hub cookie set at login).
     return `${config.gatewayOrigin}/cms/api/cms/sso?token=${encodeURIComponent(token)}`
-      + `&${hubContextParams(tenant, 'hub')}`;
+      + `&${hubContextParams(tenant, 'hub', products)}`;
   }
   // OpenDesign: the tenant-agnostic /od mount. The gateway splits /od/sso off to
   // THIS tenant's daemon using the sa_hub cookie set at login — exactly like the
   // Instatic hand-off above. No slug in the URL: one shared Next build serves
-  // every tenant (see docs/opendesign-shared-web-build.md).
+  // every tenant (see docs/opendesign/opendesign-shared-web-build.md).
   return `${config.gatewayOrigin}/design/sso?token=${encodeURIComponent(token)}`;
 }
 
@@ -217,8 +227,34 @@ function invitePage(token, err) {
     </form>`);
 }
 
-function hubPage(tenant) {
+// Shown when the operator has turned every product off. A tenant can still sign
+// in (their account is valid), so say plainly why there is nothing here rather
+// than 404ing them into thinking the platform is broken.
+function noProductsPage(tenant) {
   const name = esc(tenant.display_name || tenant.slug);
+  return shell(`${name} — Home`, `
+    <div class="topbar">
+      <div><h1>Welcome, ${name}</h1><p class="muted">No products are enabled on this account.</p></div>
+      <form method="POST" action="/logout" style="margin:0"><button class="logout" style="background:none;border:0;padding:0;width:auto;margin:0" type="submit">Sign out</button></form>
+    </div>
+    <p class="muted">Your operator has turned off both MMS Design and MMS CMS. Contact them to have one enabled.</p>`);
+}
+
+function hubPage(tenant, products) {
+  const name = esc(tenant.display_name || tenant.slug);
+  // Only ever offer a card for a product that is actually reachable — the
+  // gateway would refuse the click otherwise, which reads as a broken link.
+  const designCard = `
+      <a class="card" href="/sso/design">
+        <div class="ico">&#127912;</div><h3>MMS Design</h3>
+        <div class="muted">Design your website visually. Push it to your CMS when ready.</div>
+      </a>`;
+  const cmsCard = `
+      <a class="card" href="/sso/cms">
+        <div class="ico">&#128441;&#65039;</div><h3>MMS CMS</h3>
+        <div class="muted">Edit content, publish, and manage your live site.</div>
+      </a>`;
+  const cards = `${products.design ? designCard : ''}${products.cms ? cmsCard : ''}`;
   return shell(`${name} — Home`, `
     <div class="topbar">
       <div><h1>Welcome, ${name}</h1><p class="muted">Choose where to work.</p></div>
@@ -230,15 +266,7 @@ function hubPage(tenant) {
          an expired token — and the OpenDesign daemon answers that with a hard
          401 rather than bouncing back here. /sso/<tool> mints on click, so the
          token is always seconds old however long the page has been sitting. -->
-    <div class="cards">
-      <a class="card" href="/sso/design">
-        <div class="ico">&#127912;</div><h3>MMS Design</h3>
-        <div class="muted">Design your website visually. Push it to your CMS when ready.</div>
-      </a>
-      <a class="card" href="/sso/cms">
-        <div class="ico">&#128441;&#65039;</div><h3>MMS CMS</h3>
-        <div class="muted">Edit content, publish, and manage your live site.</div>
-      </a>
+    <div class="cards">${cards}
     </div>`);
 }
 
@@ -269,8 +297,15 @@ export async function handleHub(req, res, method, path) {
     }
     const tenant = await getTenant(slug);
     if (!tenant) { redirect(res, '/login'); return true; }
+    // A bookmarked /sso/<tool> must not hand off to a product the operator has
+    // turned off — without this check it is a straight bypass of the gate.
+    const products = await readActiveProducts();
+    if ((tool === 'cms' && !products.cms) || (tool === 'design' && !products.design)) {
+      redirect(res, '/hub');
+      return true;
+    }
     const target = tool === 'cms' ? 'instatic' : 'od';
-    let url = ssoUrl(tenant, target);
+    let url = ssoUrl(tenant, target, products);
     if (next) url += `&redirect=${encodeURIComponent(next)}`;
     redirect(res, url);
     return true;
@@ -298,6 +333,11 @@ export async function handleHub(req, res, method, path) {
     if (next) {
       const sameTenant = currentSlug(req) === null || currentSlug(req) === slug;
       target = sameTenant ? next : (next.startsWith('/design') ? '/design' : '/hub');
+      // A deep link into a product the operator has turned off goes nowhere, so
+      // fall back to /hub, which resolves to whatever IS available.
+      const products = await readActiveProducts();
+      const wantsDesign = target.startsWith('/design');
+      if ((wantsDesign && !products.design) || (!wantsDesign && !products.cms)) target = '/hub';
     }
     redirect(res, target, sessionCookie(slug));
     return true;
@@ -324,8 +364,20 @@ export async function handleHub(req, res, method, path) {
     }
   }
 
-  // POST /logout
-  if (path === '/logout' && method === 'POST') { redirect(res, '/login', clearCookie()); return true; }
+  // GET|POST /logout — the ONE sign-out. A tool's own logout only drops that
+  // tool's cookie; `sa_hub` survives it and the silent re-SSO above hands the
+  // user straight back in, so "Sign out" inside a product has to land HERE or it
+  // is a no-op. clearCookie() expires all three cookies with their correct Paths.
+  //
+  // GET is accepted as well as POST because the products navigate to this as a
+  // link. It is a deliberate top-level navigation that destroys only session
+  // state, and it is not embeddable in a way that could act on a user's behalf:
+  // the cookies are SameSite=None/Lax but a cross-site <img src="/logout"> can
+  // at worst sign someone out, never act as them.
+  if (path === '/logout' && (method === 'POST' || method === 'GET')) {
+    redirect(res, '/login', clearCookie());
+    return true;
+  }
 
   // GET /hub  (requires session)
   if (path === '/hub' && method === 'GET') {
@@ -334,8 +386,14 @@ export async function handleHub(req, res, method, path) {
     const tenant = await getTenant(slug);
     if (!tenant) { redirect(res, '/login', clearCookie()); return true; }
     // Lite = OpenDesign only → straight in. Advanced = two cards.
-    if ((tenant.tier || 'advanced') === 'lite') { redirect(res, ssoUrl(tenant, 'od')); return true; }
-    html(res, 200, hubPage(tenant));
+    const products = await readActiveProducts();
+    if ((tenant.tier || 'advanced') === 'lite') { redirect(res, ssoUrl(tenant, 'od', products)); return true; }
+    // With only one product available there is nothing to choose, so skip the
+    // chooser entirely rather than showing a one-card page.
+    if (!products.design && !products.cms) { html(res, 200, noProductsPage(tenant)); return true; }
+    if (!products.cms) { redirect(res, ssoUrl(tenant, 'od', products)); return true; }
+    if (!products.design) { redirect(res, ssoUrl(tenant, 'instatic', products)); return true; }
+    html(res, 200, hubPage(tenant, products));
     return true;
   }
 

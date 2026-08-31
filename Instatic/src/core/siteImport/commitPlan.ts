@@ -26,7 +26,9 @@ import type { PageNode } from '@core/page-tree'
 import type { ImportFragment } from '@core/htmlImport'
 import { applyAssetRewrites } from './applyAssetRewrites'
 import { rewriteInternalLinks, rewriteFragmentInternalLinks } from './linkRewrite'
+import { getErrorMessage } from '@core/utils/errorMessage'
 import type {
+  CollectionCommitResult,
   GlobalSectionCandidate,
   SharedBlockCandidate,
   ImportColorToken,
@@ -152,14 +154,49 @@ export async function commitImportPlan(
       mediaUrl: rewriteMap[a.sourcePath]!,
     }))
 
+  // ── Step D: create collections ────────────────────────────────────────────
+  // AFTER the page transaction, because the entry template is an ordinary page
+  // and must exist before its collection does — a collection whose template is
+  // missing returns 404 for every entry, and doing it in this order means that
+  // window never opens.
+  //
+  // Collections live in `data_tables` / `data_rows`, not the site document, so
+  // this cannot join the page transaction. A failure here therefore leaves the
+  // pages committed; it is reported as a warning rather than thrown, because
+  // rolling the pages back would lose the whole import over one table.
+  const collectionResults: CollectionCommitResult[] = []
+  const collectionWarnings: ImportWarning[] = []
+  for (const collection of rewrittenPlan.collections ?? []) {
+    try {
+      const created = await adapter.createCollection(collection)
+      collectionResults.push(created)
+      for (const failure of created.failedEntries) {
+        collectionWarnings.push({
+          kind: 'collection-layout',
+          message: `Entry "${collection.slug}/${failure.slug}" was not created: ${failure.message}`,
+          source: collection.slug,
+        })
+      }
+    } catch (err) {
+      collectionWarnings.push({
+        kind: 'collection-layout',
+        message:
+          `Collection "${collection.slug}" could not be created: ${getErrorMessage(err, 'unknown error')}. ` +
+          `Its ${collection.entries.length} entries were not imported; the pages and design were.`,
+        source: collection.slug,
+      })
+    }
+  }
+
   return {
     ...results,
+    collections: collectionResults,
     assets: resultAssets,
     conflicts: plan.conflicts,
     // Carry forward the plan-level warnings (CSS parser / asset planner /
     // missing stylesheet …) AND surface any per-asset upload failures from
     // Step A above. The wizard's Done step renders this list verbatim.
-    warnings: [...plan.warnings, ...uploadWarnings, ...fontInstallWarnings],
+    warnings: [...plan.warnings, ...uploadWarnings, ...fontInstallWarnings, ...collectionWarnings],
   }
 }
 
@@ -388,6 +425,7 @@ function commitPages(
         title: page.title,
         slug: resolution?.resolvedSlug ?? page.slug,
         nodeFragment: page.nodeFragment,
+        template: page.template,
       })
     }
 

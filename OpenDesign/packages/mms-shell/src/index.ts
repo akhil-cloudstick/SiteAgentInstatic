@@ -29,8 +29,8 @@ export { MmsShellHeader, isPlainClick } from './shell/MmsShellHeader'
 export type { MmsShellHeaderProps } from './shell/MmsShellHeader'
 export { MmsSpecialistRow } from './shell/MmsSpecialistRow'
 export type { MmsSpecialistRowProps } from './shell/MmsSpecialistRow'
-export { hubNavigationLinks, hubLinkHref } from './shell/hubNavigation'
-export type { HubNavigationLink } from './shell/hubNavigation'
+export { hubNavigationLinks, hubLinkHref, HUB_NAVIGATION_CONTRACT } from './shell/hubNavigation'
+export type { HubNavigationLink, HubNavigationProducts } from './shell/hubNavigation'
 export type {
   HubContext,
   HubRole,

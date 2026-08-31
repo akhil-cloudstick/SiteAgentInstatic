@@ -1806,6 +1806,7 @@ export const ptBR: Dict = {
   'avatar.amrConsoleMeta': 'Saldo e recarga',
   'avatar.settings': 'Configurações',
   'avatar.backToProjects': 'Voltar aos projetos',
+  'avatar.signOut': 'Sair',
   'avatar.metaActive': 'ativo',
   'avatar.metaOffline': 'offline',
   'avatar.metaSelected': 'selecionado',

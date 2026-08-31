@@ -1,11 +1,11 @@
 # Open Design + Instatic Integration Summary
 
 > Written 2026-07-20 from the repo at `S:\SiteAgentHub` (branch `Instatic_opendesign`).
-> Authoritative source docs in-repo: `docs/od-cms-vision.md`, `docs/od-cms-compliance.md`,
+> Authoritative source docs in-repo: `docs/integration/od-cms-vision.md`, `docs/integration/od-cms-compliance.md`,
 > `docs/CHANGELOG.md`.
 >
 > ⚠️ **Two in-repo docs are stale — do not plan from them.**
-> `docs/phase5-share-to-cms-design.md` and the **2026-07-10** CHANGELOG entry both describe a
+> `docs/integration/phase5-share-to-cms-design.md` and the **2026-07-10** CHANGELOG entry both describe a
 > **server-side** importer (a `SiteImportAdapter` at
 > `server/handlers/cms/siteImport/applyPlan.ts` that committed the import on the server). That
 > approach was **built, then deleted** in commit `9e13bf1` (2026-07-16): `applyPlan.ts` (-382),
@@ -144,7 +144,7 @@ and no duplicates on re-share.
 
 ## What changed compared to the old plan?
 
-The MMSBUILD plan (`docs/mmsbuild-project-plan.md`, dated 2026-07-06) **does not model OpenDesign at
+The MMSBUILD plan (`docs/platform/mmsbuild-project-plan.md`, dated 2026-07-06) **does not model OpenDesign at
 all**. It mentions "Hermes/Open Design/Codex-style specialist agents" once, in passing, in §9 as one
 of several possible agent surfaces. Everything below is new since that plan was written:
 

@@ -20,7 +20,7 @@
  */
 import type { DbClient } from '../../../db/client'
 import type { AuthUser } from '../../../repositories/users'
-import type { DataTable } from '@core/data/schemas'
+import type { DataRow, DataTable } from '@core/data/schemas'
 import { createAuditEvent } from '../../../repositories/audit'
 import {
   applyContentEntryCellsFilter,
@@ -34,7 +34,7 @@ import {
   updateDataTable,
   createDataRow,
   getDataRowBySlug,
-  listDataRows,
+  listDataRowsWithFilter,
 } from '../../../repositories/data'
 import { normalizeDataTableFields } from '@core/data/fields'
 import { slugForTable } from '@core/data/cells'
@@ -286,6 +286,35 @@ async function handleTableItem(
   return methodNotAllowed()
 }
 
+/**
+ * Row-listing page size. The default is small on purpose: a caller that omits
+ * `limit` used to receive the entire table with every page tree inline.
+ */
+const DEFAULT_ROW_PAGE_SIZE = 25
+const MAX_ROW_PAGE_SIZE = 200
+
+/**
+ * Listing projection that drops `cells`.
+ *
+ * Paging alone does not make listing usable — a page row is measured in
+ * megabytes, so even 25 of them is a large response. `fields=summary` returns
+ * what a list view actually needs and leaves the body to `GET /data/rows/:id`.
+ */
+function toRowSummary(row: DataRow): Record<string, unknown> {
+  const title = row.cells?.title
+  return {
+    id: row.id,
+    tableId: row.tableId,
+    slug: row.slug,
+    status: row.status,
+    title: typeof title === 'string' ? title : null,
+    authorUserId: row.authorUserId,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+    publishedAt: row.publishedAt,
+  }
+}
+
 async function handleTableRows(
   req: Request,
   db: DbClient,
@@ -301,7 +330,33 @@ async function handleTableRows(
 
   if (req.method === 'GET') {
     const visibility = canSeeAllDataRows(user) ? {} : { ownerUserId: user.id }
-    return jsonResponse({ rows: await listDataRows(db, tableId, visibility) })
+    const url = new URL(req.url)
+
+    // Unpaginated listing is not viable on a real table: a single page row
+    // carries its whole `body` tree, so a few hundred rows is gigabytes in one
+    // response. Paginate by default and let the caller opt into full cells.
+    const rawLimit = Number.parseInt(url.searchParams.get('limit') ?? String(DEFAULT_ROW_PAGE_SIZE), 10)
+    const limit = Math.min(
+      Math.max(Number.isFinite(rawLimit) ? rawLimit : DEFAULT_ROW_PAGE_SIZE, 1),
+      MAX_ROW_PAGE_SIZE,
+    )
+    const rawOffset = Number.parseInt(url.searchParams.get('offset') ?? '0', 10)
+    const offset = Math.max(Number.isFinite(rawOffset) ? rawOffset : 0, 0)
+    const summaryOnly = url.searchParams.get('fields') === 'summary'
+
+    // `listDataRowsWithFilter` applies the page in SQL; the visibility scope is
+    // still applied here because that helper filters by table, not by owner.
+    const { rows, totalCount } = await listDataRowsWithFilter(db, tableId, { limit, offset })
+    const visible = visibility.ownerUserId
+      ? rows.filter((row) => row.authorUserId === visibility.ownerUserId)
+      : rows
+
+    return jsonResponse({
+      rows: summaryOnly ? visible.map(toRowSummary) : visible,
+      totalCount,
+      limit,
+      offset,
+    })
   }
 
   if (req.method === 'POST') {

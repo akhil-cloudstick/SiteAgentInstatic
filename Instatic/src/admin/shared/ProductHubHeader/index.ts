@@ -7,5 +7,5 @@
  * resolving at their original specifier.
  */
 export { ProductHubHeader } from './ProductHubHeader'
-export { hubNavigationLinks, hubLinkHref } from '@mms/shell'
-export type { HubNavigationLink } from '@mms/shell'
+export { hubNavigationLinks, hubLinkHref, HUB_NAVIGATION_CONTRACT } from '@mms/shell'
+export type { HubNavigationLink, HubNavigationProducts } from '@mms/shell'

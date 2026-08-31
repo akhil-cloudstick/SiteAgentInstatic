@@ -1,0 +1,51 @@
+{
+  /* Connector is a sibling project: s:\SiteAgentHub has no root package.json and
+     no workspace, so nothing links this to Instatic automatically. Resolution
+     happens entirely through the rebased `paths` below — the same mechanism
+     Instatic itself uses to reach ../OpenDesign/packages/mms-shell with no build
+     step (see Instatic/vite.config.ts:214-217).
+
+     The dependency pins are not optional. Instatic source we import does bare
+     `happy-dom` / `@sinclair/typebox` imports; those resolve from the importing
+     file's own directory, so they find Instatic/node_modules and work. But if
+     Connector also installs its own copies, we end up with two TypeBox
+     registries and two happy-dom GlobalWindow classes. Pinning the specifiers
+     here is the fix the repo already uses for react/react-dom
+     (Instatic/tsconfig.json:27-30). */
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2023", "DOM"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "types": ["bun"],
+
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "verbatimModuleSyntax": true,
+
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "resolveJsonModule": true,
+    "noEmit": true,
+
+    "baseUrl": ".",
+    "paths": {
+      "@core/*": ["../Instatic/src/core/*"],
+      "@modules/*": ["../Instatic/src/modules/*"],
+      "@instatic-server/*": ["../Instatic/server/*"],
+      "@modelcontextprotocol/server": ["../Instatic/node_modules/@modelcontextprotocol/server"],
+      "@modelcontextprotocol/server/*": ["../Instatic/node_modules/@modelcontextprotocol/server/*"],
+      "@connector/*": ["./src/*"],
+
+      "happy-dom": ["../Instatic/node_modules/happy-dom"],
+      "@sinclair/typebox": ["../Instatic/node_modules/@sinclair/typebox"],
+      "@sinclair/typebox/*": ["../Instatic/node_modules/@sinclair/typebox/*"],
+      "fflate": ["../Instatic/node_modules/fflate"],
+      "nanoid": ["../Instatic/node_modules/nanoid"]
+    }
+  },
+  "include": ["src/**/*.ts", "tests/**/*.ts"]
+}

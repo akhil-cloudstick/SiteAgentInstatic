@@ -257,6 +257,36 @@ function checkPage(html) {
     }
   }
 
+  // 2c) Animation hook classes must actually animate. Rule 2b only proves the
+  // selector text appears somewhere in the CSS — `.reveal-up {}` satisfies its
+  // `styleBlocks.includes('.reveal-up')` test while declaring nothing at all.
+  // That ships a page whose markup is covered in `reveal-up`/`reveal-stagger`
+  // hooks with zero motion behind them: every other check passes and the
+  // animation is silently lost on import AND on the published site. A hook
+  // that looks like an animation name and resolves to no declarations is
+  // always a bug, so this is safe to fail on. See templateRule.md §10.
+  if (styleBlocks.trim() && extCss.length === 0) {
+    const HOOK_RE = /^(?:reveal|animate|anim|fade|slide|zoom|stagger|parallax)(?:[-_][\w-]*)?$|^[\w-]*[-_](?:reveal|stagger|fade-in|fade-up)$/i;
+    const hooks = [...new Set(allClasses.filter((c) => HOOK_RE.test(c)))];
+    const dead = hooks.filter((cls) => {
+      const escaped = cls.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      // Any rule whose selector mentions this class and declares something.
+      const ruleRe = new RegExp(`\\.${escaped}(?![\\w-])[^{}]*\\{([^{}]*)\\}`, 'g');
+      for (const m of styleBlocks.matchAll(ruleRe)) {
+        if (m[1].replace(/[\s;]/g, '')) return false;
+      }
+      return true;
+    });
+    if (dead.length) {
+      add('Animation hooks actually animate', 'FAIL',
+        `${dead.length} animation class${dead.length === 1 ? '' : 'es'} on the markup ${dead.length === 1 ? 'resolves' : 'resolve'} to an ` +
+        `empty or missing rule (${dead.slice(0, 6).join(', ')}${dead.length > 6 ? '…' : ''}) — ` +
+        `write the animation or remove the class`);
+    } else if (hooks.length) {
+      add('Animation hooks actually animate', 'PASS', `${DIM}${hooks.length} hook class${hooks.length === 1 ? '' : 'es'} wired${RST}`);
+    }
+  }
+
   // 3) Colors as :root custom properties.
   const hasRoot = /:root\s*\{[^}]*--[\w-]+\s*:/.test(styleBlocks);
   const rawHexInRules = (styleBlocks.replace(/:root\s*\{[^}]*\}/g, '').match(/#[0-9a-fA-F]{3,8}\b/g) || []).length;
@@ -412,6 +442,19 @@ function checkPage(html) {
   add('Text typography lives on classes, not bare tag selectors',
     uncoloredTextEls.length ? 'FAIL' : 'PASS',
     uncoloredTextEls.length ? `${uncoloredTextEls.length} text element(s) take their colour from a bare tag rule (${[...tagsStyledByBareRule].join(', ')}) with no colour on any of their own classes — that rule imports as ambient, so it is neither editable nor reliably applied in the editor canvas and the text renders with an inherited colour (often unreadable), even though the file looks correct in a browser. Put color/font-* on each element's OWN class${emptyStubCount ? `; ${emptyStubCount} empty stub rule(s) like ".od-title {}" are not compliance — the class must carry the declarations` : ''}. Examples: ${uncoloredTextEls.slice(0, 6).map((o) => `<${o.tag}> "${firstLine(o.text).slice(0, 40)}"`).join(', ')} (see templateRule.md)` : '');
+
+  // 11c) Inline SVG icons must carry their own size. An <svg> with neither
+  // width/height attributes NOR a class of its own can only be sized by a
+  // descendant rule against an ancestor class. When any link in that chain does
+  // not survive the import the icon falls back to its intrinsic size and
+  // renders enormous (a 17px tick as a 200px block), while the same file is
+  // correct in a browser. An svg WITH its own class binds to a real class rule,
+  // and explicit width/height attributes ride through untouched — both are safe.
+  const unsizedIcons = [...html.matchAll(/<svg\b([^>]*)>/gi)]
+    .map((m) => m[1])
+    .filter((attrs) => !/\bwidth\s*=/.test(attrs) && !/\bheight\s*=/.test(attrs) && !/\bclass\s*=/.test(attrs));
+  add('Inline SVG icons carry their own size', unsizedIcons.length ? 'FAIL' : 'PASS',
+    unsizedIcons.length ? `${unsizedIcons.length} inline <svg> element(s) have no width/height attribute and no class of their own, so their size depends entirely on a descendant rule against an ancestor class — if that chain does not survive the import the icon renders at its intrinsic size (huge) and breaks the layout, even though the file looks correct in a browser. Add width/height attributes (e.g. <svg width="17" height="17" viewBox="0 0 24 24">) or give each icon its own class with a bare sizing rule (see templateRule.md)` : '');
 
   // 11b) No raster photo delivered as a CSS background. A `background-image`
   // imports as a plain style declaration, NOT an Image block — no alt, no media
@@ -677,5 +720,95 @@ for (const f of files) {
     console.log(`   ${tag(r.status)}  ${r.rule}${r.detail ? `  ${DIM}—${RST} ${r.detail}` : ''}`);
   }
 }
+// ---------------------------------------------------------------------------
+// Run-level layout check — collections.
+//
+// Per-page checks cannot see this: whether posts are separated is a property of
+// the BUNDLE, not of any one file. Everything at the top level imports as a
+// Page, so a build shipping hundreds of top-level folders hands the tenant one
+// flat Pages list with the blog mixed into it. WARN, not FAIL — a site with
+// genuinely no collections is valid.
+// ---------------------------------------------------------------------------
+if (files.length > 1) {
+  // Key on the COLLECTION ROOT, not the file's immediate parent.
+  //
+  // This previously used parts[length - 2], which for the mandated nested layout
+  // `blog/<post-slug>/index.html` yields `<post-slug>` — a unique segment per
+  // post, count 1 each. The result was inverted: the layout this rule requires
+  // scored as "no collections" and printed WARN, while the flat
+  // `blog/<post-slug>.html` the rule forbids scored as one big collection and
+  // printed PASS. The checker contradicted its own remedy text.
+  //
+  // For `<root>/<entry>/index.html` the root is the grandparent. A listing page
+  // at `<root>/index.html` is excluded, or `blog` would count itself and a
+  // single-post blog would look like a collection of two.
+  // Two separate tallies, because they answer different questions:
+  //   topLevel   — how many `<name>/index.html` pages sit at the root. A large
+  //                number with no collections is the flat-build smell.
+  //   roots      — how many entries each collection folder holds.
+  const roots = new Map();
+  const flatEntries = new Map();
+  let topLevel = 0;
+
+  for (const f of files) {
+    const parts = f.replace(/\\/g, '/').split('/');
+    const file = parts[parts.length - 1] ?? '';
+    const isIndex = file.toLowerCase() === 'index.html';
+
+    // `blog/<slug>.html` — grouped, but in the form templateRule forbids. Track
+    // it so a flat build gets told what is wrong rather than silently scoring
+    // as "no collections", which reads like a pass.
+    if (!isIndex && parts.length >= 2 && /\.html?$/i.test(file)) {
+      const folder = parts[parts.length - 2];
+      if (folder) flatEntries.set(folder, (flatEntries.get(folder) ?? 0) + 1);
+    }
+
+    // Only the nested form counts as a collection entry:
+    //   blog/<slug>/index.html   → collection root `blog`     ✓
+    //   blog/<slug>.html         → not a collection entry     ✗
+    //
+    // The flat form is what templateRule forbids, so it must not earn the PASS.
+    // Counting it was the other half of the original inversion.
+    if (!isIndex) continue;
+
+    if (parts.length === 2) {
+      // `<name>/index.html` — a top-level page, or a collection's own listing
+      // page. Either way it is not an entry, so it never counts toward a
+      // collection tally; counting it made a one-post blog look like two.
+      topLevel++;
+      continue;
+    }
+    if (parts.length < 3) continue;
+
+    const root = parts[parts.length - 3];
+    if (root) roots.set(root, (roots.get(root) ?? 0) + 1);
+  }
+  // A collection folder holds MANY entries under one root.
+  const singles = topLevel;
+  const collections = [...roots.entries()].filter(([, n]) => n > 1).map(([sg]) => sg);
+  const flatGroups = [...flatEntries.entries()].filter(([, n]) => n > 1).map(([sg]) => sg);
+
+  if (collections.length) {
+    console.log(`\n   ${tag('PASS')}  Collections (bundle layout)  ${DIM}—${RST} ${collections.length} collection folder(s): ${collections.slice(0, 6).join(', ')}`);
+  } else if (flatGroups.length) {
+    console.log(`\n   ${tag('WARN')}  Collections (bundle layout)  ${DIM}—${RST} ` +
+      `${flatGroups.length} folder(s) hold flat entry files (${flatGroups.slice(0, 6).join(', ')}) rather than nested ` +
+      `folders. Entries must be one level deep — blog/<post-slug>/index.html, not blog/<post-slug>.html — with ` +
+      `<folder>/index.html as the listing page. Do NOT use posts/ (reserved). (see templateRule.md)`);
+  } else if (singles >= 25) {
+    console.log(`\n   ${tag('WARN')}  Collections (bundle layout)  ${DIM}—${RST} ` +
+      `${singles} top-level page folders and no collection folder. Everything at the top level imports as a Page, ` +
+      `so blog posts and guides land in one flat Pages list the tenant cannot manage separately. Nest each set ` +
+      `under a folder named for its collection — blog/<post-slug>/index.html — keeping <folder>/index.html as the ` +
+      `listing page. Do NOT use posts/ (reserved). (see templateRule.md)`);
+  } else {
+    // Previously this case printed nothing at all, so a correct small tree was
+    // indistinguishable from the check never running — anything grepping for the
+    // PASS line saw a missing line rather than a result.
+    console.log(`\n   ${tag('PASS')}  Collections (bundle layout)  ${DIM}—${RST} ` +
+      `${singles} top-level page folder(s), no collection folders — valid for a site without collections.`);
+  }
+}
+
 console.log(`\n${BLD}Overall:${RST} ${anyFail ? `${RED}some pages need fixes${RST}` : `${GRN}all pages follow the rule${RST}`}  (${files.length} page${files.length > 1 ? 's' : ''} checked)`);
 process.exit(anyFail ? 1 : 0);

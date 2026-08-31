@@ -372,6 +372,48 @@ export function checkPageCompliance(html: string): ComplianceFinding[] {
     }
   }
 
+  // 2c) Animation hook classes must actually animate.
+  // Rule 2b only proves the selector text appears somewhere in the CSS —
+  // `.reveal-up {}` satisfies its `styleBlocks.includes('.reveal-up')` test
+  // while declaring nothing at all. That ships a page covered in
+  // `reveal-up`/`reveal-stagger` hooks with zero motion behind them: every
+  // other rule passes and the animation is silently lost, both on import and
+  // on the published site (where scripts DO run, so there is nothing to
+  // recover from). A class that reads as an animation name and resolves to no
+  // declarations is always a bug, so this blocks. See templateRule.md §10.
+  // Kept in parity with rule 2c in Operator/rules/check-template-rule.mjs.
+  if (styleBlocks.trim() && extCss.length === 0) {
+    const HOOK_RE =
+      /^(?:reveal|animate|anim|fade|slide|zoom|stagger|parallax)(?:[-_][\w-]*)?$|^[\w-]*[-_](?:reveal|stagger|fade-in|fade-up)$/i;
+    const hookClasses = new Set<string>();
+    for (const m of html.matchAll(/\sclass\s*=\s*"([^"]*)"/gi)) {
+      for (const cls of (m[1] ?? '').split(/\s+/)) {
+        if (cls && HOOK_RE.test(cls)) hookClasses.add(cls);
+      }
+    }
+    const dead = [...hookClasses].filter((cls) => {
+      const escaped = cls.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      // Any rule whose selector mentions this class and declares something.
+      const ruleRe = new RegExp(`\\.${escaped}(?![\\w-])[^{}]*\\{([^{}]*)\\}`, 'g');
+      for (const m of styleBlocks.matchAll(ruleRe)) {
+        if ((m[1] ?? '').replace(/[\s;]/g, '')) return false;
+      }
+      return true;
+    });
+    if (dead.length) {
+      add(
+        'Animation hooks actually animate',
+        'fail',
+        `${dead.length} animation class${dead.length === 1 ? '' : 'es'} on the markup ` +
+          `${dead.length === 1 ? 'resolves' : 'resolve'} to an empty or missing rule ` +
+          `(${dead.slice(0, 6).join(', ')}${dead.length > 6 ? '…' : ''}) — ` +
+          `write the animation or remove the class`,
+      );
+    } else if (hookClasses.size) {
+      add('Animation hooks actually animate', 'pass');
+    }
+  }
+
   // 3) Brand colors as :root custom properties.
   const hasRoot = /:root\s*\{[^}]*--[\w-]+\s*:/.test(styleBlocks);
   const rawHex = (styleBlocks.replace(/:root\s*\{[^}]*\}/g, '').match(/#[0-9a-fA-F]{3,8}\b/g) || []).length;

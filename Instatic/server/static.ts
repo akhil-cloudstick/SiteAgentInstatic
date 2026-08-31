@@ -214,13 +214,24 @@ function requestHasSessionCookie(req: Request | undefined): boolean {
 const LOGIN_SKELETON_STYLES = `
   /* Login skeleton — visible only until React mounts. Mirrors the visual
      of the React AdminPreAuthForm closely enough that hydration is not
-     jarring. */
+     jarring.
+
+     These values are literals rather than var(--token) reads ON PURPOSE: this
+     block is inlined into the <head> of the very first response, long before
+     the token stylesheet has been fetched, so a var() here would resolve to
+     nothing and paint an unstyled form. They must therefore be kept in step
+     with the cream palette by hand — the light theme in src/styles/globals.css
+     and the body background in index.html (#fbf7ea) are the reference.
+
+     The previous values here were a DARK palette (#ededed text on a 3%-white
+     panel) sitting on that cream body, which rendered the whole form
+     effectively invisible on every cold logged-out load. */
   .login-skeleton {
     display: grid;
     min-height: 100vh;
     place-items: center;
     overflow: auto;
-    color: #ededed;
+    color: #2c2a24;
     font-family: system-ui, -apple-system, "Segoe UI", Roboto, Inter, sans-serif;
   }
   .login-skeleton__panel {
@@ -228,9 +239,9 @@ const LOGIN_SKELETON_STYLES = `
     max-width: 360px;
     padding: 36px 32px 32px;
     border-radius: 12px;
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.32);
+    background: #fffdf7;
+    border: 1px solid #e4dcc6;
+    box-shadow: 0 8px 32px rgba(44, 42, 36, 0.08);
     box-sizing: border-box;
   }
   .login-skeleton__brand {
@@ -239,45 +250,88 @@ const LOGIN_SKELETON_STYLES = `
     gap: 8px;
     margin-bottom: 24px;
     font-size: 12px;
-    color: rgba(255, 255, 255, 0.6);
+    color: #6f6857;
     letter-spacing: 0.02em;
   }
   .login-skeleton__brand-dot {
     width: 6px;
     height: 6px;
     border-radius: 50%;
-    background: #5b8def;
+    background: #1ba957;
   }
   .login-skeleton__title {
-    margin: 0 0 24px;
+    margin: 0 0 4px;
     font-size: 22px;
     font-weight: 600;
-    color: #f5f5f5;
+    color: #14120c;
     line-height: 1.2;
+  }
+  /* The loading affordance. A pre-rendered form with no motion reads as a
+     finished page that simply does not work yet — every field is inert until
+     React takes over. The bar says "still arriving", and the label says it in
+     words so the message survives when the animation cannot run. */
+  .login-skeleton__status {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    margin: 0 0 20px;
+    font-size: 12px;
+    color: #6f6857;
+  }
+  .login-skeleton__bar {
+    position: relative;
+    flex: 1;
+    height: 3px;
+    border-radius: 999px;
+    background: #ece4cf;
+    overflow: hidden;
+  }
+  .login-skeleton__bar::after {
+    content: "";
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 40%;
+    border-radius: inherit;
+    background: #1ba957;
+    animation: instaticLoginSkeletonSlide 1.1s ease-in-out infinite;
+  }
+  @keyframes instaticLoginSkeletonSlide {
+    0%   { transform: translateX(-100%); }
+    100% { transform: translateX(250%); }
+  }
+  /* Reduced motion still needs a "pending" signal, so the bar becomes a
+     static partial fill rather than simply freezing mid-sweep. Windows maps
+     its "Animation effects: off" setting onto this query, so on those
+     machines this IS the loading state, not a rare fallback. */
+  @media (prefers-reduced-motion: reduce) {
+    .login-skeleton__bar::after {
+      animation: none;
+      width: 35%;
+    }
   }
   .login-skeleton__field { display: block; margin-bottom: 14px; }
   .login-skeleton__field > span {
     display: block;
     margin-bottom: 6px;
     font-size: 12px;
-    color: rgba(255, 255, 255, 0.6);
+    color: #6f6857;
   }
   .login-skeleton__input {
     width: 100%;
     box-sizing: border-box;
     padding: 9px 12px;
     border-radius: 12px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    background: rgba(255, 255, 255, 0.04);
-    color: #f5f5f5;
+    border: 1px solid #ded5bd;
+    background: #fffefb;
+    color: #14120c;
     font-size: 14px;
     font-family: inherit;
     outline: none;
     transition: border-color 0.12s ease, box-shadow 0.12s ease;
   }
   .login-skeleton__input:focus {
-    border-color: rgba(91, 141, 239, 0.6);
-    box-shadow: 0 0 0 3px rgba(91, 141, 239, 0.15);
+    border-color: #1ba957;
+    box-shadow: 0 0 0 3px rgba(27, 169, 87, 0.16);
   }
   .login-skeleton__submit {
     width: 100%;
@@ -285,14 +339,14 @@ const LOGIN_SKELETON_STYLES = `
     margin-top: 6px;
     border-radius: 12px;
     border: 1px solid transparent;
-    background: #f5f5f5;
-    color: #000;
+    background: #1ba957;
+    color: #ffffff;
     font-size: 14px;
     font-weight: 500;
     font-family: inherit;
     cursor: pointer;
   }
-  .login-skeleton__submit:hover { background: #fff; }
+  .login-skeleton__submit:hover { background: #17924b; }
 `
 
 const LOGIN_SKELETON_HTML = `<div class="login-skeleton" data-initial-login-skeleton="true">
@@ -302,6 +356,10 @@ const LOGIN_SKELETON_HTML = `<div class="login-skeleton" data-initial-login-skel
       <span>Admin</span>
     </div>
     <h1 class="login-skeleton__title">Sign in</h1>
+    <div class="login-skeleton__status">
+      <span class="login-skeleton__bar" aria-hidden="true"></span>
+      <span>Loading…</span>
+    </div>
     <form class="login-skeleton__form" action="/cms/api/cms/login" method="POST">
       <label class="login-skeleton__field">
         <span>Email</span>

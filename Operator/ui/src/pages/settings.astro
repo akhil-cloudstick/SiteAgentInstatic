@@ -57,6 +57,15 @@ if (Astro.request.method === 'POST') {
         cloudflareToken: str('cloudflareToken'),
         cloudflareAccountId: str('cloudflareAccountId'),
       };
+    } else if (section === 'products') {
+      // Unticked checkboxes post nothing, so both flags are derived from
+      // presence and always sent explicitly — otherwise turning a product OFF
+      // would be indistinguishable from "this form didn't mention it" and the
+      // backend would coalesce it back to its old value.
+      payload = {
+        designActive: !!f.get('designActive'),
+        cmsActive: !!f.get('cmsActive'),
+      };
     } else if (section === 'media') {
       // Media provider keys. A blank field means "keep the stored key" (the same
       // convention as every other secret here), so only non-empty values are
@@ -91,7 +100,8 @@ if (Astro.request.method === 'POST') {
         try { msg = (await r.json()).error || msg; } catch {}
         throw new Error(msg);
       }
-      return Astro.redirect(`${baseUrl}settings?saved=${section === 'cloudflare' || section === 'media' ? section : 'ai'}`);
+      const savedTag = ['cloudflare', 'media', 'products'].includes(section) ? section : 'ai';
+      return Astro.redirect(`${baseUrl}settings?saved=${savedTag}`);
     } catch (e) { error = e.message; }
   }
 }
@@ -125,7 +135,12 @@ const savedLabel = savedSection === 'cloudflare' ? 'Cloudflare settings saved.'
   : savedSection === 'ai' ? 'AI agent settings saved.'
   : savedSection === 'guidance' ? 'Global AI guidance saved — all tenants use it on their next message.'
   : savedSection === 'media' ? 'Media provider keys saved — restart tenants to apply.'
+  : savedSection === 'products' ? 'Product availability saved — applies to every tenant on their next request.'
   : savedSection ? 'Saved.' : '';
+
+// Both default true so a deployment that predates these columns is unchanged.
+const designActive = s.designActive !== false;
+const cmsActive = s.cmsActive !== false;
 
 const mediaKeys = s.mediaKeys || {};
 ---
@@ -225,6 +240,36 @@ const mediaKeys = s.mediaKeys || {};
   </div>
 
   <div class="card">
+    <h2 class="card-title">Products</h2>
+    <p class="hint card-sub">
+      Which products this deployment offers, for <strong>every</strong> tenant. Turn one off and
+      tenants land straight in the other after signing in — no Product Hub in between. This is
+      separate from a tenant's Lite/Advanced plan, which controls what gets provisioned.
+    </p>
+    <form method="POST" id="products-form">
+      <input type="hidden" name="section" value="products" />
+
+      <label class="product-row">
+        <input type="checkbox" name="designActive" value="1" checked={designActive} />
+        <span><strong>MMS Design</strong><br /><span class="hint">Visual website design studio (/design)</span></span>
+      </label>
+
+      <label class="product-row">
+        <input type="checkbox" name="cmsActive" value="1" checked={cmsActive} />
+        <span><strong>MMS CMS</strong><br /><span class="hint">Content editing and publishing (/cms)</span></span>
+      </label>
+
+      {!designActive && !cmsActive && (
+        <div class="banner err" style="margin-top:14px">
+          Both products are off — tenants can sign in but have nowhere to go.
+        </div>
+      )}
+
+      <div style="margin-top:18px"><button type="submit">Save product availability</button></div>
+    </form>
+  </div>
+
+  <div class="card">
     <h2 class="card-title">Cloudflare</h2>
     <p class="hint card-sub">Used by the Publish Deployer to ship tenant sites to Cloudflare Pages.</p>
     <form method="POST" id="cf-form">
@@ -264,6 +309,14 @@ const mediaKeys = s.mediaKeys || {};
   #guidance-form .guidance-area::-webkit-scrollbar-thumb { background: var(--line); border-radius: 8px; border: 2px solid var(--bg); background-clip: padding-box; }
   #guidance-form .guidance-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 14px; }
   #guidance-form #guidance-count.near { color: var(--bad); }
+
+  /* Product availability — two toggle rows. The checkbox is sized up and pulled
+     out of the default full-width input styling, which is written for text
+     fields and would otherwise stretch the box across the card. */
+  #products-form .product-row { display: flex; align-items: flex-start; gap: 11px; padding: 11px 0; border-bottom: 1px solid var(--line); margin: 0; font-weight: 400; }
+  #products-form .product-row:last-of-type { border-bottom: 0; }
+  #products-form .product-row input[type="checkbox"] { width: auto; margin: 2px 0 0; flex: none; accent-color: var(--accent); }
+  #products-form .product-row .hint { font-weight: 400; }
 
   /* Media provider keys — one compact row per provider so ten of them read as a
      list rather than ten stacked forms. Collapses to stacked on narrow screens. */

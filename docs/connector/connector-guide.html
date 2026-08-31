@@ -1,0 +1,798 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MMS Connector</title>
+
+<style>
+  :root {
+    --ground:      #F1F4F3;
+    --surface:     #FFFFFF;
+    --surface-2:   #E7ECEA;
+    --ink:         #131E1C;
+    --ink-soft:    #3A4B48;
+    --muted:       #63736F;
+    --rule:        #CBD5D2;
+    --rule-soft:   #DFE6E4;
+    --accent:      #0D6357;
+    --accent-soft: #DCEEEA;
+    --signal:      #A6501B;
+    --signal-soft: #F6E9DD;
+
+    --font-mono: ui-monospace, "Cascadia Mono", "Cascadia Code", "SF Mono", "JetBrains Mono", Consolas, monospace;
+    --font-body: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    --font-ui:   "Segoe UI", system-ui, -apple-system, "Helvetica Neue", sans-serif;
+
+    --measure: 68ch;
+    --pad: clamp(1.25rem, 4vw, 3.5rem);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:      #0C1413;
+      --surface:     #141F1D;
+      --surface-2:   #1C2826;
+      --ink:         #E2EAE8;
+      --ink-soft:    #B6C4C1;
+      --muted:       #849793;
+      --rule:        #2C3B38;
+      --rule-soft:   #22302E;
+      --accent:      #55C6B2;
+      --accent-soft: #13322D;
+      --signal:      #DE9457;
+      --signal-soft: #33241A;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground:      #0C1413;
+    --surface:     #141F1D;
+    --surface-2:   #1C2826;
+    --ink:         #E2EAE8;
+    --ink-soft:    #B6C4C1;
+    --muted:       #849793;
+    --rule:        #2C3B38;
+    --rule-soft:   #22302E;
+    --accent:      #55C6B2;
+    --accent-soft: #13322D;
+    --signal:      #DE9457;
+    --signal-soft: #33241A;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--font-body);
+    font-size: 17px;
+    line-height: 1.62;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 78rem;
+    margin: 0 auto;
+    padding: var(--pad);
+    display: flex;
+    flex-direction: column;
+    gap: 4.5rem;
+  }
+
+  .col { max-width: var(--measure); }
+
+  p { margin: 0 0 1rem; }
+  p:last-child { margin-bottom: 0; }
+  strong { font-weight: 600; color: var(--ink); }
+  code, .mono { font-family: var(--font-mono); }
+
+  p code, li code, td code, dd code {
+    font-size: 0.82em;
+    background: var(--surface-2);
+    padding: 0.1em 0.36em;
+    border-radius: 3px;
+    color: var(--ink-soft);
+  }
+
+  /* ---------- masthead ---------- */
+
+  .masthead {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    padding-bottom: 2.5rem;
+    border-bottom: 2px solid var(--ink);
+  }
+
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0;
+  }
+
+  h1 {
+    font-family: var(--font-mono);
+    font-size: clamp(2.1rem, 5.5vw, 3.1rem);
+    line-height: 1.04;
+    letter-spacing: -0.035em;
+    font-weight: 600;
+    margin: 0;
+    text-wrap: balance;
+  }
+
+  .standfirst {
+    font-size: clamp(1.06rem, 2vw, 1.24rem);
+    line-height: 1.5;
+    color: var(--ink-soft);
+    max-width: 56ch;
+    margin: 0;
+  }
+
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 2.25rem;
+    font-family: var(--font-mono);
+    font-size: 0.76rem;
+    color: var(--muted);
+    padding-top: 0.5rem;
+  }
+  .meta span b { color: var(--ink-soft); font-weight: 500; letter-spacing: 0.02em; }
+  .meta span::before {
+    content: attr(data-k);
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    font-size: 0.9em;
+    margin-right: 0.6em;
+  }
+
+  /* ---------- sections ---------- */
+
+  section { display: flex; flex-direction: column; gap: 1.5rem; }
+
+  .sec-head {
+    display: flex;
+    align-items: baseline;
+    gap: 1rem;
+    border-bottom: 1px solid var(--rule);
+    padding-bottom: 0.7rem;
+  }
+
+  .sec-num {
+    font-family: var(--font-mono);
+    font-size: 0.74rem;
+    letter-spacing: 0.1em;
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+    flex: none;
+  }
+
+  h2 {
+    font-family: var(--font-mono);
+    font-size: clamp(1.15rem, 2.4vw, 1.42rem);
+    letter-spacing: -0.02em;
+    font-weight: 600;
+    margin: 0;
+    text-wrap: balance;
+  }
+
+  h3 { font-family: var(--font-ui); font-size: 0.98rem; font-weight: 650; margin: 0; }
+
+  /* ---------- capability groups ---------- */
+
+  .cap-group { display: flex; flex-direction: column; gap: 0.75rem; }
+  .cap-group h3 {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    font-weight: 600;
+    color: var(--accent);
+  }
+
+  /* ---------- verdict banner ---------- */
+
+  .verdict {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+    gap: 1px;
+    background: var(--rule);
+    border: 1px solid var(--rule);
+  }
+  .verdict > div {
+    background: var(--surface);
+    padding: 1.15rem 1.2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+  .verdict .n {
+    font-family: var(--font-mono);
+    font-size: 1.7rem;
+    letter-spacing: -0.03em;
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+  }
+  .verdict .n.warn { color: var(--signal); }
+  .verdict .n:not(.num) { font-size: 1.15rem; letter-spacing: -0.01em; line-height: 1.25; }
+  .verdict .n.num { font-size: 1.7rem; }
+  .verdict .l {
+    font-family: var(--font-ui);
+    font-size: 0.8rem;
+    line-height: 1.45;
+    color: var(--ink-soft);
+  }
+
+  /* ---------- callouts ---------- */
+
+  .note {
+    padding: 1.5rem clamp(1.1rem, 3vw, 1.9rem);
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+  }
+  .note.hot { background: var(--signal-soft); border-left: 3px solid var(--signal); }
+  .note.cool { background: var(--accent-soft); border-left: 3px solid var(--accent); }
+
+  .note .tag {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+  }
+  .note.hot .tag { color: var(--signal); }
+  .note.cool .tag { color: var(--accent); }
+
+  .note .lede {
+    font-family: var(--font-ui);
+    font-size: 1.1rem;
+    font-weight: 650;
+    line-height: 1.4;
+    margin: 0;
+    max-width: 50ch;
+  }
+  .note p { max-width: 68ch; color: var(--ink-soft); }
+
+  .note pre {
+    background: transparent;
+    border: none;
+    border-left: 2px solid currentColor;
+    padding: 0.1rem 0 0.1rem 0.9rem;
+    color: var(--ink);
+    font-size: 0.8rem;
+  }
+
+  /* ---------- diagram ---------- */
+
+  .figure { display: flex; flex-direction: column; gap: 0.9rem; }
+
+  .scroller {
+    overflow-x: auto;
+    background: var(--surface);
+    border: 1px solid var(--rule-soft);
+    padding: 1.5rem 1.25rem;
+  }
+  .scroller svg { display: block; min-width: 900px; width: 100%; height: auto; }
+
+  figcaption, .cap {
+    font-family: var(--font-mono);
+    font-size: 0.74rem;
+    color: var(--muted);
+    line-height: 1.55;
+  }
+
+  /* ---------- tables ---------- */
+
+  .tbl-wrap { overflow-x: auto; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: var(--font-ui);
+    font-size: 0.855rem;
+    line-height: 1.5;
+    min-width: 640px;
+  }
+
+  th {
+    text-align: left;
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 500;
+    padding: 0 1.1rem 0.65rem 0;
+    border-bottom: 1px solid var(--rule);
+    vertical-align: bottom;
+  }
+
+  td {
+    padding: 0.85rem 1.1rem 0.85rem 0;
+    border-bottom: 1px solid var(--rule-soft);
+    vertical-align: top;
+    color: var(--ink-soft);
+  }
+
+  td:first-child { color: var(--ink); font-weight: 600; width: 27%; }
+  th:last-child, td:last-child { padding-right: 0; }
+
+  td .mono { font-size: 0.85em; color: var(--muted); display: block; margin-top: 0.28rem; }
+
+  .pill {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 0.63rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 0.18em 0.5em;
+    border: 1px solid currentColor;
+    white-space: nowrap;
+  }
+  .pill.ok { color: var(--accent); }
+  .pill.no { color: var(--signal); }
+
+  /* ---------- decisions ---------- */
+
+  .decisions { display: flex; flex-direction: column; gap: 0; border-top: 1px solid var(--rule); }
+
+  .decision {
+    display: grid;
+    grid-template-columns: 3rem 1fr;
+    gap: 0 1.5rem;
+    padding: 1.5rem 0;
+    border-bottom: 1px solid var(--rule-soft);
+  }
+  .decision .d-n {
+    font-family: var(--font-mono);
+    font-size: 1.1rem;
+    color: var(--signal);
+    font-variant-numeric: tabular-nums;
+    line-height: 1.25;
+  }
+  .decision .d-b { display: flex; flex-direction: column; gap: 0.5rem; max-width: var(--measure); }
+  .decision p { font-size: 0.92rem; color: var(--ink-soft); margin: 0; }
+
+  .opts { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.15rem; }
+  .opts span {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    padding: 0.28em 0.6em;
+    color: var(--ink-soft);
+  }
+
+  /* ---------- stages ---------- */
+
+  .stages { display: flex; flex-direction: column; gap: 0; border-top: 1px solid var(--rule); }
+
+  .stage {
+    display: grid;
+    grid-template-columns: 6rem 1fr;
+    gap: 0 1.75rem;
+    padding: 1.55rem 0;
+    border-bottom: 1px solid var(--rule-soft);
+  }
+
+  .stage-id {
+    font-family: var(--font-mono);
+    font-size: 0.74rem;
+    letter-spacing: 0.1em;
+    color: var(--accent);
+    padding-top: 0.18rem;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .stage-body { display: flex; flex-direction: column; gap: 0.65rem; max-width: var(--measure); }
+  .stage-body p { font-size: 0.93rem; color: var(--ink-soft); margin: 0; }
+
+  .gate {
+    font-family: var(--font-ui);
+    font-size: 0.83rem;
+    line-height: 1.5;
+    background: var(--accent-soft);
+    color: var(--ink);
+    padding: 0.6rem 0.85rem;
+    border-left: 2px solid var(--accent);
+  }
+  .gate b {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--accent);
+    display: block;
+    margin-bottom: 0.2rem;
+    font-weight: 500;
+  }
+  .gate.stop { background: var(--signal-soft); border-left-color: var(--signal); }
+  .gate.stop b { color: var(--signal); }
+
+  /* ---------- lists ---------- */
+
+  .grid-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr));
+    gap: 1px;
+    background: var(--rule-soft);
+    border: 1px solid var(--rule-soft);
+  }
+  .grid-list li {
+    background: var(--surface);
+    padding: 1rem 1.15rem;
+    font-family: var(--font-ui);
+    font-size: 0.85rem;
+    line-height: 1.5;
+    color: var(--ink-soft);
+    display: flex;
+    flex-direction: column;
+    gap: 0.28rem;
+  }
+  .grid-list b {
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    color: var(--ink);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+
+  ol.checks {
+    margin: 0;
+    padding-left: 0;
+    list-style: none;
+    counter-reset: chk;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(21rem, 1fr));
+    gap: 0.5rem 2.5rem;
+  }
+  ol.checks li {
+    counter-increment: chk;
+    display: grid;
+    grid-template-columns: 1.9rem 1fr;
+    font-family: var(--font-ui);
+    font-size: 0.86rem;
+    line-height: 1.5;
+    color: var(--ink-soft);
+  }
+  ol.checks li::before {
+    content: counter(chk, decimal-leading-zero);
+    font-family: var(--font-mono);
+    font-size: 0.71rem;
+    color: var(--accent);
+    padding-top: 0.22rem;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .arms { display: grid; grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr)); gap: 2rem 3rem; }
+  .arm { display: flex; flex-direction: column; gap: 0.5rem; }
+  .arm .k {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+  .arm .k.dim { color: var(--muted); }
+  .arm p { font-size: 0.89rem; color: var(--ink-soft); margin: 0; }
+
+  pre {
+    margin: 0;
+    background: var(--surface);
+    border: 1px solid var(--rule-soft);
+    border-left: 2px solid var(--accent);
+    padding: 1.1rem 1.2rem;
+    overflow-x: auto;
+    font-family: var(--font-mono);
+    font-size: 0.79rem;
+    line-height: 1.72;
+    color: var(--ink-soft);
+  }
+  pre .c { color: var(--muted); }
+  pre .k { color: var(--accent); }
+
+  footer {
+    border-top: 2px solid var(--ink);
+    padding-top: 1.5rem;
+    font-family: var(--font-mono);
+    font-size: 0.74rem;
+    color: var(--muted);
+    line-height: 1.7;
+  }
+
+  @media (max-width: 40rem) {
+    .stage, .decision { grid-template-columns: 1fr; gap: 0.5rem; }
+    .meta { gap: 0.3rem 1.5rem; flex-direction: column; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="eyebrow">Documentation</p>
+    <h1>MMS Connector</h1>
+    <p class="standfirst">A content connector for MMS-CMS. Connect it to an AI assistant and it becomes a set of tools for reading, creating, editing, publishing and removing content across sites — in plain language.</p>
+    <div class="meta">
+      <span data-k="access"><b>Full CRUD + publish</b></span>
+      <span data-k="sites"><b>2 configured</b></span>
+      <span data-k="setup"><b>One command</b></span>
+    </div>
+  </header>
+
+  <section>
+    <div class="sec-head"><span class="sec-num">01</span><h2>What it is</h2></div>
+    <div class="col">
+      <p>The connector exposes a CMS through the <strong>Model Context Protocol</strong> — an open standard for giving AI assistants access to tools. The assistant calls the tools; the work happens on the server.</p>
+      <p>There is nothing to install and nothing to keep updated. Two values are needed: an endpoint URL and an access token.</p>
+      <p>Once connected, content work happens conversationally. Rather than clicking through an admin interface, you describe what you want — list the recent posts, draft a page, change a title, publish it — and the assistant carries it out.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><span class="sec-num">02</span><h2>Connecting</h2></div>
+    <div class="col"><p>For Claude Code, one command:</p></div>
+    <pre>claude mcp add --transport http mms-connector \
+  https://siteagent.tailbbb0d2.ts.net/connector-mcp \
+  --header "Authorization: Bearer &lt;token&gt;"</pre>
+    <div class="col"><p>For any other MCP-capable client, add this to its configuration:</p></div>
+    <pre>{
+  "mcpServers": {
+    "mms-connector": {
+      "type": "http",
+      "url": "https://siteagent.tailbbb0d2.ts.net/connector-mcp",
+      "headers": { "Authorization": "Bearer &lt;token&gt;" }
+    }
+  }
+}</pre>
+    <div class="col">
+      <p>Restart the client afterwards. The tools then appear in its tool list, each prefixed <code>connector_</code>.</p>
+      <p>The endpoint is public and safe to keep in this document. The token is a credential and is issued separately — treat it like a password.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><span class="sec-num">03</span><h2>The two sites</h2></div>
+    <div class="col">
+      <p>Both sites are reachable through the one connection. Each runs its own CMS, and the connector keeps a separate session for each — so work on one never touches the other.</p>
+    </div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Name</th><th>Site</th><th>Content</th></tr></thead>
+        <tbody>
+          <tr><td><code>akhil</code></td><td>globalnettech</td><td>Workstation and laptop articles</td></tr>
+          <tr><td><code>client-b</code></td><td>lovedale</td><td>Travel blog — Kodaikanal and similar</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="col">
+      <p>The name goes in the request: <em>&quot;connect to akhil&quot;</em>, <em>&quot;list the posts in client-b&quot;</em>. With two configured, a tool called without a name <strong>refuses rather than guessing</strong> — the check that stops a page being published to the wrong site.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><span class="sec-num">04</span><h2>What it can do</h2></div>
+    <div class="col">
+      <p>Full access on both sites. You do not call tools by name — describe what you want and the assistant selects one. The names are listed so you can recognise what it is doing.</p>
+    </div>
+
+    <div class="cap-group">
+      <h3>Browse and read</h3>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Ask for it like this</th><th>Tool</th></tr></thead>
+          <tbody>
+            <tr><td>&quot;What content types are in akhil?&quot;</td><td><code>connector_list_tables</code></td></tr>
+            <tr><td>&quot;List 10 posts from client-b&quot;</td><td><code>connector_list_rows</code></td></tr>
+            <tr><td>&quot;Show me that post in full&quot;</td><td><code>connector_get_row</code></td></tr>
+            <tr><td>&quot;What media is in the library?&quot;</td><td><code>connector_list_media</code></td></tr>
+            <tr><td>&quot;Is the draft different from what is live?&quot;</td><td><code>connector_publish_status</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="cap-group">
+      <h3>Create and edit</h3>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Ask for it like this</th><th>Tool</th></tr></thead>
+          <tbody>
+            <tr><td>&quot;Create a draft post in akhil titled …&quot;</td><td><code>connector_create_row</code></td></tr>
+            <tr><td>&quot;Change its title to …&quot;</td><td><code>connector_update_row</code></td></tr>
+            <tr><td>&quot;Upload this image&quot;</td><td><code>connector_upload_media</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="cap-group">
+      <h3>Publish</h3>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Ask for it like this</th><th>Tool</th></tr></thead>
+          <tbody>
+            <tr><td>&quot;Publish it&quot;</td><td><code>connector_publish_row</code></td></tr>
+            <tr><td>&quot;Publish the whole akhil site&quot;</td><td><code>connector_publish_site</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="cap-group">
+      <h3>Remove</h3>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Ask for it like this</th><th>Tool</th></tr></thead>
+          <tbody>
+            <tr><td>&quot;Unpublish that page&quot; — reversible</td><td><code>connector_set_row_status</code></td></tr>
+            <tr><td>&quot;Delete it&quot; — permanent</td><td><code>connector_delete_row</code></td></tr>
+            <tr><td>&quot;Delete these 40 pages&quot; — permanent</td><td><code>connector_delete_rows</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="cap-group">
+      <h3>Import and export</h3>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Ask for it like this</th><th>Tool</th></tr></thead>
+          <tbody>
+            <tr><td>&quot;What would this bundle change?&quot;</td><td><code>connector_preview_import</code></td></tr>
+            <tr><td>&quot;Import this bundle as draft&quot;</td><td><code>connector_import_draft</code></td></tr>
+            <tr><td>&quot;Import this zip&quot;</td><td><code>connector_import_archive</code></td></tr>
+            <tr><td>&quot;Replace the whole site with this&quot; — permanent</td><td><code>connector_import_replace</code></td></tr>
+            <tr><td>&quot;Export client-b&quot;</td><td><code>connector_export_bundle</code></td></tr>
+            <tr><td>&quot;Give me the bundle manifest&quot;</td><td><code>connector_export_manifest</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="cap-group">
+      <h3>Structure and SEO</h3>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Ask for it like this</th><th>Tool</th></tr></thead>
+          <tbody>
+            <tr><td>&quot;Create a tags table&quot;</td><td><code>connector_create_table</code></td></tr>
+            <tr><td>&quot;Add a tags field to posts&quot;</td><td><code>connector_add_table_fields</code></td></tr>
+            <tr><td>&quot;Add SEO fields to pages&quot;</td><td><code>connector_add_seo_fields</code></td></tr>
+            <tr><td>&quot;Create the blog entry template&quot;</td><td><code>connector_create_entry_template</code></td></tr>
+            <tr><td>&quot;Which templates exist?&quot;</td><td><code>connector_list_templates</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="col">
+      <p>Schema changes and destructive imports need an elevated session first — ask to <em>&quot;step up&quot;</em> and the assistant handles it.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><span class="sec-num">05</span><h2>Setting up a collection</h2></div>
+    <div class="col">
+      <p>The sequence people actually run, and the one where a skipped step fails silently.</p>
+    </div>
+    <pre><span class="c">1</span> "Connect to akhil, then step up"
+
+<span class="c">2</span> "Create a collection called Blog at /blog"
+   → a routed collection. Entries will have their own URLs.
+
+<span class="c">3</span> "Create the entry template for blog"
+   → DO NOT SKIP. Without a template, every entry URL returns 404 —
+     the rows exist and are published, but nothing renders them.
+
+<span class="c">4</span> "Add SEO fields to the blog collection"
+   → canonical, Open Graph, JSON-LD. Not in the stock schema.
+
+<span class="c">5</span> "Import this bundle as draft"
+   → content lands, still not public
+
+<span class="c">6</span> "Publish the site"
+   → the template takes effect and entry URLs resolve</pre>
+    <div class="col">
+      <p>Step 3 is the one that catches people. A collection without a template looks completely healthy from the CMS — correct rows, published status, no errors — and returns 404 for every entry.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><span class="sec-num">06</span><h2>Everyday example</h2></div>
+    <pre><span class="c">1</span> "Connect to akhil"
+<span class="c">2</span> "Create a draft page called Workstation Buying Guide"
+   → created as DRAFT. Nothing has changed on the live site.
+<span class="c">3</span> "Show me that page"
+<span class="c">4</span> "Change the title to Workstation Buying Guide 2026"
+   → edits the draft. A published page still shows the OLD text
+     until it is published again.
+<span class="c">5</span> "Publish it"          → LIVE
+<span class="c">6</span> "Unpublish it"        → route retracted, content kept
+<span class="c">7</span> "Delete it"           → gone permanently</pre>
+    <div class="col">
+      <p>Steps 6 and 7 are not the same thing. <strong>Unpublish</strong> takes a page off the site and keeps it. <strong>Delete</strong> destroys it. When the goal is &quot;get this off the site&quot;, unpublish is almost always the right one.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><span class="sec-num">07</span><h2>Publishing goes public</h2></div>
+    <div class="note hot">
+      <span class="tag">Worth knowing before the first publish</span>
+      <p class="lede">A full-site publish can reach the public internet, not just the CMS.</p>
+      <p>Publishing triggers a deployment to public hosting. The publish itself reports success as soon as the CMS is updated, and the deployment continues separately — so a clean publish response does not confirm the deployment worked, and does not tell you if it failed.</p>
+      <p><strong>Publishing has no version rollback.</strong> Unpublishing retracts a route; it does not restore earlier content. Treat publish as the committing step it is, and check <code>connector_publish_status</code> before and after.</p>
+      <p>For bulk work, publish once at the end rather than per item — each publish is a separate deployment of an intermediate state.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><span class="sec-num">08</span><h2>Reading large sites</h2></div>
+    <div class="col">
+      <p>Listing returns <strong>summaries by default</strong> — id, slug, status, title and dates. A single page can carry several megabytes of layout, so a few hundred of them is more than one response can carry.</p>
+      <p>When you need the full content of a page, ask for one: <em>&quot;show me that page in full&quot;</em>. When you genuinely need bodies for several, say so explicitly and keep the number small.</p>
+      <p>Listing is paginated and reports a total, so <em>&quot;show me the next 25&quot;</em> works through a site of any size.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><span class="sec-num">09</span><h2>Limits worth knowing</h2></div>
+    <div class="col">
+      <p><strong>Publishing is immediate and cannot be rolled back to a previous version.</strong> Unpublishing retracts the route without restoring earlier content.</p>
+      <p><strong>Deletion has no trash.</strong> There is no undo. Unpublishing is the reversible way to take something off a site.</p>
+      <p><strong>Redirects cannot be managed one at a time.</strong> They travel inside a bundle on a clean-site import, or are handled at the CDN.</p>
+      <p><strong>Generating a bundle from an existing website is not available.</strong> Bundles can be imported and exported, but the converter that turns a live site into one is not part of this interface.</p>
+    </div>
+    <div class="gate stop col"><b>Everything is logged</b>Every action — including every refusal — is recorded with its time, the caller, the tool and the outcome. Deletions, publishes and clean-site imports are tagged so they can be found at a glance.</div>
+  </section>
+
+  <section>
+    <div class="sec-head"><span class="sec-num">10</span><h2>If something does not work</h2></div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>What you see</th><th>What it means</th></tr></thead>
+        <tbody>
+          <tr><td>Tools do not appear</td><td>The configuration was not picked up. Restart the client, then check the URL and token for typos or trailing spaces.</td></tr>
+          <tr><td><code>401 Unauthorized</code></td><td>The token is missing, mistyped, or has been rotated. Request a current one.</td></tr>
+          <tr><td><code>403 Forbidden</code></td><td>Reached the service but from an unrecognised origin. A server-side setting — report it.</td></tr>
+          <tr><td><code>502</code> or no response</td><td>The service is not currently running. Report it.</td></tr>
+          <tr><td>&quot;no target was named&quot;</td><td>Two sites are configured and the request did not say which. Name <code>akhil</code> or <code>client-b</code>.</td></tr>
+          <tr><td>&quot;Not connected to …&quot;</td><td>No session open for that site yet. Ask to connect to it first.</td></tr>
+          <tr><td>&quot;needs a recent step up&quot;</td><td>Schema changes and clean-site imports need an elevated session. Ask to step up, then retry.</td></tr>
+          <tr><td>Entry URLs return 404</td><td>The collection has no entry template, or it is still a draft. Check with <code>connector_list_templates</code>.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><span class="sec-num">11</span><h2>Handling the token</h2></div>
+    <ul class="grid-list">
+      <li><b>Treat it as a credential</b>Anyone holding it can read, edit, publish and delete on both sites. Store it where you would store a password.</li>
+      <li><b>Keep it out of shared places</b>Not in chat threads, tickets, screenshots or committed files.</li>
+      <li><b>Ask for a new one if exposed</b>Rotation is immediate and the old token stops working.</li>
+      <li><b>It is scoped to this service</b>It grants no access to anything beyond the two sites listed here.</li>
+    </ul>
+  </section>
+
+  <footer>
+    MMS Connector · Model Context Protocol over HTTPS · full read, create, edit, publish and delete on globalnettech and lovedale · every action logged
+  </footer>
+
+</div>
+</body>
+</html>

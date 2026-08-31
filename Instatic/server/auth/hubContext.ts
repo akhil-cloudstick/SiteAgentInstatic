@@ -54,6 +54,22 @@ function scopeParam(params: URLSearchParams, key: string): string | null {
 }
 
 /**
+ * A '1'/'0' hand-off flag, as a spreadable fragment.
+ *
+ * Returns `{}` when the parameter is missing so the key stays absent from the
+ * candidate object entirely — the schema distinguishes "not sent" (an older
+ * hub) from an explicit `false`, and `undefined` would blur the two.
+ */
+function flagParam(
+  params: URLSearchParams,
+  key: string,
+  field: 'designActive' | 'cmsActive',
+): Record<string, boolean> {
+  const raw = scopeParam(params, key)
+  return raw === null ? {} : { [field]: raw === '1' }
+}
+
+/**
  * Resolve the return URL. Accepts either an absolute URL on the Hub origin or a
  * Hub-relative path; anything pointing elsewhere is discarded and we fall back
  * to the Hub root. Never returns a URL outside `base`.
@@ -94,6 +110,11 @@ export function parseHubContextFromSso(url: URL): HubContext | null {
     site: scopeParam(url.searchParams, HUB_CONTEXT_PARAMS.site),
     origin: scopeParam(url.searchParams, HUB_CONTEXT_PARAMS.origin),
     returnUrl: resolveReturnUrl(scopeParam(url.searchParams, HUB_CONTEXT_PARAMS.returnUrl), base),
+    // Absent stays absent rather than defaulting to `true`: the schema treats
+    // "unknown" as enabled already, and writing a guessed `true` into the
+    // session would make an old hand-off indistinguishable from a real answer.
+    ...flagParam(url.searchParams, HUB_CONTEXT_PARAMS.designActive, 'designActive'),
+    ...flagParam(url.searchParams, HUB_CONTEXT_PARAMS.cmsActive, 'cmsActive'),
   }
 
   const parsed = safeParseValue(HubContextSchema, candidate)

@@ -1,0 +1,1115 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MMS Connector</title>
+
+<style>
+  :root {
+    --ground:      #F1F4F3;
+    --surface:     #FFFFFF;
+    --surface-2:   #E7ECEA;
+    --ink:         #131E1C;
+    --ink-soft:    #3A4B48;
+    --muted:       #63736F;
+    --rule:        #CBD5D2;
+    --rule-soft:   #DFE6E4;
+    --accent:      #0D6357;
+    --accent-soft: #DCEEEA;
+    --signal:      #A6501B;
+    --signal-soft: #F6E9DD;
+
+    --font-mono: ui-monospace, "Cascadia Mono", "Cascadia Code", "SF Mono", "JetBrains Mono", Consolas, monospace;
+    --font-body: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    --font-ui:   "Segoe UI", system-ui, -apple-system, "Helvetica Neue", sans-serif;
+
+    --measure: 68ch;
+    --pad: clamp(1.25rem, 4vw, 3.5rem);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:      #0C1413;
+      --surface:     #141F1D;
+      --surface-2:   #1C2826;
+      --ink:         #E2EAE8;
+      --ink-soft:    #B6C4C1;
+      --muted:       #849793;
+      --rule:        #2C3B38;
+      --rule-soft:   #22302E;
+      --accent:      #55C6B2;
+      --accent-soft: #13322D;
+      --signal:      #DE9457;
+      --signal-soft: #33241A;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground:      #0C1413;
+    --surface:     #141F1D;
+    --surface-2:   #1C2826;
+    --ink:         #E2EAE8;
+    --ink-soft:    #B6C4C1;
+    --muted:       #849793;
+    --rule:        #2C3B38;
+    --rule-soft:   #22302E;
+    --accent:      #55C6B2;
+    --accent-soft: #13322D;
+    --signal:      #DE9457;
+    --signal-soft: #33241A;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--font-body);
+    font-size: 17px;
+    line-height: 1.62;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 78rem;
+    margin: 0 auto;
+    padding: var(--pad);
+    display: flex;
+    flex-direction: column;
+    gap: 4.5rem;
+  }
+
+  .col { max-width: var(--measure); }
+
+  p { margin: 0 0 1rem; }
+  p:last-child { margin-bottom: 0; }
+  strong { font-weight: 600; color: var(--ink); }
+  code, .mono { font-family: var(--font-mono); }
+
+  p code, li code, td code, dd code {
+    font-size: 0.82em;
+    background: var(--surface-2);
+    padding: 0.1em 0.36em;
+    border-radius: 3px;
+    color: var(--ink-soft);
+  }
+
+  /* ---------- masthead ---------- */
+
+  .masthead {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    padding-bottom: 2.5rem;
+    border-bottom: 2px solid var(--ink);
+  }
+
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0;
+  }
+
+  h1 {
+    font-family: var(--font-mono);
+    font-size: clamp(2.1rem, 5.5vw, 3.1rem);
+    line-height: 1.04;
+    letter-spacing: -0.035em;
+    font-weight: 600;
+    margin: 0;
+    text-wrap: balance;
+  }
+
+  .standfirst {
+    font-size: clamp(1.06rem, 2vw, 1.24rem);
+    line-height: 1.5;
+    color: var(--ink-soft);
+    max-width: 56ch;
+    margin: 0;
+  }
+
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 2.25rem;
+    font-family: var(--font-mono);
+    font-size: 0.76rem;
+    color: var(--muted);
+    padding-top: 0.5rem;
+  }
+  .meta span b { color: var(--ink-soft); font-weight: 500; letter-spacing: 0.02em; }
+  .meta span::before {
+    content: attr(data-k);
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    font-size: 0.9em;
+    margin-right: 0.6em;
+  }
+
+  /* ---------- sections ---------- */
+
+  section { display: flex; flex-direction: column; gap: 1.5rem; }
+
+  .sec-head {
+    display: flex;
+    align-items: baseline;
+    gap: 1rem;
+    border-bottom: 1px solid var(--rule);
+    padding-bottom: 0.7rem;
+  }
+
+  .sec-num {
+    font-family: var(--font-mono);
+    font-size: 0.74rem;
+    letter-spacing: 0.1em;
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+    flex: none;
+  }
+
+  h2 {
+    font-family: var(--font-mono);
+    font-size: clamp(1.15rem, 2.4vw, 1.42rem);
+    letter-spacing: -0.02em;
+    font-weight: 600;
+    margin: 0;
+    text-wrap: balance;
+  }
+
+  h3 { font-family: var(--font-ui); font-size: 0.98rem; font-weight: 650; margin: 0; }
+
+  /* ---------- verdict banner ---------- */
+
+  .verdict {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+    gap: 1px;
+    background: var(--rule);
+    border: 1px solid var(--rule);
+  }
+  .verdict > div {
+    background: var(--surface);
+    padding: 1.15rem 1.2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+  .verdict .n {
+    font-family: var(--font-mono);
+    font-size: 1.7rem;
+    letter-spacing: -0.03em;
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+  }
+  .verdict .n.warn { color: var(--signal); }
+  .verdict .n:not(.num) { font-size: 1.15rem; letter-spacing: -0.01em; line-height: 1.25; }
+  .verdict .n.num { font-size: 1.7rem; }
+  .verdict .l {
+    font-family: var(--font-ui);
+    font-size: 0.8rem;
+    line-height: 1.45;
+    color: var(--ink-soft);
+  }
+
+  /* ---------- callouts ---------- */
+
+  .note {
+    padding: 1.5rem clamp(1.1rem, 3vw, 1.9rem);
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+  }
+  .note.hot { background: var(--signal-soft); border-left: 3px solid var(--signal); }
+  .note.cool { background: var(--accent-soft); border-left: 3px solid var(--accent); }
+
+  .note .tag {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+  }
+  .note.hot .tag { color: var(--signal); }
+  .note.cool .tag { color: var(--accent); }
+
+  .note .lede {
+    font-family: var(--font-ui);
+    font-size: 1.1rem;
+    font-weight: 650;
+    line-height: 1.4;
+    margin: 0;
+    max-width: 50ch;
+  }
+  .note p { max-width: 68ch; color: var(--ink-soft); }
+
+  .note pre {
+    background: transparent;
+    border: none;
+    border-left: 2px solid currentColor;
+    padding: 0.1rem 0 0.1rem 0.9rem;
+    color: var(--ink);
+    font-size: 0.8rem;
+  }
+
+  /* ---------- diagram ---------- */
+
+  .figure { display: flex; flex-direction: column; gap: 0.9rem; }
+
+  .scroller {
+    overflow-x: auto;
+    background: var(--surface);
+    border: 1px solid var(--rule-soft);
+    padding: 1.5rem 1.25rem;
+  }
+  .scroller svg { display: block; min-width: 900px; width: 100%; height: auto; }
+
+  figcaption, .cap {
+    font-family: var(--font-mono);
+    font-size: 0.74rem;
+    color: var(--muted);
+    line-height: 1.55;
+  }
+
+  /* ---------- tables ---------- */
+
+  .tbl-wrap { overflow-x: auto; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: var(--font-ui);
+    font-size: 0.855rem;
+    line-height: 1.5;
+    min-width: 640px;
+  }
+
+  th {
+    text-align: left;
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 500;
+    padding: 0 1.1rem 0.65rem 0;
+    border-bottom: 1px solid var(--rule);
+    vertical-align: bottom;
+  }
+
+  td {
+    padding: 0.85rem 1.1rem 0.85rem 0;
+    border-bottom: 1px solid var(--rule-soft);
+    vertical-align: top;
+    color: var(--ink-soft);
+  }
+
+  td:first-child { color: var(--ink); font-weight: 600; width: 27%; }
+  th:last-child, td:last-child { padding-right: 0; }
+
+  td .mono { font-size: 0.85em; color: var(--muted); display: block; margin-top: 0.28rem; }
+
+  .pill {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 0.63rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 0.18em 0.5em;
+    border: 1px solid currentColor;
+    white-space: nowrap;
+  }
+  .pill.ok { color: var(--accent); }
+  .pill.no { color: var(--signal); }
+
+  /* ---------- decisions ---------- */
+
+  .decisions { display: flex; flex-direction: column; gap: 0; border-top: 1px solid var(--rule); }
+
+  .decision {
+    display: grid;
+    grid-template-columns: 3rem 1fr;
+    gap: 0 1.5rem;
+    padding: 1.5rem 0;
+    border-bottom: 1px solid var(--rule-soft);
+  }
+  .decision .d-n {
+    font-family: var(--font-mono);
+    font-size: 1.1rem;
+    color: var(--signal);
+    font-variant-numeric: tabular-nums;
+    line-height: 1.25;
+  }
+  .decision .d-b { display: flex; flex-direction: column; gap: 0.5rem; max-width: var(--measure); }
+  .decision p { font-size: 0.92rem; color: var(--ink-soft); margin: 0; }
+
+  .opts { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.15rem; }
+  .opts span {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    padding: 0.28em 0.6em;
+    color: var(--ink-soft);
+  }
+
+  /* ---------- stages ---------- */
+
+  .stages { display: flex; flex-direction: column; gap: 0; border-top: 1px solid var(--rule); }
+
+  .stage {
+    display: grid;
+    grid-template-columns: 6rem 1fr;
+    gap: 0 1.75rem;
+    padding: 1.55rem 0;
+    border-bottom: 1px solid var(--rule-soft);
+  }
+
+  .stage-id {
+    font-family: var(--font-mono);
+    font-size: 0.74rem;
+    letter-spacing: 0.1em;
+    color: var(--accent);
+    padding-top: 0.18rem;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .stage-body { display: flex; flex-direction: column; gap: 0.65rem; max-width: var(--measure); }
+  .stage-body p { font-size: 0.93rem; color: var(--ink-soft); margin: 0; }
+
+  .gate {
+    font-family: var(--font-ui);
+    font-size: 0.83rem;
+    line-height: 1.5;
+    background: var(--accent-soft);
+    color: var(--ink);
+    padding: 0.6rem 0.85rem;
+    border-left: 2px solid var(--accent);
+  }
+  .gate b {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--accent);
+    display: block;
+    margin-bottom: 0.2rem;
+    font-weight: 500;
+  }
+  .gate.stop { background: var(--signal-soft); border-left-color: var(--signal); }
+  .gate.stop b { color: var(--signal); }
+
+  /* ---------- lists ---------- */
+
+  .grid-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr));
+    gap: 1px;
+    background: var(--rule-soft);
+    border: 1px solid var(--rule-soft);
+  }
+  .grid-list li {
+    background: var(--surface);
+    padding: 1rem 1.15rem;
+    font-family: var(--font-ui);
+    font-size: 0.85rem;
+    line-height: 1.5;
+    color: var(--ink-soft);
+    display: flex;
+    flex-direction: column;
+    gap: 0.28rem;
+  }
+  .grid-list b {
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    color: var(--ink);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+
+  ol.checks {
+    margin: 0;
+    padding-left: 0;
+    list-style: none;
+    counter-reset: chk;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(21rem, 1fr));
+    gap: 0.5rem 2.5rem;
+  }
+  ol.checks li {
+    counter-increment: chk;
+    display: grid;
+    grid-template-columns: 1.9rem 1fr;
+    font-family: var(--font-ui);
+    font-size: 0.86rem;
+    line-height: 1.5;
+    color: var(--ink-soft);
+  }
+  ol.checks li::before {
+    content: counter(chk, decimal-leading-zero);
+    font-family: var(--font-mono);
+    font-size: 0.71rem;
+    color: var(--accent);
+    padding-top: 0.22rem;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .arms { display: grid; grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr)); gap: 2rem 3rem; }
+  .arm { display: flex; flex-direction: column; gap: 0.5rem; }
+  .arm .k {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+  .arm .k.dim { color: var(--muted); }
+  .arm p { font-size: 0.89rem; color: var(--ink-soft); margin: 0; }
+
+  pre {
+    margin: 0;
+    background: var(--surface);
+    border: 1px solid var(--rule-soft);
+    border-left: 2px solid var(--accent);
+    padding: 1.1rem 1.2rem;
+    overflow-x: auto;
+    font-family: var(--font-mono);
+    font-size: 0.79rem;
+    line-height: 1.72;
+    color: var(--ink-soft);
+  }
+  pre .c { color: var(--muted); }
+  pre .k { color: var(--accent); }
+
+  footer {
+    border-top: 2px solid var(--ink);
+    padding-top: 1.5rem;
+    font-family: var(--font-mono);
+    font-size: 0.74rem;
+    color: var(--muted);
+    line-height: 1.7;
+  }
+
+  @media (max-width: 40rem) {
+    .stage, .decision { grid-template-columns: 1fr; gap: 0.5rem; }
+    .meta { gap: 0.3rem 1.5rem; flex-direction: column; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="eyebrow">Build plan · revision 7</p>
+    <h1>MMS Connector</h1>
+    <p class="standfirst">One scripted pipeline that turns an approved archive into a CMS-native Instatic install. Architecture is a conditional go. Coding is still a no-go, and this page says exactly why.</p>
+    <div class="meta">
+      <span data-k="target"><b>Instatic CMS 0.0.16</b></span>
+      <span data-k="location"><b>s:\SiteAgentHub\Connector</b></span>
+      <span data-k="runtime"><b>Bun</b></span>
+      <span data-k="stages"><b>8</b></span>
+    </div>
+  </header>
+
+  <section>
+    <div class="sec-head">
+      <span class="sec-num">01</span>
+      <h2>Where revision 1 stood</h2>
+    </div>
+
+    <div class="verdict">
+      <div><span class="n">Conditional go</span><span class="l">on the architecture</span></div>
+      <div><span class="n warn">No-go</span><span class="l">on starting to write code</span></div>
+      <div><span class="n num">44</span><span class="l">review findings accepted across six validation passes</span></div>
+      <div><span class="n num warn">4</span><span class="l">product decisions owed, plus a two-part core change</span></div>
+    </div>
+
+    <div class="col">
+      <p>The verdict I accept: <strong>the plugin-based activation design was wrong, and the plan promised guarantees the chosen APIs cannot deliver.</strong> Everything moved into the CLI, the plugin became optional, and the promises that could not be kept were removed rather than softened.</p>
+      <p>The second review pass closed six more. Two of those were not gaps in detail — they were <strong>claims that could never have been true</strong>: a rerun that writes nothing while unconditionally publishing the site, and a backup that does not restore what it says it restores. Both are corrected below rather than reworded.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <span class="sec-num">02</span>
+      <h2>Two promises that were false</h2>
+    </div>
+
+    <div class="note hot">
+      <span class="tag">Corrected</span>
+      <p class="lede">A SiteBundle export is not a rollback backup.</p>
+      <p>The plan said: take a full export, checksum it, restore-drill it, and you have a safety net. The export carries the site shell, tables, rows, media, folders and redirects — <strong>and nothing else</strong>. No version history, no active-version pointers, no published site snapshot, no baked artefacts on disk, no plugin state or grants, no users, roles or audit.</p>
+      <p>Restoring it gives the draft content back and leaves the published state wrong. That is worse than no backup, because someone would trust it. A real pre-write backup is a <strong>database dump plus the uploads directory, taken together with the target quiesced</strong> — that is what gets checksummed and drilled. And for a first migration the actual rollback is a traffic switch, not a restore at all.</p>
+    </div>
+
+    <div class="note hot">
+      <span class="tag">Corrected</span>
+      <p class="lede">Full-site publish always writes, so the rerun could never have been a no-op.</p>
+      <p>The idempotency gate promised "zero publish calls, zero new versions" on a second run. But the release command called full-site publish unconditionally, and that path creates page versions every single time. The gate was unpassable as written.</p>
+      <p>Full-site publish is now <strong>conditional</strong>: skipped when the draft hashes identically to what sits behind the current published snapshot. The comparison covers the site document, not just the shell — an earlier draft said "shell", which would have skipped exactly the publishes that matter, since the shell holds breakpoints, settings, style rules and runtime but not pages, templates or components.</p>
+      <p><strong>But the hash must exclude saved layouts</strong>, and an earlier draft explicitly included them. Verified in our fork: the draft-document assembler returns shell, pages and visual components, then sets <code>layouts: []</code> with the comment <em>"Saved layouts are editor-only; publishing ignores them."</em> Including layouts flips the hash on a layout edit and triggers a full-site publish that changes nothing published — the exact false positive this conditional exists to prevent. The hash mirrors what the assembler actually returns, not what the phrase "site document" suggests.</p>
+      <p>The gate is restated to include "zero new page versions because the publish was skipped", with the skip decision logged either way. If the shell genuinely changed, the run is not a no-op and does not claim to be.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <span class="sec-num">03</span>
+      <h2>The correction that simplifies everything</h2>
+    </div>
+
+    <div class="note cool">
+      <span class="tag">Verified in our fork</span>
+      <p class="lede">A core row-publish endpoint already exists. The activation plugin is deleted.</p>
+      <pre>POST {prefix}/data/rows/:id/publish
+  → publishDataRow(db, rowId, user.id, options.uploadsDir)</pre>
+      <p>Revision 1 argued the plugin API was the only headless door to activation. It is not. The core HTTP route does the same job through the ordinary CMS session — and it passes <code>uploadsDir</code>, which the plugin path does not, so it also bakes the row artefact. The plugin was strictly worse and added install, permission, sandbox and route failure points for no benefit.</p>
+      <p>Deleting it collapses three arms into one: <strong>the CLI owns the whole pipeline.</strong> The plugin survives only as an optional extra for site packs and CDN URL rewriting.</p>
+    </div>
+
+    <div class="note hot">
+      <span class="tag">Still true — and now handled properly</span>
+      <p class="lede">Imported rows have no active version, so they do not render.</p>
+      <p>Import writes <code>data_rows</code> and nothing else. Public routes join through <code>active_version_id</code>. But there are two gaps, not one: new rows render nothing, and a <code>merge-overwrite</code> of an <em>already published</em> row keeps its old active version — so visitors see <strong>stale content rather than no content</strong>, which is harder to notice.</p>
+      <p>Fixing it needs two publish calls, not one: a full-site publish for the site snapshot and page versions, then per-row publish for the entries. The full-site publish requires <code>pages.publish</code> <em>and</em> a step-up authentication challenge. Revision 1 had neither.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <span class="sec-num">04</span>
+      <h2>What goes in, and what runs when</h2>
+    </div>
+
+    <div class="note hot">
+      <span class="tag">Corrected</span>
+      <p class="lede">The input is an approved immutable archive, not a live recrawl.</p>
+      <p>Revision 1 described the input as "an HTML export, with an optional structured feed". That is wrong, and the consequence is not cosmetic: a pipeline that re-reads a live site cannot tell you what it published, because the thing it published no longer exists in the form it was approved in.</p>
+      <p>The connector takes a <strong>content-addressed archive reference with a snapshot hash and a verified manifest</strong> — not a URL. It records that hash in its run manifest and refuses to release against an archive whose hash does not match the approval it was handed. Re-capturing the source is a separate upstream action that produces a new artefact and re-enters approval; it never silently becomes the next run's input.</p>
+    </div>
+
+    <div class="note cool">
+      <span class="tag">Corrected</span>
+      <p class="lede">Two commands, not one. Staging and releasing are different actions.</p>
+      <pre>push-draft                     preview + import, never publishes; emits a draft hash
+
+release --approval &lt;id&gt;          the approval record itself
+        --signers  &lt;ids&gt;         who signed it
+        --snapshot &lt;hash&gt;        the source archive it was granted against
+        --document &lt;hash&gt;        shell + pages + visualComponents — LAYOUTS EXCLUDED
+        --rows     &lt;digest&gt;      every approved row&#39;s canonical content hash
+        --media    &lt;digest&gt;      byte-level hash of every approved media asset
+        --contract &lt;hash&gt;        the four system tables and their field schema
+        --recipe   &lt;hash&gt;        connector version + config + strategy + flags
+        --manifest &lt;id#hash&gt; manifest identity, version AND content hash
+        --project  &lt;id&gt;          the exact project
+        --domain   &lt;fqdn&gt;        the exact domain
+        --target   &lt;host&gt;        the exact tenant</pre>
+      <p>Revision 1 fused import and activation into a single command. That is what made it both unreviewable — nobody could inspect the result before it went live — and unrecoverable, because there was no point at which anyone had agreed to what was about to be published.</p>
+      <p>Revision 2 bound only the source snapshot, which is not enough: <strong>you could approve draft A on target X and release draft B onto target Y, and every check would still pass.</strong> Every value must match the approval record.</p>
+      <p><strong>The document hash alone is not enough.</strong> The document covers the site with its pages, templates and visual components — layouts excluded, as above — and it does <em>not</em> cover the 397 post rows. Binding only the document would let every post body change between approval and release with the check still passing. The row digest closes that half, and the media digest closes a third: rows can reference media whose <em>bytes</em> changed while ids and cell values stayed identical, so that hash is byte-level, not id-level. The contract hash covers the four system table definitions — if a field is added, renamed or retyped after approval, the emitted rows no longer mean what was approved, so the release fails rather than writing cells against a shifted schema.</p>
+      <p>An approval is a statement about one specific draft on one specific target. The command must be incapable of reading it as anything looser.</p>
+    </div>
+
+    <div class="note hot">
+      <span class="tag">Open — no clean fix available today</span>
+      <p class="lede">The hash check is a race, and re-checking does not close it.</p>
+      <p>A client-side check is time-of-check-to-time-of-use. The CLI reads the draft, hashes it, compares, then calls publish — and an editor session can change content inside that window. Nothing the CLI does alone fixes this. Hashing again immediately before the call <strong>narrows</strong> the window; it does not close it, and a plan claiming otherwise is claiming a guarantee it cannot provide.</p>
+      <p>Two things actually close it, and both are prerequisites rather than implementation details:</p>
+      <p><strong>Server-side expected-hash — and the two endpoints need different placement.</strong> An earlier draft said "inside the same transaction that reads the draft" for both. That is wrong for the site path and would have been costly to discover.</p>
+      <p><strong>Site:</strong> the publisher deliberately reads the draft <em>outside</em> its database transaction, because dependency installs and per-page esbuild runs take seconds and the SQLite adapter serialises every transaction through one chain — doing that work inside would stall every concurrent autosave and row publish. So the contract is: flush collaboration, take the existing publish lock, assemble the document once, compare <code>If-Match</code> against it, and then <strong>reuse that exact captured object</strong> for every subsequent build and write. No long site transaction is needed, and the publisher must not reread the draft afterwards.</p>
+      <p><strong>Row:</strong> compare inside the existing row transaction, immediately after the reread and <em>before</em> version-number allocation, version insert, row update, redirect creation, audit, content event, artefact write or cache bump.</p>
+      <p>Both return <code>412 Precondition Failed</code> with a stable error code and write nothing — no snapshot, version, audit, artefact, hook, cache bump or webhook. One <code>If-Match</code> contract, not a second body-plus-409 variant. The good news: the canonical hash function already exists — <code>siteContentHash</code> over sorted-key canonical JSON — so this reuses core machinery rather than inventing a parallel scheme.</p>
+      <p><strong>Or an enforced write freeze.</strong> The target rejects draft writes for the release window, with editor sessions disconnected rather than merely asked to stop. An advisory "please don't edit" is not a freeze.</p>
+      <p>Until one exists, client-side rehashing is <strong>diagnosis only</strong>. It narrows the window, it does not close it, and it does not authorize a production release. The only acceptable v1 alternative is a genuine server-enforced writer freeze — proxy-level, returning <code>423 Locked</code> to every principal except the connector, with editor sessions, tokens, schedulers, plugin mutations and collaboration writes all revoked and canary-proved, recorded in a hashed freeze-proof inventory. An operator message asking people not to edit is not a freeze.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <span class="sec-num">05</span>
+      <h2>Corrected pipeline</h2>
+    </div>
+
+    <figure class="figure">
+      <div class="scroller">
+        <svg viewBox="0 0 1120 330" role="img" aria-label="Pipeline: source to CLI to bundle to draft import, then approval, then step-up, full-site publish, per-row publish and verification.">
+          <defs>
+            <marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M 0 1 L 9 5 L 0 9 z" fill="var(--rule)"></path>
+            </marker>
+            <marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M 0 1 L 9 5 L 0 9 z" fill="var(--accent)"></path>
+            </marker>
+          </defs>
+
+          <g font-family="var(--font-mono)">
+
+            <text x="12" y="22" font-size="10" letter-spacing="0.14em" fill="var(--muted)">PUSH-DRAFT · STAGE 1—2 · NO LIVE CHANGE</text>
+            <line x1="12" y1="32" x2="1108" y2="32" stroke="var(--rule-soft)" stroke-width="1"></line>
+
+            <rect x="12" y="48" width="150" height="56" fill="var(--surface-2)" stroke="var(--rule)"></rect>
+            <text x="87" y="72" text-anchor="middle" font-size="12" font-weight="600" fill="var(--ink)">APPROVED ARCHIVE</text>
+            <text x="87" y="89" text-anchor="middle" font-size="10" fill="var(--muted)">immutable · hashed</text>
+
+            <line x1="168" y1="76" x2="196" y2="76" stroke="var(--rule)" stroke-width="1.5" marker-end="url(#a1)"></line>
+
+            <rect x="202" y="48" width="176" height="56" fill="var(--surface)" stroke="var(--accent)" stroke-width="1.5"></rect>
+            <text x="290" y="72" text-anchor="middle" font-size="12" font-weight="600" fill="var(--ink)">CONNECTOR CLI</text>
+            <text x="290" y="89" text-anchor="middle" font-size="10" fill="var(--accent)">hash · emit · validate</text>
+
+            <line x1="384" y1="76" x2="412" y2="76" stroke="var(--rule)" stroke-width="1.5" marker-end="url(#a1)"></line>
+
+            <rect x="418" y="48" width="160" height="56" fill="var(--surface-2)" stroke="var(--rule)"></rect>
+            <text x="498" y="72" text-anchor="middle" font-size="12" font-weight="600" fill="var(--ink)">DB + UPLOADS BACKUP</text>
+            <text x="498" y="89" text-anchor="middle" font-size="10" fill="var(--muted)">quiesced · restore-drilled</text>
+
+            <line x1="584" y1="76" x2="612" y2="76" stroke="var(--rule)" stroke-width="1.5" marker-end="url(#a1)"></line>
+
+            <rect x="618" y="48" width="176" height="56" fill="var(--surface-2)" stroke="var(--rule)"></rect>
+            <text x="706" y="72" text-anchor="middle" font-size="12" font-weight="600" fill="var(--ink)">IMPORT AS DRAFT</text>
+            <text x="706" y="89" text-anchor="middle" font-size="10" fill="var(--muted)">merge-overwrite · step-up if replace</text>
+
+            <line x1="800" y1="76" x2="828" y2="76" stroke="var(--rule)" stroke-width="1.5" marker-end="url(#a1)"></line>
+
+            <rect x="834" y="48" width="176" height="56" fill="var(--surface)" stroke="var(--rule)" stroke-dasharray="5 4"></rect>
+            <text x="922" y="72" text-anchor="middle" font-size="12" font-weight="600" fill="var(--ink)">REVIEW + APPROVE</text>
+            <text x="922" y="89" text-anchor="middle" font-size="10" fill="var(--muted)">frozen draft evidence</text>
+
+            <path d="M 922 110 L 922 132 L 87 132 L 87 158" fill="none" stroke="var(--accent)" stroke-width="1.5" marker-end="url(#a2)"></path>
+
+            <text x="12" y="184" font-size="10" letter-spacing="0.14em" fill="var(--accent)">RELEASE · BINDS APPROVAL + SNAPSHOT + DOCUMENT + ROWS + CONTRACT + MANIFEST + TARGET · LIVE WRITES BEGIN</text>
+            <line x1="12" y1="194" x2="1108" y2="194" stroke="var(--rule-soft)" stroke-width="1"></line>
+
+            <rect x="12" y="210" width="150" height="56" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.5"></rect>
+            <text x="87" y="234" text-anchor="middle" font-size="12" font-weight="600" fill="var(--ink)">STEP-UP AUTH</text>
+            <text x="87" y="251" text-anchor="middle" font-size="10" fill="var(--accent)">cookie rotates</text>
+
+            <line x1="168" y1="238" x2="196" y2="238" stroke="var(--accent)" stroke-width="1.5" marker-end="url(#a2)"></line>
+
+            <rect x="202" y="210" width="200" height="56" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.5"></rect>
+            <text x="302" y="234" text-anchor="middle" font-size="12" font-weight="600" fill="var(--ink)">FULL-SITE PUBLISH</text>
+            <text x="302" y="251" text-anchor="middle" font-size="10" fill="var(--accent)">only if document hash differs</text>
+
+            <line x1="408" y1="238" x2="436" y2="238" stroke="var(--accent)" stroke-width="1.5" marker-end="url(#a2)"></line>
+
+            <rect x="442" y="210" width="216" height="56" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.5"></rect>
+            <text x="550" y="234" text-anchor="middle" font-size="12" font-weight="600" fill="var(--ink)">PUBLISH CHANGED ROWS</text>
+            <text x="550" y="251" text-anchor="middle" font-size="10" fill="var(--accent)">core HTTP · resumable</text>
+
+            <line x1="664" y1="238" x2="692" y2="238" stroke="var(--accent)" stroke-width="1.5" marker-end="url(#a2)"></line>
+
+            <rect x="698" y="210" width="176" height="56" fill="var(--surface)" stroke="var(--accent)" stroke-width="1.5"></rect>
+            <text x="786" y="234" text-anchor="middle" font-size="12" font-weight="600" fill="var(--ink)">VERIFY</text>
+            <text x="786" y="251" text-anchor="middle" font-size="10" fill="var(--accent)">routes · 301s · rerun</text>
+
+            <text x="1000" y="234" text-anchor="middle" font-size="11" fill="var(--signal)">not atomic</text>
+            <text x="1000" y="250" text-anchor="middle" font-size="10" fill="var(--muted)">blue-green or</text>
+            <text x="1000" y="264" text-anchor="middle" font-size="10" fill="var(--muted)">partial-release report</text>
+
+            <path d="M 880 226 L 900 226 L 900 250 L 880 250" fill="none" stroke="var(--rule)" stroke-width="1"></path>
+
+            <text x="12" y="292" font-size="10.5" fill="var(--muted)">Each row publish is its own transaction behind one global lock — a mid-run failure leaves old and new versions coexisting.</text>
+            <text x="12" y="309" font-size="10.5" fill="var(--signal)">The hash check is client-side: re-checking narrows the race window, it does not close it. Only a server-side expected-hash or an enforced write freeze does.</text>
+          </g>
+        </svg>
+      </div>
+      <figcaption>Import is a staging action. Publishing is a release action. Revision 1 fused them into one command; that is what made it unreviewable and unrecoverable.</figcaption>
+    </figure>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <span class="sec-num">06</span>
+      <h2>Findings accepted</h2>
+    </div>
+    <div class="col">
+      <p>Each of these was verified in our own fork before being accepted. Together they are the difference between a one-shot importer and a migration system.</p>
+    </div>
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr><th>Finding</th><th>What the source shows</th><th>Change to the plan</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Core row-publish endpoint exists</td>
+            <td>Route registered, handler passes <code>uploadsDir</code><span class="mono">the plugin path does not</span></td>
+            <td>Activation plugin deleted; CLI calls core directly</td>
+          </tr>
+          <tr>
+            <td>merge-overwrite skips redirects</td>
+            <td>Redirect import sits inside the <code>replace</code> branch only</td>
+            <td>The redirect gate could not have passed. Mechanism must be chosen first</td>
+          </tr>
+          <tr>
+            <td>Media folders are replace-only too</td>
+            <td>Same branch as redirects</td>
+            <td>Folder membership does not survive a merge. Stated, not assumed</td>
+          </tr>
+          <tr>
+            <td>Full-site publish is required</td>
+            <td>Needs <code>pages.publish</code> plus a step-up challenge</td>
+            <td>Added as its own release stage with a rotated session cookie</td>
+          </tr>
+          <tr>
+            <td>A second run is not a no-op</td>
+            <td>Upserts every row; every publish inserts a new version</td>
+            <td>Idempotency becomes a content-hash mechanism, not an assertion</td>
+          </tr>
+          <tr>
+            <td>Post bodies are Markdown</td>
+            <td>The HTML converter returns a page-node fragment, not Markdown</td>
+            <td>HTML-to-Markdown is now a named workstream with its own fixtures</td>
+          </tr>
+          <tr>
+            <td>The publish filter cannot identify a post</td>
+            <td>Its context carries only site, page and slug</td>
+            <td>Per-entry canonical, OG and JSON-LD blocked pending a core change</td>
+          </tr>
+          <tr>
+            <td>Wrong CDN API named</td>
+            <td>URL transform rewrites delivery; the variant delegate replaces generation</td>
+            <td>Use the URL transform for delivery-only work</td>
+          </tr>
+          <tr>
+            <td>Handwritten minifier is unsafe</td>
+            <td>Whitespace behaviour is inherited, so a tag allowlist is not enough</td>
+            <td>Dropped. Measure Brotli and gzip first</td>
+          </tr>
+          <tr>
+            <td>Plugin ids must be namespaced</td>
+            <td>The builder throws on an id without a dot</td>
+            <td><code>mms-connector</code> becomes <code>mms.connector</code></td>
+          </tr>
+          <tr>
+            <td>Doctor must check warnings</td>
+            <td>Failed CSS conversion returns zero rules <em>and</em> a warning</td>
+            <td>Gate now requires zero unexpected warnings, not just non-zero counts</td>
+          </tr>
+          <tr>
+            <td>Import drops author references</td>
+            <td>Documented as deliberate in the row importer</td>
+            <td>Publishing needs the broader right, or reattribution first</td>
+          </tr>
+          <tr>
+            <td>No backup or recovery story</td>
+            <td>No previous-version activation route exists on rows</td>
+            <td>Verified restore drill before any write; partial-release report on failure</td>
+          </tr>
+          <tr>
+            <td>Input was a live recrawl</td>
+            <td>The approved input is an immutable archive with a snapshot hash and verified manifest</td>
+            <td>The connector takes a content-addressed reference, not a URL. A fresh capture re-enters approval</td>
+          </tr>
+          <tr>
+            <td>Import and release were one command</td>
+            <td>Staging and releasing are different actions with an approval between them</td>
+            <td>Split into <code>push-draft</code> and <code>release</code>, the latter requiring a matching approval id and hash</td>
+          </tr>
+          <tr>
+            <td>System table definitions pushed blind</td>
+            <td>Import calls repository updates directly and can rewrite a system table's name, slug, route, labels and fields</td>
+            <td>Read and compare the target definitions; preserve built-ins exactly</td>
+          </tr>
+          <tr>
+            <td>Loop needed only a table id</td>
+            <td>That attribute fills the filter only — the source id comes from a separate attribute</td>
+            <td>Author loops with both <code>data-source-id</code> and <code>data-table-id</code></td>
+          </tr>
+          <tr>
+            <td>Batching avoids hundreds of transactions</td>
+            <td>Every row publish takes the global lock and opens its own transaction regardless</td>
+            <td>The cursor buys recovery, not throughput. Say so rather than imply a speed-up</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <span class="sec-num">07</span>
+      <h2>The one disagreement</h2>
+    </div>
+
+    <div class="note hot">
+      <span class="tag">Settled — was a disagreement</span>
+      <p class="lede">The route prefix and cookie path differ from public upstream — now confirmed by both sides.</p>
+      <pre>Instatic/server/handlers/cms/shared.ts:24
+export const CMS_API_PREFIX = '/cms/api/cms'</pre>
+      <p>The review originally reported <code>/admin/api/cms</code> from public upstream. It has since inspected the fork source directly and confirms <code>/cms/api/cms</code> — <strong>the dispute is settled and should not be reopened.</strong> One addition: the prefix and the session cookie path are a single compatibility unit. Our fork sets <code>Path=/cms</code>, so a connector that gets the prefix right and the cookie path wrong still fails.</p>
+      <p><strong>The useful conclusion is that neither of us should hardcode it.</strong> The connector imports the prefix constant from source and, when addressing a host it did not build, probes the prefix at startup and fails loudly on mismatch. A disagreement becomes a compatibility lock — which also catches the next divergence, and there will be one.</p>
+    </div>
+
+    <div class="col">
+      <p>One further claim could not be checked: the review cites <code>DECISIONS.md</code> as a governance stop on implementation. <strong>There is no such file anywhere in this repository.</strong> If that approval process governs this work it is a genuine input, but it is a process fact rather than a code fact — an external gate, not a repository constraint.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <span class="sec-num">08</span>
+      <h2>Decisions required before any code</h2>
+    </div>
+    <div class="col">
+      <p>Each one gates a promise the plan would otherwise make falsely. None can be deferred into implementation.</p>
+    </div>
+
+    <div class="decisions">
+      <div class="decision">
+        <div class="d-n">A</div>
+        <div class="d-b">
+          <h3>How redirects get imported</h3>
+          <p>The chosen import strategy cannot carry them. Until this is settled, redirect parity is not a gate the connector can pass — and it was one of the headline deliverables.</p>
+          <p><strong>Note that <code>replace</code> is green-target-only.</strong> It deletes every row, every non-system table, all media folders and all redirects before reinserting. On a target holding live content that is not a strategy, it is a wipe. The connector must refuse it unless the target is verified empty of user content, checked <em>before</em> step-up rather than after. It is an option for a first migration onto a fresh target and for nothing else.</p>
+          <div class="opts">
+            <span>replace — green target only</span>
+            <span>narrow core redirect endpoint</span>
+            <span>import at the edge</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="decision">
+        <div class="d-n">B</div>
+        <div class="d-b">
+          <h3>Whether per-entry SEO waits for a core change</h3>
+          <p>The publish filter cannot see which post it is rendering. Native title and description already work and ship regardless. Canonical, Open Graph and Article JSON-LD need the filter context to carry the URL path, table and entry id.</p>
+          <div class="opts">
+            <span>ship native SEO now, extend core later</span>
+            <span>make the core change part of this work</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="decision">
+        <div class="d-n">C</div>
+        <div class="d-b">
+          <h3>How the site serves root sitemap and robots</h3>
+          <p>Plugin routes mount under a runtime path and cannot claim the host root. A sitemap served from a nested path does not cover the site, and robots must sit at the root to be read at all.</p>
+          <div class="opts">
+            <span>core root route</span>
+            <span>edge rewrite</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="decision">
+        <div class="d-n">D</div>
+        <div class="d-b">
+          <h3>Blue-green or in-place</h3>
+          <p>Nothing in this pipeline is atomic. For a first migration, publish to a separate target, verify completely, then switch traffic. In-place means old and new row versions coexist during the release window, so templates must stay backward-compatible throughout.</p>
+          <div class="opts">
+            <span>blue-green (recommended for first run)</span>
+            <span>in-place with compatibility plan</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <span class="sec-num">09</span>
+      <h2>Ownership after the correction</h2>
+    </div>
+    <div class="arms">
+      <div class="arm">
+        <span class="k">Primary — CLI</span>
+        <h3>Connector/</h3>
+        <p>Doctor, inventory, deterministic ids and content hashes, bundle emission, login and step-up, preview, import, full-site publish, changed-row publish, resumable run state, verification. It calls Instatic's own HTML converter and schemas by direct source import, so nothing about the conversion is reimplemented.</p>
+      </div>
+      <div class="arm">
+        <span class="k dim">Optional — Plugin</span>
+        <h3>mms.connector</h3>
+        <p>Only what genuinely needs a plugin: a versioned site pack for chrome, declared frontend assets, and a proven CDN URL rewrite. No activation route — it would duplicate the core endpoint and lose the artefact bake.</p>
+      </div>
+      <div class="arm">
+        <span class="k dim">Later — MCP</span>
+        <h3>Post-migration maintenance</h3>
+        <p>Least-privilege connector created only after the migration passes. Headless coverage is reads, media upload and publish; page-structure writes relay to an open editor tab by design. Pin the version — the tool set changed between releases.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <span class="sec-num">10</span>
+      <h2>Stages</h2>
+    </div>
+
+    <div class="stages">
+
+      <div class="stage">
+        <div class="stage-id">STAGE 0</div>
+        <div class="stage-body">
+          <h3>Pin and doctor</h3>
+          <p>Record the fork commit, version, route prefix, schema hash and Bun range, then diff every handler used here against public upstream and store the result as a compatibility lock. Reuse the plugin CLI's existing DOM environment rather than writing a second shim. Convert a fixture carrying text, nested markup, classes, linked and inline CSS, an outlet and a loop.</p>
+          <p><strong>The route dispute is now closed by evidence.</strong> The reviewer has read the fork source directly — commit <code>693139e</code>, branch NewVersion, package 0.0.16 — and confirms both the prefix and the <code>Path=/cms</code> cookie. What is still missing is a <em>clean</em> lock: that evidence came from a dirty working tree and a selected file bundle, with no live endpoint exercised. Stage 0 outputs a committed <code>connector.lock.json</code> binding fork commit and tree, a clean-worktree assertion, package and Bun versions, upstream diff hash, dependency-lock hash, relevant source and schema hashes, the HTTP unit (prefix, admin mount, cookie path, MCP endpoint, proxy policy, live route matrix), the publish contract (If-Match v1, site and row expected-hash required, layouts excluded, webhook suppressed), and evidence hashes. No secrets in the file. Generate it from a clean checkout or an immutable build image — never by cleaning the owner working tree.</p>
+          <p><strong>External preconditions on this stage.</strong> These sit outside the repository — I cannot verify them from code, and record them as stated requirements rather than as things I have checked: the extraction core passes its two authorized contrasting niche-site tests; the archive is frozen with operator and client approval; provisioning is in place and supported; the Binding Manifest is verified. Product Hub owns the approved archive and orchestration, Instatic is the publisher.</p>
+          <div class="gate stop"><b>Gate — currently failing</b>No stage past 0 begins until the four external preconditions hold, a clean lock file exists, and the live route/auth/import/publish matrix passes. None of the three is met today. A source import of the prefix constant is not sufficient when the connector addresses a separately deployed host.</div>
+          <div class="gate"><b>Doctor gate</b>Nodes above zero, expected module ids present, style rules above zero, zero unexpected warnings, and a published lock file.</div>
+        </div>
+      </div>
+
+      <div class="stage">
+        <div class="stage-id">STAGE 1</div>
+        <div class="stage-body">
+          <h3>Deterministic bundle emitter</h3>
+          <p>Export a canonical bundle from the target and fill its shape rather than hand-rolling one — the row and table schemas need far more than ids and cell bags. Stable ids derived from source identity, never array order. Synthesize a body root, reindex parents, map class names to deterministic ids. Convert post HTML to Markdown with an explicit sanitizer and embed policy. Build a real asset contract: download, validate, dedupe by content hash, map to media ids, then rewrite every reference once the mapping is final.</p>
+          <div class="gate"><b>Gate</b>Schema validates, counts match source, every reference resolves, every tree has one reachable root, every featured image is a real media id, Markdown fixtures round-trip with nothing lost.</div>
+        </div>
+      </div>
+
+      <div class="stage">
+        <div class="stage-id">STAGE 2</div>
+        <div class="stage-body">
+          <h3>Backup, preview, draft import</h3>
+          <p>The pre-write backup is a <strong>database dump plus the uploads tree, taken together with the target quiesced</strong> — checksummed, stored off-host, and restore-drilled on a scratch target. A bundle export is taken too, but only as a content-level artefact; it is never the restore path. Then preview, then import as draft. JSON goes to the import endpoint and ZIP to the archive endpoint — the server rejects an archive sent to the wrong one.</p>
+          <div class="gate"><b>Gate</b>Restore drill passes, draft inventory matches, no live route changed.</div>
+        </div>
+      </div>
+
+      <div class="stage">
+        <div class="stage-id">STAGE 3</div>
+        <div class="stage-body">
+          <h3>Release</h3>
+          <p>Step-up, retain the rotated cookie, then full-site publish <strong>if either the document hash or the release-recipe hash differs</strong> from the last verified release — skipped only when both match, with the decision logged either way. Document-hash-only was incomplete: a changed renderer, plugin, filter, dependency, runtime or deployment policy alters baked output while the document stays identical. Then publish only new or changed rows through the core endpoint, saving a resumable cursor after each. Do not parallelize — the host serializes behind a single publish lock, so concurrency buys nothing and complicates recovery.</p>
+          <div class="gate stop"><b>On failure</b>Stop and emit a partial-release manifest: completed row and version ids, the failed row, untouched rows, live-route checks, and the resume command. Restore means a tested backup restore or a traffic switch — there is no previous-version activation route.</div>
+          <div class="gate"><b>Gate</b>Site snapshot exists; every page and approved post has an active version; home, a page and a post all return 200.</div>
+        </div>
+      </div>
+
+      <div class="stage">
+        <div class="stage-id">STAGE 4</div>
+        <div class="stage-body">
+          <h3>Reusable chrome</h3>
+          <p>One owner for header and footer rows — connector bundle or plugin pack, never both, or reinstalling the pack duplicates them. Stable component ids, explicit unique template priorities, and exactly one usable outlet per template: a template without one renders chrome and no post body, and extra outlets are dead.</p>
+          <div class="gate"><b>Gate</b>Editing one header component changes every route; each page renders one header and one footer; post rows contain no copied chrome nodes.</div>
+        </div>
+      </div>
+
+      <div class="stage">
+        <div class="stage-id">STAGE 5</div>
+        <div class="stage-body">
+          <h3>Redirects</h3>
+          <p>Implement whichever mechanism decision A selected. This stage does not exist until that decision is made.</p>
+          <div class="gate"><b>Gate</b>Every redirect in the inventory returns 301 to the expected URL. A runtime-path sitemap or a note in a document is not proof.</div>
+        </div>
+      </div>
+
+      <div class="stage">
+        <div class="stage-id">STAGE 6</div>
+        <div class="stage-body">
+          <h3>Delivery optimization</h3>
+          <p>Measure compression before considering any HTML transform — it is likely to make the minifier question moot. CDN work uses the URL transform, not the variant delegate. Root sitemap and robots per decision C. Per-entry SEO only once decision B unblocks; native title and description ship regardless.</p>
+          <div class="gate"><b>Gate — native scope, what ships</b>Exactly one title and one description per route, non-empty, matching the source; root sitemap and robots return correct content; DOM text and screenshots match the unoptimized output.</div>
+          <div class="gate stop"><b>Gate — deferred, does not apply yet</b>One canonical, one OG set and one valid JSON-LD object per route, each matching the true post URL. Blocked until the core filter context carries the entry and URL. An earlier draft listed these in the shipping gate while the body said they were out of scope — the gate was the wrong half.</div>
+        </div>
+      </div>
+
+      <div class="stage">
+        <div class="stage-id">STAGE 7</div>
+        <div class="stage-body">
+          <h3>MCP maintenance</h3>
+          <p>Least-privilege connector after the migration passes. Document the headless versus editor-required split from the pinned registry, so nobody later plans work around tools that quietly need a browser tab open.</p>
+          <div class="gate"><b>Gate</b>Tool list, capability filter and open-workspace errors match the pinned source.</div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <span class="sec-num">11</span>
+      <h2>Operational gates</h2>
+    </div>
+    <div class="col">
+      <p>Five areas the plan left implicit. Each is a decision with a stated default, not an open question — leaving them unwritten is how a migration tool quietly becomes an owner-account script with credentials in a config file.</p>
+    </div>
+    <ul class="grid-list">
+      <li><b>Governance</b>An approval record names the source snapshot, draft hash, Binding Manifest, target, signer and time. Written before release, immutable after. Without a stored record there is nothing for release to verify against.</li>
+      <li><b>Permissions</b>A dedicated service account, never an owner account. <strong>The normal floor is six rights</strong> — site-read, export, import, structure-edit, page-publish, publish-any. I said four, then five; both were wrong. Site-read is needed to read the draft document and hash it, without which the approval binding does not work, and structure-edit is every migration that ships a shell, not an edge case. Content-manage is added only for a replace run, and <strong>content-edit-any only for a prune run</strong> — the status endpoint takes data-editor rights, and content-edit-own cannot reach author-stripped imported rows. Both granted per run and revoked after.</li>
+      <li><b>Secrets</b>Credentials from the environment or an OS keychain. Never a config file in the repo, never a CLI argument — arguments land in shell history and process listings. Session cookies stay in memory and are discarded; manifests and logs redact them.</li>
+      <li><b>Deletion</b>Rows on the target but not in the source are left untouched and accumulate silently. They are reported every run and never removed implicitly. Pruning is an explicit approved pass that unpublishes rather than hard-deletes, so the route stops resolving without destroying history.</li>
+      <li><b>SEO acceptance</b>Native title and description ship and are gated on exactly one of each per route, non-empty, matching the source. Canonical, Open Graph and JSON-LD are out of scope until the core filter context carries the entry and URL — no partial version via slug-guessing.</li>
+      <li><b>Escalation</b>The rights granted temporarily are content-manage for a replace run and content-edit-any for a prune run. Both revoked immediately after, rather than left in place.</li>
+      <li><b>Live authentication proof</b>Every auth claim here — login, MFA, step-up, cookie rotation, the no-Origin CSRF path — comes from reading code, not from running it. None is proven against a live instance. That proof is a prerequisite, because a scripted release that discovers its auth assumptions are wrong discovers it mid-migration.</li>
+      <li><b>Plugin HTML hooks</b><code>publish.before</code> and <code>publish.after</code> run inside the HTML pipeline, so they fire per rendered page or row artefact — not once per publish operation. Inventory every side-effectful listener and suppress it for the release window, then restore.</li>
+      <li><b>Deploy webhook — separate mechanism, and mis-sequenced</b>Our fork POSTs <code>INSTATIC_DEPLOY_WEBHOOK</code> from the full-publish handler, fire-and-forget, unawaited. It is <strong>not</strong> a plugin hook and needs its own rule. Worse, it fires after full-site publish and therefore <em>before</em> the row batch — it would deploy a site whose 397 posts are not yet activated. Suppress it for the whole window; deploy once, explicitly, after CMS state and public routes verify, carrying a release id and returning a terminal status. A fire-and-forget POST cannot be a release-completion signal: CMS publish success does not prove deploy success.</li>
+    </ul>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <span class="sec-num">12</span>
+      <h2>Idempotency, as a mechanism</h2>
+    </div>
+    <div class="col">
+      <p>Revision 1 asserted that a second run would be a no-op. It would not have been — the import upserts every supplied row and every publish inserts a new version. Stable ids alone do not achieve this. What does:</p>
+    </div>
+    <ul class="grid-list">
+      <li><b>Canonicalize, then hash</b>Exclude volatile timestamps and object key order before hashing each logical row.</li>
+      <li><b>Keep a run manifest</b>Source key, row id, content hash, last version id, public path.</li>
+      <li><b>Compare before importing</b>Against target state or the last verified manifest.</li>
+      <li><b>Omit unchanged rows</b>Leave them out of the bundle entirely where it is safe to do so.</li>
+      <li><b>Publish selectively</b>Only rows whose content differs, or which have no active version at all.</li>
+      <li><b>Decide deletion policy</b>A merge import leaves target-only rows in place. That is a choice, so make it one.</li>
+      <li><b>Resume re-reads target state</b>Never trust the local cursor alone after a failure.</li>
+      <li><b>Record the live hash last</b>Only after route verification passes, never before.</li>
+    </ul>
+    <div class="gate col"><b>Second-run gate</b>Zero changed rows, zero row publishes, zero new row versions, zero new page versions because the full-site publish was skipped, and identical public response hashes once volatile headers are normalized. The skip decision is logged either way.</div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <span class="sec-num">13</span>
+      <h2>Verification</h2>
+    </div>
+    <div class="col">
+      <p>A connector-owned integration suite against a scratch instance. The existing round-trip test proves row, table and strategy behaviour only — it does not prove rendering, redirects, or idempotency, and revision 1 leaned on it as though it did.</p>
+    </div>
+    <ol class="checks">
+      <li>Fork compatibility — prefix, schemas, permissions, version and commit match the lock file</li>
+      <li>Doctor — environment loaded, expected nodes and rules, no warnings</li>
+      <li>Schema — every table, row, tree, binding, redirect and media record validates</li>
+      <li>Reference integrity — no missing child, parent, root, class, component or template reference</li>
+      <li>Archive routing — ZIP rejected at the JSON endpoint, accepted at the archive endpoint</li>
+      <li>Full publish — site snapshot and page active versions created</li>
+      <li>Row activation — a new post gets one version and renders; a changed post gets exactly one new version</li>
+      <li>Stale-version regression — overwriting a published row must not leave the old version live</li>
+      <li>Templates — unique priority winners, one outlet, shared component appears once</li>
+      <li>Loops — blog index returns expected rows, order, limit and pagination</li>
+      <li>Redirects — every expected redirect returns 301 with the correct target</li>
+      <li>Resume — kill mid-run, resume with no duplicate versions</li>
+      <li>Idempotency — the full second run is a real no-op</li>
+      <li>Partial-release safety — force a mid-run failure, prove the report and the resume path</li>
+      <li>Backup restore — the <strong>database dump plus uploads tree</strong> restores on a scratch target and reproduces the pre-change public hashes including published state. A bundle-export restore does not satisfy this and never did</li>
+      <li>Live browser — desktop and 390px screenshots show correct structure and no overflow</li>
+    </ol>
+    <p class="cap col" style="margin-top:0.4rem">Owner acceptance runs on a scratch tenant before any real target. Automated checks do not replace the final visible route and editor checks.</p>
+  </section>
+
+  <footer>
+    Revision 7 · read against the fork at commit 693139e (branch NewVersion, tree dirty, 0.0.16) — source-read, not a live installation · Runtime Bun, per the repository engine range · Architecture: conditional go · Coding: no-go — fork lock not produced; the release race needs a two-part core change (expected-hash on document AND row) or an enforced write freeze; four product decisions owed. Backup = database + uploads, never a bundle export. Permission floor = six rights. Layouts are excluded from the document hash
+  </footer>
+
+</div>
+</body>
+</html>

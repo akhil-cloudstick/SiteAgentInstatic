@@ -139,15 +139,34 @@ A control that JS fills at runtime arrives at the CMS **empty** — the tenant s
 
 A control drawn purely by CSS is fine — `<button class="hamburger"><span></span><span></span></button>` has elements to style, so it renders. Only a control with **nothing at all** inside it is blocked.
 
-### 10. Content hidden until JavaScript runs
-The importer strips your `<script>`s from the **editing canvas**, so any content that only becomes visible once JS runs is **blank** there (it appears only on the published site). ❌ A full-screen loading overlay that a script removes; ❌ `opacity:0`/`visibility:hidden` content revealed only by a JS-added class (e.g. `IntersectionObserver` scroll reveals), or a hero whose words start `opacity:0`. Make the visible state the **default** and let CSS animate it in.
+### 10. Content that is invisible when JavaScript does not run
+The importer strips your `<script>`s from the **editing canvas** (they *do* run in preview and on the published site). So the canvas is a no-JS environment: any content that only becomes visible once JS runs is **blank** there — the tenant cannot see it, select it, or edit it.
+
+The rule is about the **resting state**, not about animation. ❌ A full-screen loading overlay that only a script removes; ❌ a hero whose words start `opacity:0` and are revealed by a JS-added class. **Never let the no-JS state be invisible.**
+
+**Scroll-triggered animations are allowed, and `IntersectionObserver` is the right tool for them.** Just invert the default: ship the content **visible**, and let JS *arm* the animation by putting a marker class on `<html>`. No JS → no marker → nothing ever hides.
 
 ```html
-<!-- ❌ WRONG — blank in the editor until JS adds .is-visible -->
-<style>.reveal{opacity:0;transform:translateY(20px)} .reveal.is-visible{opacity:1;transform:none}</style>
-<!-- ✅ RIGHT — visible by default; CSS animates it in on load (no JS needed) -->
-<style>.reveal{animation:fadeUp .6s ease both} @keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:none}}</style>
+<!-- ❌ WRONG — invisible in the canvas; JS is what makes it appear -->
+<style>.reveal-up{opacity:0;transform:translateY(20px)} .reveal-up.is-visible{opacity:1;transform:none}</style>
+
+<!-- ✅ RIGHT — visible by default; JS arms the animation, then triggers it on scroll -->
+<style>
+  .reveal-up{opacity:1;transform:none}                                  /* canvas sees this */
+  .js-anim .reveal-up{opacity:0;transform:translateY(20px)}             /* armed only once JS runs */
+  .js-anim .reveal-up.is-visible{opacity:1;transform:none;transition:opacity .6s ease,transform .6s ease}
+  @media (prefers-reduced-motion:reduce){.js-anim .reveal-up{opacity:1;transform:none;transition:none}}
+</style>
+<script>
+  document.documentElement.classList.add('js-anim');   // arm first, before paint
+  var io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add('is-visible'); io.unobserve(e.target); } });
+  }, { rootMargin: '0px 0px -10% 0px' });
+  document.querySelectorAll('.reveal-up, .reveal-stagger').forEach(function (el) { io.observe(el); });
+</script>
 ```
+
+**An animation hook class must actually animate.** If you put `reveal-up`, `reveal-stagger`, `fade-in` or similar on markup, it must have a non-empty CSS rule behind it. Writing `.reveal-up {}` and leaving it empty ships a site with dead class names and no motion at all — it passes every other check and silently loses the animation. Either wire it up or drop the class.
 
 ### 11. Non-YouTube `<iframe>` embeds
 Vimeo, Google Maps, Calendly, booking and chat widgets. This is the sneakiest failure in this document: the iframe imports cleanly and still displays in the editor, so nothing looks wrong until the site is live. Published pages ship `frame-src 'none'` and **only a YouTube video block lifts it** — every other embed renders **blank**. No attribute opts a different provider in.
@@ -164,6 +183,7 @@ Vimeo, Google Maps, Calendly, booking and chat widgets. This is the sneakiest fa
 - `:root { --name: <color> }` → editable **color token** (any name). `#hex`/`rgb()`/`hsl()`/`var()` colors.
 - `@media` (site breakpoints become responsive overrides; other queries become reusable conditions), `@supports`, `@container`, `@keyframes`.
 - `transition`, `animation`, `transform`, `position: sticky`, `display:grid`/`flex`, gradients, `url()` backgrounds, pseudo-classes/elements, `:has()`.
+- Scroll-driven animations (`animation-timeline: view()` / `scroll()`) import and publish fine. They need **no JavaScript**, so they also animate live in the editing canvas — prefer them for scroll reveals where the browser support is acceptable, and wrap them in `@supports (animation-timeline: view())` so browsers without support simply show the content.
 
 **Selectors — style each component with a single semantic class.** A rule becomes editable by **binding to the rightmost class in its selector**: `.hero-title` binds to `hero-title`, `.btn:hover` binds to `btn`, `.stat-item .stat-value` binds to `stat-value`, and `.hero h1` binds to `hero`. A selector with **no class at all** (`h1`, `a:hover`), or whose only classes sit inside a function like `:is(.a, .b)`, imports as an **ambient** (global) rule — it still renders, but no single element owns it, so editing it changes every match at once.
 
@@ -179,30 +199,30 @@ Three consequences to build around:
 
   | selector | subject | imports as | editable? |
   |---|---|---|---|
-  | `.section-title { … }` | `.section-title` | class rule `section-title` | ✅ yes |
+  | `.card__title { … }` | `.card__title` | class rule `card__title` | ✅ yes |
   | `h1, h2, h3 { … }` | `h1`/`h2`/`h3` | ambient | ❌ no |
   | `.feature-card h3 { … }` | `h3` | **binds to `.feature-card`** | ❌ no — styles the card, not the h3 |
-  | `.section--dark .section-title { … }` | `.section-title` | ambient (compound context) | ❌ no |
+  | `.theme--dark .card__title { … }` | `.card__title` | ambient (compound context) | ❌ no |
   | `.card > .card__title { … }` | `.card__title` | class rule `card__title` | ✅ yes |
 
   **`.feature-card h3` is the trap.** It *contains* a class, so a naive "does this selector mention a class?" test passes it — but the subject is `h3`, so the declarations land on `.feature-card` and the heading gets nothing. Judging by "contains a class" instead of "subject is a class" is the single most common way a build passes its own review and still imports broken.
 
-- **The class must CARRY the declarations. An empty stub is not compliance.** `.od-title {}` next to `h1, h2, h3 { color: var(--text) }` satisfies nothing: a **bare tag selector imports as an `ambient` rule**, not a class rule, so the colour is neither editable nor reliably applied in the editor canvas — the heading renders with an inherited colour and can come out unreadable, while the same page looks perfect opened directly in a browser. Everything the element needs (`color`, `font-size`, `font-weight`, `font-family`, `line-height`, `letter-spacing`, `margin`) belongs **inside its own class rule**.
+- **The class must CARRY the declarations. An empty stub is not compliance.** `.card__title {}` next to `h1, h2, h3 { color: var(--text) }` satisfies nothing: a **bare tag selector imports as an `ambient` rule**, not a class rule, so the colour is neither editable nor reliably applied in the editor canvas — the heading renders with an inherited colour and can come out unreadable, while the same page looks perfect opened directly in a browser. Everything the element needs (`color`, `font-size`, `font-weight`, `font-family`, `line-height`, `letter-spacing`, `margin`) belongs **inside its own class rule**.
 - **Never let a bare tag selector be the only source of a text element's typography or colour.** `h1, h2, h3, h4, h5 { … }`, `p { … }`, `a { … }`, `body { color: … }` may set *inherited defaults* only. Every heading, paragraph, link and label still needs its own class repeating what it actually needs.
 
   ❌ **Wrong** — the class exists but is empty, so the real styling rides on a tag rule:
   ```html
-  <h2 class="od-title section-title">On-demand configurations</h2>
+  <h2 class="card-title-7 card__title">Section heading</h2>
   ```
   ```css
   h1, h2, h3, h4, h5 { font-family: var(--font-heading); font-weight: 800; color: var(--text); }
-  .od-title {}          /* ← stub only: nothing to edit, nothing applied */
-  .section-title {}
+  .card-title-7 {}     /* ← stub only: nothing to edit, nothing applied */
+  .card__title {}
   ```
 
   ✅ **Correct** — the unique class owns the declarations:
   ```css
-  .od-title {
+  .card__title {
     font-family: var(--font-heading);
     font-size: clamp(1.8rem, 3.5vw, 2.6rem);
     font-weight: 800;
@@ -212,7 +232,7 @@ Three consequences to build around:
   }
   ```
 
-  Compare: `.section-head .section-sub { color: var(--text-soft) }` imports as an **editable class rule** bound to `section-sub` and renders correctly, because the subject of the selector is a class. `h1, h2, … { color: var(--text) }` imports as **ambient** and does not. Same page, same token — the only difference is whether a class is the subject.
+  Compare: `.card__body .card__text { color: var(--text-soft) }` imports as an **editable class rule** bound to `card__text` and renders correctly, because the subject of the selector is a class. `h1, h2, … { color: var(--text) }` imports as **ambient** and does not. Same page, same token — the only difference is whether a class is the subject.
 
 #### Prove it — the text-colour audit (run this on EVERY page before handover)
 
@@ -229,7 +249,7 @@ Run it as three deterministic passes over each page's own `<style>` block:
 Why per-element and not "strip the stylesheet and re-render":
 
 - **The wrong test — this is how a build passes its own review and still imports broken:** "delete every rule with no class *anywhere* in its selector, then re-render". That keeps `.feature-card h3`, so the stripped page looks perfect while the real import is not. A recent 52-page batch shipped on exactly this test: it reported 13 ambient rules and a clean render, and **34 of the 52 pages were still broken**.
-- A compound or descendant rule is **not** a substitute for the bare rule. `.section--dark .section-title { color:#fff }` is a contextual variant; the base colour must still live on bare `.section-title`.
+- A compound or descendant rule is **not** a substitute for the bare rule. `.theme--dark .card__title { color:#fff }` is a contextual variant; the base colour must still live on bare `.card__title`.
 - Per page, assert **0 failing elements**. Report the per-page count in your handover notes — a pass on the homepage says nothing about the other 51.
 
 **Scale rule:** this is mechanical — run it over the whole batch, never a sample. In a recent 52-page batch the role classes were folded correctly and **34 pages were still broken**, because the fix was applied per role-class instead of per element. At 100–500 pages a sampled check is worthless; only a per-page count is evidence.
@@ -240,6 +260,43 @@ Why per-element and not "strip the stylesheet and re-render":
 
 **Structure** — each `.html` file is a page (`index.html` → home `/`). Identical top-level `<nav>`/`<header>`/`<footer>` across pages are auto-promoted to one shared, edit-once component. (For active-state, set it at runtime — see below — don't bake a different class into each page.)
 
+### Collections — put posts in their own folder
+
+Everything at the top level imports as a **Page**. To land content in its own collection (Blog, Guides, Case studies…) so the tenant gets a separate list to manage instead of 400 undifferentiated pages, **nest it under one folder named after the collection**:
+
+```
+dist/
+  index.html                       → Page   /
+  about-us/index.html              → Page   /about-us
+  contact/index.html               → Page   /contact
+  blog/
+    index.html                     → Page   /blog          (the listing page)
+    my-first-post/index.html       → Blog   /blog/my-first-post
+    another-post/index.html        → Blog   /blog/another-post
+  guides/
+    index.html                     → Page   /guides
+    choosing-a-gpu/index.html      → Guides /guides/choosing-a-gpu
+```
+
+Rules:
+
+- **One folder = one collection.** The folder name is the collection name (`blog/` → Blog, `guides/` → Guides). Use a plain lowercase slug.
+- **`<folder>/index.html` stays a Page** — that's the listing/landing page for the collection, not an entry in it.
+- **Entries are one level deep**: `blog/<post-slug>/index.html`. Deeper nesting is not a sub-collection; keep it flat inside the folder.
+- **Do not use `posts/`** as a folder name — that slug is reserved by a built-in collection whose body is rich text, and a designed page cannot go into it. Use `blog/`, `articles/`, `news/`, etc.
+- Anything left at the top level is a Page. That is also the fallback: if you don't use collection folders, everything imports as Pages exactly as before.
+
+❌ The common mistake — every post as a top-level sibling, indistinguishable from a real page:
+
+```
+dist/
+  about-us/index.html                          → Page
+  10-reasons-to-rent-a-workstation/index.html  → imports as a Page, not a post
+  best-gpus-2026/index.html                    → imports as a Page, not a post
+```
+
+Nothing in that layout says which folders are posts, so all 400 arrive as Pages in one flat list.
+
 ---
 
 ## Build any effect the compliant way (cookbook)
@@ -249,6 +306,7 @@ Whatever the tenant asks — in whatever words — build it like this. **Effects
 | Tenant asks for… | Build it with… |
 |---|---|
 | animation, motion, "make it move", loading / buffering spinner | CSS `@keyframes` + `transition`/`animation` |
+| scroll reveal / fade-up-on-scroll / stagger-in, scroll progress bar, parallax | `animation-timeline: view()`/`scroll()` (no JS, animates in the canvas too), **or** `IntersectionObserver` adding a class — but ship the content **visible by default** and let JS arm the animation via a marker class on `<html>`. See §10. Never leave the hook class empty. |
 | 3D, tilt, parallax, hover effects | CSS `transform` / `perspective` (+ behavioral JS that only updates the *style* of existing elements) |
 | filterable / sortable gallery, tabs, accordion, carousel, slider | ALL items as **static HTML**, then show/switch with CSS (`:has()`, `:target`, scroll-snap) or behavioral JS (`classList` on existing markup). Never build the items in JS. |
 | counters, progress bars, "count up" | behavioral JS updating the **text/attributes of existing elements** |
@@ -276,7 +334,7 @@ Define every brand color as a `:root` custom property and use it via `var(--…)
 - **Full-bleed / banner / hero photos are the trap.** A photo behind heading text is still content. Use an `<img>` positioned to fill, and keep the gradient scrim as CSS:
   ```html
   <div class="banner">
-    <img class="banner__bg" src="/images/banner-media.jpg" alt="Media &amp; entertainment">
+    <img class="banner__bg" src="/images/banner.jpg" alt="Descriptive alt text">
     <div class="banner__overlay"></div>   <!-- gradient: CSS is correct here -->
     <div class="banner__content">…</div>
   </div>
@@ -289,6 +347,27 @@ Define every brand color as a `:root` custom property and use it via `var(--…)
   Same rendering, and the tenant gets a normal editable Image block.
 - ❌ Not: `background-image: url(…/photo.jpg)`, `background: … url(…/photo.jpg) center/cover …`, or a `--*-img: url(…/photo.jpg)` token feeding either — on any element, at any breakpoint. ✅ Fine: `background-image: linear-gradient(…)`, repeating patterns, and `.svg` textures/noise.
 - Allowed: **jpg, png, webp, gif, svg** (+ mp4/webm), at a clean web-root path (`/images/…`) with **no** `?query`/`#fragment`, not `data:`. A **real photo URL is fine** — OD saves it into `public/images/` and rewrites the ref before publish (see ❌ §7).
+
+### Inline SVG icons — give each one its own size
+
+An inline `<svg>` whose size comes only from a **descendant** rule (`.list-item svg { width: 17px }`) has nothing of its own to hold on to: the icon carries no dimensions, no class, and the rule that sizes it binds to an ancestor. If anything about that chain does not survive the import, the icon falls back to its intrinsic size and renders **enormous** — a 17px tick becoming a 200px block that shreds the layout — while the same file looks perfect in a browser.
+
+Give every inline icon one of these, so its size is its own:
+
+```html
+<!-- ✅ explicit dimensions (simplest, always safe) -->
+<svg width="17" height="17" viewBox="0 0 24 24" fill="none">…</svg>
+
+<!-- ✅ or its own class, sized by a bare rule -->
+<svg class="list-item__icon" viewBox="0 0 24 24" fill="none">…</svg>
+```
+```css
+.list-item__icon { width: 17px; height: 17px; color: var(--brand); flex-shrink: 0; }
+```
+
+❌ Not: `<svg viewBox="0 0 24 24">` with no `width`/`height` and no class, sized from an ancestor — `.list .list-item svg { width: 17px }`.
+
+The `width`/`height` **attributes** ride through the import untouched, which is what makes the first form immune. This applies to every inline `<svg>`: ticks, chevrons, card icons, social icons, nav glyphs.
 
 ### Video & embeds
 
@@ -529,7 +608,8 @@ Don't block their workflow and don't lecture them. Figure out the compliant way 
 - [ ] Images are real `<img>` in **jpg/png/webp/gif/svg** (no avif/ico, no `data:`/`?query`) — a local `/images/…` path or a real photo URL (OD saves the file in).
 - [ ] **No `<iframe>` except YouTube** — every other embed (Vimeo, Maps, Calendly, chat widgets) publishes blank under `frame-src 'none'`; ship a linked image instead.
 - [ ] Forms keep their own `action` unless deliberately bound with `data-instatic-form-mode="cms"` + `data-instatic-target-table`; placeholder `<option>`s carry an explicit `value=""`.
-- [ ] **Every section is visible with CSS alone** — no JS-dismissed loading overlay, no `opacity:0`/`visibility:hidden` content revealed only by a JS-added class.
+- [ ] **Every section is visible with CSS alone** — no JS-dismissed loading overlay, no `opacity:0`/`visibility:hidden` content revealed only by a JS-added class. Scroll reveals are fine when the content is visible by default and JS only *arms* them (§10).
+- [ ] **No empty animation hooks** — every `reveal`/`fade`/`stagger`-style class on the markup has a non-empty CSS rule behind it.
 - [ ] No hashed/`_astro` imports, no SPA hydration root.
 - [ ] JavaScript is **behavior only** on existing markup (menus, tabs, swaps); no `on*=` inline handlers; no asset paths hardcoded in script text.
 - [ ] **No bare text anywhere** — never text sitting directly inside a `<div>`/`<li>`/`<td>`/`<b>`/etc., and never a loose run beside a child element inside a heading. Every run is wrapped in its own `<span>`/`<p>`/heading so all of it is selectable.

@@ -1806,6 +1806,7 @@ export const tr: Dict = {
   'avatar.amrConsoleMeta': 'Bakiye ve yükleme',
   'avatar.settings': 'Ayarlar',
   'avatar.backToProjects': 'Projelere dön',
+  'avatar.signOut': 'Oturumu kapat',
   'avatar.metaActive': 'aktif',
   'avatar.metaOffline': 'çevrim dışı',
   'avatar.metaSelected': 'seçildi',

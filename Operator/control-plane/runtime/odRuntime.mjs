@@ -129,7 +129,7 @@ function clearSupervision(slug) {
 // belongs to from the hub session cookie. basePath is a BUILD-TIME constant, so
 // the old per-tenant `/od/<slug>` forced one build (and one `next start`) per
 // tenant — 50 tenants meant 50 builds and 50 Node processes. Do not reintroduce
-// a per-tenant prefix here. See docs/opendesign-shared-web-build.md.
+// a per-tenant prefix here. See docs/opendesign/opendesign-shared-web-build.md.
 export const SHARED_WEB_PREFIX = '.next-prod-shared-';
 
 // Newest valid production web build. Builds are versioned

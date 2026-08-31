@@ -90,6 +90,12 @@ interface PublishPageOptions {
    */
   loopEndpointBaseUrl?: string
   /**
+   * SEO for the document being rendered, when the caller has the row cells.
+   * Collection entries do not need this — their cells arrive on the entry
+   * stack and are read from there.
+   */
+  seo?: DocumentSeo
+  /**
    * How site-wide CSS (reset, framework, user classes) is emitted into the
    * published HTML.
    *
@@ -313,18 +319,141 @@ interface DocumentMetaTags {
   langAttr: string
 }
 
-function buildDocumentMetaTags(site: SiteDocument, page: Page): DocumentMetaTags {
+/**
+ * Per-document SEO, resolved from the row being rendered.
+ *
+ * Every field is optional: a site that sets none of them produces exactly the
+ * head it produced before.
+ */
+export interface DocumentSeo {
+  title?: string
+  description?: string
+  canonicalUrl?: string
+  ogTitle?: string
+  ogDescription?: string
+  ogImage?: string
+  jsonLd?: string
+}
+
+function seoString(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim() ? value.trim() : undefined
+}
+
+/**
+ * Read a document's SEO out of a content row's cells.
+ *
+ * The same field ids back both content shapes — a collection entry and a
+ * `pages` row carry `seoTitle` / `canonicalUrl` / `jsonLd` alike — so both
+ * render paths resolve SEO through this one mapper rather than each growing
+ * its own copy of the field list.
+ */
+export function documentSeoFromCells(cells: Record<string, unknown>): DocumentSeo {
+  return {
+    title: seoString(cells.seoTitle),
+    description: seoString(cells.seoDescription),
+    canonicalUrl: seoString(cells.canonicalUrl),
+    ogTitle: seoString(cells.ogTitle),
+    ogDescription: seoString(cells.ogDescription),
+    ogImage:
+      seoString(cells.ogImage) ??
+      // A featured image is the obvious social image when none is set
+      // explicitly, and the loop source already resolves it to a public URL.
+      seoString(cells.featuredMediaUrl) ??
+      seoString(cells.featuredMediaPath),
+    jsonLd: seoString(cells.jsonLd),
+  }
+}
+
+/**
+ * Resolve SEO for the document being rendered.
+ *
+ * Order: an explicit `options.seo` (what the caller knows about a page row),
+ * then the current entry's own cells, then site-wide settings.
+ *
+ * Both branches matter, and they cover different routes. A collection entry's
+ * cells arrive as `fields` on the entry stack, so entries self-resolve. A
+ * `pages` row has no entry stack — its cells are not in the published snapshot
+ * at all — so the caller reads the row and passes `options.seo`. Without the
+ * explicit branch every page on the site shares one set of site-wide tags and
+ * emits no canonical, which is the state a migrated site must not launch in.
+ */
+function resolveDocumentSeo(options: PublishPageOptions): DocumentSeo {
+  const entry = options.templateContext?.entryStack?.at(-1)
+  const fromCells = documentSeoFromCells((entry?.fields ?? {}) as Record<string, unknown>)
+  const explicit = options.seo ?? {}
+
+  return {
+    title: explicit.title ?? fromCells.title,
+    description: explicit.description ?? fromCells.description,
+    canonicalUrl: explicit.canonicalUrl ?? fromCells.canonicalUrl,
+    ogTitle: explicit.ogTitle ?? fromCells.ogTitle,
+    ogDescription: explicit.ogDescription ?? fromCells.ogDescription,
+    ogImage: explicit.ogImage ?? fromCells.ogImage,
+    jsonLd: explicit.jsonLd ?? fromCells.jsonLd,
+  }
+}
+
+function buildDocumentMetaTags(
+  site: SiteDocument,
+  page: Page,
+  options: PublishPageOptions = {},
+): DocumentMetaTags {
   const { settings } = site
-  const metaDesc = settings.metaDescription
-    ? `\n  <meta name="description" content="${escapeHtml(settings.metaDescription)}">`
+  const seo = resolveDocumentSeo(options)
+
+  // Row-level wins over site-level. Previously only site settings were read, so
+  // a per-row seoTitle was stored and silently never rendered.
+  const title = seo.title ?? settings.metaTitle ?? page.title ?? site.name
+  const description = seo.description ?? settings.metaDescription
+
+  const metaDesc = description
+    ? `\n  <meta name="description" content="${escapeHtml(description)}">`
     : ''
+
+  const canonical =
+    seo.canonicalUrl && isSafeUrl(seo.canonicalUrl)
+      ? `\n  <link rel="canonical" href="${escapeHtml(seo.canonicalUrl)}">`
+      : ''
+
+  // Open Graph falls back to the page title and description rather than being
+  // omitted — a share card with no title is worse than a duplicated one.
+  const ogTitle = seo.ogTitle ?? title
+  const ogDescription = seo.ogDescription ?? description
+  const ogParts = [
+    `\n  <meta property="og:title" content="${escapeHtml(ogTitle)}">`,
+    ogDescription
+      ? `\n  <meta property="og:description" content="${escapeHtml(ogDescription)}">`
+      : '',
+    seo.canonicalUrl && isSafeUrl(seo.canonicalUrl)
+      ? `\n  <meta property="og:url" content="${escapeHtml(seo.canonicalUrl)}">`
+      : '',
+    seo.ogImage && isSafeUrl(seo.ogImage)
+      ? `\n  <meta property="og:image" content="${escapeHtml(seo.ogImage)}">`
+      : '',
+    `\n  <meta property="og:type" content="website">`,
+  ]
+  // Emit nothing at all when the document carries no SEO of its own, so pages
+  // that never opted in keep exactly the head they had before.
+  const hasOwnSeo = Boolean(
+    seo.title || seo.description || seo.canonicalUrl || seo.ogTitle || seo.ogDescription || seo.ogImage,
+  )
+  const openGraph = hasOwnSeo ? ogParts.join('') : ''
+
+  // JSON-LD is authored content, so it is emitted inside a script block with
+  // `<` escaped — a raw `</script>` in the value would otherwise close the tag
+  // and turn stored data into live markup.
+  const jsonLd = seo.jsonLd
+    ? `\n  <script type="application/ld+json">${seo.jsonLd.replace(/</g, '\\u003c')}</script>`
+    : ''
+
   const favicon =
     settings.faviconUrl && isSafeUrl(settings.faviconUrl)
       ? `\n  <link rel="icon" href="${escapeHtml(settings.faviconUrl)}">`
       : ''
+
   return {
-    pageTitle: escapeHtml(settings.metaTitle ?? page.title ?? site.name),
-    metaDesc,
+    pageTitle: escapeHtml(title),
+    metaDesc: `${metaDesc}${canonical}${openGraph}${jsonLd}`,
     favicon,
     langAttr: escapeHtml(settings.language ?? 'en'),
   }
@@ -555,7 +684,7 @@ export function publishPage(
     acc.cssMap,
   )
 
-  const meta = buildDocumentMetaTags(site, page)
+  const meta = buildDocumentMetaTags(site, page, options)
   const runtime = buildRuntimeAssetsBlock(options, acc)
   const csp = buildContentSecurityPolicy(runtime.anyScriptTag, runtime.importmap, acc.cspSources)
 

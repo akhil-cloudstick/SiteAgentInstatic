@@ -29,6 +29,8 @@ import {
 import { openExternalUrl } from '../providers/registry';
 import { amrPlansUrlForWorkspace } from '../runtime/amr-guidance';
 import { isMacPlatform } from '../utils/platform';
+import { useHubContext } from '../state/hubContext';
+import { signOutOfHub } from '../state/hubSignOut';
 import {
   useWorkspaceBillingResponse,
   useWorkspaceContext,
@@ -88,6 +90,7 @@ export function AvatarMenu({
 }: Props) {
   const t = useT();
   const analytics = useAnalytics();
+  const hubContext = useHubContext();
   // recvqfYKutwWlQ: gate the AMR upgrade entry on billing permission below,
   // not just plan tier — a team member without `canManageBilling` (owner-only)
   // can't act on an upgrade even when the tier itself is upgradeable.
@@ -787,6 +790,27 @@ export function AvatarMenu({
                 <span>{t('avatar.backToProjects')}</span>
               </button>
             </>
+          ) : null}
+
+          {/* Sign out of the HUB. Only rendered under a hub — a standalone or
+              desktop OD has no hub session to end, and the item would do
+              nothing. The daemon has no logout route and needs none: the hub's
+              /logout expires od_session along with the other two cookies. */}
+          {hubContext ? (
+            <button
+              type="button"
+              className="avatar-item"
+              data-testid="avatar-hub-sign-out"
+              onClick={() => {
+                setOpen(false);
+                signOutOfHub(hubContext.hubBaseUrl);
+              }}
+            >
+              <span className="avatar-item-icon" aria-hidden>
+                <RemixIcon name="logout-box-r-line" size={15} />
+              </span>
+              <span>{t('avatar.signOut')}</span>
+            </button>
           ) : null}
         </div>,
         document.body,

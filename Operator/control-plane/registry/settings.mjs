@@ -97,12 +97,44 @@ export async function getSettings() {
     classifierModel: r.classifier_model || '',
     aiGuidance: r.ai_guidance || '',
     designModel: r.design_model || '',
+    // Both default true when the row predates these columns.
+    designActive: r.design_active !== false,
+    cmsActive: r.cms_active !== false,
     // Masked, never plaintext — the console only needs to show which slots are
     // filled and enough of a tail to tell two keys apart.
     mediaKeys: Object.fromEntries(
       Object.entries(mediaKeys).map(([id, key]) => [id, `••••${key.slice(-4)}`]),
     ),
   };
+}
+
+// Which products this deployment offers. Read on EVERY gateway request, so it is
+// cached behind a short TTL rather than hitting Postgres per request (same idea as
+// defaultGuidanceCache above); saveSettings() drops the cache so an operator's
+// toggle applies immediately without a restart.
+//
+// Fails OPEN: if the registry is briefly unreachable, a read error must not 404
+// the whole platform, so an unknown state is treated as "both available".
+const ACTIVE_PRODUCTS_TTL_MS = 5_000;
+let activeProductsCache = null;
+let activeProductsAt = 0;
+
+export async function readActiveProducts() {
+  const now = Date.now();
+  if (activeProductsCache && now - activeProductsAt < ACTIVE_PRODUCTS_TTL_MS) {
+    return activeProductsCache;
+  }
+  try {
+    const { rows } = await query(
+      'select design_active, cms_active from siteagent_control.settings where id = 1',
+    );
+    const r = rows[0] || {};
+    activeProductsCache = { design: r.design_active !== false, cms: r.cms_active !== false };
+  } catch {
+    activeProductsCache = { design: true, cms: true };
+  }
+  activeProductsAt = now;
+  return activeProductsCache;
 }
 
 // Decrypted secrets — server-side only (AI Gateway, Deployer).
@@ -270,6 +302,8 @@ export async function saveSettings({
   designModel,
   mediaKeys,
   mediaKeysClear,
+  designActive,
+  cmsActive,
 } = {}) {
   validateAiConfig({ aiCategories, aiGuidance, classifierModel, designModel, mediaKeys });
 
@@ -298,8 +332,9 @@ export async function saveSettings({
   await query(
     `insert into siteagent_control.settings
        (id, openrouter_key_enc, openrouter_model, cloudflare_token_enc, cloudflare_account_id,
-        ai_categories, classifier_model, ai_guidance, design_model, media_keys_enc, updated_at)
-     values (1, $1, $2, $3, $4, $5, $6, $7, $8, $9, now())
+        ai_categories, classifier_model, ai_guidance, design_model, media_keys_enc,
+        design_active, cms_active, updated_at)
+     values (1, $1, $2, $3, $4, $5, $6, $7, $8, $9, coalesce($10, true), coalesce($11, true), now())
      on conflict (id) do update set
        openrouter_key_enc    = coalesce($1, siteagent_control.settings.openrouter_key_enc),
        openrouter_model      = coalesce($2, siteagent_control.settings.openrouter_model),
@@ -310,6 +345,8 @@ export async function saveSettings({
        ai_guidance           = coalesce($7, siteagent_control.settings.ai_guidance),
        design_model          = coalesce($8, siteagent_control.settings.design_model),
        media_keys_enc        = coalesce($9, siteagent_control.settings.media_keys_enc),
+       design_active         = coalesce($10, siteagent_control.settings.design_active),
+       cms_active            = coalesce($11, siteagent_control.settings.cms_active),
        updated_at = now()`,
     [
       openrouterKey ? encrypt(openrouterKey) : null,
@@ -323,7 +360,12 @@ export async function saveSettings({
       // back to the default category), omitting the field preserves it.
       designModel != null ? (designModel || '') : null,
       mediaKeysEnc,
+      // A checkbox posts nothing when unticked, so the products form always sends
+      // an explicit boolean. undefined => this save is about another section, keep.
+      designActive === undefined ? null : !!designActive,
+      cmsActive === undefined ? null : !!cmsActive,
     ],
   );
+  activeProductsCache = null; // a toggle must take effect without a restart
   return getSettings();
 }

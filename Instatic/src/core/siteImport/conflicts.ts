@@ -640,7 +640,17 @@ export function forceOverwriteResolutions(conflicts: {
     ),
     rules: conflicts.rules.map((c) => ({ ...c, defaultResolution: overwrite })),
     tokens: conflicts.tokens.map((c) => ({ ...c, defaultResolution: overwrite })),
-    crossSheetClasses: conflicts.crossSheetClasses.map((c) => ({ ...c, defaultResolution: overwrite })),
+    // NOT overwritten. A cross-sheet conflict is two *incoming* definitions of
+    // one class name disagreeing with each other — there is no existing rule to
+    // overwrite, so `overwrite` is not a resolution this conflict kind accepts.
+    // Forcing it made `applyCrossSheetClassResolutions` match no branch and drop
+    // the class from `styleRules` altogether; the pages still referenced the
+    // name, so the store auto-created an EMPTY bare class for it and every
+    // element bound to that class lost all its styling (headings imported with
+    // no colour or font while the same page looked correct in a browser).
+    // Keep each conflict's own default (`auto-rename`, which materialises both
+    // definitions and rebinds the affected pages).
+    crossSheetClasses: conflicts.crossSheetClasses,
   }
 }
 

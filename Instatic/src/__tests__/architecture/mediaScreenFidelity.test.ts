@@ -5,7 +5,7 @@
  * library's Media screen, under the migration rule agreed for it:
  *   • STRUCTURE and geometry come from `screens/media/src/styles.css`.
  *   • LOOKS come from the approved design masters in
- *     `docs/cms-new-ui-review/04-media-*-approved-*.png`.
+ *     `docs/instatic/cms-new-ui-review/04-media-*-approved-*.png`.
  *
  * A pixel diff catches "this looks wrong"; it is weakest exactly where this
  * re-skin is most likely to drift — a value that is visually close but is not

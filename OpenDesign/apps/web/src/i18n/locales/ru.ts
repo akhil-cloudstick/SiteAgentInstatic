@@ -1806,6 +1806,7 @@ export const ru: Dict = {
   'avatar.amrConsoleMeta': 'Баланс и пополнение',
   'avatar.settings': 'Настройки',
   'avatar.backToProjects': 'Назад к проектам',
+  'avatar.signOut': 'Выйти',
   'avatar.metaActive': 'активно',
   'avatar.metaOffline': 'офлайн',
   'avatar.metaSelected': 'выбрано',

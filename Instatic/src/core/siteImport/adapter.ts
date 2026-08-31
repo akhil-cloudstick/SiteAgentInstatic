@@ -16,6 +16,8 @@
  */
 
 import type {
+  CollectionCommitPlan,
+  CollectionCommitResult,
   NewStyleRule,
   ImportFontFamily,
   ImportGoogleFont,
@@ -23,6 +25,7 @@ import type {
   ImportFontToken,
   ImportScript,
   ImportStylesheet,
+  PageTemplatePlan,
 } from './types'
 import type { ConditionDef } from '@core/page-tree'
 import type { ImportFragment } from '@core/htmlImport'
@@ -54,6 +57,27 @@ export interface SiteImportAdapter {
    * single import transaction.
    */
   installGoogleFont(font: ImportGoogleFont): Promise<FontEntry>
+
+  /**
+   * Create one collection implied by the imported folder layout: the
+   * `postType` table and one row per entry.
+   *
+   * Async and OUTSIDE `commit`, unlike every page mutation, because a
+   * collection does not live in the site document. Pages are nodes in the CRDT
+   * site tree; collection entries are rows in `data_tables` / `data_rows`
+   * behind the CMS data API. The two stores are written by different means and
+   * cannot share one transaction, so this is its own call.
+   *
+   * Idempotent on the table: an existing table with the same slug is reused
+   * rather than duplicated, so re-running an import updates a collection
+   * instead of creating `blog-2`.
+   *
+   * Entries are created as DRAFTS. Nothing an import produces goes public until
+   * someone publishes, which keeps a mistaken import off the live site.
+   *
+   * @returns What was created, for the import result summary.
+   */
+  createCollection(collection: CollectionCommitPlan): Promise<CollectionCommitResult>
 
   /**
    * Execute all page and style-rule mutations in a single atomic step.
@@ -102,6 +126,12 @@ export interface SiteImportTransaction {
     title: string
     slug: string
     nodeFragment: ImportFragment
+    /**
+     * Set only for a collection entry template. Written straight onto the
+     * committed page so the template resolves for its collection — templates
+     * are matched by target and priority, never by id.
+     */
+    template?: PageTemplatePlan
   }): string
 
   /**

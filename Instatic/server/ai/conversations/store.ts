@@ -431,8 +431,17 @@ export async function appendMessage(
     const cacheReadTokens = input.cacheReadTokens ?? 0
     const cacheCreationTokens = input.cacheCreationTokens ?? 0
 
-    // Pass content as a plain array; the DB boundary handles JSON
-    // encoding/decoding for `_json` columns.
+    // `content_json` is a TEXT column, so the array must be serialised HERE.
+    // The DB boundary only handles the READ half (`normalizePostgresRow`
+    // JSON.parses string-valued `*_json` columns); there is no write-side
+    // encoder, so binding the array directly let the driver coerce it with
+    // String(value) and every row landed as the literal 15-character string
+    // "[object Object]". Reads then failed to parse it, `parseContentBlocks`
+    // returned empty blocks, and the model received a conversation with no
+    // content at all — so it answered every edit request with "I don't see a
+    // specific edit instruction yet" no matter which model was configured.
+    // Every other repository stringifies at the bind site for the same reason.
+    const contentJson = JSON.stringify(input.content)
     const { rows: msgRows } = await tx<MessageRow>`
       insert into ai_messages (
         id, conversation_id, position, role, content_json,
@@ -441,7 +450,7 @@ export async function appendMessage(
         cache_read_tokens, cache_creation_tokens
       )
       values (
-        ${id}, ${conversationId}, ${position}, ${input.role}, ${input.content},
+        ${id}, ${conversationId}, ${position}, ${input.role}, ${contentJson},
         ${input.toolCallId ?? null}, ${input.toolName ?? null},
         ${promptTokens}, ${completionTokens}, ${costUsd},
         ${cacheReadTokens}, ${cacheCreationTokens}

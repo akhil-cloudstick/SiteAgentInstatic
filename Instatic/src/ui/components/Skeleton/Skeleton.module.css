@@ -119,3 +119,23 @@
         background-position: -200% 0;
     }
 }
+
+/* Reduced motion has to change the PAINT, not just stop the sweep.
+ *
+ * The global reset in globals.css clamps every animation to 0.01ms with one
+ * iteration, which leaves the gradient frozen at `background-position: -200% 0`
+ * — the sheen parked entirely off-canvas, so the bar reads as a flat block of
+ * nothing rather than as "loading". Dropping the gradient for a solid fill at
+ * the sheen's midpoint keeps it legible as a placeholder without motion.
+ *
+ * This matters more than it looks: Windows maps Settings -> Accessibility ->
+ * Visual effects -> "Animation effects: Off" onto this query, and it is off by
+ * default on many VMs and tuned machines, so for those users this branch IS the
+ * loading state.
+ */
+@media (prefers-reduced-motion: reduce) {
+    .skeleton {
+        background-image: none;
+        background-color: color-mix(in srgb, var(--skeleton-sheen) 55%, var(--skeleton-fill));
+    }
+}

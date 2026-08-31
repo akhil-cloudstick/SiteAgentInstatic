@@ -86,11 +86,20 @@ function isHiddenPath(normalizedPath: string): boolean {
 }
 
 /**
- * Throw `PathTraversalError` if the normalised path contains `..`, an
- * absolute leading `/`, or a Windows drive letter like `C:`.
+ * Throw `PathTraversalError` if the normalised path escapes the bundle root:
+ * a `..` path SEGMENT, an absolute leading `/`, or a Windows drive letter
+ * like `C:`.
+ *
+ * Traversal requires a segment that IS `..` — it is not "the path contains two
+ * dots anywhere". A substring test rejected perfectly ordinary filenames that
+ * happen to contain `..`, e.g. a WordPress-exported image whose name ends in a
+ * period: `…WINDOWS-10..webp`. One such file failed the entire import, and the
+ * message ("Unsafe path detected") pointed at a file that was never unsafe.
+ * Separators are normalised to `/` before this runs (see `normalizeSlashes`),
+ * so splitting on `/` sees every real segment.
  */
 function assertSafePath(path: string): void {
-  if (path.includes('..')) throw new PathTraversalError(path)
+  if (path.split('/').some((segment) => segment === '..')) throw new PathTraversalError(path)
   if (path.startsWith('/')) throw new PathTraversalError(path)
   // Windows drive letters: C: D: etc.
   if (/^[a-zA-Z]:/.test(path)) throw new PathTraversalError(path)

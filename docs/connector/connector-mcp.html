@@ -1,0 +1,664 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Connector MCP Guide</title>
+
+<style>
+  :root {
+    --ground:      #F1F4F3;
+    --surface:     #FFFFFF;
+    --surface-2:   #E7ECEA;
+    --ink:         #131E1C;
+    --ink-soft:    #3A4B48;
+    --muted:       #63736F;
+    --rule:        #CBD5D2;
+    --rule-soft:   #DFE6E4;
+    --accent:      #0D6357;
+    --accent-soft: #DCEEEA;
+    --signal:      #A6501B;
+    --signal-soft: #F6E9DD;
+
+    --font-mono: ui-monospace, "Cascadia Mono", "Cascadia Code", "SF Mono", "JetBrains Mono", Consolas, monospace;
+    --font-body: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    --font-ui:   "Segoe UI", system-ui, -apple-system, "Helvetica Neue", sans-serif;
+
+    --measure: 68ch;
+    --pad: clamp(1.25rem, 4vw, 3.5rem);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:      #0C1413;
+      --surface:     #141F1D;
+      --surface-2:   #1C2826;
+      --ink:         #E2EAE8;
+      --ink-soft:    #B6C4C1;
+      --muted:       #849793;
+      --rule:        #2C3B38;
+      --rule-soft:   #22302E;
+      --accent:      #55C6B2;
+      --accent-soft: #13322D;
+      --signal:      #DE9457;
+      --signal-soft: #33241A;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground:      #0C1413;
+    --surface:     #141F1D;
+    --surface-2:   #1C2826;
+    --ink:         #E2EAE8;
+    --ink-soft:    #B6C4C1;
+    --muted:       #849793;
+    --rule:        #2C3B38;
+    --rule-soft:   #22302E;
+    --accent:      #55C6B2;
+    --accent-soft: #13322D;
+    --signal:      #DE9457;
+    --signal-soft: #33241A;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--font-body);
+    font-size: 17px;
+    line-height: 1.62;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 78rem;
+    margin: 0 auto;
+    padding: var(--pad);
+    display: flex;
+    flex-direction: column;
+    gap: 4.5rem;
+  }
+
+  .col { max-width: var(--measure); }
+
+  p { margin: 0 0 1rem; }
+  p:last-child { margin-bottom: 0; }
+  strong { font-weight: 600; color: var(--ink); }
+  code, .mono { font-family: var(--font-mono); }
+
+  p code, li code, td code, dd code {
+    font-size: 0.82em;
+    background: var(--surface-2);
+    padding: 0.1em 0.36em;
+    border-radius: 3px;
+    color: var(--ink-soft);
+  }
+
+  /* ---------- masthead ---------- */
+
+  .masthead {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    padding-bottom: 2.5rem;
+    border-bottom: 2px solid var(--ink);
+  }
+
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0;
+  }
+
+  h1 {
+    font-family: var(--font-mono);
+    font-size: clamp(2.1rem, 5.5vw, 3.1rem);
+    line-height: 1.04;
+    letter-spacing: -0.035em;
+    font-weight: 600;
+    margin: 0;
+    text-wrap: balance;
+  }
+
+  .standfirst {
+    font-size: clamp(1.06rem, 2vw, 1.24rem);
+    line-height: 1.5;
+    color: var(--ink-soft);
+    max-width: 56ch;
+    margin: 0;
+  }
+
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 2.25rem;
+    font-family: var(--font-mono);
+    font-size: 0.76rem;
+    color: var(--muted);
+    padding-top: 0.5rem;
+  }
+  .meta span b { color: var(--ink-soft); font-weight: 500; letter-spacing: 0.02em; }
+  .meta span::before {
+    content: attr(data-k);
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    font-size: 0.9em;
+    margin-right: 0.6em;
+  }
+
+  /* ---------- sections ---------- */
+
+  section { display: flex; flex-direction: column; gap: 1.5rem; }
+
+  .sec-head {
+    display: flex;
+    align-items: baseline;
+    gap: 1rem;
+    border-bottom: 1px solid var(--rule);
+    padding-bottom: 0.7rem;
+  }
+
+  .sec-num {
+    font-family: var(--font-mono);
+    font-size: 0.74rem;
+    letter-spacing: 0.1em;
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+    flex: none;
+  }
+
+  h2 {
+    font-family: var(--font-mono);
+    font-size: clamp(1.15rem, 2.4vw, 1.42rem);
+    letter-spacing: -0.02em;
+    font-weight: 600;
+    margin: 0;
+    text-wrap: balance;
+  }
+
+  h3 { font-family: var(--font-ui); font-size: 0.98rem; font-weight: 650; margin: 0; }
+
+  /* ---------- verdict banner ---------- */
+
+  .verdict {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+    gap: 1px;
+    background: var(--rule);
+    border: 1px solid var(--rule);
+  }
+  .verdict > div {
+    background: var(--surface);
+    padding: 1.15rem 1.2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+  .verdict .n {
+    font-family: var(--font-mono);
+    font-size: 1.7rem;
+    letter-spacing: -0.03em;
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+  }
+  .verdict .n.warn { color: var(--signal); }
+  .verdict .n:not(.num) { font-size: 1.15rem; letter-spacing: -0.01em; line-height: 1.25; }
+  .verdict .n.num { font-size: 1.7rem; }
+  .verdict .l {
+    font-family: var(--font-ui);
+    font-size: 0.8rem;
+    line-height: 1.45;
+    color: var(--ink-soft);
+  }
+
+  /* ---------- callouts ---------- */
+
+  .note {
+    padding: 1.5rem clamp(1.1rem, 3vw, 1.9rem);
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+  }
+  .note.hot { background: var(--signal-soft); border-left: 3px solid var(--signal); }
+  .note.cool { background: var(--accent-soft); border-left: 3px solid var(--accent); }
+
+  .note .tag {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+  }
+  .note.hot .tag { color: var(--signal); }
+  .note.cool .tag { color: var(--accent); }
+
+  .note .lede {
+    font-family: var(--font-ui);
+    font-size: 1.1rem;
+    font-weight: 650;
+    line-height: 1.4;
+    margin: 0;
+    max-width: 50ch;
+  }
+  .note p { max-width: 68ch; color: var(--ink-soft); }
+
+  .note pre {
+    background: transparent;
+    border: none;
+    border-left: 2px solid currentColor;
+    padding: 0.1rem 0 0.1rem 0.9rem;
+    color: var(--ink);
+    font-size: 0.8rem;
+  }
+
+  /* ---------- diagram ---------- */
+
+  .figure { display: flex; flex-direction: column; gap: 0.9rem; }
+
+  .scroller {
+    overflow-x: auto;
+    background: var(--surface);
+    border: 1px solid var(--rule-soft);
+    padding: 1.5rem 1.25rem;
+  }
+  .scroller svg { display: block; min-width: 900px; width: 100%; height: auto; }
+
+  figcaption, .cap {
+    font-family: var(--font-mono);
+    font-size: 0.74rem;
+    color: var(--muted);
+    line-height: 1.55;
+  }
+
+  /* ---------- tables ---------- */
+
+  .tbl-wrap { overflow-x: auto; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: var(--font-ui);
+    font-size: 0.855rem;
+    line-height: 1.5;
+    min-width: 640px;
+  }
+
+  th {
+    text-align: left;
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 500;
+    padding: 0 1.1rem 0.65rem 0;
+    border-bottom: 1px solid var(--rule);
+    vertical-align: bottom;
+  }
+
+  td {
+    padding: 0.85rem 1.1rem 0.85rem 0;
+    border-bottom: 1px solid var(--rule-soft);
+    vertical-align: top;
+    color: var(--ink-soft);
+  }
+
+  td:first-child { color: var(--ink); font-weight: 600; width: 27%; }
+  th:last-child, td:last-child { padding-right: 0; }
+
+  td .mono { font-size: 0.85em; color: var(--muted); display: block; margin-top: 0.28rem; }
+
+  .pill {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 0.63rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 0.18em 0.5em;
+    border: 1px solid currentColor;
+    white-space: nowrap;
+  }
+  .pill.ok { color: var(--accent); }
+  .pill.no { color: var(--signal); }
+
+  /* ---------- decisions ---------- */
+
+  .decisions { display: flex; flex-direction: column; gap: 0; border-top: 1px solid var(--rule); }
+
+  .decision {
+    display: grid;
+    grid-template-columns: 3rem 1fr;
+    gap: 0 1.5rem;
+    padding: 1.5rem 0;
+    border-bottom: 1px solid var(--rule-soft);
+  }
+  .decision .d-n {
+    font-family: var(--font-mono);
+    font-size: 1.1rem;
+    color: var(--signal);
+    font-variant-numeric: tabular-nums;
+    line-height: 1.25;
+  }
+  .decision .d-b { display: flex; flex-direction: column; gap: 0.5rem; max-width: var(--measure); }
+  .decision p { font-size: 0.92rem; color: var(--ink-soft); margin: 0; }
+
+  .opts { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.15rem; }
+  .opts span {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    padding: 0.28em 0.6em;
+    color: var(--ink-soft);
+  }
+
+  /* ---------- stages ---------- */
+
+  .stages { display: flex; flex-direction: column; gap: 0; border-top: 1px solid var(--rule); }
+
+  .stage {
+    display: grid;
+    grid-template-columns: 6rem 1fr;
+    gap: 0 1.75rem;
+    padding: 1.55rem 0;
+    border-bottom: 1px solid var(--rule-soft);
+  }
+
+  .stage-id {
+    font-family: var(--font-mono);
+    font-size: 0.74rem;
+    letter-spacing: 0.1em;
+    color: var(--accent);
+    padding-top: 0.18rem;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .stage-body { display: flex; flex-direction: column; gap: 0.65rem; max-width: var(--measure); }
+  .stage-body p { font-size: 0.93rem; color: var(--ink-soft); margin: 0; }
+
+  .gate {
+    font-family: var(--font-ui);
+    font-size: 0.83rem;
+    line-height: 1.5;
+    background: var(--accent-soft);
+    color: var(--ink);
+    padding: 0.6rem 0.85rem;
+    border-left: 2px solid var(--accent);
+  }
+  .gate b {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--accent);
+    display: block;
+    margin-bottom: 0.2rem;
+    font-weight: 500;
+  }
+  .gate.stop { background: var(--signal-soft); border-left-color: var(--signal); }
+  .gate.stop b { color: var(--signal); }
+
+  /* ---------- lists ---------- */
+
+  .grid-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr));
+    gap: 1px;
+    background: var(--rule-soft);
+    border: 1px solid var(--rule-soft);
+  }
+  .grid-list li {
+    background: var(--surface);
+    padding: 1rem 1.15rem;
+    font-family: var(--font-ui);
+    font-size: 0.85rem;
+    line-height: 1.5;
+    color: var(--ink-soft);
+    display: flex;
+    flex-direction: column;
+    gap: 0.28rem;
+  }
+  .grid-list b {
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    color: var(--ink);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+
+  ol.checks {
+    margin: 0;
+    padding-left: 0;
+    list-style: none;
+    counter-reset: chk;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(21rem, 1fr));
+    gap: 0.5rem 2.5rem;
+  }
+  ol.checks li {
+    counter-increment: chk;
+    display: grid;
+    grid-template-columns: 1.9rem 1fr;
+    font-family: var(--font-ui);
+    font-size: 0.86rem;
+    line-height: 1.5;
+    color: var(--ink-soft);
+  }
+  ol.checks li::before {
+    content: counter(chk, decimal-leading-zero);
+    font-family: var(--font-mono);
+    font-size: 0.71rem;
+    color: var(--accent);
+    padding-top: 0.22rem;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .arms { display: grid; grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr)); gap: 2rem 3rem; }
+  .arm { display: flex; flex-direction: column; gap: 0.5rem; }
+  .arm .k {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+  .arm .k.dim { color: var(--muted); }
+  .arm p { font-size: 0.89rem; color: var(--ink-soft); margin: 0; }
+
+  pre {
+    margin: 0;
+    background: var(--surface);
+    border: 1px solid var(--rule-soft);
+    border-left: 2px solid var(--accent);
+    padding: 1.1rem 1.2rem;
+    overflow-x: auto;
+    font-family: var(--font-mono);
+    font-size: 0.79rem;
+    line-height: 1.72;
+    color: var(--ink-soft);
+  }
+  pre .c { color: var(--muted); }
+  pre .k { color: var(--accent); }
+
+  footer {
+    border-top: 2px solid var(--ink);
+    padding-top: 1.5rem;
+    font-family: var(--font-mono);
+    font-size: 0.74rem;
+    color: var(--muted);
+    line-height: 1.7;
+  }
+
+  @media (max-width: 40rem) {
+    .stage, .decision { grid-template-columns: 1fr; gap: 0.5rem; }
+    .meta { gap: 0.3rem 1.5rem; flex-direction: column; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="eyebrow">Operations guide · MMS Connector</p>
+    <h1>Connector MCP Guide</h1>
+    <p class="standfirst">How to run the connector, how a remote client reaches it over Tailscale, and — just as important — what it deliberately will not let you do.</p>
+    <div class="meta">
+      <span data-k="package"><b>s:\SiteAgentHub\Connector</b></span>
+      <span data-k="runtime"><b>Bun 1.3.x</b></span>
+      <span data-k="endpoint"><b>POST /mcp</b></span>
+      <span data-k="auth"><b>Bearer</b></span>
+    </div>
+  </header>
+
+  <section>
+    <div class="sec-head"><span class="sec-num">01</span><h2>What this is</h2></div>
+    <div class="col">
+      <p>The connector migrates a site into Instatic CMS: posts become a managed collection rather than hundreds of flat pages, shared chrome becomes reusable components, and one template wraps every post. The MCP server is the <strong>remote control surface</strong> for that tooling — it lets someone drive the connector from Claude or any MCP client without shell access to this machine.</p>
+    </div>
+
+    <div class="note hot">
+      <span class="tag">Read this before planning around it</span>
+      <p class="lede">MCP is not the migration transport, and that is a design decision rather than an unfinished feature.</p>
+      <p>Instatic&#39;s own publish tool accepts an empty input schema and no expected hash, and its content writes relay through an open browser tab. Driving a release through that surface would reintroduce the approval race the design spent six review passes closing — a release could publish something other than what was approved, and nothing would notice.</p>
+      <p>So the release path stays in the CLI, behind the approval bindings and the server-side expected-hash contract. <strong>This MCP server exposes read-only and gate tools only.</strong> It can tell you whether a release is safe; it cannot perform one.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><span class="sec-num">02</span><h2>Running it locally</h2></div>
+    <div class="col"><p>Generate a token first. It is read from the environment and never from a file in the repo or a command-line argument — arguments land in shell history and in the process list on a shared machine.</p></div>
+    <pre><span class="c"># 1. generate a token</span>
+bun -e "console.log(crypto.randomUUID()+crypto.randomUUID())"
+
+<span class="c"># 2. prove the conversion environment works before anything else</span>
+cd s:\SiteAgentHub\Connector
+bun src/main.ts doctor
+
+<span class="c"># 3. start the MCP server</span>
+export MMS_CONNECTOR_MCP_TOKEN=&lt;the token&gt;
+bun src/main.ts serve --port 8787</pre>
+    <div class="col">
+      <p>It binds to <code>127.0.0.1</code> by default. That is intentional: remote access arrives through Tailscale, which routes to the loopback listener, whereas binding <code>0.0.0.0</code> would additionally expose the port to anything else that can reach the machine.</p>
+      <p>Check it with <code>curl http://127.0.0.1:8787/health</code> — you should get <code>{"ok":true,"service":"mms-connector-mcp"}</code>.</p>
+    </div>
+  </section>
+  <section>
+    <div class="sec-head"><span class="sec-num">03</span><h2>Remote access over Tailscale</h2></div>
+    <div class="col">
+      <p>Tailscale Funnel permits only three ports — <strong>443, 8443 and 10000</strong> — and the Operator control plane already claims two of them. It opens its own funnel on boot and closes it on shutdown (<code>GATEWAY_FUNNEL=0</code> to manage by hand), so this is not a blank slate.</p>
+    </div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Port</th><th>Currently</th><th>Origin</th></tr></thead>
+        <tbody>
+          <tr><td>443</td><td>Operator gateway — reverse-proxies operator, every tenant&#39;s OpenDesign and Instatic</td><td><code>https://siteagent.tailbbb0d2.ts.net</code></td></tr>
+          <tr><td>10000</td><td>Tenant test funnel — one tenant editor published for remote access</td><td><code>…ts.net:10000</code></td></tr>
+          <tr><td>8443</td><td><strong>Free</strong> — the only spare</td><td><code>…ts.net:8443</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note hot">
+      <span class="tag">Correction — do not use the bare gateway origin</span>
+      <p class="lede">The gateway origin routes to the control plane, not to this server.</p>
+      <p><code>https://siteagent.tailbbb0d2.ts.net</code> is port 443, which the Operator control plane owns and reverse-proxies to per-tenant backends. Pointing a client there for MCP gets the control plane, not the connector. The port must be in the URL.</p>
+    </div>
+
+    <div class="col"><p><strong>Option A — take the spare port.</strong> Nothing in Operator changes, and it works immediately. It does spend the last free funnel port.</p></div>
+    <pre>tailscale funnel --bg --https=8443 http://127.0.0.1:8787
+
+<span class="c"># public URL</span>
+https://siteagent.tailbbb0d2.ts.net:8443/mcp
+export MMS_CONNECTOR_ALLOWED_ORIGINS=https://siteagent.tailbbb0d2.ts.net:8443</pre>
+
+    <div class="col"><p><strong>Option B — behind the existing gateway.</strong> Matches the &quot;one funnel fronts everything&quot; design and keeps 8443 spare, but needs a proxy route added to the control plane, so it is a change to Operator rather than pure configuration.</p></div>
+    <pre><span class="c"># route /connector-mcp -&gt; http://127.0.0.1:8787/mcp in the control-plane proxy</span>
+https://siteagent.tailbbb0d2.ts.net/connector-mcp
+export MMS_CONNECTOR_ALLOWED_ORIGINS=https://siteagent.tailbbb0d2.ts.net</pre>
+
+    <div class="note hot">
+
+      <span class="tag">The trap that already bit this repo once</span>
+      <p class="lede">The funnel rewrites Origin and Host, so the server rejects every request until you tell it the public origin.</p>
+      <p>Instatic&#39;s CSRF check hit exactly this, and <code>Operator/pending.md</code> records the workaround. Our server needs the same thing said explicitly:</p>
+      <pre>export MMS_CONNECTOR_ALLOWED_ORIGINS=&lt;the origin from the option you chose&gt;</pre>
+      <p>A request with <em>no</em> Origin header is allowed — that is a CLI or server-to-server caller, and it cannot be a browser rebinding attack because browsers always send Origin cross-origin. A request with a <em>wrong</em> Origin gets 403 before the token is ever compared.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><span class="sec-num">04</span><h2>Connecting a client</h2></div>
+    <div class="col"><p>Give the client the public URL and the token. Nothing else — no repo access, no credentials for the CMS.</p></div>
+    <pre>claude mcp add --transport http mms-connector \
+  https://siteagent.tailbbb0d2.ts.net:8443/mcp \
+  --header "Authorization: Bearer &lt;token&gt;"</pre>
+    <div class="col"><p>Or, for any MCP client that reads JSON config:</p></div>
+    <pre>{
+  "mcpServers": {
+    "mms-connector": {
+      "type": "http",
+      "url": "https://siteagent.tailbbb0d2.ts.net:8443/mcp",
+      "headers": { "Authorization": "Bearer &lt;token&gt;" }
+    }
+  }
+}</pre>
+  </section>
+
+  <section>
+    <div class="sec-head"><span class="sec-num">05</span><h2>Tools available today</h2></div>
+    <div class="col"><p>Only tools whose implementation exists are registered. A tool that advertises itself and then returns &quot;not implemented&quot; is worse than an absent one — an agent will plan a whole migration around it and fail halfway.</p></div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Tool</th><th>What it does</th><th>Writes?</th></tr></thead>
+        <tbody>
+          <tr><td><code>connector_doctor</code></td><td>Converts a fixture through Instatic&#39;s own <code>importHtml</code> and <code>cssToStyleRules</code>, asserting nodes, module ids, style rules and zero unexpected warnings<span class="mono">catches the silent CSS failure that loses every style on the site</span></td><td>No</td></tr>
+          <tr><td><code>connector_environment</code></td><td>Bun version, registered module ids, whether the DOM globals are installed</td><td>No</td></tr>
+          <tr><td><code>connector_hash_rows</code></td><td>Canonical per-row hashes plus the aggregate rows digest, order-independent<span class="mono">the digest is what an approval binds; each row hash is what a release sends as If-Match</span></td><td>No</td></tr>
+          <tr><td><code>connector_verify_approval</code></td><td>Checks an approval record against observed state and a release manifest, returning every failing binding at once<span class="mono">this is the gate — it reports, it does not release</span></td><td>No</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><span class="sec-num">06</span><h2>Security posture</h2></div>
+    <ul class="grid-list">
+      <li><b>Refuses to start unauthenticated</b>A missing or under-32-character token aborts before the port opens. A server that starts and then rejects everything looks like a network fault and wastes an afternoon.</li>
+      <li><b>Constant-time token compare</b>So a wrong token cannot be recovered by timing the response.</li>
+      <li><b>Origin checked before auth</b>A rebinding attempt is rejected without the token ever being compared.</li>
+      <li><b>Loopback bind by default</b>Tailscale routes to loopback. Exposing <code>0.0.0.0</code> has to be asked for explicitly.</li>
+      <li><b>No CMS credentials here</b>This server exposes migration tooling, not content. It holds no session for any Instatic instance.</li>
+      <li><b>One shared secret per deployment</b>Deliberately not a user system. Rotate by restarting with a new token; there is no revocation list to drift out of sync.</li>
+    </ul>
+  </section>
+
+  <section>
+    <div class="sec-head"><span class="sec-num">07</span><h2>What is not built yet</h2></div>
+    <div class="col">
+      <p>Being straight about this matters more than the feature list, because the gap is where a client&#39;s expectations will land.</p>
+      <p><strong>Nothing here talks to a CMS yet.</strong> There is no login, no session handling, no import and no publish. The bundle emitter that converts a real site does not exist — <code>doctor</code> converts a fixture, not your content. The Instatic <code>If-Match</code> changes that close the release race are specified but not written.</p>
+      <p>What <em>is</em> proven is the foundation the rest stands on: a separate package can reuse Instatic&#39;s own converter rather than reimplementing it, and the hashing and approval machinery agrees with the server byte-for-byte. That was the make-or-break question, and it is answered.</p>
+    </div>
+    <div class="gate stop col"><b>Do not promise</b>A working migration, a preview against a live tenant, or a release. None of those paths exist yet. This server is a control surface over the parts that do.</div>
+  </section>
+
+  <footer>
+    MMS Connector · MCP over Streamable HTTP · read-only and gate tools only · the release path stays in the CLI behind the approval bindings
+  </footer>
+
+</div>
+</body>
+</html>

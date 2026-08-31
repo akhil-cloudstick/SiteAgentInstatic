@@ -59,6 +59,18 @@ alter table siteagent_control.tenants add column if not exists od_status text no
 -- Per-tenant OpenDesign web (Next.js dev) port — the tenant browses here.
 alter table siteagent_control.tenants add column if not exists od_web_port int;
 
+-- Whether search engines may index this tenant's published site.
+--
+-- Defaults to FALSE, and that default is the point. Instatic bakes only page
+-- HTML — no robots.txt, no _headers, no meta robots — so before this column
+-- every tenant we deployed was fully crawlable the moment it went live,
+-- including staging copies of clients' real production sites. The deployer now
+-- writes robots.txt + _headers on every deploy and reads this flag to decide
+-- which pair to write, so exposure becomes a deliberate act instead of the
+-- default. Existing tenants backfill to false: a live site that should be
+-- indexed gets the flag set once, on purpose.
+alter table siteagent_control.tenants add column if not exists search_indexing boolean not null default false;
+
 -- Per-task-type AI model routing + global guidance (managed multi-tenant).
 --   ai_categories: [{ slug, name, description, modelId, isDefault, builtin }]
 --     slug is the stable, header-safe id used for routing (never the display name).
@@ -156,3 +168,12 @@ create index if not exists mcp_agent_audit_tenant_time
 --   tenant's OD daemon as OD_*_API_KEY env vars at spawn.
 alter table siteagent_control.settings add column if not exists design_model    text;
 alter table siteagent_control.settings add column if not exists media_keys_enc  text;
+
+-- Product availability, platform-wide. Deliberately SEPARATE from tenants.tier:
+-- `tier` decides what gets PROVISIONED for one tenant (lite = no Instatic), these
+-- decide what is AVAILABLE on this deployment at all, for every tenant at once.
+-- Both default true, so an existing deployment behaves exactly as before until an
+-- operator turns something off. When only one is active the hub chooser is skipped
+-- and login lands straight in that product.
+alter table siteagent_control.settings add column if not exists design_active boolean not null default true;
+alter table siteagent_control.settings add column if not exists cms_active    boolean not null default true;

@@ -1806,6 +1806,7 @@ export const en: Dict = {
   'avatar.amrConsoleMeta': 'Balance & recharge',
   'avatar.settings': 'Settings',
   'avatar.backToProjects': 'Back to projects',
+  'avatar.signOut': 'Sign out',
   'avatar.metaActive': 'active',
   'avatar.metaOffline': 'offline',
   'avatar.metaSelected': 'selected',

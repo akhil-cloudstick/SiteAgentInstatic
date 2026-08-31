@@ -17,7 +17,7 @@
  * import uses (`buildImportPlan` + `commitImportPlan` against the live
  * editor store), not a separate server-side reimplementation. This is why
  * there is no `buildImportPlan`/commit call in this file: staging is the
- * entire job. See `docs/phase5-share-to-cms-design.md` for the original
+ * entire job. See `docs/integration/phase5-share-to-cms-design.md` for the original
  * design and `siteImport/stagedImports.ts` for the handoff store.
  *
  * Requires `data.import` on both routes (the SSO'd Owner has it).

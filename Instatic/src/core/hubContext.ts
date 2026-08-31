@@ -56,6 +56,17 @@ export const HubContextSchema = Type.Object({
   origin: OptionalScope,
   /** Absolute URL of the exact Hub view to return to. Always Hub-origin. */
   returnUrl: Type.String({ maxLength: 2048 }),
+  /**
+   * Which products the operator has enabled platform-wide. The header uses them
+   * to decide whether a Product Hub is worth linking to: with only one product
+   * enabled the Hub bounces straight back, so `Home` links to where you are.
+   *
+   * Optional because a session minted before these existed has neither, and an
+   * absent flag means "unknown" — treated as enabled, since the real gate is
+   * server-side and wrongly hiding navigation is the worse failure.
+   */
+  designActive: Type.Optional(Type.Boolean()),
+  cmsActive: Type.Optional(Type.Boolean()),
 })
 
 export type HubContext = Static<typeof HubContextSchema>
@@ -77,4 +88,6 @@ export const HUB_CONTEXT_PARAMS = {
   site: 'hubSite',
   origin: 'hubOrigin',
   returnUrl: 'hubReturnUrl',
+  designActive: 'hubDesignActive',
+  cmsActive: 'hubCmsActive',
 } as const
