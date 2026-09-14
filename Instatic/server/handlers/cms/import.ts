@@ -59,11 +59,13 @@ import { jsonResponse, readValidatedBody } from '../../http'
 import { parseValue } from '@core/utils/typeboxHelpers'
 import {
   SiteBundleSchema,
-  ImportStrategySchema,
   ImportResultSchema,
   type ImportStrategy,
 } from '@core/data/bundleSchema'
+import { assertSystemTableUpdateAllowed } from '@core/data/systemTableGuard'
+import type { DataTable, UpdateDataTableInput } from '@core/data/schemas'
 import { CMS_API_PREFIX, type CmsHandlerOptions } from './shared'
+import { InvalidImportStrategyError, resolveImportStrategy } from './importStrategy'
 import {
   notifyRowWrite,
   notifyShellWrite,
@@ -99,6 +101,51 @@ function orderFoldersParentFirst<T extends { id: string; parentId: string | null
   return ordered
 }
 
+/**
+ * Build a `updateDataTable` input for a table an import wants to overwrite,
+ * dropping anything a system table is not allowed to change.
+ *
+ * The admin UI and the HTTP PATCH both run `assertSystemTableUpdateAllowed`
+ * before writing. The import path did not, so a bundle was the one surface that
+ * could repoint a system table's `routeBase` — making the seeded `posts` table
+ * serve `/news/…`, say — or rewrite a built-in field. A bundle is data from a
+ * file, not a privileged caller, and it should not out-rank the two interactive
+ * surfaces.
+ *
+ * Frozen fields are DROPPED rather than the import rejected. A bundle exported
+ * from this same CMS carries its system tables back verbatim, so every ordinary
+ * round-trip would fail the guard's equality check on values it never intended
+ * to change. Dropping keeps that case working while making the disallowed
+ * change a no-op. Custom tables pass through untouched.
+ */
+function systemSafeTableUpdate(
+  existing: DataTable | undefined,
+  table: DataTable,
+): UpdateDataTableInput {
+  const full: UpdateDataTableInput = {
+    name: table.name,
+    slug: table.slug,
+    routeBase: table.routeBase,
+    singularLabel: table.singularLabel,
+    pluralLabel: table.pluralLabel,
+    primaryFieldId: table.primaryFieldId,
+    fields: table.fields,
+  }
+  if (!existing || existing.system !== true) return full
+  if (assertSystemTableUpdateAllowed(existing, full) === null) return full
+
+  // Something in the update is frozen. Keep only what a system table may
+  // change: the primary field and custom (non-built-in) fields, with the
+  // stored built-ins preserved in place.
+  const builtIns = existing.fields.filter((f) => f.builtIn === true)
+  const builtInIds = new Set(builtIns.map((f) => f.id))
+  const customFields = table.fields.filter((f) => f.builtIn !== true && !builtInIds.has(f.id))
+  return {
+    primaryFieldId: table.primaryFieldId,
+    fields: [...builtIns, ...customFields],
+  }
+}
+
 /** ZIP local-file-header magic (`PK\x03\x04`) — enough to tell an archive from JSON. */
 function looksLikeZipArchive(body: ArrayBuffer): boolean {
   if (body.byteLength < 4) return false
@@ -119,16 +166,14 @@ export async function handleImportRoute(
   const user = await requireCapability(req, db, 'data.import')
   if (user instanceof Response) return user
 
-  // Parse strategy from query string (default: replace)
-  const strategyParam = url.searchParams.get('strategy') ?? 'replace'
+  // Resolved through the shared reader so `/import/preview` cannot describe a
+  // different run than this one performs.
   let strategy: ImportStrategy
   try {
-    strategy = parseValue(ImportStrategySchema, strategyParam)
-  } catch {
-    return jsonResponse(
-      { error: 'Invalid strategy — must be replace, merge-add, or merge-overwrite' },
-      { status: 400 },
-    )
+    strategy = resolveImportStrategy(url)
+  } catch (err) {
+    if (!(err instanceof InvalidImportStrategyError)) throw err
+    return jsonResponse({ error: err.message }, { status: 400 })
   }
 
   // `replace` strategy = wipe every data row and reinsert. Highest-blast
@@ -219,7 +264,18 @@ export async function handleImportRoute(
       await tx`delete from data_rows`
 
       // 2. Delete all non-system data tables
-      await tx`delete from data_tables where system = 0 or system = false`
+      //
+      // BOUND, not a literal. `system = 0` is valid SQLite and a hard error on
+      // Postgres — `operator does not exist: boolean = integer` — because the
+      // column is `integer` in one dialect and `boolean` in the other. The
+      // previous `system = 0 or system = false` looks like it covers both and
+      // does the opposite: Postgres rejects the whole statement on the first
+      // comparison, so replace-import never worked on Postgres at all. Every
+      // test runs SQLite, so nothing caught it until a real tenant tried.
+      //
+      // Binding the value lets each driver render its own truth: SQLite takes 0,
+      // Postgres takes false.
+      await tx`delete from data_tables where system = ${false}`
 
       // 3. Load remaining system tables so we know which bundle tables to
       //    update vs insert.
@@ -229,16 +285,18 @@ export async function handleImportRoute(
       // 4. Upsert tables from the bundle
       for (const table of bundle.tables) {
         if (existingTableIds.has(table.id)) {
-          // System table already present — update its fields
-          await updateDataTable(tx, table.id, {
-            name: table.name,
-            slug: table.slug,
-            routeBase: table.routeBase,
-            singularLabel: table.singularLabel,
-            pluralLabel: table.pluralLabel,
-            primaryFieldId: table.primaryFieldId,
-            fields: table.fields,
-          })
+          // System table already present — update its fields.
+          //
+          // Through the SAME guard the admin UI and the HTTP PATCH apply. An
+          // import is bulk data from a file, not a privileged surface: without
+          // this, a bundle could repoint a system table's `routeBase` (making
+          // the seeded `posts` table serve `/news/…`) or rewrite a built-in
+          // field, which both other surfaces refuse. Identity fields are
+          // dropped rather than the import rejected — a bundle exported from
+          // this same CMS round-trips its own system tables unchanged, so
+          // failing the run would break the ordinary case to punish the rare one.
+          const existing = existingTables.find((t) => t.id === table.id)
+          await updateDataTable(tx, table.id, systemSafeTableUpdate(existing, table))
           tablesAffected++
         } else if (!SYSTEM_TABLE_IDS.has(table.id)) {
           // Custom table — insert with original id
@@ -285,7 +343,12 @@ export async function handleImportRoute(
       // 7. Media folder tree. `delete from data_rows` above does NOT touch
       //    media_folders (unrelated FK), so wipe explicitly, then insert
       //    parent-first to satisfy the self-referencing parent_id FK.
-      if (bundle.mediaFolders) {
+      // `?.length`, not truthiness: an empty array is truthy, so a bundle
+      // carrying `mediaFolders: []` used to wipe the folder tree and restore
+      // nothing — destroying a structure the bundle never claimed to replace,
+      // with no count in the result to show it. "Only when the bundle carries
+      // one" is the intent stated above; an empty array carries none.
+      if (bundle.mediaFolders?.length) {
         await deleteAllMediaFolders(tx)
         for (const folder of orderFoldersParentFirst(bundle.mediaFolders)) {
           await importMediaFolder(tx, folder)
@@ -297,7 +360,8 @@ export async function handleImportRoute(
       // 8. Redirects. Old ones already cascade-deleted with their target rows
       //    in step 1; wipe explicitly for clarity, then reinsert from the
       //    bundle now that the target rows exist.
-      if (bundle.redirects) {
+      // Same empty-array trap as the folder tree above.
+      if (bundle.redirects?.length) {
         await deleteAllDataRowRedirects(tx)
         for (const redirect of bundle.redirects) {
           await importDataRowRedirect(tx, redirect)
@@ -355,7 +419,9 @@ export async function handleImportRoute(
       // bundle does not mention, and both its old and new collab docs/rosters
       // must be invalidated after commit.
       const existingRowTables = new Map<string, string>()
+      const existingTablesById = new Map<string, DataTable>()
       for (const table of await listDataTables(tx)) {
+        existingTablesById.set(table.id, table)
         const existing = await listDataRows(tx, table.id)
         for (const row of existing) existingRowTables.set(row.id, row.tableId)
       }
@@ -374,15 +440,10 @@ export async function handleImportRoute(
           fields: table.fields,
         })
         if (!inserted) {
-          await updateDataTable(tx, table.id, {
-            name: table.name,
-            slug: table.slug,
-            routeBase: table.routeBase,
-            singularLabel: table.singularLabel,
-            pluralLabel: table.pluralLabel,
-            primaryFieldId: table.primaryFieldId,
-            fields: table.fields,
-          })
+          // Same guard as the replace path above — a merge import must not be
+          // the one surface that can rewrite a system table's identity.
+          const existing = existingTablesById.get(table.id)
+          await updateDataTable(tx, table.id, systemSafeTableUpdate(existing, table))
         }
         tablesAffected++
       }

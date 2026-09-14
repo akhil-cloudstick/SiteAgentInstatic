@@ -509,9 +509,9 @@ export function PluginsView({
   return (
     <section className="plugins-view" aria-labelledby="plugins-title">
       <header className="plugins-view__hero">
-        <div>
+        <div className="mms-nav-duplicate-titleblock">
           {/* #5517: a bare 扩展 heading — no kicker, no lede paragraph. */}
-          <h1 id="plugins-title" className="entry-section__title">
+          <h1 id="plugins-title" className="entry-section__title mms-nav-duplicate-title">
             {t('entry.navPlugins')}
           </h1>
         </div>
@@ -2036,7 +2036,7 @@ export function ExtensionsMarketplace({
         skill={selectedSkill}
         author={
           scope === 'official'
-            ? 'Open Design'
+            ? 'MMS Design'
             : scope === 'team'
               ? 'Nexu Team'
               : t('chat.you')

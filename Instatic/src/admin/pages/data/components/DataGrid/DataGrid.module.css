@@ -840,3 +840,14 @@
     flex: 0 0 auto;
     color: var(--mms-text-muted);
 }
+
+/* Missing entry template — a warning band, same geometry as .protectedNote. */
+.templateWarning {
+  composes: protectedNote;
+  color: var(--editor-warning);
+}
+
+.templateWarning svg {
+  color: var(--editor-warning);
+  flex: none;
+}

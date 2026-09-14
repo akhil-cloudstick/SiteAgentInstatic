@@ -33,6 +33,10 @@ if (Astro.request.method === 'POST') {
           cfProject: f.get('cfProject'),
           customDomain: f.get('customDomain'),
           tier: f.get('tier'),
+          // An unticked checkbox is absent from the body, so presence IS the
+          // value. Always send an explicit boolean — otherwise turning indexing
+          // back off would be unrepresentable.
+          searchIndexing: f.get('searchIndexing') === 'on',
         }),
       });
       const j = await r.json();
@@ -161,6 +165,11 @@ const fmtDate = (s) => (s ? new Date(s).toLocaleString() : '—');
                 ? (<a href={t.custom_domain ? `https://${t.custom_domain}` : t.pages_url} target="_blank" rel="noreferrer">{(t.custom_domain || t.pages_url).replace('https://', '')} ↗</a>)
                 : (<span class="hint">not published</span>)}
                 {!t.last_deploy_at && (t.custom_domain || t.pages_url) && (<div class="hint" style="margin-top:2px">placeholder</div>)}
+                {t.search_indexing === true
+                  ? (t.custom_domain || t.pages_url) && (<div class="hint" style="margin-top:2px">indexable</div>)
+                  : (t.custom_domain
+                      ? (<div style="margin-top:2px"><span class="pill warn" title="This site is on its own domain but ships robots.txt Disallow: / and X-Robots-Tag: noindex. Deploys are refused until indexing is turned on.">noindex — on a custom domain</span></div>)
+                      : (t.pages_url && (<div class="hint" style="margin-top:2px">noindex</div>)))}
               </td>
               <td>
                 <div class="row-actions">
@@ -202,6 +211,9 @@ const fmtDate = (s) => (s ? new Date(s).toLocaleString() : '—');
                     <dt>CF project name</dt><dd><code>{t.cf_project || '—'}</code></dd>
                     <dt>CF project URL</dt><dd>{t.pages_url ? (<a href={t.pages_url} target="_blank" rel="noreferrer">{t.pages_url} ↗</a>) : (<span class="hint">created on first publish</span>)}</dd>
                     <dt>Custom domain</dt><dd>{t.custom_domain ? (<a href={`https://${t.custom_domain}`} target="_blank" rel="noreferrer">{t.custom_domain} ↗</a>) : (<span class="hint">none</span>)}</dd>
+                    <dt>Search indexing</dt><dd>{t.search_indexing === true
+                      ? (<span>allowed — <code>robots.txt</code> permits crawling</span>)
+                      : (<span>blocked — <code>Disallow: /</code> + <code>X-Robots-Tag: noindex</code> on every deploy{t.custom_domain ? ' (deploys to the custom domain are refused while this is off)' : ''}</span>)}</dd>
                     <dt>Published</dt><dd>{t.last_deploy_at ? (<span>yes · {fmtDate(t.last_deploy_at)}{t.last_deploy_status ? ` (${t.last_deploy_status})` : ''}</span>) : (<span class="hint">placeholder only — tenant hasn’t published yet</span>)}</dd>
                     <dt>Internal port</dt><dd><code>{t.port ?? '—'}</code></dd>
                     <dt>Created</dt><dd>{fmtDate(t.created_at)}</dd>
@@ -235,6 +247,11 @@ const fmtDate = (s) => (s ? new Date(s).toLocaleString() : '—');
                     <label>Custom domain</label>
                     <input name="customDomain" value={t.custom_domain || ''} placeholder="acme.siteagent.com" />
                     <p class="hint" style="margin:4px 0 0">Saved and attached to the Pages project automatically (if its zone is in your Cloudflare account).</p>
+                    <label style="display:flex;align-items:center;gap:8px;margin-top:12px">
+                      <input name="searchIndexing" type="checkbox" checked={t.search_indexing === true} />
+                      Allow search engines to index this site
+                    </label>
+                    <p class="hint" style="margin:4px 0 0">Off by default. While off, every deploy ships <code>robots.txt</code> with <code>Disallow: /</code> and an <code>X-Robots-Tag: noindex</code> header — correct for a staging or preview site, wrong for a live one. Deploying a <strong>custom domain</strong> with this off is refused.</p>
                     <div class="row-actions" style="justify-content:flex-end;margin-top:16px">
                       <button class="ghost" type="button" onclick={`document.getElementById('edit-${t.slug}').close()`}>Cancel</button>
                       <button type="submit">Save</button>

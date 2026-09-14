@@ -12,11 +12,10 @@
  * ride along with a merge import.
  */
 
-import { readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
 import type { ConnectorTool, ToolResult } from './tools'
 import { requireSession } from '../http/store'
 import { previewBundle, importBundle, importArchive } from '../http/client'
+import { resolveBundleSource } from './bundleSource'
 
 const ok = (value: unknown): ToolResult => ({
   content: [{ type: 'text', text: JSON.stringify(value, null, 2) }],
@@ -46,28 +45,39 @@ export const IMPORT_TOOLS: ConnectorTool[] = [
   {
     name: 'connector_import_archive',
     description:
-      'Import a site bundle ZIP from a local path. WRITES. Use merge-overwrite or merge-add for ' +
-      'an additive import; use connector_import_replace for a clean-site load. A ZIP carries ' +
-      'media files as well as content, which the JSON path cannot.',
+      'Import a site bundle ZIP. WRITES. Use merge-overwrite or merge-add for an additive import; ' +
+      'use connector_import_replace for a clean-site load. A ZIP carries media files as well as ' +
+      'content, which the JSON path cannot. Name it with uploadId (POST it to /imports first) or ' +
+      'with a path on the server — exactly one.',
     inputSchema: {
       type: 'object',
       properties: {
         target: targetProp,
-        path: { type: 'string', description: 'Absolute path to a site-bundle .zip on the server.' },
+        uploadId: {
+          type: 'string',
+          description: 'A ZIP already POSTed to /imports. The route for a caller not on this host.',
+        },
+        path: { type: 'string', description: 'Or a site-bundle .zip on the SERVER filesystem.' },
         strategy: {
           type: 'string',
           enum: ['merge-overwrite', 'merge-add'],
           description: 'Defaults to merge-overwrite. For replace, use connector_import_replace.',
         },
       },
-      required: ['path'],
       additionalProperties: false,
     },
     handler: async (a) =>
       guarded(async () => {
-        const bytes = new Uint8Array(readFileSync(resolve(str(a.path))))
+        const source = resolveBundleSource({
+          path: str(a.path) || undefined,
+          uploadId: str(a.uploadId) || undefined,
+        })
+        if (!source.ok) return fail(source.reason)
+        if (!source.value.archive) {
+          return fail('This tool imports a ZIP. For a JSON bundle use connector_import_replace.')
+        }
         const strategy = a.strategy === 'merge-add' ? ('merge-add' as const) : ('merge-overwrite' as const)
-        return ok(await importArchive(requireSession(str(a.target)), bytes, strategy))
+        return ok(await importArchive(requireSession(str(a.target)), source.value.archive, strategy))
       }),
   },
 
@@ -76,8 +86,12 @@ export const IMPORT_TOOLS: ConnectorTool[] = [
     description:
       'CLEAN-SITE IMPORT. Deletes EVERY row, every non-system table, all media folders and all ' +
       'redirects on the target, then inserts the bundle. NOT REVERSIBLE — there is no undo and no ' +
-      'trash. This is the right tool for loading a freshly generated site onto an empty or ' +
-      'disposable target, and the wrong tool for updating a site that has content worth keeping. ' +
+      'trash. ALSO CLEARS THE PUBLISHED VERSION: the site stops being published and its public ' +
+      'URLs keep serving the last deployment until a new publish runs, with nothing in the admin ' +
+      'saying so. Recoverable by republishing — unless publishing needs another party to approve, ' +
+      'which is when it becomes an outage rather than a step. This is the right tool for loading a ' +
+      'freshly generated site onto an empty or disposable target, and the wrong tool for updating ' +
+      'a site that has content worth keeping. ' +
       'It is also the only import that carries redirects and media folders. Requires confirm to ' +
       'be exactly "REPLACE <target>", and runs a dry run first, returning the counts it is about ' +
       'to apply.',
@@ -85,15 +99,24 @@ export const IMPORT_TOOLS: ConnectorTool[] = [
       type: 'object',
       properties: {
         target: targetProp,
-        bundle: { type: 'object', description: 'A SiteBundle object.' },
-        path: { type: 'string', description: 'Or an absolute path to a site-bundle .zip.' },
+        bundle: { type: 'object', description: 'A SiteBundle object, inline. Only practical for small bundles.' },
+        uploadId: {
+          type: 'string',
+          description:
+            'A bundle already POSTed to /imports. Preferred for a real bundle: inline JSON of any ' +
+            'realistic size is hundreds of thousands of tokens, and a server path is not writable ' +
+            'by a remote caller. A ZIP upload imports media too.',
+        },
+        path: { type: 'string', description: 'Or a site-bundle .zip on the SERVER filesystem.' },
         confirm: {
           type: 'string',
           description: 'Must be exactly "REPLACE <target>", e.g. "REPLACE staging".',
         },
         previewOnly: {
           type: 'boolean',
-          description: 'Run the dry run and stop. Use this first — it writes nothing.',
+          description:
+            'Run the dry run and stop. Use this first — it writes nothing. Works for every source, ' +
+            'archives included.',
         },
       },
       required: ['confirm'],
@@ -114,29 +137,35 @@ export const IMPORT_TOOLS: ConnectorTool[] = [
           )
         }
 
-        const hasBundle = a.bundle !== undefined && a.bundle !== null
-        const hasPath = str(a.path).length > 0
-        if (hasBundle === hasPath) {
-          return fail('Provide exactly one of bundle or path.')
-        }
+        const source = resolveBundleSource({
+          bundle: a.bundle,
+          path: str(a.path) || undefined,
+          uploadId: str(a.uploadId) || undefined,
+        })
+        if (!source.ok) return fail(source.reason)
 
-        // Dry run first, always — the counts are the only honest answer to
-        // "what is about to happen", and they are cheap.
-        if (hasBundle) {
-          const preview = await previewBundle(session, a.bundle)
-          if (a.previewOnly === true) return ok({ previewOnly: true, preview })
-          const result = await importBundle(session, a.bundle, 'replace')
-          return ok({ preview, result })
+        // Dry run first, ALWAYS — including for archives, which used to refuse
+        // previewOnly outright because the preview endpoint takes JSON. A ZIP
+        // carries its manifest, so the dry run was always possible; the effect
+        // of not doing it was that the one import that deletes everything was
+        // also the one that could not be rehearsed.
+        // Previewed AS a replace, so the counts describe the post-wipe state
+        // this tool actually produces rather than a merge that never happens.
+        const preview = await previewBundle(session, source.value.bundle, 'replace')
+        const previewReport = {
+          ...(preview as Record<string, unknown>),
+          bundleSource: source.value.source,
+          ...(source.value.archive ? { mediaFilesInArchive: source.value.mediaFilesInArchive } : {}),
         }
+        if (a.previewOnly === true) return ok({ previewOnly: true, preview: previewReport })
 
-        const bytes = new Uint8Array(readFileSync(resolve(str(a.path))))
-        if (a.previewOnly === true) {
-          return fail(
-            'previewOnly is not available for a ZIP import — the preview endpoint takes JSON. ' +
-              'Use connector_export_manifest or pass the bundle as JSON to preview it.',
-          )
-        }
-        return ok(await importArchive(session, bytes, 'replace'))
+        // An archive goes in as an archive: it carries media bytes and media
+        // folders that the manifest alone does not, and dropping them silently
+        // would import a site missing its images.
+        const result = source.value.archive
+          ? await importArchive(session, source.value.archive, 'replace')
+          : await importBundle(session, source.value.bundle, 'replace')
+        return ok({ preview: previewReport, result })
       }),
   },
 ]

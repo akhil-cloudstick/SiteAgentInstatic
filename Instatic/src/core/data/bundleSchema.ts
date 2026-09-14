@@ -324,6 +324,26 @@ export const BundleUnknownFieldSchema = Type.Object({
 export type BundleUnknownField = Static<typeof BundleUnknownFieldSchema>
 
 /**
+ * A node `classId` that resolves to no style rule in the bundle's registry.
+ *
+ * The publisher's tree-shaker keeps a rule only when some node references its
+ * id, so a bundle whose ids do not match its `classIds` publishes with almost
+ * no CSS — the site renders unstyled while every count, hash and schema check
+ * passes. Reported, never fatal: a bundle may legitimately reference a rule it
+ * deliberately omits (a class whose stylesheet was gated behind JavaScript that
+ * import strips, where shipping the rule would hide the node instead of
+ * styling it). Blocking on that would refuse the bundle for the thing it gets
+ * right, so the count is surfaced and the judgement left to the sender.
+ */
+export const BundleUnresolvedClassSchema = Type.Object({
+  className: Type.String(),
+  /** How many nodes carry it. */
+  nodeCount: Type.Number(),
+})
+
+export type BundleUnresolvedClass = Static<typeof BundleUnresolvedClassSchema>
+
+/**
  * Read-only diff returned by `POST /cms/api/cms/import/preview`.
  * Shows the operator what would happen before they commit an import.
  */
@@ -347,6 +367,20 @@ export const BundlePreviewSchema = Type.Object({
     mediaFolders: Type.Number(),
     redirects: Type.Number(),
   }),
+  /**
+   * Node `classIds` matching no style rule. See `BundleUnresolvedClassSchema`.
+   * Advisory — a non-empty list is worth reading, not a reason to refuse.
+   */
+  unresolvedClasses: Type.Optional(Type.Array(BundleUnresolvedClassSchema)),
+  /**
+   * Things this import destroys that the bundle does not carry, and which no
+   * count above describes. `replace` clears the published version along with
+   * the rows: the site stops being published and the admin shows no sign until
+   * someone fetches the public URL. Recoverable by republishing — unless the
+   * publish is gated on someone else's approval, which is when it stops being
+   * recoverable and starts being an outage.
+   */
+  destructiveEffects: Type.Optional(Type.Array(Type.String())),
 })
 
 export type BundlePreview = Static<typeof BundlePreviewSchema>

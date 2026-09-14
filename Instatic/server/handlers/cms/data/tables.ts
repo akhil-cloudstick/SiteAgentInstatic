@@ -300,19 +300,48 @@ const MAX_ROW_PAGE_SIZE = 200
  * megabytes, so even 25 of them is a large response. `fields=summary` returns
  * what a list view actually needs and leaves the body to `GET /data/rows/:id`.
  */
-function toRowSummary(row: DataRow): Record<string, unknown> {
-  const title = row.cells?.title
-  return {
-    id: row.id,
-    tableId: row.tableId,
-    slug: row.slug,
-    status: row.status,
-    title: typeof title === 'string' ? title : null,
-    authorUserId: row.authorUserId,
-    createdAt: row.createdAt,
-    updatedAt: row.updatedAt,
-    publishedAt: row.publishedAt,
+/**
+ * Whether a cell holds a whole document (a `pageTree` or `fieldSchema` value)
+ * rather than an authorable scalar.
+ *
+ * Detected structurally rather than by consulting the table's field types: the
+ * projection has the rows but not the table definition, and a `{nodes,
+ * rootNodeId}` pair is the shape every page/component/layout body has. Getting
+ * this wrong is cheap in one direction only — a missed document stays in the
+ * payload, a false positive would silently drop an authored value — so the test
+ * is deliberately narrow.
+ */
+function isDocumentCell(value: unknown): boolean {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    !Array.isArray(value) &&
+    'nodes' in value &&
+    'rootNodeId' in value
+  )
+}
+
+/**
+ * A row with its document-valued cells removed.
+ *
+ * Every list surface — the admin grid, the connector, a relation picker —
+ * renders scalars: title, slug, status, SEO, dates. None render a page body,
+ * and the body is essentially all of the weight: on a real site an average page
+ * row is ~82 KB of `pageTree` against a few hundred bytes of everything else,
+ * so a list of 18 pages ships 1.4 MB to populate five text columns.
+ *
+ * The result keeps the full `DataRow` shape rather than a bespoke summary
+ * object, so callers validate it against `DataRowSchema` exactly as they do a
+ * full row and no consumer needs a second type. A row opened for editing is
+ * fetched individually, where the body is genuinely needed.
+ */
+function toRowSummary(row: DataRow): DataRow {
+  const cells: Record<string, unknown> = {}
+  for (const key of Object.keys(row.cells ?? {})) {
+    const value = row.cells[key]
+    if (!isDocumentCell(value)) cells[key] = value
   }
+  return { ...row, cells }
 }
 
 async function handleTableRows(

@@ -32,6 +32,8 @@ interface DataCanvasProps {
   header?: ReactNode
   rows: DataRow[]
   loading: boolean
+  /** Routed collection with no entry template — every entry URL 404s. */
+  missingEntryTemplate?: boolean
   /**
    * `true` while the table list itself is still loading. Shown as a
    * full-canvas `DataGridSkeleton` so the user never sees the "Select
@@ -73,6 +75,7 @@ export function DataCanvas({
   header,
   rows,
   loading,
+  missingEntryTemplate,
   loadingTables,
   error,
   selectedRowId,
@@ -131,6 +134,7 @@ export function DataCanvas({
           tables={tables}
           selectedRowId={selectedRowId}
           loading={loading}
+          missingEntryTemplate={missingEntryTemplate}
           error={error}
           readOnly={!canEdit}
           onSelectRow={onSelectRow}

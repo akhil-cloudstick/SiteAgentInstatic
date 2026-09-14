@@ -12,6 +12,7 @@
  */
 import { Type } from '@core/utils/typeboxHelpers'
 import { BRAND_NAME } from '@core/brand'
+import { parseTemplateTarget } from '@core/page-tree'
 import type { CoreCapability } from '@core/capabilities'
 import type { AiTool, ToolContext } from '../../runtime/types'
 import { getDraftSite } from '../../../repositories/site'
@@ -37,7 +38,8 @@ const GetContextInput = Type.Object(
 interface PageCells {
   title?: string
   templateEnabled?: boolean
-  templateTarget?: { kind?: string; tableSlugs?: string[] }
+  /** Object or JSON string — read it through `parseTemplateTarget`, never directly. */
+  templateTarget?: unknown
   templatePriority?: number
 }
 
@@ -67,13 +69,19 @@ export const contextMcpTools: AiTool[] = [
       `
       const templates = rows
         .filter((r) => r.cells_json?.templateEnabled)
-        .map((r) => ({
-          id: r.id,
-          title: r.cells_json.title ?? r.id,
-          target: r.cells_json.templateTarget?.kind ?? 'unknown',
-          tableSlugs: r.cells_json.templateTarget?.tableSlugs,
-          priority: r.cells_json.templatePriority ?? 100,
-        }))
+        .map((r) => {
+          // The cell is declared `longText`, so a bundle-authored template
+          // stores it as a JSON string. Reading `.kind` off it directly
+          // reported a real template as target "unknown".
+          const target = parseTemplateTarget(r.cells_json.templateTarget)
+          return {
+            id: r.id,
+            title: r.cells_json.title ?? r.id,
+            target: target?.kind ?? 'unknown',
+            tableSlugs: target?.kind === 'postTypes' ? target.tableSlugs : undefined,
+            priority: r.cells_json.templatePriority ?? 100,
+          }
+        })
         .sort((a, b) => a.priority - b.priority)
 
       const result: Record<string, unknown> = {

@@ -29,6 +29,8 @@ import { cn } from '@ui/cn'
 import { getErrorMessage } from '@core/utils/errorMessage'
 import { PublishActionGroup, type PublishActionMenuItem } from '@site/toolbar/PublishActionGroup'
 import { CheckIcon, CircleAlertSolidIcon, LoaderIcon, SaveSolidIcon, UploadIcon } from '@admin/pages/data/icons'
+import { listCmsDataRows } from '@core/persistence/cmsData'
+import { parseTemplateTarget } from '@core/page-tree'
 import { useDataWorkspace } from './hooks/useDataWorkspace'
 import { DataSidebar } from './components/DataSidebar/DataSidebar'
 import { DataCanvas } from './components/DataCanvas/DataCanvas'
@@ -87,6 +89,46 @@ export function DataPage() {
   const [activeDraft, setActiveDraft] = useState<DataRowDraftState | null>(null)
   const activeDraftRef = useRef<DataRowDraftState | null>(null)
   const [publishState, setPublishState] = useState<'idle' | 'publishing' | 'published' | 'error'>('idle')
+  // Collection slugs that an entry template targets. `null` means "not read
+  // yet" and is deliberately distinct from an empty set: an unknown must not
+  // render as a warning we cannot stand behind.
+  const [entryTemplateSlugs, setEntryTemplateSlugs] = useState<Set<string> | null>(null)
+
+  const pagesTableId = workspace.tables.find((t) => t.slug === 'pages')?.id ?? null
+
+  // A routed collection with no entry template publishes rows that 404 at every
+  // URL while the admin reports them Published — `status` describes the row, not
+  // whether anything exists to render it. Templates are `pages` rows and the
+  // summary projection carries their scalar cells, so detecting this costs one
+  // cheap request rather than a new endpoint.
+  useEffect(() => {
+    if (!pagesTableId || !canLoadRows) return
+    let cancelled = false
+    void (async () => {
+      try {
+        const pages = await listCmsDataRows(pagesTableId, undefined, undefined, { fields: 'summary' })
+        if (cancelled) return
+        const slugs = new Set<string>()
+        for (const page of pages) {
+          if (page.cells?.templateEnabled !== true) continue
+          // Read the cell through the renderer's own parser. The field is
+          // declared `longText`, so the target is stored as an object or as a
+          // JSON string depending on who wrote the row — and a band that
+          // reported "no template" for a template the renderer honours would
+          // be exactly the wrong-and-confident signal this band exists to fix.
+          const target = parseTemplateTarget(page.cells?.templateTarget)
+          if (target?.kind !== 'postTypes') continue
+          for (const slug of target.tableSlugs) slugs.add(slug)
+        }
+        setEntryTemplateSlugs(slugs)
+      } catch (err) {
+        // Never block or mislead the grid on this. Stay at "unknown".
+        console.error('[DataPage] Could not read entry templates:', err)
+        if (!cancelled) setEntryTemplateSlugs(null)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [pagesTableId, canLoadRows])
 
   useEffect(() => {
     function refreshAfterBundleImport() {
@@ -286,6 +328,12 @@ export function DataPage() {
   }
 
   const selectedTable = workspace.selectedTable
+  // Only warn once the templates have actually been read — `null` is "unknown",
+  // and an unknown must not render as a claim.
+  const collectionMissingTemplate =
+    selectedTable?.kind === 'postType' &&
+    entryTemplateSlugs !== null &&
+    !entryTemplateSlugs.has(selectedTable.slug)
   const rowsWithDraftChanges = workspace.rows.filter(hasDraftChanges)
   const activeDraftDirty = activeDraft?.isDirty ?? false
   const hasPublishableChanges = activeDraftDirty || rowsWithDraftChanges.some((row) =>
@@ -301,13 +349,20 @@ export function DataPage() {
     onSelect: () => { void handleSaveActiveDraft() },
     testId: 'toolbar-data-save-draft-action',
   }]
+  // "Published" is derived from the ABSENCE of rows with draft changes, so an
+  // unloaded grid and a fully-published one are the same input. Without this
+  // branch the header states the site is published for as long as the rows take
+  // to arrive — a confident wrong answer about the one piece of state an
+  // operator acts on, and worse than showing nothing.
   const publishStatus = activeDraft?.saveError
     ? { label: 'Draft save failed', tone: 'danger' as const }
     : isSavingDraft
       ? { label: 'Saving draft', tone: 'neutral' as const }
-      : hasPublishableChanges
-        ? { label: activeDraftDirty ? 'Unsaved draft' : 'Draft changes', tone: 'warning' as const }
-        : { label: 'Published', tone: 'success' as const }
+      : workspace.loadingRows
+        ? { label: 'Loading', tone: 'neutral' as const }
+        : hasPublishableChanges
+          ? { label: activeDraftDirty ? 'Unsaved draft' : 'Draft changes', tone: 'warning' as const }
+          : { label: 'Published', tone: 'success' as const }
   const PublishDataIcon = publishBusy
     ? LoaderIcon
     : publishState === 'error'
@@ -360,16 +415,21 @@ export function DataPage() {
   // The publish control (status + Publish + Save-draft menu) is unchanged — it
   // just moves from the global toolbar into the workbench header so the header
   // row matches the approved mock. Same handlers, same gates.
+  // The publish BUTTON reads the same signal, so it makes the same claim while
+  // loading. Treat "still loading" as "unknown", not as "published".
+  const publishSettled = !workspace.loadingRows
+  const nothingToPublish = publishSettled && !hasPublishableChanges
+
   const publishActionGroup = selectedTable ? (
     <PublishActionGroup
       statusLabel={publishStatus.label}
       statusTone={publishStatus.tone}
-      publishLabel={publishBusy ? 'Publishing' : !hasPublishableChanges ? 'Published' : 'Publish data'}
-      publishAriaLabel={!hasPublishableChanges ? 'Data published' : 'Publish data'}
-      publishTitle={!hasPublishableChanges ? 'Data published' : `Publish changes to ${selectedTable.pluralLabel}`}
-      publishState={publishBusy ? 'busy' : publishState === 'error' ? 'error' : !hasPublishableChanges ? 'success' : 'idle'}
+      publishLabel={publishBusy ? 'Publishing' : nothingToPublish ? 'Published' : 'Publish data'}
+      publishAriaLabel={nothingToPublish ? 'Data published' : 'Publish data'}
+      publishTitle={nothingToPublish ? 'Data published' : `Publish changes to ${selectedTable.pluralLabel}`}
+      publishState={publishBusy ? 'busy' : publishState === 'error' ? 'error' : nothingToPublish ? 'success' : 'idle'}
       publishBusy={publishBusy}
-      publishDisabled={!hasPublishableChanges || activeDraftDirty || isSavingDraft || publishBusy}
+      publishDisabled={!publishSettled || !hasPublishableChanges || activeDraftDirty || isSavingDraft || publishBusy}
       publishIcon={PublishDataIcon}
       onPublish={handlePublishData}
       menuItems={publishMenuItems}
@@ -441,6 +501,7 @@ export function DataPage() {
             header={workbenchHeader}
             rows={workspace.rows}
             loading={workspace.loadingRows}
+            missingEntryTemplate={collectionMissingTemplate}
             loadingTables={workspace.loadingTables}
             error={workspace.rowsError}
             selectedRowId={workspace.selectedRowId}

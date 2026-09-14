@@ -59,6 +59,45 @@ alter table siteagent_control.tenants add column if not exists od_status text no
 -- Per-tenant OpenDesign web (Next.js dev) port — the tenant browses here.
 alter table siteagent_control.tenants add column if not exists od_web_port int;
 
+-- The CMS account the connector signs in as, when it is not the tenant owner.
+--
+-- Two separate reasons this is not `owner_email`:
+--
+--   1. The hub login and the CMS login are different credential stores. The hub
+--      mints an SSO token into the CMS, so an operator can use a tenant for
+--      months without ever knowing its CMS password — and `owner_password_enc`
+--      is empty for every tenant whose owner set their own password by invite.
+--   2. A shared machine identity should not be a person's account. The connector
+--      can create sites, replace a site's whole contents and publish; binding
+--      that to an individual's login means their lockouts become outages and
+--      their password changes become silent breakages.
+--
+-- Falls back to the owner credential when unset, so existing tenants are
+-- unaffected.
+alter table siteagent_control.tenants add column if not exists connector_email        text;
+alter table siteagent_control.tenants add column if not exists connector_password_enc text;
+
+-- Whether this tenant was provisioned THROUGH the connector, by the partner who
+-- holds its token.
+--
+-- Exists to settle a conflict between two changes that were each correct.
+-- `connector_create_site` was added so the partner stops waiting on us to
+-- provision every client; connector target derivation became an explicit
+-- allowlist after one of our own scratch tenants surfaced on their target list.
+-- Together they let a caller create a site and then be unable to address it —
+-- the dependency moved from "ask the dev to create it" to "ask the dev to
+-- allowlist it", which is the same wait wearing a different hat.
+--
+-- Ownership resolves it where a list could not. A tenant created through the
+-- connector is theirs and enrols itself; a tenant we create stays invisible to
+-- them however many we add. That keeps the exposure closed while making
+-- onboarding a single call, so the safe default and the convenient one stop
+-- pulling against each other.
+--
+-- Defaults FALSE, so every existing tenant — including any created before this
+-- column — is reachable only by being named deliberately.
+alter table siteagent_control.tenants add column if not exists connector_managed boolean not null default false;
+
 -- Whether search engines may index this tenant's published site.
 --
 -- Defaults to FALSE, and that default is the point. Instatic bakes only page

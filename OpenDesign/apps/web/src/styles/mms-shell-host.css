@@ -27,7 +27,13 @@
  *    popups (updater / what's-new / message centre) that render nothing until
  *    opened, so hiding the strip costs no behaviour — but it was still
  *    reserving a row of height and showing two orphaned icons. */
-.workspace-tabs-chrome,
+/* Scoped to the UNDOCKED strip only. On the project route `WorkspaceTabsBar`
+   re-renders itself with `is-docked` into the chat column's own dock
+   (`.split-chat-tabs-dock`), where it is the project's open-tabs + search
+   strip rather than app chrome — and the MMS rows do not replace that. An
+   unqualified `display: none` here hid it there too, taking the project tab
+   strip with it. */
+.workspace-tabs-chrome:not(.is-docked),
 .entry-shell--no-header .entry-main__topbar {
     display: none;
 }
@@ -47,17 +53,18 @@
 }
 
 /* ── Page canvas ──────────────────────────────────────────────────────────
- * The approved screen is full-bleed on the workspace tone: the content runs to
- * the window edge with its own internal padding, and there is no cream gutter
- * framing a floating card. Upstream's entry body centred a max-width column on
- * `--bg-app`, which is what produced the border of cream on all four sides. */
+ * Full-bleed on the workspace tone: the surface runs to the window edge
+ * instead of framing a floating card on a contrasting ground.
+ *
+ * Surface ONLY. An earlier version of this rule also zeroed `max-width`,
+ * `margin` and `padding`, which stripped upstream's 35px gutters from
+ * `.entry-main__inner` and left every screen's content welded to both window
+ * edges. The gutters belong to upstream's layout (`home/entry-layout.css`);
+ * this file has no business touching them. */
 .entry-shell--no-header .entry-main,
 .entry-shell--no-header .entry-main__inner,
 .entry-shell--no-header .home-view {
-    max-width: none;
-    margin: 0;
-    padding: 0;
-    background: var(--mms-workspace);
+    background: var(--bg);
 }
 
 /* ── `New project` ────────────────────────────────────────────────────────
@@ -104,4 +111,178 @@
     .mms-new-project span {
         display: none;
     }
+}
+
+/* ── Nav-rail toggle ──────────────────────────────────────────────────────
+ * Upstream collapses `.entry` to a 0-width rail track by default and offers
+ * only two ways to open it: Ctrl/Cmd+B, and the workspace tab bar's sidebar
+ * button — which the `.workspace-tabs-chrome` rule above hides, because these
+ * rows replaced that bar. That left the rail's destinations (library, brands,
+ * community, drafts, all-projects, members, search, billing) with no reachable
+ * affordance at all. `DesignShellRows` renders this control into the specialist
+ * row's middle slot so they stay one click away. */
+.mms-rail-toggle {
+    display: inline-flex;
+    min-height: 32px;
+    align-items: center;
+    gap: 8px;
+    padding: 0 10px;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--toolbar-icon);
+    font-family: var(--font-nav);
+    font-size: 13px;
+    font-weight: 560;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.mms-rail-toggle:hover {
+    background: var(--toolbar-icon-tint);
+    color: var(--toolbar-accent-strong);
+}
+
+.mms-rail-toggle[aria-expanded='true'] {
+    border-color: var(--toolbar-accent);
+    color: var(--toolbar-accent-strong);
+}
+
+/* Icon-only below the specialist tier — same rule the row's other local
+   action follows, so the two controls shrink together. */
+@media (max-width: 760px) {
+    .mms-rail-toggle {
+        min-width: 38px;
+        justify-content: center;
+        padding: 0;
+    }
+
+    .mms-rail-toggle span {
+        display: none;
+    }
+}
+
+/* ── Share to CMS ─────────────────────────────────────────────────────────
+ * The project screen's own chrome row. `.app` (shell.css) is a two-row grid
+ * whose first track was left empty when upstream moved the old chrome into the
+ * chat pane and the Design Files tab row — `.split` is pinned to `grid-row: 2`,
+ * so this bar fills a reserved track instead of pushing the split down. */
+.app-cms-actions {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    background: var(--veil-shell);
+}
+
+.mms-share-cms {
+    display: inline-flex;
+    min-height: 32px;
+    align-items: center;
+    gap: 8px;
+    padding: 0 14px;
+    /* Upstream palette, not the MMS header's: this bar sits on the project
+       body, below the shared chrome, so it follows the product tokens. */
+    border: 1px solid var(--accent);
+    border-radius: 6px;
+    background: var(--accent);
+    color: var(--accent-contrast);
+    font-family: var(--sans);
+    font-size: 13px;
+    font-weight: 640;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.mms-share-cms:hover:not(:disabled) {
+    background: var(--accent-hover);
+}
+
+.mms-share-cms:disabled {
+    cursor: not-allowed;
+    opacity: 0.46;
+}
+
+@media (max-width: 760px) {
+    .mms-share-cms span {
+        display: none;
+    }
+
+    .mms-share-cms {
+        min-width: 40px;
+        justify-content: center;
+        padding: 0;
+    }
+}
+/* ── Page titles that duplicate the nav ───────────────────────────────────
+ * The specialist row already marks the active destination, so repeating
+ * "Projects" / "Plugins" / "Design systems" / "Integrations" / "Community" as
+ * an <h1> at the top of the same screen says it twice.
+ *
+ * `display: none`, not the usual visually-hidden clip. These headings sit in
+ * `display: flex; justify-content: space-between` header rows, and an
+ * absolutely-positioned h1 collapsed its wrapper to zero width — which is what
+ * left "+ Create" orphaned at the top-right of Design systems with the tab row
+ * stranded below it. Taking the box out of flow entirely lets the row close up.
+ *
+ * `aria-labelledby` still resolves against a `display: none` element (name
+ * computation deliberately reads hidden referenced nodes), so the three
+ * regions that point at these ids — `plugins-title`, `integrations-title`,
+ * `community-template-title` — keep their accessible names. */
+.mms-nav-duplicate-title {
+    display: none;
+}
+
+/* Wrappers whose ONLY child was that heading. Left in place they hold a gap
+   (or a flex slot) where the title used to be. Tagged per call site rather
+   than guessed with `:has()`, because these are CSS-module classes whose real
+   names are hashed at build time. Integrations is deliberately NOT tagged —
+   its wrapper also carries a kicker and a lede. */
+.mms-nav-duplicate-titleblock {
+    display: none;
+}
+
+/* ── Example prompts disclosure ───────────────────────────────────────────
+ * The hero opens on the composer; the example rail is opt-in. All three
+ * branches inside the disclosure print their own
+ * `.home-hero__prompt-examples-title`, which is the same string the toggle
+ * already shows, so those inner titles are suppressed here rather than in
+ * three separate components. */
+.home-hero__examples-disclosure {
+    display: flex;
+    justify-content: center;
+    margin-top: 4px;
+}
+
+.home-hero__examples-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 30px;
+    padding: 0 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-pill);
+    background: transparent;
+    color: var(--text-muted);
+    font-family: var(--sans);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.home-hero__examples-toggle:hover {
+    border-color: var(--border-strong);
+    color: var(--text-strong);
+}
+
+
+.home-hero__prompt-examples-title {
+    display: none;
+}
+
+/* Only `chevron-down` exists in the icon set, so "open" is the same glyph
+   rotated rather than a second asset. */
+.home-hero__examples-caret--open {
+    transform: rotate(180deg);
 }

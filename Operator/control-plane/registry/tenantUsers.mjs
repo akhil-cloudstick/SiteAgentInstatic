@@ -53,19 +53,56 @@ export async function acceptInvite(token, password) {
   return user.tenant_slug;
 }
 
-// Validate a login. The identifier may be the email OR the tenant slug.
+/**
+ * Validate a login. The identifier may be the email OR the tenant slug.
+ *
+ * One person can own more than one site — the same address is the owner of two
+ * tenants the moment an agency runs a second client through us. The previous
+ * query took `limit 1` with no ordering, so that person's email matched an
+ * arbitrary row and they landed on whichever site Postgres returned first. Not
+ * an error, not a wrong password: the wrong site, silently, and a different one
+ * on another day.
+ *
+ * A tenant slug is unique, so it is never ambiguous. Only an email can be, and
+ * when it is, the honest answer is to say so and name the way through rather
+ * than to pick. Returns:
+ *
+ *   { slug }        — signed in
+ *   null            — no match, or wrong password
+ *   { ambiguous }   — the password was right for several sites; ask which
+ */
 export async function validateLogin(identifier, password) {
   const id = String(identifier || '').trim().toLowerCase();
   if (!id || !password) return null;
   const { rows } = await query(
     `select * from siteagent_control.tenant_users
       where status = 'active' and (lower(email) = $1 or tenant_slug = $1)
-      limit 1`,
+      order by tenant_slug`,
     [id],
   );
-  const user = rows[0];
-  if (!user || !verifyPassword(password, user.password_hash)) return null;
-  return user.tenant_slug;
+  // Checked against every candidate, because two sites owned by one person can
+  // have different passwords — matching only the first would reject a correct
+  // one for the second site.
+  const matches = rows.filter((u) => verifyPassword(password, u.password_hash));
+  return resolveLogin(matches.map((u) => u.tenant_slug));
+}
+
+/**
+ * Decide the outcome from the slugs whose password matched.
+ *
+ * Split out from the query so it can be tested without a database — this is the
+ * part that decides which client's content someone sees, and it is three lines
+ * that are easy to get subtly wrong.
+ *
+ * @param {string[]} slugs tenants whose stored password matched
+ * @returns {string | null | { ambiguous: string[] }}
+ */
+export function resolveLogin(slugs) {
+  if (slugs.length === 0) return null;
+  if (slugs.length === 1) return slugs[0];
+  // Never pick. Picking is what the old `limit 1` did, and it put a person on
+  // an arbitrary one of their sites without saying so.
+  return { ambiguous: [...slugs].sort() };
 }
 
 export async function getTenantUser(tenantSlug) {

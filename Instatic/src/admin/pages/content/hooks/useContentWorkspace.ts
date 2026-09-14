@@ -211,7 +211,9 @@ export function useContentWorkspace({
       setEntriesLoading(true)
       setError(null)
       try {
-        const nextEntries = await listCmsDataRows(tableId)
+        // Grid columns are scalars — title, slug, status, SEO, dates. Asking for
+        // full rows ships every page body to render text cells.
+        const nextEntries = await listCmsDataRows(tableId, undefined, undefined, { fields: 'summary' })
         if (cancelled || loadEpoch !== entriesLoadEpochRef.current) return
         // A row changed after this request began (for example by an MCP save)
         // wins over the older list snapshot. Otherwise the response is

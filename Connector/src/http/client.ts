@@ -54,8 +54,16 @@ export interface ImportResult {
 export async function previewBundle(
   session: InstaticSession,
   bundle: unknown,
+  strategy?: 'replace' | 'merge-add' | 'merge-overwrite',
 ): Promise<ImportPreview> {
-  const res = await session.request('/import/preview', {
+  // The strategy changes what the diff MEANS, not just what happens after it.
+  // `replace` wipes before inserting, so its preview must diff against an empty
+  // site; without this the dry run reported slug conflicts against rows the
+  // import was about to delete — read literally, "your homepage will be renamed
+  // to index-2". An operator would abort on that, or accept it and end up with
+  // no page at `/`.
+  const query = strategy ? `?strategy=${encodeURIComponent(strategy)}` : ''
+  const res = await session.request(`/import/preview${query}`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(bundle),

@@ -23,7 +23,6 @@ import { parseValue, formatValueErrors, compiled } from '@core/utils/typeboxHelp
 import { validateAndSanitizeMediaBytes, resolveMediaWriteTarget } from './importMediaValidation'
 import {
   ImportResultSchema,
-  ImportStrategySchema,
   BundleImportSelectionSchema,
   SiteBundleSchema,
   type BundleImportSelection,
@@ -39,6 +38,7 @@ import {
 } from '@core/data/bundleArchive'
 import { createCrc32 } from '../../archive/storedZip'
 import { CMS_API_PREFIX, type CmsHandlerOptions } from './shared'
+import { InvalidImportStrategyError, resolveImportStrategy } from './importStrategy'
 import { handleImportRoute } from './import'
 
 const IMPORT_ARCHIVE_PATH = `${CMS_API_PREFIX}/import/archive`
@@ -348,14 +348,13 @@ async function readArchiveMediaEntries(input: {
 }
 
 function parseImportStrategy(url: URL): ImportStrategy | Response {
-  const strategyParam = url.searchParams.get('strategy') ?? 'replace'
+  // Resolved through the shared reader so all three import surfaces agree on
+  // what an absent `?strategy=` means — see ./importStrategy.
   try {
-    return parseValue(ImportStrategySchema, strategyParam)
-  } catch {
-    return jsonResponse(
-      { error: 'Invalid strategy — must be replace, merge-add, or merge-overwrite' },
-      { status: 400 },
-    )
+    return resolveImportStrategy(url)
+  } catch (err) {
+    if (!(err instanceof InvalidImportStrategyError)) throw err
+    return jsonResponse({ error: err.message }, { status: 400 })
   }
 }
 

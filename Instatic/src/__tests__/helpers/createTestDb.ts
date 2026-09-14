@@ -15,8 +15,8 @@ export interface TestDb {
  *
  * Set `DB=postgres TEST_POSTGRES_URL=postgres://...` to run against a real
  * Postgres instance instead. The helper supports that mode at the type level;
- * connection-pool teardown is left to process exit until DbClient grows a
- * close() method.
+ * connection-pool teardown is left to process exit, since the Postgres client
+ * does not implement the optional `close()` and nothing on disk needs freeing.
  *
  * @example
  * const { db, cleanup } = await createTestDb()
@@ -51,11 +51,20 @@ export async function createTestDb(): Promise<TestDb> {
   return {
     db,
     cleanup: async () => {
-      // Remove the entire temp directory. bun:sqlite doesn't expose a close()
-      // method on our DbClient interface; on macOS/Linux the file can still be
-      // deleted while the handle is open, and the handle goes out of scope once
-      // the test function returns.
-      await fs.rm(path.dirname(tmpFile), { recursive: true, force: true })
+      // Close BEFORE removing. Windows refuses to delete a file with an open
+      // handle, so leaving the connection open failed teardown on every case in
+      // a file — the identical code being harmless on macOS and Linux, where an
+      // open file can be unlinked.
+      db.close?.()
+      // Still tolerant of a failed removal. A leaked temp directory is a
+      // housekeeping matter the OS eventually resolves; a throw here fails a
+      // test whose assertions all passed, which reports a product bug that does
+      // not exist and hides any real failure underneath it.
+      try {
+        await fs.rm(path.dirname(tmpFile), { recursive: true, force: true })
+      } catch {
+        // ignore — see above
+      }
     },
   }
 }

@@ -1,6 +1,7 @@
 // SiteAgent control-plane HTTP API. Node built-ins + pg only.
 // Wires Registry + Provisioner + Deployer + AI Gateway. The Astro console calls this.
 import http from 'node:http';
+import { timingSafeEqual } from 'node:crypto';
 import config from './lib/env.mjs';
 import { migrate } from './registry/db.mjs';
 import { getSettings, saveSettings, getSecrets, getDefaultGuidance, saveDefaultGuidance } from './registry/settings.mjs';
@@ -26,6 +27,13 @@ const CORS = {
   'Access-Control-Allow-Methods': 'GET,POST,DELETE,OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type',
 };
+
+// Constant-time, and length-guarded because timingSafeEqual throws on a length
+// mismatch — which would otherwise be a 500 that leaks the expected length.
+function tokenMatches(presented, expected) {
+  if (!presented || presented.length !== expected.length) return false;
+  return timingSafeEqual(Buffer.from(presented), Buffer.from(expected));
+}
 
 function send(res, code, obj) {
   res.writeHead(code, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', ...CORS });
@@ -192,6 +200,36 @@ const server = http.createServer(async (req, res) => {
         const body = await readJson(req);
         return send(res, 200, await provisionTenant(body));
       }
+    }
+    // ---- Connector-managed targets ----------------------------------------
+    // Sites the connector provisioned, with the credentials to reach them, so
+    // the connector can enrol them without a restart. Deliberately NOT every
+    // tenant: `connector_managed` is set only when the connector created the
+    // site, so this can never widen to sites we create ourselves — which is the
+    // exposure the target allowlist exists to prevent.
+    //
+    // Behind the connector's own bearer token. It returns live credentials, so
+    // "loopback only" is not sufficient on its own: anything that can reach the
+    // control plane port could otherwise read every managed tenant's login.
+    if (path === '/api/connector/targets' && method === 'GET') {
+      const expected = (process.env.MMS_CONNECTOR_MCP_TOKEN || '').trim();
+      const presented = (req.headers.authorization || '').replace(/^Bearer\s+/i, '').trim();
+      if (!expected || !tokenMatches(presented, expected)) {
+        return send(res, 401, { error: 'unauthorized' });
+      }
+      const rows = await tenantsRepo.listTenants();
+      const targets = {};
+      for (const t of rows) {
+        if (!t.connector_managed || t.status !== 'active' || !t.port) continue;
+        const email = t.connector_email || t.owner_email;
+        const enc = t.connector_email ? t.connector_password_enc : t.owner_password_enc;
+        if (!email || !enc) continue; // still provisioning, or no credential seeded
+        let secret;
+        try { secret = decrypt(enc); } catch { continue; }
+        if (!secret) continue;
+        targets[t.slug] = { url: `http://127.0.0.1:${t.port}`, email, secret };
+      }
+      return send(res, 200, { targets });
     }
     // ---- MCP agent keys (operator console) --------------------------------
     // Minting happens HERE, not in the tenant: the QuickJS sandbox has no

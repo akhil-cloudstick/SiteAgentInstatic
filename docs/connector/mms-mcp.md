@@ -1,3 +1,5 @@
+> **Superseded by `mms-mcp-v2.md`.** Kept for reference; details below may no longer match the code.
+
 # MMS MCP — one MCP endpoint per site
 
 Gives an external AI agent (Claude, n8n, Codex, a custom bot) scoped access to one MMS-CMS

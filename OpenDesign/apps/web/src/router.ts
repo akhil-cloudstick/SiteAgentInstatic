@@ -6,6 +6,49 @@
 import { useSyncExternalStore } from 'react';
 import { LIBRARY_UI_VISIBLE } from './features/libraryUi';
 
+// ── Base path ──────────────────────────────────────────────────────────────
+// Behind the MMSBUILD gateway this app is served under a FIXED, tenant-agnostic
+// Next `basePath` of `/design`, but every route in this file is authored
+// base-less (`/projects`, `/design-systems/:id`, …).
+//
+// The router used to ignore that entirely, and appeared to work only by
+// accident: `commitNavigation` pushed the base-less path, and `parseRoute` then
+// read that same base-less path back. The URL bar was left pointing OUTSIDE the
+// app's namespace, so the route survived exactly as long as the SPA stayed
+// mounted — a refresh on `/projects` went to the gateway, matched no `/design`
+// route, and returned `{"error":"Not found"}`. Deep-linking into `/design/...`
+// was broken in the mirror image: `parseRoute('/design/projects')` saw
+// `parts[0] === 'design'`, matched nothing, and silently fell back to Home.
+//
+// Both directions are fixed here, at the one boundary that touches
+// `window.location`: strip the base when reading a pathname, add it back when
+// writing history. Everything between stays base-less, so `buildPath` and
+// `parseRoute` keep their existing contracts for their non-history callers
+// (`WorkspaceTabsBar` comparisons, `runtime/in-project-link`).
+//
+// Detection mirrors `app/gateway-basepath-shim.ts`; it cannot be imported from
+// there because this module is also used outside that provider tree. Empty when
+// served at the root (plain `next dev`), which makes both helpers no-ops.
+function basePath(): string {
+  if (typeof window === 'undefined') return '';
+  const match = window.location.pathname.match(/^\/design(?=\/|$)/);
+  return match ? match[0] : '';
+}
+
+/** `/design/projects` → `/projects`. Base-less input is returned unchanged. */
+function stripBase(pathname: string): string {
+  const base = basePath();
+  if (!base || !pathname.startsWith(base)) return pathname;
+  return pathname.slice(base.length) || '/';
+}
+
+/** `/projects` → `/design/projects`. A no-op when served at the root. */
+function withBase(path: string): string {
+  const base = basePath();
+  if (!base) return path;
+  return path === '/' ? base : `${base}${path}`;
+}
+
 // Entry-shell sub-views. The home/project landing renders one of three
 // columns and each sub-view now owns a top-level path so the browser
 // back/forward buttons work, deep links are shareable, and per-tab
@@ -421,7 +464,9 @@ interface NavigationOptions {
 }
 
 function commitNavigation(route: Route, opts: NavigationOptions = {}): void {
-  const target = buildPath(route);
+  // Written to history, so it carries the base; compared against the raw
+  // `window.location.pathname`, which carries it too.
+  const target = withBase(buildPath(route));
   if (target === window.location.pathname) return;
   const index = readHistoryIndex();
   // `replace` keeps the current depth (it swaps the entry in place); a push
@@ -476,7 +521,9 @@ function getRouteSnapshot(): Route {
   const pathname = acceptedHistoryLocation?.pathname ?? window.location.pathname;
   if (cachedPathname !== pathname || cachedRoute === null) {
     cachedPathname = pathname;
-    cachedRoute = parseRoute(pathname);
+    // `pathname` comes from window.location / accepted history, so it still
+    // carries the gateway base. Routes are authored base-less.
+    cachedRoute = parseRoute(stripBase(pathname));
   }
   return cachedRoute;
 }

@@ -257,8 +257,8 @@ export function CommunityView({ onRemixTemplate, onUsePrompt, onUsePlugin }: Com
       {/* Header (title + search + filter rows) scrolls away with the grid. */}
       <div className="community-template-view__header">
       <header className="community-template-view__hero">
-        <div>
-          <h1 id="community-template-title" className="entry-section__title">{t('community.title')}</h1>
+        <div className="mms-nav-duplicate-titleblock">
+          <h1 id="community-template-title" className="entry-section__title mms-nav-duplicate-title">{t('community.title')}</h1>
         </div>
         <div className="community-template-view__search" role="search">
           <Icon name="search" size={16} />

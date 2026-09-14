@@ -4,6 +4,7 @@ import { registry } from '@core/module-engine'
 import { publishPage, documentSeoFromCells } from '@core/publisher'
 import { buildRouteFrame } from '@core/templates/contextFrames'
 import { getDataRow } from '../repositories/data/rows'
+import { resolveMediaIdsToPaths } from '@core/loops/sources/dataRows'
 import { buildPublishedSiteCssBundle } from './siteCssBundle'
 import { buildPublishedSiteModuleJsMap } from './moduleJsBundle'
 import { resolveTemplateChain, resolveNotFoundTemplate, composeTemplateChain } from '@core/templates'
@@ -139,7 +140,19 @@ async function renderMergedTemplate(
  */
 async function readPageSeo(ctx: RenderPublishedSnapshotContext, pageRowId: string): Promise<DocumentSeo | undefined> {
   const row = await getDataRow(ctx.db, pageRowId)
-  return row ? documentSeoFromCells(row.cells) : undefined
+  if (!row) return undefined
+
+  const seo = documentSeoFromCells(row.cells)
+  if (!seo.ogImage) return seo
+
+  // `ogImage` is a `media` field, so an editor-picked value is an asset id and
+  // not a URL. Nothing downstream would catch that: a bare id has no scheme, so
+  // `isSafeUrl` treats it as a relative URL and the page would publish
+  // `og:image` pointing at a path that does not exist. Resolve it here, and
+  // leave the value alone when it is not a known asset — an imported row can
+  // legitimately carry an absolute URL in the same cell.
+  const paths = await resolveMediaIdsToPaths(ctx.db, [seo.ogImage])
+  return { ...seo, ogImage: paths.get(seo.ogImage) ?? seo.ogImage }
 }
 
 export async function renderPublishedSnapshot(

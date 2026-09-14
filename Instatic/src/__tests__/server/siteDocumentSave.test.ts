@@ -155,6 +155,30 @@ async function backdateRows(harness: CapabilityTestHarness, tableId: string): Pr
   `
 }
 
+/** The site-global shell seq, as `getDraftSiteSeq` reads it server-side. */
+async function liveShellSeq(harness: CapabilityTestHarness): Promise<number> {
+  const { rows } = await harness.db<{ seq: number }>`
+    select seq from site where id = 'default' limit 1
+  `
+  return rows[0] ? Number(rows[0].seq) : 0
+}
+
+/**
+ * Stored seqs for every row, across all three tables.
+ *
+ * Used to default `baseSeqs` to "this client is up to date". The conflict check
+ * treats a stored row with no base entry exactly like a stale one, so a test
+ * that edits a row it created in an earlier save must ship a base for it — and
+ * making each test spell that out would turn the interesting line into the
+ * fifth line of boilerplate.
+ */
+async function liveRowSeqs(harness: CapabilityTestHarness): Promise<Record<string, number>> {
+  const { rows } = await harness.db<{ id: string; seq: number }>`
+    select id, seq from data_rows
+  `
+  return Object.fromEntries(rows.map((row) => [row.id, Number(row.seq)]))
+}
+
 interface Ctx {
   harness: CapabilityTestHarness
   cookie: string
@@ -189,7 +213,37 @@ interface DocOverrides {
   shellBaseSeq?: number
 }
 
-function putDoc(ctx: Ctx, overrides: DocOverrides = {}): Promise<Response> {
+/**
+ * PUT one site-document save, defaulting every field the endpoint requires.
+ *
+ * `SiteDocumentBodySchema` has no optional members and refuses additional
+ * properties, so a caller has to send all ten keys even to change one row.
+ * Spelling that out per test would bury the single line each one is actually
+ * about, so the defaults are "a save that changes nothing" and each test
+ * overrides only its subject.
+ *
+ * The shell defaults to the stored one verbatim: it is shipped with every save,
+ * and re-shipping it unchanged is what keeps the coarse shell-seq check from
+ * firing on saves that only touch rows.
+ */
+async function putDoc(ctx: Ctx, overrides: DocOverrides = {}): Promise<Response> {
+  // Read CURRENT seqs, so the default is a synchronized client — the ordinary
+  // case, and the only one in which an edit is expected to succeed. A test that
+  // stages a conflict passes a deliberately stale `baseSeqs` / `shellBaseSeq`
+  // of its own, and those overrides win.
+  const body = {
+    mode: 'incremental',
+    site: ctx.shell,
+    changedPages: [],
+    deletedPageIds: [],
+    changedComponents: [],
+    deletedComponentIds: [],
+    changedLayouts: [],
+    deletedLayoutIds: [],
+    baseSeqs: overrides.baseSeqs ?? (await liveRowSeqs(ctx.harness)),
+    shellBaseSeq: overrides.shellBaseSeq ?? (await liveShellSeq(ctx.harness)),
+    ...overrides,
+  }
   return ctx.harness.cms('/cms/api/cms/site-document', {
     method: 'PUT',
     cookie: ctx.cookie,

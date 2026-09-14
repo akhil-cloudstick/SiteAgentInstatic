@@ -13,6 +13,32 @@
   --entry-rail-width: 236px;
 }
 
+/* ── MMS-OWNED — do not take upstream's side on this block ────────────────
+ * `entry-shell--mms-rows` is added alongside `--no-header` by the surfaces that
+ * render `components/shell/DesignShellRows` (the MMSBUILD two-row shell).
+ *
+ * `--no-header` means "upstream's AppChromeHeader is not rendered", and its
+ * single `1fr` track is correct for the plain loader/error shells in App.tsx
+ * that use it with one child. The MMS shell adds two chrome rows above the
+ * body, so those surfaces need THREE tracks — leaving the single track
+ * collapses all three children into one overlapping row. This was lost in the
+ * 0.20.0 upgrade (upstream's version of this file won the merge) while
+ * `mms-shell-host.css` kept hiding the workspace tab bar, which is what left
+ * /design with no chrome at all.
+ *
+ * `minmax(0, 1fr)` on the body is what gives its `overflow-y: auto` a bounded
+ * track to scroll inside. */
+.entry-shell--mms-rows {
+  grid-template-rows: auto auto minmax(0, 1fr);
+}
+
+/* The rail column keeps upstream's collapsible behaviour (0 → rail width via
+   `.entry--rail-open`); only the height contract changes, so the body track can
+   actually scroll instead of growing the page. */
+.entry-shell--mms-rows .entry {
+  min-height: 0;
+}
+
 /* `.entry-shell` is always mounted inside `.workspace-shell__body`, which
    reserves its own space above for the app's persistent tab-chrome header
    (shell.css: `.workspace-shell` grid rows `44px minmax(0, 1fr)`) and already
@@ -6394,7 +6420,7 @@
 /* :not(:disabled) lifts specificity above the global button:hover reset. */
 .entry-nav-rail__menu-credits-upgrade:hover:not(:disabled),
 .entry-nav-rail__menu-credits-upgrade:focus-visible {
-  background: #fff;
+  background: var(--bg-panel);
   color: #202020;
 }
 .entry-nav-rail__menu-credits-row {
@@ -6726,7 +6752,7 @@ button.entry-nav-rail__menu-credits-row:active:not(:disabled) {
 
 [data-testid="design-systems-tab"] > aside div:has(> [data-testid^="design-system-card-"][aria-pressed="true"]) {
   border-color: #dbdbdb;
-  background: #ffffff;
+  background: var(--bg-panel);
 }
 
 [data-testid="design-systems-tab"] > aside div:has(> [data-testid^="design-system-card-"]):hover > [data-testid^="design-system-card-"],
@@ -8690,4 +8716,24 @@ button.entry-nav-rail__menu-credits-row:active:not(:disabled) {
   color: var(--text-faint);
   font-size: 12px;
   font-variant-numeric: tabular-nums;
+}
+
+/* ── MMS-OWNED — do not take upstream's side on this block ────────────────
+ * The left nav rail is gone (the MMSBUILD specialist row is the navigation),
+ * so the body is a single column. Upstream's rule above still declares a
+ * two-track grid whose first track animates 0 → 236px; with no rail to put in
+ * it, that track only ever added an empty animated gutter.
+ *
+ * `.entry-top-right-cluster` is `EntryNavRail`'s PORTAL — it renders into
+ * document.body, so it is not removed by dropping the rail from a parent tree.
+ * Any other surface that still mounts the rail would float its GitHub star
+ * chip, credits pill and second account dropdown over the shared header's own
+ * Help / notifications / theme / account run. */
+.entry-shell--mms-rows .entry,
+.entry-shell--mms-rows .entry.entry--rail-open {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.entry-top-right-cluster {
+  display: none;
 }

@@ -256,9 +256,39 @@ export function parseStyleRule(raw: unknown): StyleRule | null {
   }
 }
 
-/** Parse the style rule registry: iterate entries and silently drop invalid current-shape rules. */
+/**
+ * Parse the style rule registry: iterate entries and silently drop invalid
+ * current-shape rules.
+ *
+ * Absent is tolerated; the WRONG SHAPE is not. Those are different facts and
+ * were previously answered the same way — an array, a string, a number all
+ * returned `{}`, identical to a shell that simply has no rules yet.
+ *
+ * The distinction matters because of what `{}` means downstream: every class
+ * reference resolves to nothing and the site renders with no styling at all,
+ * successfully. A registry that arrives as an array is not an author saying
+ * "no rules", it is something upstream emitting the wrong shape — and
+ * substituting a default there converts a loud failure into a silent one that
+ * ships. Reported by the studio, whose emitter did exactly this: an array of
+ * 617 valid rules, which would have imported as a site with no styles.
+ *
+ * Per-ENTRY leniency is unchanged and still right: one corrupt rule should not
+ * stop a site loading, which is what makes the editor robust against partially
+ * corrupt persisted data.
+ *
+ * @throws if `raw` is present but is not a plain object.
+ */
 export function parseStyleRuleRegistry(raw: unknown): Record<string, StyleRule> {
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {}
+  // Absent — the author had nothing to say.
+  if (raw === undefined || raw === null) return {}
+  if (typeof raw !== 'object' || Array.isArray(raw)) {
+    throw new Error(
+      `styleRules must be an object keyed by rule id, received ${
+        Array.isArray(raw) ? 'an array' : typeof raw
+      }. An array of rules is a registry with the wrong shape, not an empty one — ` +
+        'importing it would produce a site with no styling.',
+    )
+  }
   const result: Record<string, StyleRule> = {}
   for (const [id, rule] of Object.entries(raw as Record<string, unknown>)) {
     const parsed = parseStyleRule(rule)

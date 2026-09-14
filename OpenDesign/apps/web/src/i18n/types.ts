@@ -3522,6 +3522,48 @@ export interface Dict {
   'studio.firstArtifactHint.title': string;
   'studio.firstArtifactHint.body': string;
   'studio.firstArtifactHint.dismiss': string;
+  // ── Studio (MMS) ──────────────────────────────────────────────────────
+  // Present in all 19 locale files but dropped from this type by the 0.20.0
+  // merge, which left the whole family untyped — `t('studio.shareToCms')`
+  // stopped compiling even though every locale carried the string. Restored
+  // here so the Share-to-CMS UI type-checks against the dictionary again.
+  'studio.agentAndModel': string;
+  'studio.agentDetected': string;
+  'studio.agentSelected': string;
+  'studio.collapseConversation': string;
+  'studio.collapseDesignFiles': string;
+  'studio.designFiles': string;
+  'studio.dockCanvas': string;
+  'studio.dockChat': string;
+  'studio.dockEdit': string;
+  'studio.dockFiles': string;
+  'studio.expandConversation': string;
+  'studio.expandDesignFiles': string;
+  'studio.factDesignSystem': string;
+  'studio.factFiles': string;
+  'studio.factFolder': string;
+  'studio.factType': string;
+  'studio.fileMenuAria': string;
+  'studio.fileMenuOpen': string;
+  'studio.fixIt': string;
+  'studio.messageRailAria': string;
+  'studio.messageRailJump': string;
+  'studio.mobileDockAria': string;
+  'studio.newDocument': string;
+  'studio.newSketch': string;
+  'studio.noFilesMatch': string;
+  'studio.noFilesYet': string;
+  'studio.projectFactsTitle': string;
+  'studio.resizeDesignFiles': string;
+  'studio.searchFiles': string;
+  'studio.searchFilesAria': string;
+  'studio.shareDialogBody': string;
+  'studio.shareDialogEyebrow': string;
+  'studio.shareDialogTitle': string;
+  'studio.shareDisabledHint': string;
+  'studio.shareToCms': string;
+  'studio.uploadFiles': string;
+  'studio.viewportFullWidth': string;
   'home.starter.product_ui_prototype.title': string;
   'home.starter.product_ui_prototype.desc': string;
   'home.starter.product_ui_prototype.firstPrompt': string;

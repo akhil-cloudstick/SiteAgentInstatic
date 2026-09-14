@@ -31,7 +31,8 @@ import {
   sessionExpiry,
 } from '../../../server/auth/tokens'
 import { createDataRow } from '../../../server/repositories/data/rows'
-import { handleImportPreviewRoute } from '../../../server/handlers/cms/importPreview'
+import { handleImportPreviewRoute, findUnresolvedClasses } from '../../../server/handlers/cms/importPreview'
+import { DEFAULT_IMPORT_STRATEGY } from '../../../server/handlers/cms/importStrategy'
 import { parseValue } from '@core/utils/typeboxHelpers'
 import { BundlePreviewSchema } from '@core/data/bundleSchema'
 import type { DbClient } from '../../../server/db/client'
@@ -131,10 +132,27 @@ function bundleRowEntry(id: string, tableId: string, slug: string = ''): DataRow
   }
 }
 
-function makePreviewRequest(cookie: string, bundle: unknown): Request {
+/**
+ * A preview request.
+ *
+ * `strategy` defaults to `merge-overwrite` because the suites below measure
+ * merge diffs — willReplace, willAdd, slug conflicts — and those only mean
+ * anything under a merge. It used to be omitted, which silently asserted that
+ * an absent `?strategy=` means "merge". Both import endpoints read an absent
+ * one as `replace`, so that assumption was the bug rather than the contract:
+ * it let preview describe a row-by-row merge for a run that wipes first.
+ * Naming the strategy keeps these tests about diffing, and leaves the default
+ * to the suite that actually tests the default.
+ */
+function makePreviewRequest(
+  cookie: string,
+  bundle: unknown,
+  strategy: string | null = 'merge-overwrite',
+): Request {
   // The `cookie` header is a forbidden header per WHATWG Fetch spec and is
   // stripped by Bun's Request constructor in test mode. Set it after construction.
-  const req = new Request('http://localhost/cms/api/cms/import/preview', {
+  const query = strategy === null ? '' : `?strategy=${strategy}`
+  const req = new Request(`http://localhost/cms/api/cms/import/preview${query}`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(bundle),
@@ -464,5 +482,109 @@ describe('handleImportPreviewRoute — auth', () => {
     })
     const res = await handleImportPreviewRoute(req, db)
     expect(res!.status).toBe(401)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// The default strategy — the one thing preview and import must never disagree on
+// ---------------------------------------------------------------------------
+
+describe('handleImportPreviewRoute — an absent ?strategy=', () => {
+  test('resolves the same way the import endpoints resolve it', async () => {
+    const db = createSqliteClient(':memory:')
+    await runMigrations(db, sqliteMigrations)
+    const cookie = await seedAuth(db)
+
+    // Two local rows the bundle also carries. Under a merge they are
+    // willReplace=2 against currentLocal=2; under `replace` the wipe removes
+    // them before anything is inserted, so they are willAdd against nothing.
+    const overlap1 = await createDataRow(db, { tableId: 'posts', cells: {}, slug: 'o1' })
+    const overlap2 = await createDataRow(db, { tableId: 'posts', cells: {}, slug: 'o2' })
+
+    const bundle = {
+      schemaVersion: 1,
+      exportedAt: new Date().toISOString(),
+      tables: [bundleTableEntry('posts', 'Posts')],
+      rows: [
+        bundleRowEntry(overlap1.id, 'posts', 'o1'),
+        bundleRowEntry(overlap2.id, 'posts', 'o2'),
+      ],
+    }
+
+    const res = await handleImportPreviewRoute(makePreviewRequest(cookie, bundle, null), db)
+    const preview = parseValue(BundlePreviewSchema, JSON.parse(await res!.text()))
+    const postsEntry = preview.tables.find((t) => t.id === 'posts')
+
+    // Both import endpoints read an absent `?strategy=` as `replace`, so the
+    // default preview must describe the wipe. If this ever reads willReplace=2,
+    // preview has drifted back to describing a merge the import will not do —
+    // a dry run reporting an operation that never happens.
+    expect(DEFAULT_IMPORT_STRATEGY).toBe('replace')
+    expect(postsEntry).toBeDefined()
+    expect(postsEntry!.willReplace).toBe(0)
+    expect(postsEntry!.willAdd).toBe(2)
+    expect(postsEntry!.currentLocal).toBe(0)
+    expect(preview.rowConflicts).toHaveLength(0)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// unresolvedClasses — the join nobody validated
+// ---------------------------------------------------------------------------
+
+describe('findUnresolvedClasses', () => {
+  const bundleWith = (styleRules: Record<string, unknown>, classIds: string[]) => ({
+    schemaVersion: 1 as const,
+    exportedAt: new Date().toISOString(),
+    tables: [],
+    rows: [{ ...bundleRowEntry('r1', 'pages', 'p'), cells: { body: { rootNodeId: 'n1', nodes: { n1: { classIds } } } } }],
+    site: { styleRules },
+  })
+
+  test('reports a class whose id matches no rule, with the node count', () => {
+    // The v4 shape: rules exist, ids were minted, nothing resolves.
+    const found = findUnresolvedClasses(
+      bundleWith({ 'style:class:hero': { id: 'style:class:hero', name: 'hero', kind: 'class' } }, ['hero', 'hero']) as never,
+    )
+    expect(found).toHaveLength(1)
+    expect(found[0]!.className).toBe('hero')
+    expect(found[0]!.nodeCount).toBe(2)
+  })
+
+  test('reports nothing when ids and classIds agree', () => {
+    // The v5 shape: id === name, so every reference resolves.
+    expect(
+      findUnresolvedClasses(bundleWith({ hero: { id: 'hero', name: 'hero', kind: 'class' } }, ['hero']) as never),
+    ).toHaveLength(0)
+  })
+
+  test('stays silent when the bundle carries no registry at all', () => {
+    // Nothing to resolve against. Reporting every class here would be noise,
+    // not a finding, and would fire on every bundle that ships no styles.
+    expect(findUnresolvedClasses(bundleWith({}, ['hero', 'card']) as never)).toHaveLength(0)
+  })
+})
+
+describe('destructiveEffects', () => {
+  test('a replace preview names the published-version wipe; a merge does not', async () => {
+    const db = createSqliteClient(':memory:')
+    await runMigrations(db, sqliteMigrations)
+    const cookie = await seedAuth(db)
+    const bundle = {
+      schemaVersion: 1,
+      exportedAt: new Date().toISOString(),
+      tables: [bundleTableEntry('posts', 'Posts')],
+      rows: [bundleRowEntry('a', 'posts', 'a')],
+    }
+
+    // The effect that has no count anywhere else in the preview: rows come back
+    // from the bundle, the published version comes back from nothing.
+    const replaceRes = await handleImportPreviewRoute(makePreviewRequest(cookie, bundle, 'replace'), db)
+    const replaced = parseValue(BundlePreviewSchema, JSON.parse(await replaceRes!.text()))
+    expect(replaced.destructiveEffects?.join(' ')).toContain('published version')
+
+    const mergeRes = await handleImportPreviewRoute(makePreviewRequest(cookie, bundle, 'merge-overwrite'), db)
+    const merged = parseValue(BundlePreviewSchema, JSON.parse(await mergeRes!.text()))
+    expect(merged.destructiveEffects ?? []).toHaveLength(0)
   })
 })

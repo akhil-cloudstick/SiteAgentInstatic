@@ -165,6 +165,7 @@ import {
 } from './state/config';
 import { createSilentUpdatePreferenceWriter } from './state/silent-update-preference';
 import { applyAppearanceToDocument } from './state/appearance';
+import { isManagedSession } from './state/managed';
 import { isMacPlatform } from './utils/platform';
 import { randomUUID } from './utils/uuid';
 import { summarizeProjectNameFromPrompt } from './utils/projectName';
@@ -289,6 +290,12 @@ export function shouldRouteToFirstRunOnboarding(
   config: AppConfig,
   pathname: string,
 ): boolean {
+  // A managed session already authenticated at the MMSBUILD Product Hub, and
+  // the operator — not the tenant — picks the provider, key and model. The
+  // first-run panel's "Sign in to Cloud / Local coding agent / Bring your own
+  // key" fork is therefore a second login for an already-signed-in person and a
+  // dead end for a tenant who owns none of those three things.
+  if (isManagedSession()) return false;
   if (config.onboardingCompleted === true) return false;
   if (
     pathname.startsWith('/projects/')
@@ -1826,13 +1833,21 @@ function AppInner() {
   ]);
 
   // Stamp the app appearance onto the <html> element so CSS variables pick it
-  // up. The theme itself is a constant (light-only), but the accent still comes
-  // from config, and the stamp must be re-applied whenever that changes.
+  // up. Both the accent AND the theme come from config, so the stamp must be
+  // re-applied whenever either changes.
+  //
+  // `config.theme` was missing from the dependency list, left over from
+  // upstream 0.20.0's forced-light build (`FORCED_APP_THEME = 'light'`), where
+  // theme genuinely was a constant. The MMS side re-enabled dark, so the
+  // toggle updated React state but never re-stamped `data-theme` — the new
+  // theme only appeared after a full document load (e.g. bouncing through the
+  // hub and back).
+  //
   // useLayoutEffect (vs useEffect) fires before the browser paints, so no
   // 1-frame flash. Safe here because the component tree is ssr:false.
   useLayoutEffect(() => {
     applyAppearanceToDocument({ accentColor: config.accentColor, theme: config.theme });
-  }, [config.accentColor]);
+  }, [config.accentColor, config.theme]);
 
   // Tell the daemon what the user is currently looking at, so the MCP
   // server can surface it as `get_active_context` to a coding agent in

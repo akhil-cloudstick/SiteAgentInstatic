@@ -302,10 +302,20 @@ function bodyHtmlAttributes(value: unknown): string {
     .join('')
 }
 
+/** First value that is a non-blank string. Blank-safe alternative to `??` chains. */
+function firstNonEmpty(...values: (string | undefined | null)[]): string {
+  for (const value of values) {
+    if (typeof value === 'string' && value.trim().length > 0) return value
+  }
+  return ''
+}
+
 /**
  * `<head>` metadata tags derived from site settings + page.
  *
- * - `title` falls back through metaTitle → page.title → site.name.
+ * - `title` falls back through the row's SEO title → page.title → metaTitle →
+ *   site.name. Site-wide `metaTitle` sits below the page's own title so it acts
+ *   as a default, not an override.
  * - URL-typed settings (faviconUrl) are validated by
  *   isSafeUrl() (blocks `javascript:` / `vbscript:` schemes) and then
  *   escapeHtml()'d for safe attribute interpolation.
@@ -382,7 +392,7 @@ function resolveDocumentSeo(options: PublishPageOptions): DocumentSeo {
   const fromCells = documentSeoFromCells((entry?.fields ?? {}) as Record<string, unknown>)
   const explicit = options.seo ?? {}
 
-  return {
+  return absoluteOgImage({
     title: explicit.title ?? fromCells.title,
     description: explicit.description ?? fromCells.description,
     canonicalUrl: explicit.canonicalUrl ?? fromCells.canonicalUrl,
@@ -390,6 +400,33 @@ function resolveDocumentSeo(options: PublishPageOptions): DocumentSeo {
     ogDescription: explicit.ogDescription ?? fromCells.ogDescription,
     ogImage: explicit.ogImage ?? fromCells.ogImage,
     jsonLd: explicit.jsonLd ?? fromCells.jsonLd,
+  })
+}
+
+/**
+ * `og:image` has to be absolute. A media asset resolves to a root-relative
+ * public path, and every social crawler that matters — Facebook, LinkedIn,
+ * Slack, X — drops a relative `og:image` rather than resolving it, so the card
+ * renders with no image and nothing reports an error.
+ *
+ * There is no site-wide base URL to build from: `SiteSettings` has never
+ * carried one. Rather than add a setting somebody has to remember to fill in,
+ * this uses what the document already states — a page declaring an absolute
+ * canonical has told us the origin it is served from, and its images come from
+ * that same origin. Nothing to configure, so nothing to forget.
+ *
+ * A document with no canonical keeps the relative path it had. That is not a
+ * regression: it is what a page without SEO always emitted.
+ */
+function absoluteOgImage(seo: DocumentSeo): DocumentSeo {
+  if (!seo.ogImage || !seo.canonicalUrl) return seo
+  // Already absolute — a bundle-supplied URL passes straight through.
+  if (/^[a-z][a-z0-9+.-]*:/i.test(seo.ogImage)) return seo
+  try {
+    return { ...seo, ogImage: new URL(seo.ogImage, seo.canonicalUrl).toString() }
+  } catch {
+    // A relative canonical cannot resolve a relative image. Leave both alone.
+    return seo
   }
 }
 
@@ -401,9 +438,20 @@ function buildDocumentMetaTags(
   const { settings } = site
   const seo = resolveDocumentSeo(options)
 
-  // Row-level wins over site-level. Previously only site settings were read, so
-  // a per-row seoTitle was stored and silently never rendered.
-  const title = seo.title ?? settings.metaTitle ?? page.title ?? site.name
+  // Most specific title wins: the row's own SEO title, then the document's own
+  // title, then the site-wide default.
+  //
+  // `settings.metaTitle` sits BELOW `page.title` deliberately. It is a
+  // site-wide fallback, and ranking it above the document's own title makes it
+  // a site-wide override — every page that has not been given an explicit SEO
+  // title publishes under one identical `<title>`. On a 497-page site that is
+  // 497 documents a crawler cannot tell apart, produced by a setting whose name
+  // suggests a default rather than an override.
+  //
+  // `firstNonEmpty`, not `??`: a page's title is `''` rather than undefined when
+  // unset (`pageFromRow` defaults it), and `??` would hand an empty `<title>` to
+  // every such page instead of falling through to the site default.
+  const title = firstNonEmpty(seo.title, page.title, settings.metaTitle, site.name)
   const description = seo.description ?? settings.metaDescription
 
   const metaDesc = description

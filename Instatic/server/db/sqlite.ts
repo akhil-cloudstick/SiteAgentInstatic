@@ -158,5 +158,15 @@ export function createSqliteClient(filename: string): DbClient {
     return result
   }
 
-  return Object.assign(fn, { dialect: 'sqlite' as const })
+  // Guarded so a double close is a no-op rather than a throw from bun:sqlite.
+  // Cleanup paths run in `finally` blocks and after failures, where being
+  // called twice is normal and an exception there would mask the real error.
+  let closed = false
+  const close = (): void => {
+    if (closed) return
+    closed = true
+    db.close()
+  }
+
+  return Object.assign(fn, { dialect: 'sqlite' as const, close })
 }

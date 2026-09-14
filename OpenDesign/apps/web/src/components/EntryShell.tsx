@@ -95,7 +95,9 @@ import { CenteredLoader } from './Loading';
 import { DesignsTab } from './DesignsTab';
 import { DesignSystemsTab } from './DesignSystemsTab';
 import { BrandsTab } from './BrandsTab';
-import { EntryNavRail, type EntryView as EntryViewKind } from './EntryNavRail';
+import { type EntryView as EntryViewKind } from './EntryNavRail';
+import { DesignShellRows } from './shell/DesignShellRows';
+import { AvatarMenu } from './AvatarMenu';
 import {
   buildProjectSearchCatalog,
   ProjectSearchModal,
@@ -1621,6 +1623,38 @@ export function EntryShell({
     );
   }
 
+
+  // The shared shell's theme toggle is a two-state control, so `system` has to
+  // resolve to what the user is actually looking at before it can be shown.
+  const shellTheme: 'light' | 'dark' =
+    (config.theme ?? 'system') === 'dark'
+      ? 'dark'
+      : (config.theme ?? 'system') === 'light'
+        ? 'light'
+        : typeof window !== 'undefined' &&
+            window.matchMedia?.('(prefers-color-scheme: dark)').matches
+          ? 'dark'
+          : 'light';
+
+  // Row 1's account control. The shared shell ends its utility run with the
+  // signed-in user's identity, so this menu wears the avatar rather than a
+  // second gear beside the shell's own Settings gear. It is also where the
+  // hub-wide "Sign out" lives (see `state/hubSignOut.ts`).
+  const avatarMenu = (
+    <AvatarMenu
+      config={config}
+      agents={agents}
+      daemonLive={daemonLive}
+      onModeChange={onModeChange}
+      onAgentChange={onAgentChange}
+      onAgentModelChange={onAgentModelChange}
+      onApiModelChange={onApiModelChange}
+      providerModelsCache={activeProviderModelsCache}
+      onOpenSettings={onOpenSettings}
+      onRefreshAgents={onRefreshAgents}
+    />
+  );
+
   const homeExecutionSwitcher = (
     <InlineModelSwitcher
       compact
@@ -1639,54 +1673,57 @@ export function EntryShell({
   );
 
   return (
-    <div className="entry-shell entry-shell--no-header">
-      <div
-        className={`entry${railOpen ? ' entry--rail-open' : ''}`}
-        // The team/local shell is a labeled Manus-style rail, so widen the rail
-        // track (the base 56px icon-rail clips the labels + team affordances).
-        style={{ ['--entry-rail-width' as string]: '236px' }}
-      >
-        <EntryNavRail
-          view={view}
-          onViewChange={changeView}
-          onNewProject={() => {
-            trackHomeNavClick(analytics.track, {
-              page_name: 'home',
-              area: 'nav',
-              element: 'new_project_plus',
-            });
-            openNewProject();
-          }}
-          onOpenSearch={() => setProjectSearchOpen(true)}
-          open={railOpen}
-          topRightSlot={
-            view === 'home' && deepSeekV4FlashCampaignAudience !== 'unknown' ? (
-              <button
-                type="button"
-                className="entry-deepseek-campaign-badge"
-                onClick={openDeepSeekCampaignPricing}
-                aria-label={t('campaign.deepseekV4Flash.workbenchBadgeAria')}
-                data-testid="deepseek-campaign-pricing-badge"
-              >
-                <span>{t('campaign.deepseekV4Flash.workbenchBadge')}</span>
-                <Icon name="arrow-right" size={13} />
-              </button>
-            ) : null
-          }
-          context={railWorkspaceContext}
-          billing={workspaceBilling}
-          balanceUsd={workspaceBalanceUsd}
-          onOpenSettings={onOpenSettings}
-          onInvite={() => changeView('members')}
-          onSignInCloud={() => navigate({ kind: 'home', view: 'onboarding' })}
-          onSignedOut={onSignedOut}
-          updaterSlot={updaterSlot}
-          // A loading or unavailable workspace read is not proof of sign-out.
-          // Keep the account slot neutral until Cloud answers successfully;
-          // only a successful null context (or known local sign-out) may show
-          // the sign-in card.
-          footerNotice={accountFooterNotice}
-        />
+    <div className="entry-shell entry-shell--no-header entry-shell--mms-rows">
+      {/* The MMSBUILD shared shell — row 1 (Product Hub) and row 2 (MMS Design
+          specialist navigation), both rendered from `@mms/shell` so the CMS and
+          this product can never drift.
+
+          Restored after the 0.20.0 upgrade deleted `DesignShellRows` while
+          leaving `mms-shell-host.css` in place — that file hides
+          `.workspace-tabs-chrome` and collapses `.workspace-shell`'s first
+          track because these rows replaced them, so with the rows gone the app
+          rendered no chrome at all AND no way to open the nav rail (which
+          upstream collapses to a 0-width track by default). The rows now sit
+          ABOVE the rail rather than replacing it, so upstream's team
+          destinations stay reachable via `onToggleRail`. */}
+      <DesignShellRows
+        view={view}
+        onSelectView={changeView}
+        theme={shellTheme}
+        onToggleTheme={() =>
+          void onConfigPersist({
+            ...config,
+            theme: shellTheme === 'dark' ? 'light' : 'dark',
+          })
+        }
+        // Help and Notifications keep their existing surfaces. Both still live
+        // in this shell — the shared row only owns their trigger, per the
+        // contract's "each utility exactly once" rule.
+        onOpenHelp={() => onOpenSettings('language')}
+        onOpenSettings={() => onOpenSettings('appearance')}
+        onOpenNotifications={() => onOpenSettings('notifications')}
+        notificationCount={0}
+        onNewProject={() => {
+          trackHomeNavClick(analytics.track, {
+            page_name: 'home',
+            area: 'nav',
+            element: 'new_project_plus',
+          });
+          openNewProject();
+        }}
+        accountSlot={avatarMenu}
+      />
+      {/* No left nav rail. The MMSBUILD specialist row above IS the navigation,
+          so a second, competing menu column was pure duplication — and the
+          rail's portalled `.entry-top-right-cluster` (GitHub star chip, credits
+          pill and a second account dropdown) sat on top of the shared header's
+          own Help / notifications / theme / account run.
+          Nothing was lost with it: Settings and Notifications are utilities on
+          the shared header, the GitHub help + feature-request links are barred
+          by the no-git rule (mms-overrides.css), and the social row was already
+          hidden. `Community` moved into the row's destinations. Project search
+          keeps its Ctrl/Cmd+K binding below. */}
+      <div className="entry">
         {projectSearchOpen ? (
           <ProjectSearchModal
             // Search spans personal drafts plus the shared workspace catalog.
@@ -1778,8 +1815,8 @@ export function EntryShell({
                 <CenteredLoader label={t('common.loading')} />
               ) : (
                 <div className="entry-section">
-                  <header className="entry-section__head">
-                    <h1 className="entry-section__title">{t('entry.navProjects')}</h1>
+                  <header className="entry-section__head mms-nav-duplicate-titleblock">
+                    <h1 className="entry-section__title mms-nav-duplicate-title">{t('entry.navProjects')}</h1>
                   </header>
                   <DesignsTab
                     projects={projects}

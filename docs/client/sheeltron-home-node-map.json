@@ -1,0 +1,7549 @@
+{
+  "rowId": "8z-CfBkhaqJb4BqGOGNLf",
+  "slug": "index",
+  "status": "published",
+  "rootNodeId": "body-Lrya3ZwzEtSr",
+  "nodeCount": 494,
+  "reachable": 494,
+  "orphans": 0,
+  "nodes": [
+    {
+      "id": "body-Lrya3ZwzEtSr",
+      "depth": 0,
+      "reachable": true,
+      "moduleId": "base.body",
+      "classIds": [],
+      "children": 16,
+      "propKeys": [
+        "htmlAttributes"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "CzMHpx3hbDQuXhDaysr45",
+      "depth": 1,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "dx9nEXt5lRgKiS-By4Kyj",
+      "depth": 2,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "tXMRglhSpDXfqzk6DwKc8",
+      "depth": 1,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "nav"
+      ],
+      "children": 4,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "oHk3lCMdVtWlyzlximIeq",
+      "depth": 2,
+      "reachable": true,
+      "moduleId": "base.link",
+      "classIds": [
+        "nav-logo"
+      ],
+      "children": 1,
+      "propKeys": [
+        "href",
+        "htmlAttributes",
+        "target"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "Ee4ju00ZmP66P7v5u66df",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.image",
+      "classIds": [
+        "brand-mark"
+      ],
+      "children": 0,
+      "propKeys": [
+        "decoding",
+        "fetchPriority",
+        "htmlAttributes",
+        "loading",
+        "src"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "i5i_QBLdUKMN0JgvT29-o",
+      "depth": 2,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "nav-links"
+      ],
+      "children": 9,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "s2M4_77KPGfUlYFEwmdb1",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "0xuKwCMxuUPlIGH5rjwQl",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.link",
+      "classIds": [
+        "active"
+      ],
+      "children": 0,
+      "propKeys": [
+        "href",
+        "htmlAttributes",
+        "target",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "PFI8EpKuIE4H987etQsD0",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "kGUhhLpnhOfaNf39GjMnP",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.link",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "href",
+        "htmlAttributes",
+        "target",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "Ja6y7YgEWaZ_qS1zyA8Ya",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "wefuu_E-XzcUvM-SEPM8n",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.link",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "href",
+        "htmlAttributes",
+        "target",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "NRqjvXWNaqqSdLkELUPvc",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "NKOA5SOT5P2v9hmKmFJRR",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.link",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "href",
+        "htmlAttributes",
+        "target",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "_NKyq9Wvh5Fez4AC7OQYh",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "dHXdfM5z9AOPqie2cmNTe",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.link",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "href",
+        "htmlAttributes",
+        "target",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "xuispuLq7SVGv3Zc-O_mw",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "Tfq4P7VDCmto2WUmrAsa7",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.link",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "href",
+        "htmlAttributes",
+        "target",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "Gp-XqvFQWu184pXv_ZTVp",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "LIVYsEbMXNAWFJdRRlGUW",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.link",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "href",
+        "htmlAttributes",
+        "target",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "OgcXcLcbcf7ygeGrv520Z",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "-hOkDfVAYspMm88ut_vrS",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.link",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "href",
+        "htmlAttributes",
+        "target",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "jNWkJ7nepkFW7JOREZPgy",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "Q4tW8-2hsCxMOEkRe7NRS",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.link",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "href",
+        "htmlAttributes",
+        "target",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "-mlBmaytNc16ajuR6hXRg",
+      "depth": 2,
+      "reachable": true,
+      "moduleId": "base.button",
+      "classIds": [
+        "nav-toggle"
+      ],
+      "children": 0,
+      "propKeys": [
+        "buttonType",
+        "disabled",
+        "href",
+        "htmlAttributes",
+        "label",
+        "target"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "sgpxoMd-wwswue9NnWfIe",
+      "depth": 2,
+      "reachable": true,
+      "moduleId": "base.link",
+      "classIds": [
+        "nav-cta"
+      ],
+      "children": 0,
+      "propKeys": [
+        "href",
+        "htmlAttributes",
+        "target",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "1OC-nHDut_vmGYH-4Tu5T",
+      "depth": 1,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "hero-bento-section"
+      ],
+      "children": 2,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "hLX893xl8WGA4Lcipyf84",
+      "depth": 2,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "bg-pattern-dots"
+      ],
+      "children": 0,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "cgqncV9Zt_Y6AwEHhhTbs",
+      "depth": 2,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "hero-bento-wrap"
+      ],
+      "children": 5,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "jdWVhGnEStkt276WB8wXj",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "hero-kicker"
+      ],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "m0cEqINZ7vjZvya_pM0AL",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "fYleTo6VrYA7PdJKfb3cB",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [],
+      "children": 5,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "SKvCJ41X8ZORmuEHgejy9",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [
+        "h1-line"
+      ],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "vxrFQngcHyJVWEmrkLPZQ",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "h1-line"
+      ],
+      "children": 2,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "l8s4hC1-Mo2seMULCbn4G",
+      "depth": 5,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [
+        "accent"
+      ],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "oxT2QeaKDGEadiyCj_MlZ",
+      "depth": 5,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "Qcme-aGUp5wynPLn54GtM",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [
+        "h1-line"
+      ],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "aJYi0IFv9Ii-OZn_vseAy",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [
+        "h1-line"
+      ],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "fGRcpqXOjMcSEyEML6iB0",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [
+        "h1-line"
+      ],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "LPg6Of2CRdtDP3JqFg5oJ",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "VX9GZ-yaRQCel1nGphWIo",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "hero-cta-row"
+      ],
+      "children": 2,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "J9_ouXoW0cGuvtWAVfstM",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.link",
+      "classIds": [
+        "btn-primary"
+      ],
+      "children": 2,
+      "propKeys": [
+        "href",
+        "htmlAttributes",
+        "target"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "d7CLX5CbtpxNMCf9MFt7X",
+      "depth": 5,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "ZAbr2qjnChfNrS2U5slq8",
+      "depth": 5,
+      "reachable": true,
+      "moduleId": "base.svg",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "svg",
+        "title"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "0GJ6hswxPHKeWz2tpsczJ",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.link",
+      "classIds": [
+        "btn-ghost"
+      ],
+      "children": 0,
+      "propKeys": [
+        "href",
+        "htmlAttributes",
+        "target",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "8GFuSJaqvSsQuwN0GKkwP",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "hero-scroll-cue-wrap"
+      ],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "8OGlg478KhuQbkR84Xmpd",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [
+        "hero-scroll-cue"
+      ],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "us8y4WfX77-8p04gFbqyM",
+      "depth": 1,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "phase-transition"
+      ],
+      "children": 2,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "_CS0LJ5TIb8qUfE3HcX_e",
+      "depth": 2,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "marquee-label"
+      ],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "_HhrCYS-sfvXMveXERcf7",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "PWUmRsOxgzhKmkq_BZqtA",
+      "depth": 2,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "marquee-viewport"
+      ],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "4-bn-SYS2gMWdJl9v2buG",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "marquee-track"
+      ],
+      "children": 30,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "TEG34XgfB4nP2tZFjRNkN",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "VAmL9IxvK8w7MRsJjvdfk",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "yRPifAxaw_ff5QpVcESqS",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "wQ4ABl9o6OYdx4qeEEe1R",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "Z59Uzy-myIK9esx5NAEXy",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "RlCEMj36ERgD-uoY9j0dD",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "Ez6ZWnhLwqzVBsKos5qCo",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "UcUMaQHx_gAgAMwXO7xuJ",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "tP9hJw2-wImTpAYnhEOKD",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "HJGw8t_GWvTMtk86Slknq",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "bIisjxlwILDf3qQmDSS3L",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "A2_WGT0aeS5_ViwF5v57r",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "x71TbRJyTPmt5Sow3eV5d",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "Y1jRMRgJfhIvOP8Uuct_4",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "bxGlSjMwW1cjgyIrUnulA",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "To8Vs_QnmWkBAFa6ZlqKM",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "Bu-RX8FCL5bBoylavJGvA",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "eHvAp9NyWy4RRQRaR-Qag",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "b9qZd9b1gDJqD31XkVi9o",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "t2bM4pDkqHRkaAIxubPjX",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "2tcI6Sc7MpleMcb_wfzp4",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "kY9Lc7dmMBJFsqfuB8zgX",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "ZXPK-aluNwb8MmqZaxGYa",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "WiWz5qQf9zaNaVKmB55xL",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "Igt-JadeKW9gdLaJEgXxv",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "nBDa2zrSyVVrAQtrua6cz",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "uYUpvjgNiAaD0lqYPtX2g",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "3IxGiXxaD7kngTIun0RcQ",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "QFB9FI50d1CaAI_xpCyiC",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "On2xebJ7fSCUwd8IjAm0e",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "1XWOzHScj0PqiE8PPyiZT",
+      "depth": 1,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "ai-glow-line"
+      ],
+      "children": 0,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "TyabVZbFmfma9naVnVmzx",
+      "depth": 1,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "ai-spotlight"
+      ],
+      "children": 3,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "07tMilKffyg4AOM5V5uHS",
+      "depth": 2,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "ai-spotlight-bg"
+      ],
+      "children": 0,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "3n_Cj9w_6rzC3dg7AfIaF",
+      "depth": 2,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "bg-pattern-dots"
+      ],
+      "children": 0,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "COwTd7g_2nIVzKsv9aRFW",
+      "depth": 2,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "ai-spotlight-inner"
+      ],
+      "children": 2,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "LyRvMqaPntgwgsqJm-FsO",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "ai-spot-content"
+      ],
+      "children": 5,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "ICamqGarlwsvLwgJiyJ2D",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "ai-spot-badge"
+      ],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "SUg3T1TNfusHitc2RPndK",
+      "depth": 5,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "LIVVDySzsUXb255hIjUtq",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [],
+      "children": 5,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "vD1cb1TEIJ9qGSTNJHPp1",
+      "depth": 5,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "jD5dX7cRlWpiTBCr7CEWq",
+      "depth": 5,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "M3Wou0nvHmQ-fzETJ6QKp",
+      "depth": 5,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [
+        "neon"
+      ],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "oIBUJjB6lXRPaiLZbb0gV",
+      "depth": 5,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "ASqV1YNFtDO1_E5R_GHRE",
+      "depth": 5,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "0V-T_jZcw9-qFDRXALadA",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "jpdyDX-XRgqw2CZQU5QN_",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "ai-spot-stats"
+      ],
+      "children": 3,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "RGt9jCyCF4uwjMtSIGU-n",
+      "depth": 5,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [],
+      "children": 2,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "BqVWRUCwSPfRsgmXcVcaP",
+      "depth": 6,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "ai-spot-stat-num"
+      ],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "wZTOlklkWJzJppwl04Kre",
+      "depth": 7,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "9JSB6G2GesH1I5v9YS7tB",
+      "depth": 6,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "ai-spot-stat-label"
+      ],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "Lnjx32npKZeI_Xt_YybBk",
+      "depth": 7,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "anmspAi8GugG03mU6SluM",
+      "depth": 5,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [],
+      "children": 2,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "2s5hBChj9TNQaU7nacCM-",
+      "depth": 6,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "ai-spot-stat-num"
+      ],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "Bp7a80GMuxjdCi5Upbn8Z",
+      "depth": 7,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "WQWLDjJyBv1OPOdlIBnDR",
+      "depth": 6,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "ai-spot-stat-label"
+      ],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "aC9JGJzkuvTWDJXk84Bh8",
+      "depth": 7,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "svAB0hj10X10SEDCssCTs",
+      "depth": 5,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [],
+      "children": 2,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "-FxFvmavn5UlWhIi93d3A",
+      "depth": 6,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "ai-spot-stat-num"
+      ],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "XfrESU-9I3u9jtYjn0sNk",
+      "depth": 7,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "5vNH8uuYhl8sbl0HPOV8e",
+      "depth": 6,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "ai-spot-stat-label"
+      ],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "COwQw3OZl26rp3FISZDE0",
+      "depth": 7,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "DJ3zTTLNR8DZ4rFiu3kco",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.link",
+      "classIds": [
+        "ai-spot-cta"
+      ],
+      "children": 2,
+      "propKeys": [
+        "href",
+        "htmlAttributes",
+        "target"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "EFjjz61eb5p72kUdm2xD8",
+      "depth": 5,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "Wqzg8fatkSmRmsa6Cc75K",
+      "depth": 5,
+      "reachable": true,
+      "moduleId": "base.svg",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "svg",
+        "title"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "iy0lRWpnTaOovianNsJhf",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "ai-spot-cards"
+      ],
+      "children": 4,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "9O4q4PIfkiHTqd28PcMgW",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "ai-spot-card"
+      ],
+      "children": 2,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "E5Bf8i5sW5HkBQOE7yB-U",
+      "depth": 5,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "ai-spot-card-icon"
+      ],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "neQr4s1mqaonee-32RBmr",
+      "depth": 6,
+      "reachable": true,
+      "moduleId": "base.svg",
+      "classIds": [
+        "icon-tt"
+      ],
+      "children": 0,
+      "propKeys": [
+        "svg",
+        "title"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "mTKxeT_0nBz6nhNZhBioJ",
+      "depth": 5,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [],
+      "children": 2,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "fvwyYIZOGuyRTvVw7Qfj8",
+      "depth": 6,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "TSZiJItSsEiRJLxfG3bf0",
+      "depth": 6,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "oy6iBd9VRleIO_ic0iwFN",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "ai-spot-card"
+      ],
+      "children": 2,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "j3s5UMrQXvxAkl4oR3Mlw",
+      "depth": 5,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "ai-spot-card-icon"
+      ],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "L_AIg4ew8vwtplrynO9eX",
+      "depth": 6,
+      "reachable": true,
+      "moduleId": "base.svg",
+      "classIds": [
+        "icon-tt"
+      ],
+      "children": 0,
+      "propKeys": [
+        "svg",
+        "title"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "QoOW3-9d1QvXpp6dROXhc",
+      "depth": 5,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [],
+      "children": 2,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "fgkZ8_zSkZdQP_QTsTsmO",
+      "depth": 6,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "wCubAfcfdwnJCc_XZOfSY",
+      "depth": 6,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "PdwxDfvZjt0OERs8Nm-ll",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "ai-spot-card"
+      ],
+      "children": 2,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "6-srdToAMGWgbhjcLcldk",
+      "depth": 5,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "ai-spot-card-icon"
+      ],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "GO3V0HNpUVX3xaeNPyhBM",
+      "depth": 6,
+      "reachable": true,
+      "moduleId": "base.svg",
+      "classIds": [
+        "icon-tt"
+      ],
+      "children": 0,
+      "propKeys": [
+        "svg",
+        "title"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "ab-C9z3y4h1kOFWQ1sfa-",
+      "depth": 5,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [],
+      "children": 2,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "MXc9azlP2KWSpasdPpwP2",
+      "depth": 6,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "0Fg3vs14rNkgNo2UaSu7e",
+      "depth": 6,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "jUrfhx_TKqDvwT-1pcjwk",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "ai-spot-card"
+      ],
+      "children": 2,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "mQkOw8GB1_lYBLOBBTWmx",
+      "depth": 5,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "ai-spot-card-icon"
+      ],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "JX2Wnidsp90jVBIg84fPZ",
+      "depth": 6,
+      "reachable": true,
+      "moduleId": "base.svg",
+      "classIds": [
+        "icon-tt"
+      ],
+      "children": 0,
+      "propKeys": [
+        "svg",
+        "title"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "gju-p552R2GULrsQbptyp",
+      "depth": 5,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [],
+      "children": 2,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "PwiO3e5zuyDvAI_Vgi7qq",
+      "depth": 6,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "9DsskiiaVDrKezzaZbm7N",
+      "depth": 6,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "7mEFhvIUUo1jSUup4sB1V",
+      "depth": 1,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "ai-glow-line"
+      ],
+      "children": 0,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "iPGUVMBJJpO6_vSH849Rr",
+      "depth": 1,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "phase-void"
+      ],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "mXxkaMVqpO4_4L8TAGtCf",
+      "depth": 2,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "void-text"
+      ],
+      "children": 28,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "JpGR0y9TUC-uLAtFO51w2",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [
+        "rw"
+      ],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "Qi7RPNJ1HSkHPSEUxDFAB",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [
+        "rw"
+      ],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "quPA5hLTHFfkxxVy58sPc",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [
+        "rw"
+      ],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "vYHaik4vQky7xLtLh-TIB",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [
+        "rw"
+      ],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "jXlYM7xOUn0dK0ng66skb",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [
+        "rw"
+      ],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "A5NYJ0eptuQvIdJV0hKq7",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [
+        "rw"
+      ],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "_E8wOIkzj209ZUuoRyvs0",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [
+        "ra"
+      ],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "d1DuEhvktWyexQCu4viVI",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [
+        "ra"
+      ],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "DfgRQJH1iDMowcoSxRRdy",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [
+        "rw"
+      ],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "4trsmtRZVJ8RchLDSgVoM",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [
+        "rw"
+      ],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "__x7eudO8Es2yQ6TKOnbl",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [
+        "rw"
+      ],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "4cP5oo6FDP1xLTJNb-rRu",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [
+        "rw"
+      ],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "vB-dFTJbosS1o0gCkF6oa",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [
+        "rw"
+      ],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "Iu4rfkBkqrlN5Z9EpUpUd",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [
+        "rw"
+      ],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "Bl0XQlr0kqgurKjSC-6Vq",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [
+        "rw"
+      ],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "uGPmq1pDd082CatmqjT7q",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [
+        "rw"
+      ],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "KeOYWTVWRegmzKehrzzda",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [
+        "rw"
+      ],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "lAg7GuFFZecHUEWmMJ4MY",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [
+        "rw"
+      ],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "ywAxyL210IKpElR8jQevd",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [
+        "ra"
+      ],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "sSZ9eM-dhnVAmBooRjmGa",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [
+        "ra"
+      ],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "engD_t58AB-RNGwN4MfH1",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [
+        "rw"
+      ],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "vI8TzHHG38q-zAbArQ1SE",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [
+        "rw"
+      ],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "Jy4lppkaIUSFx1zpQY4CD",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [
+        "ra"
+      ],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "A1QbLnfxkcIbSeIA2KEnS",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [
+        "ra"
+      ],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "GP9GCNEbCiuSbmRQb4CFQ",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [
+        "rw"
+      ],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "Jiiy3EKct_EbqKXiF2SK1",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [
+        "rw"
+      ],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "DIaCElDVPOyQTrHK0idzN",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [
+        "rw"
+      ],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "8s3gN0uAM8uo7GOj33e1S",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [
+        "rw"
+      ],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "0IUhbm2VbUG2djMLVg-nz",
+      "depth": 1,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "phase-pillars"
+      ],
+      "children": 9,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "METLRvysWoa7PWPU1RHNg",
+      "depth": 2,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "bg-pattern-grid"
+      ],
+      "children": 0,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "0rVLdUjZTWjD3t_rz2Ovm",
+      "depth": 2,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "pillars-label"
+      ],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "CqF0oHNt6rabCzYpfwGsz",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "Ox1s65lYnIbshTUsosp_n",
+      "depth": 2,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "pillar"
+      ],
+      "children": 3,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "qWHii5vT3Xa9VrPb0XPue",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [
+        "pillar-num"
+      ],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "yoTgExR_TwOqMYRp1MsXd",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "pillar-title"
+      ],
+      "children": 3,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "V_7GE8x7vz_ZXv7CyPPxI",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "ZTpwTDB_sT9HsPuVdDNXm",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [
+        "fade-accent"
+      ],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "3XilJ6KeS0wHge0CJmHIB",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "wiq-x0jFhtbatuMi7GYWS",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [
+        "pillar-desc"
+      ],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "osCdpx1BYUNqq9OPDuNL4",
+      "depth": 2,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "pillar"
+      ],
+      "children": 3,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "FBmGeQdknpI9ZHZv1-qXq",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [
+        "pillar-num"
+      ],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "Germ4oEv5aaRiDXvvVyT2",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "pillar-title"
+      ],
+      "children": 2,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "KtixvKriFHBi7Yv20ZlCh",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [
+        "fade-accent"
+      ],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "1FX-BgJ_nqzk5TrIHeb3M",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "-tuZaK6TcxPGqBfbcaHxw",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [
+        "pillar-desc"
+      ],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "Ucvece2zN2Q3u-acfzEND",
+      "depth": 2,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "pillar"
+      ],
+      "children": 3,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "_0DLC-WRRk-8bW81SCqed",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [
+        "pillar-num"
+      ],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "yNoG_6dZipArLYgxJI3Gf",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "pillar-title"
+      ],
+      "children": 2,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "AO8tQo6_lz9oNEDQ_anF7",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "GKVaESBMhCYNtvRE-tIbU",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [
+        "fade"
+      ],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "CdqgSDFCFT-yDeU7owL7T",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [
+        "pillar-desc"
+      ],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "SzHV7KsBZgZSRcd5VWpIM",
+      "depth": 2,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "pillar"
+      ],
+      "children": 3,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "6zwgOxPFvz8mALyAdFXf7",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [
+        "pillar-num"
+      ],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "jRJOHEi_NT_ijUMAjLap4",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "pillar-title"
+      ],
+      "children": 3,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "Uda5s6YzhSvqvFnmfYgQc",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "0-eihunA79c5qRUwZyOrc",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [
+        "fade-accent"
+      ],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "wIHrPVIomMuZ24yALBFxF",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "QJOCzTAsZYgTog-BedVze",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [
+        "pillar-desc"
+      ],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "RU8qRQylc-vJYQzYnmcCU",
+      "depth": 2,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "pillar"
+      ],
+      "children": 3,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "DGBkCnIfBctfTBox6gojd",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [
+        "pillar-num"
+      ],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "qUt5uV8-7BzIXOsHaisjy",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "pillar-title"
+      ],
+      "children": 2,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "JW2MK1l9baxaKVclmR-q2",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [
+        "fade"
+      ],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "BdqkkyLXjqr-PCVtxB3UR",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "T0JGat0SFJji06IKNPrVT",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [
+        "pillar-desc"
+      ],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "1kvoMYizv5X8bAP168zRS",
+      "depth": 2,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "pillar"
+      ],
+      "children": 3,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "v6AC5skCK6Gai6o5tyCvU",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [
+        "pillar-num"
+      ],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "gzmxY8D3d_nY7E5B4jnh0",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "pillar-title"
+      ],
+      "children": 2,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "h-OTEu4Nb-XEH9kw4Dz5G",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "Ltexiyqn0PU2VaeR0xiRI",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [
+        "fade-accent"
+      ],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "BrDWDTZKfGAYIQd1uobJh",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [
+        "pillar-desc"
+      ],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "92V3PH4pQE0KjI_UWLiRn",
+      "depth": 2,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "pillar"
+      ],
+      "children": 3,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "pTkxQ2ve9lS3kPv-qSPvu",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [
+        "pillar-num"
+      ],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "z5FL95pgfVBXmfAalJx_g",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "pillar-title"
+      ],
+      "children": 3,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "jlZ6ef0Bs0Q46I73CS1AZ",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "tlQq3hTyU16dNeZMeDWWZ",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [
+        "fade"
+      ],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "vHKMv1Z1Vh6Cc4_HaWSj4",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "PhrzTh-2NimwA-I7QOm-x",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [
+        "pillar-desc"
+      ],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "-EQ5NGV2jQGh8CfClq2xs",
+      "depth": 1,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "phase-brand"
+      ],
+      "children": 5,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "GgxcOYzUWgCW3LNGT2Hw1",
+      "depth": 2,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "bg-pattern-grid"
+      ],
+      "children": 0,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "7zj42wvp02DtJkcUDa8rX",
+      "depth": 2,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [
+        "brand-pre"
+      ],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "xQ2QIzhMV0vTyGOnxX1nU",
+      "depth": 2,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [
+        "brand-title"
+      ],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "2A1Iec2HIAyhMZltiTS4R",
+      "depth": 2,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [
+        "brand-sub"
+      ],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "OoZMGExW47NIwUc14zvvV",
+      "depth": 2,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "fbs01wvVi8wLXI_Ia8nen",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.svg",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "svg",
+        "title"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "aSdmrngwcuS8g78FnA_1K",
+      "depth": 1,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "phase-dives"
+      ],
+      "children": 2,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "JOphOMZ07Wl4qtdsQSi-j",
+      "depth": 2,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "dives-header"
+      ],
+      "children": 2,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "wDmGrgAj4MQpYRy-uOYR6",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "LE9H1UuMHpvxikmrwYuUK",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "fKlXNtsqcHSd2WZJBbM3G",
+      "depth": 2,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "bento-figma"
+      ],
+      "children": 2,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "_7WRa2thRf_o6vjjJzo0u",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "bf-left"
+      ],
+      "children": 2,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "B2hroXWjPJmY59gkh2_Qw",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "bf-row-top"
+      ],
+      "children": 4,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "wXcn2MAuUGLkU964kAgMp",
+      "depth": 5,
+      "reachable": true,
+      "moduleId": "base.link",
+      "classIds": [
+        "bf-card",
+        "bf-325"
+      ],
+      "children": 2,
+      "propKeys": [
+        "href",
+        "htmlAttributes",
+        "target"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "IEmB9A1zSgLBtVBYrAREa",
+      "depth": 6,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [],
+      "children": 3,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "yCynaNkhcxrg9yFpjD6re",
+      "depth": 7,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [
+        "bf-num"
+      ],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "qruwtnE2sRhZB8DUpMF5o",
+      "depth": 7,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "8YH9yeuULABcA6ALi0TP8",
+      "depth": 7,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "v7oL3EMifJzMJ1p1c6nVP",
+      "depth": 6,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [
+        "bf-link"
+      ],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "sbxq7_WtcxWbhuYE_Yw0C",
+      "depth": 5,
+      "reachable": true,
+      "moduleId": "base.link",
+      "classIds": [
+        "bf-card",
+        "bf-439",
+        "bf-featured"
+      ],
+      "children": 2,
+      "propKeys": [
+        "href",
+        "htmlAttributes",
+        "target"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "GdvCR1hs41UZrdbliAijz",
+      "depth": 6,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [],
+      "children": 3,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "IMyAGhelAp6Sq7bn-OHpq",
+      "depth": 7,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [
+        "bf-num"
+      ],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "jWaDNkwyIobuQ4KXusqkZ",
+      "depth": 7,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "AjCdzQ_VVFy01riUmiUAU",
+      "depth": 7,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "3RFhlCPaO7Izj0sdIDQXP",
+      "depth": 6,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [
+        "bf-link"
+      ],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "7yu-Z-vPdpH1Ft5_upddt",
+      "depth": 5,
+      "reachable": true,
+      "moduleId": "base.link",
+      "classIds": [
+        "bf-card",
+        "bf-325"
+      ],
+      "children": 2,
+      "propKeys": [
+        "href",
+        "htmlAttributes",
+        "target"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "FsgUxctKz9-ZWkNIAVeRA",
+      "depth": 6,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [],
+      "children": 3,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "W8fybEsSr_ALYv_1jKrIS",
+      "depth": 7,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [
+        "bf-num"
+      ],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "cInEnqfNLWA2Lc8qPcASK",
+      "depth": 7,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "I1iETZriHOeLNUtkuaNjI",
+      "depth": 7,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "2XflpVnPCFW2a0C2G7XJK",
+      "depth": 6,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [
+        "bf-link"
+      ],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "LcRIOaJN71ayhXcyqp2fN",
+      "depth": 5,
+      "reachable": true,
+      "moduleId": "base.link",
+      "classIds": [
+        "bf-card",
+        "bf-439"
+      ],
+      "children": 2,
+      "propKeys": [
+        "href",
+        "htmlAttributes",
+        "target"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "yfQc1I7gVsQZV7uBLf-bg",
+      "depth": 6,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [],
+      "children": 3,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "4rJTACDp5KmAvyqUtAwNr",
+      "depth": 7,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [
+        "bf-num"
+      ],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "UVdspyi7wmZHdLzE6rGTS",
+      "depth": 7,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "uNpQNFb0ZtYKpteHUTLKP",
+      "depth": 7,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "JP-tMwEOD6OMM5RPxmNcS",
+      "depth": 6,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [
+        "bf-link"
+      ],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "GCDCkY1dlPVuovvJ4Bpry",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "bf-row-bot"
+      ],
+      "children": 2,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "-UhF83L_wtwer0lKEpurD",
+      "depth": 5,
+      "reachable": true,
+      "moduleId": "base.link",
+      "classIds": [
+        "bf-card",
+        "bf-476"
+      ],
+      "children": 2,
+      "propKeys": [
+        "href",
+        "htmlAttributes",
+        "target"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "75XtJVM4K4Ubzb3u51G5g",
+      "depth": 6,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [],
+      "children": 3,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "3-svFEusA6LcnhcNMhotN",
+      "depth": 7,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [
+        "bf-num"
+      ],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "PqP5XuGSqQdD1nwDgW23w",
+      "depth": 7,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "JS8cNYXuJsBiBbeO81yaq",
+      "depth": 7,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "Y3tkBqZQLs7t9ioKFI9_B",
+      "depth": 6,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [
+        "bf-link"
+      ],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "xxRkZE58azHo_v0-qVAmg",
+      "depth": 5,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "bf-card",
+        "bf-288",
+        "bf-brand"
+      ],
+      "children": 2,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "b0ELp-oBrp78cONA-vChA",
+      "depth": 6,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [
+        "bf-brand-mini"
+      ],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "5lHjRGC9MGmBBprx1fQlA",
+      "depth": 6,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [],
+      "children": 3,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "Si9dt3DNpHDxT4cZKuv9R",
+      "depth": 7,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "_zaiG6s5BoXAbKJj-1GJP",
+      "depth": 7,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "LiBHcCKkHRJy0i7P77fE9",
+      "depth": 7,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "HZWVI9pI9ffW5-4P8b9xJ",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "bf-right"
+      ],
+      "children": 2,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "lI11oFAyq5R9UIsfQs5lf",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.link",
+      "classIds": [
+        "bf-card",
+        "bf-324-tall",
+        "bf-tall-product"
+      ],
+      "children": 2,
+      "propKeys": [
+        "href",
+        "htmlAttributes",
+        "target"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "H0v6H0RAKy-lnh4B4Oi0-",
+      "depth": 5,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "bf-tall-art"
+      ],
+      "children": 2,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "kDLtR291DMgpJSJJHnjEO",
+      "depth": 6,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [
+        "bf-orb",
+        "m"
+      ],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "G6wjFSGa4UZTJ0UPCK2_5",
+      "depth": 6,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [
+        "bf-orb",
+        "s"
+      ],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "6QvisZj2QwWgrArVBvo-C",
+      "depth": 5,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "bf-tall-content"
+      ],
+      "children": 4,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "x6CIRJOwDi16oRl5A7XtZ",
+      "depth": 6,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [
+        "bf-num"
+      ],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "KsqGGGjCeEZ1B2iQ1RAUb",
+      "depth": 6,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "_LZd7uwDk3tKxIMoqF3Nz",
+      "depth": 6,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "foWlM1wGj7UQWySOr6tD-",
+      "depth": 6,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [
+        "bf-link"
+      ],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "cea3C2T2Q0_Qk9Um7OxO6",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.link",
+      "classIds": [
+        "bf-card",
+        "bf-324-xtall",
+        "bf-tall-product",
+        "bf-eco"
+      ],
+      "children": 2,
+      "propKeys": [
+        "href",
+        "htmlAttributes",
+        "target"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "FPNbA54OoWrMTogAnw7oh",
+      "depth": 5,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "bf-tall-art"
+      ],
+      "children": 3,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "ZvQVsJ-gX92THZBRgIZLW",
+      "depth": 6,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [
+        "bf-orb",
+        "l"
+      ],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "CWdbKXJG61ajXFgT0AmbL",
+      "depth": 6,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [
+        "bf-orb",
+        "m"
+      ],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "8YpoFbOBKK609deHd07hh",
+      "depth": 6,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [
+        "bf-orb",
+        "s"
+      ],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "4gZJBI3dzg3-kvI3Kq4Id",
+      "depth": 5,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "bf-tall-content"
+      ],
+      "children": 4,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "tFDWzAp6N4ELCZpvZBeMo",
+      "depth": 6,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [
+        "bf-num"
+      ],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "jgm0ChoiLjqZaV8HaUcng",
+      "depth": 6,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "4r6kpb7OP3lmX9NtAGhMM",
+      "depth": 6,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "cVyAS5HPETg4UGTcDWIrk",
+      "depth": 6,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [
+        "bf-link"
+      ],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "sOUdeyZAuEEKyodd7TBfg",
+      "depth": 1,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "phase-trust"
+      ],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "jmHx9eZXhnPYkj5wRDFSX",
+      "depth": 2,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "trust-grid"
+      ],
+      "children": 27,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "KAtotNK4PoFFdddVphlyQ",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "trust-grid-label"
+      ],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "KQMPo93kPlb1lDGD0ajBX",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "sIzzn7hZINoDbg98iPRn0",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "trust-partner"
+      ],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "mcvX1rFZjq3arrS_q8_q1",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "logo-card"
+      ],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "nbrxsmjxCukPDwn-O9KnM",
+      "depth": 5,
+      "reachable": true,
+      "moduleId": "base.image",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "decoding",
+        "fetchPriority",
+        "htmlAttributes",
+        "loading",
+        "src"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "VH11NiF490eyjIDy7rkeA",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "trust-partner"
+      ],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "DwYK9o5ejXquyD4SL4dz5",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "logo-card"
+      ],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "rXnX9V6Hn6umO5uhOW5H1",
+      "depth": 5,
+      "reachable": true,
+      "moduleId": "base.image",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "decoding",
+        "fetchPriority",
+        "htmlAttributes",
+        "loading",
+        "src"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "GXUfpaA4etlf71oiDdPdc",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "trust-partner"
+      ],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "07_TdoXoeuC4eJcXx4Ksd",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "logo-card"
+      ],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "utMfde5Y7fEBZl2XMjvLl",
+      "depth": 5,
+      "reachable": true,
+      "moduleId": "base.image",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "decoding",
+        "fetchPriority",
+        "htmlAttributes",
+        "loading",
+        "src"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "uBTTLpQDc4JII0gbdFcFo",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "trust-partner"
+      ],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "GKdL8EZDJtX0YvIaWM2-h",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "logo-card"
+      ],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "iV3hwvsklLBINjccA_e1r",
+      "depth": 5,
+      "reachable": true,
+      "moduleId": "base.image",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "decoding",
+        "fetchPriority",
+        "htmlAttributes",
+        "loading",
+        "src"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "lCMRzQx2iWbxp7DXXsJ3x",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "trust-partner"
+      ],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "asVPd6Cm49dqIHGJFmxji",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "logo-card"
+      ],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "ThE7-8He1pqtFd3_ove_i",
+      "depth": 5,
+      "reachable": true,
+      "moduleId": "base.image",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "decoding",
+        "fetchPriority",
+        "htmlAttributes",
+        "loading",
+        "src"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "F4Laim3j2bfYeD2IkkcG3",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "trust-partner"
+      ],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "pcc3MTwxHF4EDEWqImZa4",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "logo-card"
+      ],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "3n1tn8E_T9LyL-_j-unJh",
+      "depth": 5,
+      "reachable": true,
+      "moduleId": "base.image",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "decoding",
+        "fetchPriority",
+        "htmlAttributes",
+        "loading",
+        "src"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "wKfA9RFh2Ut6M3wbcp3qW",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "trust-partner"
+      ],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "LsoXda0rm7peT5e3IjSux",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "logo-card"
+      ],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "GwLgcXWfTKVTTv4ztDJEw",
+      "depth": 5,
+      "reachable": true,
+      "moduleId": "base.image",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "decoding",
+        "fetchPriority",
+        "htmlAttributes",
+        "loading",
+        "src"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "hBD4OBrbI-IsAbo2Kkk1o",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "trust-partner"
+      ],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "gPw3gTczyOJ-XXAWg7Yol",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "logo-card"
+      ],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "3gQ7yyJflfIsLgOw4zi3n",
+      "depth": 5,
+      "reachable": true,
+      "moduleId": "base.image",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "decoding",
+        "fetchPriority",
+        "htmlAttributes",
+        "loading",
+        "src"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "M9AVUgnFSh6xjvXsHuiTf",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "trust-partner"
+      ],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "blYbnCjYRsTRAi3Ydwv5U",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "logo-card"
+      ],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "9ciCDlWpmyslFFaK4dM-K",
+      "depth": 5,
+      "reachable": true,
+      "moduleId": "base.image",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "decoding",
+        "fetchPriority",
+        "htmlAttributes",
+        "loading",
+        "src"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "E6ik4FaIYqjAn6znFG2WZ",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "trust-partner"
+      ],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "iwojJItZoVwYSLNcKW37o",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "logo-card"
+      ],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "b8-V_hg2zlXj-QkcRxtJ5",
+      "depth": 5,
+      "reachable": true,
+      "moduleId": "base.image",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "decoding",
+        "fetchPriority",
+        "htmlAttributes",
+        "loading",
+        "src"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "Ou5rYTIHVm-wWWUGyBHy0",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "trust-partner"
+      ],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "oeiUulyXM8Iw0CDYnGkJM",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "logo-card"
+      ],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "pt7_J-iYFGmZMQkZ3N0rB",
+      "depth": 5,
+      "reachable": true,
+      "moduleId": "base.image",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "decoding",
+        "fetchPriority",
+        "htmlAttributes",
+        "loading",
+        "src"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "0IttlrlkreCdYpSFPMs5P",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "trust-partner"
+      ],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "EzxET5THwinNLJTf5dXSo",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "logo-card"
+      ],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "euFJzltbqCQlEVUEUbawV",
+      "depth": 5,
+      "reachable": true,
+      "moduleId": "base.image",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "decoding",
+        "fetchPriority",
+        "htmlAttributes",
+        "loading",
+        "src"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "Ui5F-jAcYtsqVUKD0EJie",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "trust-partner"
+      ],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "zGUMdfudGiBpw9MFK2auf",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "logo-card"
+      ],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "bouvyXvBdjP-zOqyikaXG",
+      "depth": 5,
+      "reachable": true,
+      "moduleId": "base.image",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "decoding",
+        "fetchPriority",
+        "htmlAttributes",
+        "loading",
+        "src"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "hEcenac8uRGe_8wzbGgak",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "trust-partner"
+      ],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "OjfqKQsf2U23daqpxTwzY",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "logo-card"
+      ],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "khyvkxpMXPYh7AuUk0L-r",
+      "depth": 5,
+      "reachable": true,
+      "moduleId": "base.image",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "decoding",
+        "fetchPriority",
+        "htmlAttributes",
+        "loading",
+        "src"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "Wr40WFzHWYwGVrdHskViE",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "trust-partner"
+      ],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "StEk9EOQbxRxX88QVneXF",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "logo-card"
+      ],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "b_eEDnTHpUMEza0_x3qql",
+      "depth": 5,
+      "reachable": true,
+      "moduleId": "base.image",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "decoding",
+        "fetchPriority",
+        "htmlAttributes",
+        "loading",
+        "src"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "2aOdi4QO_zGJwHO7kFWK9",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "trust-partner"
+      ],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "YXlapFVnHvbUB5-YEktXj",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "logo-card"
+      ],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "OLA6wRj2ejL_89Fas_Hb2",
+      "depth": 5,
+      "reachable": true,
+      "moduleId": "base.image",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "decoding",
+        "fetchPriority",
+        "htmlAttributes",
+        "loading",
+        "src"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "xQL6Mp0fVRlDgNjU6g8Sr",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "trust-partner"
+      ],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "Nurlio3MVITTD_tErPeaC",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "logo-card"
+      ],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "3nCSduuFITnYo_lR-Uwcy",
+      "depth": 5,
+      "reachable": true,
+      "moduleId": "base.image",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "decoding",
+        "fetchPriority",
+        "htmlAttributes",
+        "loading",
+        "src"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "3jDTKdbSlCiIbEONxPQxo",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "trust-partner"
+      ],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "TATjoJqQ78OL6gdaRXz6-",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "logo-card"
+      ],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "sy9kwKZkfR8ksxCm2WEmS",
+      "depth": 5,
+      "reachable": true,
+      "moduleId": "base.image",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "decoding",
+        "fetchPriority",
+        "htmlAttributes",
+        "loading",
+        "src"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "0bPI5XjnTgEjeGXACg0We",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "trust-partner"
+      ],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "-OvNMvQnvprYMLDWBGe2g",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "logo-card"
+      ],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "O5FLB9Dlkq6R5_s4iBqT6",
+      "depth": 5,
+      "reachable": true,
+      "moduleId": "base.image",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "decoding",
+        "fetchPriority",
+        "htmlAttributes",
+        "loading",
+        "src"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "XrSk7YFue6mddAZ67il2u",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "trust-partner"
+      ],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "spxW0qZlxe1tS18WkyjWO",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "logo-card"
+      ],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "raX2L0xygxZEN0ylMwzHa",
+      "depth": 5,
+      "reachable": true,
+      "moduleId": "base.image",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "decoding",
+        "fetchPriority",
+        "htmlAttributes",
+        "loading",
+        "src"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "vqUGpnohielPlg1G0Fy51",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "trust-partner"
+      ],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "6qMYhbd50My5Nl99XsK3b",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "logo-card"
+      ],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "jUhIv6fzWeYXC3ZGyqqab",
+      "depth": 5,
+      "reachable": true,
+      "moduleId": "base.image",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "decoding",
+        "fetchPriority",
+        "htmlAttributes",
+        "loading",
+        "src"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "Cr30d6yT0qLW7CvJrM4ws",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "trust-partner"
+      ],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "DBM2dS8mjgUtKFS_5xh_x",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "logo-card"
+      ],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "2OU8SBCfgiCTfsIneq5ZF",
+      "depth": 5,
+      "reachable": true,
+      "moduleId": "base.image",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "decoding",
+        "fetchPriority",
+        "htmlAttributes",
+        "loading",
+        "src"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "Eq8dmePPr551DPR92tyhw",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "trust-partner"
+      ],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "GY2_vBlsT5Cm2UlFZo1_D",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "logo-card"
+      ],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "Wu_sAZls-aQOJz0eGmTAE",
+      "depth": 5,
+      "reachable": true,
+      "moduleId": "base.image",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "decoding",
+        "fetchPriority",
+        "htmlAttributes",
+        "loading",
+        "src"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "jIamWdtU7iPwbpbp_Hasy",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "trust-partner"
+      ],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "AwWpkCTf1_GlIaoc3KT5M",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "logo-card"
+      ],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "ryj_XF10moZlFUicvtLij",
+      "depth": 5,
+      "reachable": true,
+      "moduleId": "base.image",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "decoding",
+        "fetchPriority",
+        "htmlAttributes",
+        "loading",
+        "src"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "t1_-wQKTXqaPMqKDWwtzx",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "trust-partner"
+      ],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "7F3_aV2QHzLzNEYh-HOUt",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "logo-card"
+      ],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "v9p1gL5VqZkmb8nNhO2nc",
+      "depth": 5,
+      "reachable": true,
+      "moduleId": "base.image",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "decoding",
+        "fetchPriority",
+        "htmlAttributes",
+        "loading",
+        "src"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "nNJHt-W6lnEksoRJ5-kVz",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "trust-partner",
+        "trust-partner--more"
+      ],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "BUeVjTcepMkcesQvmWKGu",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "logo-card"
+      ],
+      "children": 2,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "N7XMUYI76YMlpwpwYF4DN",
+      "depth": 5,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [
+        "tp-num"
+      ],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "W0HqpEibVm2_8hdcZ45R5",
+      "depth": 5,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "tp-text"
+      ],
+      "children": 3,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "lAf2LSLEvzBRm_rPaUvND",
+      "depth": 6,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "DzyP5yOZ4N9X6X_wS34Si",
+      "depth": 6,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "oOXAv9jqSh2l851sL6IDp",
+      "depth": 6,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "nY8nWLGM-lcAzreAhGn4O",
+      "depth": 1,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "stats"
+      ],
+      "children": 4,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "3dU8oIUAPnd4-wiWcDFvS",
+      "depth": 2,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "stat"
+      ],
+      "children": 2,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "h2brW6j4_4AutoQ217PgB",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "stat-num"
+      ],
+      "children": 2,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "knVKkkT6-KUC0Vd1riNKV",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "yfE_dpwmpAeTcmufcpPoL",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [
+        "red"
+      ],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "5zcy25ZOIibRV4kVF3WNA",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "stat-label"
+      ],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "BMXgfWYmtX4WHkav1Il-N",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "SidwF-PwsiH3RHvMe3ZsU",
+      "depth": 2,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "stat"
+      ],
+      "children": 2,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "bmoPC09ZVNg4Fj3GaWE2F",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "stat-num"
+      ],
+      "children": 2,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "aUs6Aeai2qfFdBIDTgxbV",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "ZTsEIp4DvkJL0rSpHeWy6",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [
+        "red"
+      ],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "Ae7EENGYzvuCQ4KCkyWy8",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "stat-label"
+      ],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "vGDxz0RQBcliGuiDI3Ed9",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "o02u5vc8harGwxN6Lmz0q",
+      "depth": 2,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "stat"
+      ],
+      "children": 2,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "jQGwgukESR67W9JTbVWgW",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "stat-num"
+      ],
+      "children": 2,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "7tHnEEAL-rDl4mmUQ7f1U",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "5jwiKCIYf_96OLI99zNO_",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [
+        "red"
+      ],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "m2KGY3vln83l3zYw_Fbza",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "stat-label"
+      ],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "nrqObe5cy35aY4X1-kJMp",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "0DHz-YB0v-mwyXAi75Jsj",
+      "depth": 2,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "stat"
+      ],
+      "children": 2,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "3kT7rWEICicP5gaIEod6x",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "stat-num"
+      ],
+      "children": 2,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "ihQCOP30S2nQHTBbO8jhH",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "H2uQ_b_XnLJtRayQS3H-C",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [
+        "red"
+      ],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "MUge8K7SqoxWzR2vAp2Cx",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "stat-label"
+      ],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "UoKq12okljIflcE53qP5j",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "RlwNapNKclFcmtbYuxWio",
+      "depth": 1,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "testimonial"
+      ],
+      "children": 3,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "dI8X2NRkiHQuUzJcdXaON",
+      "depth": 2,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "testi-label"
+      ],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "EecOKmxILNLOZu48jVD0e",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "NV7cO4a-mtJRme9MBooj7",
+      "depth": 2,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [
+        "testi-heading"
+      ],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "RzlkvlZRSZ7kzq8vO_Buu",
+      "depth": 2,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "testi-card"
+      ],
+      "children": 3,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "XAMifRjWq6BZ83ScBqcJM",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [
+        "testi-quote"
+      ],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "blvAm69yIGnF5CX_efPzV",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "testi-author"
+      ],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "0UdgvKzw0kHYMUKaCupeg",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "Gs5v_bUd-0E5qkKQ-7qfX",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "testi-role"
+      ],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "4NC1wLmgfplF9xsvP3Ooh",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "fkt-uLyYfUc2TG67jdxnT",
+      "depth": 1,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "cta"
+      ],
+      "children": 3,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "Hm_PLqjhK58m4FJQ-cHW3",
+      "depth": 2,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [],
+      "children": 3,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "mE6NBykc-PFpOScmg9JvA",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "rLeLHNDGcKa72VK6UGb0v",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "769EN_IIXCRKvSsyT0LuU",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "YLcuZ4CAy3AymtcJ1B11K",
+      "depth": 2,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "ThqafhMYbZcIgInggF59k",
+      "depth": 2,
+      "reachable": true,
+      "moduleId": "base.link",
+      "classIds": [
+        "btn-primary"
+      ],
+      "children": 2,
+      "propKeys": [
+        "href",
+        "htmlAttributes",
+        "target"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "DdtO6bGGJU4kEBTqTk9aq",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "6ujxjxq6axfjJj0LOmlkW",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.svg",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "svg",
+        "title"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "W-PMJfXD5ayAGj_UuCBHj",
+      "depth": 1,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "footer"
+      ],
+      "children": 3,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "KklyXUyOc-wokAy0wO-Tr",
+      "depth": 2,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "footer-grid"
+      ],
+      "children": 4,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "pvetmUX5HGwfw7WLq0LeD",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "footer-brand"
+      ],
+      "children": 3,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "u6f_IP7_f57OSEkeFKStz",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.link",
+      "classIds": [
+        "nav-logo"
+      ],
+      "children": 1,
+      "propKeys": [
+        "href",
+        "htmlAttributes",
+        "target"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "FdNVvq5Pdv12X-Cs3LWb4",
+      "depth": 5,
+      "reachable": true,
+      "moduleId": "base.image",
+      "classIds": [
+        "brand-mark"
+      ],
+      "children": 0,
+      "propKeys": [
+        "decoding",
+        "fetchPriority",
+        "htmlAttributes",
+        "loading",
+        "src"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "3Vd4EBQ0wGRWO3lFiWC8G",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "1LHQfZc67nFWE0Tt7o2bG",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "footer-social"
+      ],
+      "children": 3,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "NRHB1CbINKJSftdbyBGB1",
+      "depth": 5,
+      "reachable": true,
+      "moduleId": "base.link",
+      "classIds": [],
+      "children": 1,
+      "propKeys": [
+        "href",
+        "htmlAttributes",
+        "target"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "I0o33whECmhe7us0CPBQW",
+      "depth": 6,
+      "reachable": true,
+      "moduleId": "base.svg",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "svg",
+        "title"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "dMEDRZzNrib0IrH7fy4mL",
+      "depth": 5,
+      "reachable": true,
+      "moduleId": "base.link",
+      "classIds": [],
+      "children": 1,
+      "propKeys": [
+        "href",
+        "htmlAttributes",
+        "target"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "5tr9iV1ZxHma4OJChA7f7",
+      "depth": 6,
+      "reachable": true,
+      "moduleId": "base.svg",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "svg",
+        "title"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "4NogRb6WJPANTMq2tW0Uw",
+      "depth": 5,
+      "reachable": true,
+      "moduleId": "base.link",
+      "classIds": [],
+      "children": 1,
+      "propKeys": [
+        "href",
+        "htmlAttributes",
+        "target"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "V7_vNuLmaMO32hd12e7wb",
+      "depth": 6,
+      "reachable": true,
+      "moduleId": "base.svg",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "svg",
+        "title"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "2QwKyAHR_Bb5n6VFver_Y",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "footer-col"
+      ],
+      "children": 10,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "BC_NV_ZhJ0Ik83pPiR4Pa",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "rxkF3DIPOkS62X6-47mkK",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.link",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "href",
+        "htmlAttributes",
+        "target",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "O6UwfxM7OQ5H86PbnyVFn",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.link",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "href",
+        "htmlAttributes",
+        "target",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "6X8XUl5nrF0uXHLTEStso",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.link",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "href",
+        "htmlAttributes",
+        "target",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "CFC8yHPrzbLDCQossxGWo",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.link",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "href",
+        "htmlAttributes",
+        "target",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "h5Wk5aNnDvWZenRF8_MvU",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.link",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "href",
+        "htmlAttributes",
+        "target",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "pLXoQFdsCkbOD2M24f0Uw",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.link",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "href",
+        "htmlAttributes",
+        "target",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "_qBnPwAA2FPkgRWms3A7i",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.link",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "href",
+        "htmlAttributes",
+        "target",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "OuXenN02TE7ClrLR9HX6D",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.link",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "href",
+        "htmlAttributes",
+        "target",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "DJlBLq1KWuraJSHXGBGi0",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.link",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "href",
+        "htmlAttributes",
+        "target",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "n10-UuF9ct0EHams7Fnze",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "footer-col"
+      ],
+      "children": 8,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "mKm1gw69pmSODyuvk2aEX",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "pn8wvva5GmRXSbVuuxPm0",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.link",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "href",
+        "htmlAttributes",
+        "target",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "PtgJkYsUw8hH6HICNQXNP",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.link",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "href",
+        "htmlAttributes",
+        "target",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "juVj1og_WNsM3gVFCreKe",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.link",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "href",
+        "htmlAttributes",
+        "target",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "WEsnkfRCiJi2-qvMrX49y",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.link",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "href",
+        "htmlAttributes",
+        "target",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "ZGMFeiAnlmJ3FBxHu4yIF",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.link",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "href",
+        "htmlAttributes",
+        "target",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "8-B1o64wTEXkVTV6ix2Iy",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.link",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "href",
+        "htmlAttributes",
+        "target",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "HM3IUlichv-wFqChoR9GW",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.link",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "href",
+        "htmlAttributes",
+        "target",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "81dJC1bPT5e_twkUaAZyf",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "footer-col"
+      ],
+      "children": 5,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "puSk1NvlPpE9i4_Eq2oQq",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "fWvRzMMYIdgf3QosBGKeh",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.link",
+      "classIds": [],
+      "children": 2,
+      "propKeys": [
+        "href",
+        "htmlAttributes",
+        "target"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "KASPiOkrf2UdU61178eaD",
+      "depth": 5,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "9dIg124-Pq5-ZOmR8nRbd",
+      "depth": 5,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "NoUw4kzw0J9WeGv30uI9U",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.link",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "href",
+        "htmlAttributes",
+        "target",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "pqoeytKXKScj_LMGJZebi",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "footer-address"
+      ],
+      "children": 4,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "qCPq6oFTwdN1D4GcBXKqP",
+      "depth": 5,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "ZANOhErxEkide6QDKq8dh",
+      "depth": 5,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "adyg_mJXt5f7AMekLqdIu",
+      "depth": 5,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "fm4d9PiXoMETwZldWYtNI",
+      "depth": 5,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "a7fI2WQ9hvOwW1U6Id9Gb",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "footer-address"
+      ],
+      "children": 6,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "UoFF4UUwNSHq9m8gis0yS",
+      "depth": 5,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "eajd5nK4JI2-Y5Ul3NkXj",
+      "depth": 5,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "85HTcNn-MDZ5yxD6l22SY",
+      "depth": 5,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "aX97kXFydB-uzm20YJCyw",
+      "depth": 5,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "OHvlWuvsUr1hHbTe2R6Np",
+      "depth": 5,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "GBkIe7cr4ysUzqUbRaRxa",
+      "depth": 5,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "fpdUaPQI9vZkNxYx6sLDR",
+      "depth": 2,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "footer-locations"
+      ],
+      "children": 2,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "5p7mjaVw0kwlsLjyseGmQ",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [
+        "fl-label"
+      ],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "GX2ORh_OfuXyhPn5eldk1",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [],
+      "children": 7,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "cjWPTzxmzucy0VtNyRXBX",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "sTEp_l7Biatt20SvW52br",
+      "depth": 5,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "73qQRq1OJ1e5kmMG38JMs",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "c17lFbdVYrooERJ1AQdkd",
+      "depth": 5,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "UWX2Lz6XJsoj39v9TU7y6",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "Pf-NrdPHz9Eq42FwqXoc0",
+      "depth": 5,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "lmQj1ehON8U06pmu67NId",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "06_Je3hjCXtifqw4xPf4E",
+      "depth": 5,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "ETXYAD4S--NdmhTTk-loR",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "tjb3oy__vQC5dUr8FhFRy",
+      "depth": 5,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "pBs00quvYrLPTEMij8JEk",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "cz2-Sv65Qe8F17qgO-Ysv",
+      "depth": 5,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "1kbcnwPYa-6rTIVb_BCRH",
+      "depth": 4,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [],
+      "children": 1,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "vxxBiR0SgqnvTrT5Zcki1",
+      "depth": 5,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "urXm62Tbw6T7hwWcsCVEv",
+      "depth": 2,
+      "reachable": true,
+      "moduleId": "base.container",
+      "classIds": [
+        "footer-bottom"
+      ],
+      "children": 2,
+      "propKeys": [
+        "customTag",
+        "htmlAttributes",
+        "tag"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "d68DGX80AkV15YBffBZY9",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.text",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "htmlAttributes",
+        "tag",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    },
+    {
+      "id": "WnE73panuSf5rKtBr84ho",
+      "depth": 3,
+      "reachable": true,
+      "moduleId": "base.link",
+      "classIds": [],
+      "children": 0,
+      "propKeys": [
+        "href",
+        "htmlAttributes",
+        "target",
+        "text"
+      ],
+      "hasDynamicBindings": false
+    }
+  ]
+}

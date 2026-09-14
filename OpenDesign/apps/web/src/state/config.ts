@@ -22,6 +22,7 @@ import {
   DEFAULT_SUCCESS_SOUND_ID,
 } from '../utils/notifications';
 import { randomUUID } from '../utils/uuid';
+import { applyManagedAiConfig } from './managed';
 
 const STORAGE_KEY = 'open-design:config';
 const CONFIG_MIGRATION_VERSION = 3;
@@ -656,7 +657,7 @@ function migrateRetiredKnownProviderModel(
   return true;
 }
 
-export function loadConfig(): AppConfig {
+function loadConfigRaw(): AppConfig {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) {
@@ -804,6 +805,19 @@ export function loadConfig(): AppConfig {
       orbit: normalizeOrbit(DEFAULT_ORBIT),
     };
   }
+}
+
+/**
+ * Read the persisted config, then force a managed session's execution fields to
+ * the operator-managed runtime.
+ *
+ * This is the ONE place that decides what a tenant runs on. `applyManagedAiConfig`
+ * is a no-op outside a managed session, and it is applied on the way OUT of the
+ * read rather than into storage, so the placeholders never get persisted — a
+ * tenant who later runs standalone still has their own config intact.
+ */
+export function loadConfig(): AppConfig {
+  return applyManagedAiConfig(loadConfigRaw());
 }
 
 interface PublicComposioConfigResponse {

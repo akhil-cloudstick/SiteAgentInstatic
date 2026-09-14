@@ -30,7 +30,7 @@ import {
 } from '../repositories/data/publish'
 import { renderPublishedDataRowTemplate } from './publicRenderer'
 import { applyPublishedHtmlPipeline } from './publishedHtmlPipeline'
-import { writeArtefact } from './staticArtefact'
+import { applyRoutePolicy, writeArtefact } from './staticArtefact'
 import { getLatestSnapshotForVersion } from './publishedSnapshotCache'
 import { snapshotForEntryRoute } from './entryTemplateSnapshot'
 
@@ -87,7 +87,10 @@ export async function bakePublishedDataRowArtefacts(
 
   for (const route of routes) {
     if (!hasEntryChain(route.tableSlug)) continue
-    const urlPath = publicRowPath(route.tableRouteBase, route.rowSlug)
+    const urlPath = applyRoutePolicy(
+      publicRowPath(route.tableRouteBase, route.rowSlug),
+      siteSnapshot.site.settings.trailingSlash,
+    )
     try {
       const row = await getPublishedDataRowByRoute(db, route.tableRouteBase, route.rowSlug)
       if (!row) continue

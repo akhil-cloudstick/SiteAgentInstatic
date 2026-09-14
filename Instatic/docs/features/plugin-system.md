@@ -206,6 +206,26 @@ Authors normally write `instatic-plugin.config.ts` with `definePlugin(...)`; the
 - Public routes require both `cms.routes` and `cms.routes.public`.
 - Server `fetch()` requires `network.outbound` and a matching `networkAllowedHosts[]` entry.
 
+### What the outbound guard does and does not stop
+
+`server/plugins/host/network.ts` checks the protocol, the host allowlist, and every
+resolved address against a blocklist of loopback / RFC1918 / link-local / CGNAT /
+unique-local ranges. It re-runs that whole check on **every redirect hop**, so an
+allowlisted host cannot bounce a request to an internal target.
+
+**It does not stop DNS rebinding.** The guard resolves the hostname and inspects the
+answers; the `fetch` that follows resolves it again, independently. A name whose DNS an
+attacker controls can answer with a public address for the check and a private one for the
+connection. Closing that means pinning the validated address into the connect, and Bun's
+`fetch` exposes no hook to do it — the alternative is a hand-rolled socket client
+re-implementing TLS verification and redirect semantics, which is more attack surface than
+the flaw.
+
+So the guard's honest guarantee is: **a plugin cannot name an internal address, and cannot
+be redirected to one.** The control that still holds under rebinding is the allowlist
+itself — an attacker needs a hostname the manifest already declares and a human already
+approved at install. Treat `networkAllowedHosts` as the boundary, not the IP check.
+
 ---
 
 ## Lifecycle
@@ -251,6 +271,17 @@ without installing it. Nothing runs and nothing is granted: the row in
 `uploads/plugins/_staged/<pluginId>/` are inert until an operator approves them
 through the normal `POST /plugins/package` path, which keeps its own
 `plugins.install` capability **and** step-up.
+
+Step-up on the install-class routes — install (JSON), install/upgrade (zip),
+pack install, uninstall — is **unconditional**: unlike most sensitive actions it
+ignores the caller's own `stepUpAuthMode`, so a user who has turned step-up off
+for themselves is still challenged here. These four routes run code inside the
+CMS, where the step-up is not a convenience trade-off about the caller's own
+account but the boundary protecting every site on the instance from a stolen
+session. The same rule already applies to the route that changes that setting.
+
+The read-only routes that share the capability — `inspect-package` and the
+staging endpoints — honour the user preference, because neither runs anything.
 
 Staging itself requires `plugins.install` but **not** step-up — the step-up
 belongs on the act that executes code, not on parking a file. One package per

@@ -43,6 +43,7 @@ import { prefetchMediaAssets } from './mediaPrefetch'
 import { applyPublishedHtmlPipeline } from './publishedHtmlPipeline'
 import {
   NOT_FOUND_ARTEFACT_URL_PATH,
+  applyRoutePolicy,
   prepareInactiveSlot,
   swapSlot,
   writeArtefact,
@@ -267,7 +268,10 @@ async function publishDraftSiteLocked(
       for (const snapshot of snapshots) {
         const page = snapshot.site.pages.find((p) => p.id === snapshot.pageRowId)
         if (!page || isTemplatePage(page)) continue // template pages only ever wrap; never baked at their own slug
-        const urlPath = page.slug === 'index' ? '/' : `/${page.slug}`
+        const urlPath = applyRoutePolicy(
+          page.slug === 'index' ? '/' : `/${page.slug}`,
+          publishedSite.settings.trailingSlash,
+        )
         try {
           const syntheticUrl = new URL(`http://localhost${urlPath}`)
           const rendered = await renderPublishedSnapshot(snapshot, {

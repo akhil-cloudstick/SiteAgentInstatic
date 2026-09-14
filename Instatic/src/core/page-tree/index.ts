@@ -27,6 +27,7 @@ export {
   classKindSelector,
   classifySelectorCreateInput,
   parseStyleRule,
+  parseStyleRuleRegistry,
 } from './styleRule'
 export {
   extractCssSelectorClasses,
@@ -36,7 +37,7 @@ export {
 } from './cssSelectorClasses'
 export type { CssSelectorClassToken } from './cssSelectorClasses'
 export { SiteShellSchema } from './siteDocument'
-export {   parsePageTemplate } from './pageTemplate'
+export { parsePageTemplate, parseTemplateTarget } from './pageTemplate'
 
 // Types — derived from schemas. Schemas are the source of truth.
 export type { Breakpoint } from './breakpoint'

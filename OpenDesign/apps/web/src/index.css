@@ -1,8 +1,14 @@
-/* The MMS design system, shared verbatim with MMS-CMS. Self-hosted: the old
-   Google Fonts @import was a blocking cross-origin request on every load, and
-   behind the Tailscale funnel that is a request this app cannot rely on.
-   `tokens.css` is the BASE layer — a surface that needs different values
-   re-scopes them locally (see `start-desk.css`), it never edits the base. */
+/* Fonts + FontAwesome + the `--mms-*` / `--toolbar-*` tokens the shared
+   MMSBUILD header (`@mms/shell`) renders with. Self-hosted: the old Google
+   Fonts @import was a blocking cross-origin request behind the Tailscale
+   funnel.
+
+   These are CHROME tokens only. The product palette below is upstream
+   open-design's own (`./styles/tokens.css`) — the MMS alias layer that used
+   to overwrite it defined just 63 of upstream's 93 tokens, leaving `--brand`
+   (44 uses), `--stroke-thin` (48), `--radius-medium` (35), `--glass-regular`
+   (27), `--brand-text` and `--accent-contrast` (25 each) undefined — which is
+   what made text and borders vanish in both light and dark mode. */
 @import '../../../packages/mms-shell/src/styles/fonts.css';
 @import '../../../packages/mms-shell/src/styles/tokens.css';
 @import '../../../packages/mms-shell/src/styles/fontawesome/fontawesome-solid.css';

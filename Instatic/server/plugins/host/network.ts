@@ -122,6 +122,34 @@ function stripBrackets(host: string): string {
  * resolved address falls in a blocked range — and return the parsed URL.
  * Re-run for the initial URL and every redirect hop, so the allowlist + IP
  * guard remain the kernel-of-correctness across the whole chain.
+ *
+ * KNOWN LIMITATION — DNS rebinding is not closed by this check.
+ *
+ * This resolves the hostname and inspects the answers; the `fetch` that follows
+ * resolves it AGAIN, independently. A name whose DNS an attacker controls can
+ * answer with a public address here and a private one there, and the private
+ * address is the one connected to. The check is resolve-then-connect, and the
+ * gap between them is real.
+ *
+ * Closing it means pinning the validated address into the connection — connect
+ * to the IP, carry the original Host, and validate the certificate against the
+ * hostname rather than the address. Bun's `fetch` exposes no way to do that: no
+ * `lookup` hook, no connect-address override. Doing it by hand means replacing
+ * this bridge with a raw socket client that re-implements redirects, TLS
+ * verification and HTTP semantics — more attack surface than the flaw.
+ *
+ * What this check IS worth, stated honestly so nobody assumes more:
+ *   - it stops a plugin naming a private address outright;
+ *   - it stops an allowlisted host REDIRECTING to one, because it re-runs per
+ *     hop (see the loop below — that per-hop call is load-bearing, not
+ *     defensive duplication, and must not be hoisted out);
+ *   - it does not stop a host that resolves differently between this call and
+ *     the next one.
+ *
+ * The allowlist is the control that still holds under rebinding: an attacker
+ * needs a name the manifest already permits, which a human approved at install.
+ * Reported by an integration partner who read the code and flagged it without
+ * being asked.
  */
 async function assertOutboundAllowed(
   manifest: HostPluginRecord['manifest'],

@@ -61,6 +61,10 @@ const ALLOWLIST: ReadonlyMap<string, string> = new Map([
   // gate their routes via requireCapability; this file contains no request
   // handler itself.
   ['importMediaValidation.ts', 'Validation/sanitisation helper called by import.ts + importArchive.ts (which gate via requireCapability); no handlers.'],
+  // Resolves `?strategy=` for /import, /import/archive and /import/preview so
+  // the three cannot disagree about what an absent parameter means. Pure query
+  // parsing — all three callers gate via requireCapability before reaching it.
+  ['importStrategy.ts', 'Shared ?strategy= resolver called by the three import routes (which gate via requireCapability); no handlers.'],
   ['mediaUploadDispatch.ts', 'Storage adapter dispatch called by gated parent handlers.'],
   ['mediaUploadExecutor.ts', 'Filesystem write helper called by gated parent handlers.'],
   ['mediaVariants.ts', 'Variant generation helper called by gated parent handlers.'],

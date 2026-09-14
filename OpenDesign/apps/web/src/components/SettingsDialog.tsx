@@ -61,6 +61,7 @@ import {
 import { installDeepSeekHarnessCompanion } from '../providers/agent-companion';
 import { amrProfileBadgeLabel } from '../runtime/amr-guidance';
 import { deepSeekHarnessNeedsSetup, isVisibleLocalCliAgent } from '../utils/visibleAgents';
+import { isManagedSession, MANAGED_SETTINGS_SECTION } from '../state/managed';
 import { ExportDiagnosticsRow } from './ExportDiagnosticsButton';
 import { Icon } from './Icon';
 import { defaultAgentModelId, effectiveAgentModelChoice } from './agentModelSelection';
@@ -259,6 +260,14 @@ export type SettingsSection =
 // mapping them to General used to send deep links to the wrong section with
 // the wrong nav item highlighted.
 function normalizeSettingsSection(section: SettingsSection): SettingsSection {
+  // A managed session has no Execution or Media pane (the operator owns the
+  // provider, key, model and every media credential), so a deep link or a
+  // caller that still names one — `onOpenSettings('execution')` survives in
+  // several places — must land somewhere that exists rather than on a blank
+  // pane with no nav item to leave by.
+  if (isManagedSession() && (section === 'execution' || section === 'media')) {
+    return MANAGED_SETTINGS_SECTION;
+  }
   switch (section) {
     case 'language':
     case 'appearance':
@@ -879,7 +888,7 @@ function cleanAgentVersionLabel(
 }
 
 function displayAgentName(agent: Pick<AgentInfo, 'id' | 'name'>): string {
-  return agent.id === 'amr' ? 'Open Design' : agent.name;
+  return agent.id === 'amr' ? 'MMS Design' : agent.name;
 }
 
 const AGENT_CLI_ENV_FIELDS = [
@@ -1627,6 +1636,10 @@ export function SettingsDialog({
       ? { [initial.apiProtocol ?? 'anthropic']: byokProviderKeyForConfig(initial) }
       : {},
   );
+  // Managed = opened from the MMSBUILD Product Hub, or built with
+  // NEXT_PUBLIC_OD_MANAGED_AI. Read once per render; the value cannot change
+  // without a navigation.
+  const managedSession = isManagedSession();
   const [activeSection, setActiveSection] = useState<SettingsSection>(() => normalizeSettingsSection(initialSection));
   // Workspace region gating (E-frontend, D4.3). One shared read of the workspace
   // context; the Workspace section only renders for a team workspace whose
@@ -4307,6 +4320,12 @@ export function SettingsDialog({
                 </button>
               </div>
             ) : null}
+            {/* Execution — the "Local CLI / BYOK" pane. Hidden in a managed
+                session: the operator picks provider, key and model in the
+                control-plane Settings panel and the AI Gateway rewrites both
+                server-side on every call, so every control in here would be
+                deciding nothing. */}
+            {managedSession ? null : (
             <button
               type="button"
               className={`settings-nav-item${activeSection === 'execution' ? ' active' : ''}`}
@@ -4319,6 +4338,7 @@ export function SettingsDialog({
                 <small>{`${t('settings.localCli')} / ${t('settings.modeApiMeta')}`}</small>
               </span>
             </button>
+            )}
             <button
               type="button"
               className={`settings-nav-item${activeSection === 'general' ? ' active' : ''}`}
@@ -4352,6 +4372,14 @@ export function SettingsDialog({
                 <small>{t('settings.memoryHint')}</small>
               </span>
             </button>
+            {/* Media providers — hidden in a managed session for the same
+                reason as Execution. The operator supplies every media key to
+                the daemon (odRuntime's MEDIA_KEY_ENV: Replicate, fal, BFL,
+                ElevenLabs, Google, MiniMax, Kling, AIHubMix, Tavily) and those
+                win over anything stored per tenant, so a key typed here is
+                silently overridden — worse than absent, because it looks like
+                it took effect. */}
+            {managedSession ? null : (
             <button
               type="button"
               className={`settings-nav-item${activeSection === 'media' ? ' active' : ''}`}
@@ -4363,6 +4391,7 @@ export function SettingsDialog({
                 <small>Image / video / audio</small>
               </span>
             </button>
+            )}
             <button
               type="button"
               className={`settings-nav-item${activeSection === 'integrations' ? ' active' : ''}`}

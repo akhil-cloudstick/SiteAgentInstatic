@@ -1009,13 +1009,28 @@ describe('publishPage', () => {
     expect(html).not.toContain('zustand')
   })
 
-  it('uses site metaTitle for <title> when set', () => {
+  it('uses site metaTitle for <title> when the page has no title of its own', () => {
     const proj = makeSite({
       settings: { ...makeSite().settings, metaTitle: 'My Site — Home' },
     })
     const page = makePage({ root: { moduleId: 'base.text', props: { text: 'Hi' } } })
+    page.title = '' // no title of its own, so the site default is reached
     const { html } = publishPage(page, proj, registry)
     expect(html).toContain('<title>My Site — Home</title>')
+  })
+
+  it('does NOT let site metaTitle override a page that has its own title', () => {
+    // metaTitle is a site-wide DEFAULT. Ranking it above page.title made it an
+    // override, so every page without explicit SEO published one identical
+    // <title> — hundreds of documents a crawler cannot tell apart.
+    const proj = makeSite({
+      settings: { ...makeSite().settings, metaTitle: 'My Site — Home' },
+    })
+    const page = makePage({ root: { moduleId: 'base.text', props: { text: 'Hi' } } })
+    page.title = 'About Us'
+    const { html } = publishPage(page, proj, registry)
+    expect(html).toContain('<title>About Us</title>')
+    expect(html).not.toContain('My Site — Home')
   })
 
   it('XSS: escapes metaTitle with special chars', () => {
@@ -1025,7 +1040,9 @@ describe('publishPage', () => {
         metaTitle: '<script>alert(1)</script>',
       },
     })
+    // Title cleared so metaTitle is the value that actually reaches the head.
     const page = makePage({ root: { moduleId: 'base.text', props: { text: 'Hi' } } })
+    page.title = '' // no title of its own, so the site default is reached
     const { html } = publishPage(page, proj, registry)
     expect(html).not.toContain('<script>')
     expect(html).toContain('&lt;script&gt;')

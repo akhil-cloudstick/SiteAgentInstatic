@@ -103,7 +103,7 @@ function runtimeParams(row) {
   };
 }
 
-export async function provisionTenant({ name, ownerEmail, cfProject, customDomain, tier }) {
+export async function provisionTenant({ name, ownerEmail, cfProject, customDomain, tier, connectorManaged }) {
   const slug = slugify(name);
   if (!slug) throw new Error('A valid tenant name is required.');
   const existing = await tenants.getTenant(slug);
@@ -133,12 +133,22 @@ export async function provisionTenant({ name, ownerEmail, cfProject, customDomai
     cf_project, custom_domain, last_error: null,
     display_name: String(name || '').trim() || slug,
     od_port: odPort, od_web_port: odWebPort, od_status: 'stopped',
+    // Set only when the caller was the connector. Written here rather than in
+    // createTenant because a re-provision of a removed slug must not inherit an
+    // earlier owner: whoever creates it THIS time owns it.
+    connector_managed: connectorManaged === true,
   });
 
   // Mint the tenant's one-time invite link (the URL the operator shares). Only the
   // token's hash is stored; this raw URL is shown once in the console.
   const inviteToken = await createInvite(slug, ownerEmail || null);
-  const inviteUrl = `${config.publicBaseUrl}/invite/${inviteToken}`;
+  // gatewayOrigin, NOT publicBaseUrl. This link is opened by a PERSON in a
+  // browser, and publicBaseUrl defaults to the control-plane's own loopback
+  // address — so the returned link worked on this machine and nowhere else,
+  // including for the one person it is meant for. `decorate()` has always used
+  // gatewayOrigin for the console's copy of the same link; these two were the
+  // stragglers, and they are the copy an API caller gets.
+  const inviteUrl = `${config.gatewayOrigin}/invite/${inviteToken}`;
 
   // Fire-and-forget: never await the saga here (that is what blocked the page).
   runProvisionSaga({ slug, schema, role, dbPassword, secretKey, port, odPort, odWebPort, tier: tier === 'lite' ? 'lite' : 'advanced' })
@@ -156,7 +166,9 @@ export async function createTenantInvite(slug) {
   const row = await tenants.getTenant(slug);
   if (!row) throw new Error(`Unknown tenant: ${slug}`);
   const token = await createInvite(slug, row.owner_email || null);
-  return { ok: true, slug, url: `${config.publicBaseUrl}/invite/${token}` };
+  // Same reason as provisionTenant above: a person opens this, so it must be
+  // the public origin rather than the control-plane's loopback address.
+  return { ok: true, slug, url: `${config.gatewayOrigin}/invite/${token}` };
 }
 
 // Auto-create the Instatic Owner via the one-shot setup endpoint, so the hub can
@@ -295,7 +307,7 @@ export async function upgradeTenantToAdvanced(slug) {
 // Edit an existing tenant's editable details (owner email, CF project name, custom
 // domain). Changing the domain re-attaches it on Cloudflare (safe — never touches
 // published content). CF project name only affects FUTURE deploys.
-export async function editTenant(slug, { displayName, ownerEmail, cfProject, customDomain, tier } = {}) {
+export async function editTenant(slug, { displayName, ownerEmail, cfProject, customDomain, tier, searchIndexing } = {}) {
   const row = await tenants.getTenant(slug);
   if (!row) throw new Error(`Unknown tenant: ${slug}`);
 
@@ -322,6 +334,15 @@ export async function editTenant(slug, { displayName, ownerEmail, cfProject, cus
     const cd = String(customDomain || '').trim().toLowerCase() || null;
     domainChanged = cd !== (row.custom_domain || null);
     fields.custom_domain = cd;
+  }
+  // Search indexing is off for every tenant until somebody turns it on here.
+  // The console always posts an explicit boolean (an unticked checkbox is absent
+  // from the form body, so it normalises presence to true/false before calling).
+  // `undefined` therefore means an API caller omitted the field entirely, and
+  // that must leave the flag alone — an unrelated edit silently de-indexing a
+  // live site is precisely the failure this flag exists to prevent.
+  if (searchIndexing !== undefined) {
+    fields.search_indexing = searchIndexing === true || searchIndexing === 'on' || searchIndexing === 'true';
   }
   await tenants.updateTenant(slug, fields);
 

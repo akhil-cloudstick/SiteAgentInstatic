@@ -100,6 +100,7 @@ import {
   trackRunStartBlockedSurfaceView,
 } from '../analytics/events';
 import { byokPreflightBlockReason } from './byok/preflight';
+import { isManagedSession } from '../state/managed';
 import {
   clearOnboardingSessionId,
   peekOnboardingSessionId,
@@ -347,6 +348,13 @@ import {
   buildFinalizeRequest,
 } from '../lib/resolve-finalize-request';
 import type { CommentSendResult } from './comment-send-result';
+import { ShareToCmsDialog } from './studio/ShareToCmsDialog';
+import {
+  buildFixInstruction,
+  buildFixVisibleMessage,
+  pushProjectToCms,
+  type ShareBlock,
+} from './studio/share-to-cms';
 
 type BrandBrowserSnapshot =
   | { status: 'ready'; html: string; css: string; baseUrl: string }
@@ -6547,9 +6555,15 @@ export function ProjectView({
         ),
       );
       const byokOpenCodeProvider = byokOpenCodeProviderFromConfig(config);
+      // A managed session never fails BYOK preflight on the tenant's account:
+      // the daemon overwrites provider, key and model from the operator's
+      // gateway on every run (apps/daemon/src/managed-ai.ts), so the only thing
+      // this check could do here is block a run over a credential the tenant
+      // does not own and cannot supply.
       const requiresByokPreflight =
-        (config.mode === 'api' && config.apiProtocol !== 'bedrock') ||
-        (config.mode === 'daemon' && config.agentId === 'byok-opencode');
+        !isManagedSession() &&
+        ((config.mode === 'api' && config.apiProtocol !== 'bedrock') ||
+          (config.mode === 'daemon' && config.agentId === 'byok-opencode'));
       if (requiresByokPreflight && !byokOpenCodeProvider) {
         const blockReason = byokPreflightBlockReason(config) ?? 'config_invalid';
         const recoveryActionInstanceId = `blocked:${taskAnalytics.taskExecutionId}`;
@@ -8192,6 +8206,32 @@ export function ProjectView({
       projectMutationReadOnly,
       projectWorkspaceScopeState.scope,
     ],
+  );
+
+  // ── Share to CMS ────────────────────────────────────────────────────────
+  // The daemon runs the templateRule compliance gate inside
+  // `POST /api/projects/:id/push/instatic`, so a rejected page never reaches
+  // Instatic. `pushProjectToCms` reports that rejection here and the dialog
+  // opens on its own — the tenant does not have to find it.
+  const [cmsBlock, setCmsBlock] = useState<ShareBlock | null>(null);
+  const handleShareToCms = useCallback(() => {
+    void pushProjectToCms(project.id, setCmsBlock);
+  }, [project.id]);
+  // "Fix it": the tenant sees a short reassuring message (`visible`) in the
+  // chat, while the agent privately receives the full compliance detail + fix
+  // directives via the hidden `context.agentInstruction` channel — OD chat has
+  // no separate system field. The agent (which also carries templateRule.md in
+  // its prompt) makes the page importable without changing the look; the tenant
+  // then re-shares. If a run is in flight, handleSend queues it, which is
+  // ordinary composer behaviour.
+  const handleFixItPrompt = useCallback(
+    (msg: { visible: string; instruction: string }) => {
+      void handleSend(msg.visible, [], undefined, {
+        entryFrom: 'cms_fix',
+        context: { agentInstruction: msg.instruction },
+      });
+    },
+    [handleSend],
   );
 
   const handleComposerSend = useCallback(
@@ -10945,6 +10985,34 @@ export function ProjectView({
   return (
     <CollabProvider value={collabValue}>
     <div className="app">
+      {/* Share to CMS — restored after the 0.20.0 upgrade deleted
+          `components/studio/`, which left the daemon's push route with no
+          caller at all. `.app` reserves an auto-height chrome row above the
+          split (shell.css: `grid-template-rows: auto 1fr`, with `.split`
+          pinned to row 2), so this bar occupies a row that was otherwise
+          empty rather than displacing anything. */}
+      <div className="app-cms-actions">
+        <button
+          type="button"
+          className="mms-share-cms"
+          onClick={handleShareToCms}
+          data-testid="share-to-cms"
+        >
+          <i className="fa-solid fa-cloud-arrow-up" aria-hidden="true" />
+          <span>{t('studio.shareToCms')}</span>
+        </button>
+      </div>
+      <ShareToCmsDialog
+        block={cmsBlock}
+        onClose={() => setCmsBlock(null)}
+        onFix={() => {
+          handleFixItPrompt({
+            visible: buildFixVisibleMessage(),
+            instruction: buildFixInstruction(cmsBlock?.reason ?? null),
+          });
+          setCmsBlock(null);
+        }}
+      />
       <CritiqueTheaterMount
         projectId={project.id}
         enabled={critiqueTheaterEnabled}

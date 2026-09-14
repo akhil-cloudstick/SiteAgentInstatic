@@ -131,6 +131,33 @@ describe('plugin sandbox invariants', () => {
     expect(targetsSource).toContain("'network.fetch': 'network.outbound'")
   })
 
+  it('the outbound guard re-validates on every redirect hop', async () => {
+    // The allowlist + blocked-address check runs INSIDE the redirect loop, not
+    // once before it. That placement is the only thing stopping an allowlisted
+    // host from bouncing a request to an internal address, and it reads like
+    // redundant work from outside the loop — so it is easy to "optimise" out.
+    //
+    // It also carries more weight than it looks: the guard is
+    // resolve-then-connect and therefore does not close DNS rebinding (the
+    // limitation is documented on the function and in the feature doc). Per-hop
+    // revalidation is what still holds when the first answer was honest and a
+    // later hop is not.
+    const source = await read('server/plugins/host/network.ts')
+
+    const loopStart = source.indexOf('for (let hop = 0; ; hop++)')
+    const fetchCall = source.indexOf('await fetchImpl(', loopStart)
+    const guardCall = source.indexOf('await assertOutboundAllowed(', loopStart)
+
+    expect(loopStart).toBeGreaterThan(-1)
+    expect(guardCall).toBeGreaterThan(loopStart)
+    // …and BEFORE the request goes out on this hop.
+    expect(guardCall).toBeLessThan(fetchCall)
+
+    // The documented limitation must stay documented — a future reader who
+    // removes it will assume the IP check is airtight and build on that.
+    expect(source).toContain('DNS rebinding is not closed by this check')
+  })
+
   it('BOOTSTRAP_SOURCE provides URL, URLSearchParams, TextEncoder, TextDecoder globals', async () => {
     // These Web APIs are absent from QuickJS; the bootstrap polyfills them so
     // plugin code can use `new URL(req.url)`, `new TextEncoder().encode(s)`,

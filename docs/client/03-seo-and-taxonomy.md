@@ -32,15 +32,20 @@ So this was not simply "add three fields". The renderer had to start reading row
 | `ogImage` | media | Social card image |
 | `jsonLd` | longText | Structured data |
 
-**The head builder now resolves SEO per document**, in this order: an explicit value passed by the caller, then the row's own cells, then site settings. For a collection entry the row's cells arrive on the render context, so each entry gets its own tags without any caller change.
+**The head builder resolves SEO per document**, in this order: an explicit value passed by the caller, then the row's own cells, then site settings. For a collection entry the row's cells arrive on the render context, so each entry gets its own tags without any caller change.
 
 It emits `<title>`, `<meta name="description">`, `<link rel="canonical">`, the `og:` set, and a JSON-LD script block — each only when a value exists.
 
-Three deliberate choices:
+**Pages needed a second half, added later.** A `pages` row has no entry stack, and `SiteDocument.pages[]` is a page *tree* — id, slug, title, nodes, template — which never carried the row's cells. So per-row SEO worked on collection entries and silently did nothing on pages: authorable, stored, never rendered. The page render path now reads its own row and passes the result as the explicit override, which covers the static bake, the live fallback and republish in one place. If you are reading an older copy of this note, that was the gap it did not mention.
+
+Four deliberate choices:
 
 - **Open Graph falls back** to the page title and description rather than being omitted. A share card with no title is worse than a duplicated one.
 - **`ogImage` falls back to the featured image** when not set explicitly. The loop source already resolves it to a public URL, and it is almost always the right picture.
+- **`ogImage` is made absolute** against the document's own canonical when it is a relative path. A `media` field stores an asset id that resolves to a root-relative public path, and social crawlers drop a relative `og:image` instead of resolving it. A document with no canonical keeps the relative path.
 - **A document with no SEO of its own emits nothing new.** Pages that never opted in keep exactly the head they had before.
+
+The 404 route is excluded on purpose: its body is served at whatever URL missed, so a canonical resolved from the template row would point a crawler at the error page as though it were a real document.
 
 JSON-LD is authored content, so `<` is escaped inside the script block — a stored `</script>` would otherwise close the tag and turn data into live markup.
 

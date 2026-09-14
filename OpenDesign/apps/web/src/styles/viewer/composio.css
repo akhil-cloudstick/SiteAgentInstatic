@@ -375,7 +375,7 @@
   border-radius: var(--radius-sm);
   cursor: pointer;
 }
-.present-exit:hover { background: white; }
+.present-exit:hover { background: var(--bg-panel); }
 
 /* Picker (legacy in some surfaces) */
 .picker {

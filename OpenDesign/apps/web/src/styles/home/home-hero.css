@@ -2463,7 +2463,7 @@
   border-radius: 12px;
   /* Favicons are drawn for a light browser tab, so keep the tile light in both
      themes; the border keeps it defined on a light page. */
-  background: #fff;
+  background: var(--bg-panel);
   border: 1px solid var(--border);
   box-shadow: var(--shadow-xs);
   overflow: hidden;
@@ -3436,4 +3436,19 @@
 .home-hero__type-pill:disabled {
   cursor: default;
   opacity: 0.6;
+}
+
+/* Hero wordmark (MMS). Replaces upstream's WebGL logotype, whose artwork is
+   vector paths spelling the upstream brand. Sized to sit in the same optical
+   slot as the old mark so the composer below does not shift. */
+.home-hero__wordmark {
+  display: block;
+  font-family: var(--serif);
+  font-size: clamp(34px, 6vw, 54px);
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  text-align: center;
+  color: var(--text-strong);
+  user-select: none;
 }

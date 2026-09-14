@@ -49,7 +49,46 @@ export type PageTemplateConfig = Static<typeof PageTemplateConfigSchema>
 // Tolerant parsing
 // ---------------------------------------------------------------------------
 
-function parseTarget(raw: unknown): TemplateTarget | null {
+/**
+ * Read a stored `templateTarget` cell into a `TemplateTarget`.
+ *
+ * Accepts BOTH an object and a JSON string, because both are legitimately
+ * stored shapes. The editor writes an object (`pageToCells`), but the `pages`
+ * system table declares the field as `longText` — so a producer that honours
+ * the declared field type serialises the target, while one that mirrors the
+ * editor emits an object. Refusing the string made a conforming bundle import
+ * cleanly and then 404 every entry: a target that fails to parse leaves
+ * `page.template` unset, and the page never enters the matching chain.
+ *
+ * Exported so the admin grid and the MCP context tool read the cell the same
+ * way the renderer does. Three readers disagreeing about the shape is how a
+ * template ends up "missing" on one surface and present on another.
+ */
+export function parseTemplateTarget(raw: unknown): TemplateTarget | null {
+  if (typeof raw === 'string') {
+    const trimmed = raw.trim()
+    if (!trimmed) return null
+    try {
+      // Deliberately a bare `JSON.parse` rather than `safeParseJson`: the
+      // validation that matters is `parseTargetObject`, and routing the string
+      // branch through TypeBox instead would make the two branches disagree —
+      // `Value.Check` rejects a target whose `tableSlugs` holds one bad entry,
+      // where the object branch filters it and keeps the rest. Two readers of
+      // one cell that accept different inputs is the bug this function exists
+      // to close, so both branches end in the same reader.
+      //
+      // One level only — a JSON string of a JSON string is a producer bug,
+      // not a shape worth supporting.
+      return parseTargetObject(JSON.parse(trimmed))
+    } catch {
+      // A `longText` cell holding prose rather than JSON. Not a template.
+      return null
+    }
+  }
+  return parseTargetObject(raw)
+}
+
+function parseTargetObject(raw: unknown): TemplateTarget | null {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
   const r = raw as Record<string, unknown>
   if (r.kind === 'everywhere') return { kind: 'everywhere' }
@@ -68,7 +107,7 @@ export function parsePageTemplate(raw: unknown): PageTemplateConfig | null {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
   const r = raw as Record<string, unknown>
   if (r.enabled !== true) return null
-  const target = parseTarget(r.target)
+  const target = parseTemplateTarget(r.target)
   if (!target) return null
   const priority = typeof r.priority === 'number' && isFinite(r.priority) ? r.priority : 0
   return { enabled: true, target, priority }

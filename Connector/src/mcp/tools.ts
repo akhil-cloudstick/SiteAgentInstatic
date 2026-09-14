@@ -12,7 +12,8 @@
 
 import { resolve } from 'node:path'
 import { runDoctor, DoctorFailedError } from '../env/doctor'
-import { registeredModuleIds } from '../env/shim'
+import { registeredModuleIds, installDomEnvironment } from '../env/shim'
+import { toolSurface } from './toolSurface'
 import { rowsDigest, type HashableRow } from '../hash/row'
 import { verifyApproval, parseApproval, parseReleaseManifest } from '../approval/verify'
 
@@ -74,15 +75,50 @@ export const CONNECTOR_TOOLS: ConnectorTool[] = [
     name: 'connector_environment',
     description:
       'Report the Connector runtime environment: Bun version, registered Instatic module ids, ' +
-      'and whether the DOM globals are installed. Read-only.',
+      'whether the DOM globals are installed, and the current tool-surface revision. Read-only. ' +
+      'Safe to use as a pre-flight: it installs the DOM environment before reporting, so the ' +
+      'flags describe whether conversion CAN run rather than whether it happens to have run ' +
+      'already. For a full check that actually converts a fixture, use connector_doctor. ' +
+      'IF YOU CACHE tools/list: record toolSurface.revision beside your cached copy and compare ' +
+      'it here at the start of a session. It changes whenever any tool name or input schema ' +
+      'changes, so a different value means your cached schemas are stale and you should refetch ' +
+      '— otherwise you will conclude a parameter does not exist when it does.',
     inputSchema: { type: 'object', properties: {}, additionalProperties: false },
-    handler: async () =>
-      ok({
+    handler: async () => {
+      // Install before reporting, rather than observing whatever happened to be
+      // loaded. The globals install lazily on first conversion, so a cold
+      // process reported domParser:false and cssStyleSheet:false — the two flags
+      // whose failure `doctor` describes as "loses every style on the site" —
+      // while the connector was perfectly healthy. Anyone gating a run on this
+      // would abort for no reason; anyone reading `true` learned only that
+      // something else had already done the real work. Reported by the studio.
+      let installError: string | undefined
+      try {
+        installDomEnvironment()
+      } catch (err) {
+        installError = err instanceof Error ? err.message : String(err)
+      }
+      const domParser = typeof globalThis.DOMParser !== 'undefined'
+      const cssStyleSheet = typeof globalThis.CSSStyleSheet !== 'undefined'
+      return ok({
         bunVersion: typeof Bun !== 'undefined' ? Bun.version : 'unknown',
         moduleIds: registeredModuleIds(),
-        domParser: typeof globalThis.DOMParser !== 'undefined',
-        cssStyleSheet: typeof globalThis.CSSStyleSheet !== 'undefined',
-      }),
+        domParser,
+        cssStyleSheet,
+        ready: domParser && cssStyleSheet && !installError,
+        ...(installError ? { installError } : {}),
+        // A cached tools/list is invisible to the client holding it: an agent
+        // reads its stale schema and concludes a parameter does not exist,
+        // rather than that its copy is old. Comparing this against the value
+        // recorded when the list was cached makes that detectable in one call.
+        toolSurface: {
+          ...toolSurface(),
+          note:
+            'Changes whenever any tool name or input schema changes. Record it with your cached ' +
+            'tools/list; a different value here means refetch.',
+        },
+      })
+    },
   },
 
   {

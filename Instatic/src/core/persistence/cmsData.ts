@@ -152,13 +152,24 @@ export async function deleteCmsDataTable(
 // Data row CRUD
 // ---------------------------------------------------------------------------
 
+/**
+ * List a table's rows.
+ *
+ * `fields: 'summary'` drops document-valued cells (page bodies) server-side.
+ * Every list surface renders scalars — title, slug, status, SEO, dates — and
+ * the body is nearly all of the payload weight, so any caller populating a
+ * grid, picker or count should pass it. Omit it only when the caller genuinely
+ * needs each row's body.
+ */
 export async function listCmsDataRows(
   tableId: string,
   fetchImpl: FetchLike = globalThis.fetch.bind(globalThis),
   basePath = '/cms/api/cms',
+  options: { fields?: 'summary' | 'full' } = {},
 ): Promise<DataRow[]> {
+  const query = options.fields === 'summary' ? '?fields=summary' : ''
   const body = await apiRequest(
-    `${basePath}/data/tables/${encodeURIComponent(tableId)}/rows`,
+    `${basePath}/data/tables/${encodeURIComponent(tableId)}/rows${query}`,
     { schema: RowsListEnvelope, fetchImpl, fallbackMessage: 'CMS data rows request failed' },
   )
   return body.rows ?? []

@@ -117,7 +117,7 @@ export function IntegrationsView({
       <header className="integrations-view__hero">
         <div>
           <p className="integrations-view__kicker">{t('integrations.kicker')}</p>
-          <h1 id="integrations-title" className="entry-section__title">
+          <h1 id="integrations-title" className="entry-section__title mms-nav-duplicate-title">
             {t('entry.navIntegrations')}
           </h1>
           <p className="integrations-view__lede">

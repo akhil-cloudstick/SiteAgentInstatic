@@ -10,6 +10,10 @@
   "scripts": {
     "dev": "node dev.mjs",
     "migrate": "node control-plane/registry/migrate.mjs",
+    "test:deployer": "node control-plane/deployer/deploy.selftest.mjs",
+    "test:allowlist": "node control-plane/lib/connectorAllowlist.selftest.mjs",
+    "test:login": "node control-plane/registry/tenantUsers.selftest.mjs",
+    "test": "npm run test:deployer && npm run test:allowlist && npm run test:login",
     "start": "node control-plane/server.mjs",
     "console:dev": "npm --prefix ui run dev",
     "console:build": "npm --prefix ui run build"

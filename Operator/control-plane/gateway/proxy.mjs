@@ -227,6 +227,23 @@ function forward(req, res, target) {
   headers['x-forwarded-proto'] = 'https';
   headers['x-forwarded-host'] = req.headers.host || '';
   headers['x-forwarded-for'] = req.socket?.remoteAddress || '';
+  // The mount point we stripped, so the backend can rebuild a URL that comes
+  // back through this gateway. Without it a backend only ever sees its own
+  // rewritten path, and any absolute URL it hands out omits the prefix — which
+  // is exactly how the connector's archive download URL came out as
+  // `/exports/<id>` and 404ed, when the route that works is
+  // `/connector-mcp/exports/<id>`.
+  //
+  // `rewriteLocation` already does the mirror image of this for redirects the
+  // backend sends. This covers URLs a backend puts in a response BODY, which a
+  // proxy cannot rewrite for it.
+  //
+  // Connector only, deliberately. `x-forwarded-prefix` is a header some
+  // frameworks act on by rewriting their own asset and redirect URLs, and OD's
+  // Next build already handles its basePath itself — sending it there risks a
+  // double prefix on a surface that is working. Widen this per backend, after
+  // testing that backend, rather than by default.
+  if (prefix && kind === 'connector-mcp') headers['x-forwarded-prefix'] = prefix;
   // The OD daemon gates its privileged routes (connector connect/disconnect,
   // Composio config, library pairing, db verify/vacuum) behind
   // `requireLocalDaemonRequest`, which insists the request LOOK local on all

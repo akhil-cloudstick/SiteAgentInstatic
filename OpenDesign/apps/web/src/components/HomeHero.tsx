@@ -55,7 +55,6 @@ import {
   type HomeHeroChip,
 } from './home-hero/chips';
 import { homeHeroChipLabel } from './home-hero/chip-labels';
-import { PixelScanLogo } from './home-hero/PixelScanLogo';
 import { ScenarioArt } from './home-hero/ScenarioArt';
 import { useEdgeAutoScroll, EdgeScrollZones } from './home-hero/EdgeAutoScroll';
 import {
@@ -405,6 +404,8 @@ export const HomeHero = forwardRef<HomeHeroHandle, Props>(function HomeHero(
   // every scene binds the Prototype action, while Mobile/Wireframe additionally
   // retain the project metadata from their former top-level actions.
   const [localSelectedSubcategory, setLocalSelectedSubcategory] = useState<string | null>(null);
+  // Example prompts start collapsed — see the disclosure in the render below.
+  const [examplesOpen, setExamplesOpen] = useState(false);
   const selectedSubcategory =
     activeChipId === 'prototype' && activePrototypeSubtypeId !== undefined
       ? activePrototypeSubtypeId
@@ -1293,15 +1294,18 @@ export const HomeHero = forwardRef<HomeHeroHandle, Props>(function HomeHero(
 
   return (
     <section ref={homeHeroRef} className="home-hero" data-testid="home-hero">
-      {/* #5517 hero header: the OpenDesign logotype replaces the small
-          brand-mark + name pair, and the tagline subtitle is dropped. The
-          static wordmark is now a WebGL pixel-scan effect (round 7) — the
-          title heading below it is dropped too, since the animated wordmark
-          alone carries the brand moment. */}
+      {/* Hero wordmark. Upstream draws its own logotype here — a WebGL
+          pixel-scan effect that samples `public/logo-scan.svg`, whose vector
+          paths spell "OpenDesign". There is no way to rebrand that artwork
+          without redrawing the SVG, so the effect is dropped and the product
+          name is set as type instead: no upstream brand can leak through, and
+          it themes with the rest of the page for free.
+          `PixelScanLogo` and its engine stay on disk, unreferenced. */}
       <span className="home-hero__logo-wrap">
-        <PixelScanLogo className="home-hero__logo home-hero__logo--tiles" />
+        <span className="home-hero__wordmark" data-testid="home-hero-wordmark">
+          MMS Design
+        </span>
       </span>
-
       {/* Capsule type row: the 10 top-level create-scenario types as pill chips above
           the composer (per product — replaces the fanned card carousel); the
           selected pill carries the accent tint, click switches. */}
@@ -2153,6 +2157,31 @@ export const HomeHero = forwardRef<HomeHeroHandle, Props>(function HomeHero(
         />
       ) : null}
 
+      {/* Example prompts are collapsed by default. They are a browse-when-you-
+          want-to surface, not something to scroll past on every visit, so the
+          hero opens on the composer and this stays one click away. The three
+          branches below (loading skeleton, plugin presets, plain examples) all
+          render their own `home-hero__prompt-examples-title`, which the
+          disclosure button already says — `mms-shell-host.css` hides those
+          inner titles so the label is not printed twice. */}
+      <div className="home-hero__examples-disclosure">
+        <button
+          type="button"
+          className="home-hero__examples-toggle"
+          aria-expanded={examplesOpen}
+          data-testid="home-hero-examples-toggle"
+          onClick={() => setExamplesOpen((v) => !v)}
+        >
+          <span>{t('homeHero.promptExamples')}</span>
+          <Icon
+            name="chevron-down"
+            size={14}
+            className={examplesOpen ? 'home-hero__examples-caret--open' : undefined}
+          />
+        </button>
+      </div>
+      {examplesOpen ? (
+        <>
       {pluginsLoading ? (
         <PluginPromptPresetsLoading />
       ) : filteredExamplePlugins.length > 0 && activeChipId ? (
@@ -2199,6 +2228,8 @@ export const HomeHero = forwardRef<HomeHeroHandle, Props>(function HomeHero(
             )}
           </div>
         </div>
+      ) : null}
+        </>
       ) : null}
 
       {error ? (

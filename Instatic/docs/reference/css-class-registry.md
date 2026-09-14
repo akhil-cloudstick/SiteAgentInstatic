@@ -267,6 +267,19 @@ The framework regenerates these rules whenever the user changes the framework sc
 
 This is what makes the editor robust against partially-corrupt persisted data — a single broken rule doesn't break the whole site load.
 
+**Tolerance is per-entry, not per-registry.** `parseStyleRuleRegistry` returns `{}` when `styleRules` is **absent**, and **throws** when it is present with the wrong shape — an array, a string, a number. Those are different facts and must not get the same answer:
+
+| `styleRules` | Result | Why |
+|---|---|---|
+| missing / `null` | `{}` | the author has no rules yet |
+| `{}` | `{}` | same |
+| `{ id: {...}, … }` with one bad entry | the good entries | a corrupt rule must not stop a site loading |
+| `[ {...}, {...} ]` | **throws** | a registry with the wrong shape, not an empty one |
+
+The reason is what `{}` means downstream: every `classIds` reference resolves to nothing and the site renders **with no styling at all, successfully**. An array of valid rules is an upstream emitter bug, and answering it with a default converts a loud failure into a silent one that ships. A partner's emitter did exactly this with 617 rules.
+
+The general rule, worth applying beyond this parser: **tolerate absent, reject wrong-shaped.** Absent means "nothing to say"; wrong-shaped means "something upstream is broken".
+
 The tolerant parser also backfills `kind`, `selector`, and `order` on old persisted shells that predate the selectors system.
 
 Hard parsing (throws on shape mismatch) uses `Value.Parse(StyleRuleSchema, raw)` directly. The persistence layer uses the tolerant path so the editor can render even with garbage entries.
@@ -387,7 +400,8 @@ Nodes that reference the rule by id keep working — only the rendered CSS outpu
 | Naming a user class `__instatic_scope_*`                                   | Internal scoped rules use this prefix; keep user-created names free of it (the class-kind validator does not reject the prefix — it's a convention, not a gate) |
 | Mixing user rules and framework rules in the same `classIds` array without intent | The order matters — later wins. Framework rules are usually last (override semantics). |
 | Reading `rule.styles` as `CSSPropertyBag` without narrowing         | The persistence boundary stores `Record<string, unknown>` — narrow via `bagToCSS` or `parseStylesBag` |
-| Hard-failing the editor on a corrupt rule entry                     | `parseStyleRuleRegistry` is tolerant — invalid entries drop silently |
+| Hard-failing the editor on a corrupt rule ENTRY                     | `parseStyleRuleRegistry` is tolerant per-entry — invalid entries drop silently |
+| Tolerating a registry of the wrong SHAPE                            | An array/string/number throws — `{}` there would render the site with no styling and report success |
 | Assigning an ambient rule to `node.classIds`                        | Ambient rules attach by selector matching — only `kind: 'class'` rules go in `classIds` |
 
 ---

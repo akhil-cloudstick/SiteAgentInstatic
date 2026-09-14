@@ -49,6 +49,7 @@ import {
 } from '../providers/daemon';
 import { resetCloudSignInTipDismissal } from './CloudSignInTip';
 import { SignOutConfirmDialog } from './SignOutConfirmDialog';
+import { getHubContext } from '../state/hubContext';
 import { notifyAmrLoginStatusChanged } from './amrLoginPolling';
 import { Icon } from './Icon';
 import { GITHUB_STARS_FALLBACK_LABEL, formatStars, useGithubStars } from './useGithubStars';
@@ -1063,6 +1064,18 @@ export function EntryTopRightCluster({
                       </a>
                     </div>
                     <div className="entry-nav-rail__menu-divider" />
+                    {/* OpenDesign Cloud sign-out. Hidden behind the MMSBUILD
+                        hub, where it is actively harmful rather than merely
+                        dead: `velaLogout()` ends the Cloud identity but leaves
+                        the hub's `sa_hub` cookie alive, and
+                        `app/gateway-basepath-shim.ts` then auto-bounces the
+                        next daemon 401 through `/sso/design`, which silently
+                        re-mints — so the app re-authenticates against a session
+                        the user believes they just ended. The hub-wide sign-out
+                        in AvatarMenu (`state/hubSignOut.ts` → the control
+                        plane's `/logout`) is the one that actually signs the
+                        user out of MMS Design AND the CMS. */}
+                    {getHubContext() != null ? null : (
                     <button
                       type="button"
                       className="entry-nav-rail__menu-item"
@@ -1077,6 +1090,7 @@ export function EntryTopRightCluster({
                     >
                       <Icon name="log-out" size={15} /> {t('entry.accountSignOut')}
                     </button>
+                    )}
                   </div>
                 </>
               ) : null}

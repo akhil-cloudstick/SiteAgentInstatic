@@ -97,6 +97,7 @@ import {
 } from './providerModelsCache';
 import { isDeepSeekV4FlashCampaignModel } from '../campaigns/deepseek-v4-flash';
 import { useDeepSeekV4FlashCampaignVisibility } from '../campaigns/use-deepseek-v4-flash-campaign';
+import { isManagedSession } from '../state/managed';
 
 interface Props {
   config: AppConfig;
@@ -165,11 +166,11 @@ function markAmrReminderSeen(): void {
 }
 
 function displayAgentName(agent: Pick<AgentInfo, 'id' | 'name'>): string {
-  return agent.id === 'amr' ? 'Open Design' : agent.name;
+  return agent.id === 'amr' ? 'MMS Design' : agent.name;
 }
 
 function displayAgentChipName(agent: Pick<AgentInfo, 'id' | 'name'>): string {
-  return agent.id === 'amr' ? 'Open Design' : displayAgentName(agent);
+  return agent.id === 'amr' ? 'MMS Design' : displayAgentName(agent);
 }
 
 export function InlineModelSwitcher({
@@ -186,6 +187,17 @@ export function InlineModelSwitcher({
   onProviderModelsCacheChange,
   onOpenSettings,
 }: Props) {
+  // A managed session runs on the operator's provider, key and model: the AI
+  // Gateway force-overwrites the model onto every request body server-side
+  // (control-plane `ai-gateway/gateway.mjs`), so nothing this popover offers
+  // would survive the round trip. Rendering nothing is the honest form of a
+  // control that decides nothing — and it also stops the BYOK branch below
+  // from fetching OpenRouter's /models with the managed placeholder key.
+  //
+  // Placed before every hook, not after: the value cannot change within a
+  // document, so a managed session calls no hooks at all and an unmanaged one
+  // calls all of them — the hook order stays constant either way.
+  if (isManagedSession()) return null;
   const t = useT();
   const analytics = useAnalytics();
   // Both flags are reserved presentation branches with no trigger wired yet:

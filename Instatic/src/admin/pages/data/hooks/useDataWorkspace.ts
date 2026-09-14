@@ -156,7 +156,9 @@ export function useDataWorkspace({ shouldLoadRows }: DataWorkspaceOptions): Data
     let cancelled = false
     void (async () => {
       try {
-        const nextRows = await listCmsDataRows(selectedTableId)
+        // Grid columns are scalars — title, slug, status, SEO, dates. Asking for
+        // full rows ships every page body to render text cells.
+        const nextRows = await listCmsDataRows(selectedTableId, undefined, undefined, { fields: 'summary' })
         if (cancelled) return
         setRows(nextRows)
         setRowsError(null)

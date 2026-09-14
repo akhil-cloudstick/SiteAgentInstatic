@@ -115,15 +115,36 @@ const PLUGIN_ITEM_DISPATCH_PATTERN =
 interface PluginRoutePolicy {
   capability: CoreCapability
   stepUp: boolean
+  /**
+   * Whether a user who has turned step-up off for themselves still has to do it.
+   *
+   * `'user'` (the default) honours `stepUpAuthMode`, which a user sets on their
+   * own account — the right behaviour for most sensitive actions, where the
+   * preference is a considered trade-off about their own convenience.
+   *
+   * `'always'` ignores it. Reserved for the routes that RUN CODE INSIDE THE
+   * CMS, because for those the step-up is not protecting the user from
+   * themselves — it is the boundary protecting every site on the instance from
+   * a stolen session. A per-user convenience setting should not be able to
+   * lower it, and the documentation has always described this gate without
+   * that qualifier. Reported by an integration partner who read the docs,
+   * checked the implementation, and found they disagreed.
+   *
+   * The same reasoning already applies to the route that CHANGES this setting
+   * (`me.ts`, `policy: 'always'`) — turning the protection off is itself
+   * protected. This extends the identical rule to the other action that cannot
+   * be undone by knowing about it afterwards.
+   */
+  stepUpPolicy?: 'user' | 'always'
 }
 
 function resolvePluginRoutePolicy(method: string, pathname: string): PluginRoutePolicy {
   // Fresh install / upgrade — uploads + executes arbitrary plugin code. RCE.
   if (method === 'POST' && pathname === '/cms/api/cms/plugins') {
-    return { capability: 'plugins.install', stepUp: true }
+    return { capability: 'plugins.install', stepUp: true, stepUpPolicy: 'always' }
   }
   if (method === 'POST' && pathname === '/cms/api/cms/plugins/package') {
-    return { capability: 'plugins.install', stepUp: true }
+    return { capability: 'plugins.install', stepUp: true, stepUpPolicy: 'always' }
   }
   if (method === 'POST' && pathname === '/cms/api/cms/plugins/inspect-package') {
     // Read-only — inspect a .zip before deciding to install. Same audience
@@ -134,7 +155,7 @@ function resolvePluginRoutePolicy(method: string, pathname: string): PluginRoute
   // Pack install — re-syncs a plugin's bundled modules/loops/VCs into the
   // draft site. Runs plugin code in the worker.
   if (method === 'POST' && PLUGIN_PACK_INSTALL_PATTERN.test(pathname)) {
-    return { capability: 'plugins.install', stepUp: true }
+    return { capability: 'plugins.install', stepUp: true, stepUpPolicy: 'always' }
   }
   // Staging parks an inspected package on the host without granting it
   // anything — no code runs and no plugin row changes until it is approved
@@ -149,7 +170,7 @@ function resolvePluginRoutePolicy(method: string, pathname: string): PluginRoute
   if (method === 'DELETE' && PLUGIN_ITEM_PATTERN.test(pathname)) {
     // Uninstall = the install endpoint's inverse; RCE-class risk if
     // forged (deletes plugin assets, runs the uninstall lifecycle hook).
-    return { capability: 'plugins.install', stepUp: true }
+    return { capability: 'plugins.install', stepUp: true, stepUpPolicy: 'always' }
   }
   if (method === 'PATCH' && PLUGIN_ITEM_PATTERN.test(pathname)) {
     // Enable / disable — runs activate / deactivate hooks; lifecycle.
@@ -272,7 +293,7 @@ export async function handlePluginsRoutes(
   const user = await requireCapability(req, db, policy.capability)
   if (user instanceof Response) return user
   if (policy.stepUp) {
-    const stepUp = await requireStepUp(req, db, user)
+    const stepUp = await requireStepUp(req, db, user, { policy: policy.stepUpPolicy ?? 'user' })
     if (stepUp) return stepUp
   }
 

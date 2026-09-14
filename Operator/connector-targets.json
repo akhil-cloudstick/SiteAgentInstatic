@@ -1,0 +1,4 @@
+{
+  "_comment": "Tenants the MMS Connector may reach, beyond the ones it created itself. Read by dev.mjs at start-up. An absent or empty list means only connector-created sites are reachable - it fails closed on purpose, because the token behind it can create, replace and publish. Sites provisioned through connector_create_site enrol themselves and do not belong here.",
+  "allow": ["akhil", "client-b", "sheeltron", "global-nettech"]
+}

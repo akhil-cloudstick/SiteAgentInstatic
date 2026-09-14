@@ -12,6 +12,7 @@ import { basename, extname, resolve } from 'node:path'
 import type { ConnectorTool, ToolResult } from './tools'
 import { requireSession } from '../http/store'
 import { resolveTarget } from '../http/config'
+import { reachableFrom } from './requestContext'
 import { deleteRow } from '../http/rows'
 import {
   stepUp,
@@ -22,6 +23,18 @@ import {
   listMedia,
   type DataField,
 } from '../http/admin'
+
+/**
+ * Where the control plane listens.
+ *
+ * Site creation is the one operation that is not a call to a CMS instance — a
+ * site does not exist until the control plane has provisioned a schema, a role
+ * and a runtime for it. Configurable because the connector does not always run
+ * on the same host, and defaulted because it usually does.
+ */
+const CONTROL_PLANE_URL_ENV = 'MMS_CONTROL_PLANE_URL'
+const controlPlaneUrl = (): string =>
+  (process.env[CONTROL_PLANE_URL_ENV] ?? 'http://127.0.0.1:4400').replace(/\/+$/, '')
 
 const ok = (value: unknown): ToolResult => ({
   content: [{ type: 'text', text: JSON.stringify(value, null, 2) }],
@@ -306,6 +319,80 @@ export const ADMIN_TOOLS: ConnectorTool[] = [
         const name = str(a.fileName) || basename(filePath)
         const mime = MIME[extname(name).toLowerCase()] ?? 'application/octet-stream'
         return ok(await uploadMedia(requireSession(str(a.target)), name, bytes, mime))
+      }),
+  },
+
+  {
+    name: 'connector_create_site',
+    description:
+      'Provision a NEW, empty CMS site and return its details. Each site is an isolated instance ' +
+      'with its own database schema and its own login — which is why a clean seed needs one of ' +
+      'these rather than a wipe of an existing site. Provisioning runs in the background and takes ' +
+      'roughly 30-60 seconds. ' +
+      'Onboarding is ONE call: a site created here is automatically reachable as a connector ' +
+      'target once provisioning finishes. Poll connector_target until the returned slug appears, ' +
+      'then connector_connect to it. Nobody needs to configure anything for you. ' +
+      'A new site is NOT completely empty: it has the four system tables (pages, posts, ' +
+      'components, layouts), no collections, and exactly ONE row — a starter homepage in pages ' +
+      '(slug "index", title "Home", draft, unpublished). That seed is deliberate; a site with no ' +
+      'homepage has nothing to open. Count it in any baseline diff. import_replace clears it ' +
+      'along with everything else.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        name: {
+          type: 'string',
+          description:
+            'Display name. The slug is derived from it by lowercasing and replacing each run of ' +
+            'non-alphanumeric characters with a single hyphen, e.g. "Global Nettech" -> ' +
+            '"global-nettech". Use the returned slug rather than a predicted one.',
+        },
+        ownerEmail: { type: 'string', description: 'Email of the site owner. Receives the invite link.' },
+        customDomain: { type: 'string', description: 'Optional custom domain to attach, e.g. globalnettech.com.' },
+      },
+      required: ['name'],
+      additionalProperties: false,
+    },
+    handler: async (a) =>
+      guarded(async () => {
+        const res = await fetch(`${controlPlaneUrl()}/api/tenants`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: str(a.name),
+            ownerEmail: str(a.ownerEmail) || undefined,
+            customDomain: str(a.customDomain) || undefined,
+            tier: 'advanced',
+            // Flags the tenant as belonging to whoever holds this connector
+            // token, which is what makes it auto-enrol as a target. Tenants
+            // created any other way stay invisible here.
+            connectorManaged: true,
+          }),
+        })
+        const body = (await res.json().catch(() => ({}))) as Record<string, unknown>
+        if (!res.ok) {
+          return fail(
+            typeof body.error === 'string' ? body.error : `Site creation failed (HTTP ${res.status})`,
+            body,
+          )
+        }
+        return ok({
+          ...body,
+          // The control plane mints this against its own base URL, which is
+          // loopback on the host it runs on — so as returned it was a link only
+          // this machine could open, handed to the one person who is not on it.
+          // Re-addressed to whatever host the caller reached us on.
+          ...(typeof body.inviteUrl === 'string'
+            ? { inviteUrl: reachableFrom(body.inviteUrl) }
+            : {}),
+          inviteUrlNote:
+            'Carries a password-set token — treat as a secret, and share it over a channel you ' +
+            'would send a password on. Not needed to use the site through the connector.',
+          note:
+            'Provisioning continues in the background (~30-60s). Poll connector_target until the ' +
+            'slug appears — it enrols itself, no configuration step. Then connector_connect and ' +
+            'the site is ready for an import_replace.',
+        })
       }),
   },
 ]

@@ -2150,7 +2150,7 @@ a.avatar-item:visited {
   padding: 8px 10px;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  background: #fff;
+  background: var(--bg-panel);
   color: var(--text);
   font-size: 12px;
   line-height: 1.4;

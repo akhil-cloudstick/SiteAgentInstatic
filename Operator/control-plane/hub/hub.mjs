@@ -324,8 +324,20 @@ export async function handleHub(req, res, method, path) {
   if (path === '/login' && method === 'POST') {
     const f = await readForm(req);
     const next = safeNext(f.next);
-    const slug = await validateLogin(f.identifier, f.password);
-    if (!slug) { html(res, 401, loginPage('Wrong email/account or password.', next)); return true; }
+    const result = await validateLogin(f.identifier, f.password);
+    if (!result) { html(res, 401, loginPage('Wrong email/account or password.', next)); return true; }
+    // The password was right for more than one site, so the email alone does not
+    // say which. Naming them and asking is the only answer that cannot land
+    // someone on the wrong client's content.
+    if (typeof result !== 'string') {
+      html(res, 401, loginPage(
+        `That email owns more than one site (${result.ambiguous.join(', ')}). ` +
+          `Sign in with the site name instead of the email.`,
+        next,
+      ));
+      return true;
+    }
+    const slug = result;
     // Back to where they were. If they signed in as a DIFFERENT tenant the deep
     // link is not theirs to open, so drop them at that tool's home instead of a
     // 404: /design/... -> /design, anything else -> /hub.

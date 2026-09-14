@@ -27,8 +27,28 @@ import { TEMPLATE_TOOLS } from './templateTools'
 import { authorize, unauthorized } from './auth'
 import { originAllowed, originRejected } from './origin'
 import { logActivity, callerFingerprint } from '../audit/log'
+import { resolveExport, EXPORT_DOWNLOAD_PREFIX } from './exportStore'
+import { saveUpload, UPLOAD_ROUTE, type UploadKind } from './uploadStore'
+import { setToolSurface } from './toolSurface'
+import { withRequestContext } from './requestContext'
+import { readFileSync, statSync } from 'node:fs'
 
 export const MCP_ENDPOINT_PATH = '/mcp'
+
+/**
+ * `/exports/<exportId>` serves a whole archive in one piece.
+ *
+ * The inline `part` mechanism works and stays, but it was built for a caller
+ * that can hold the bytes. An AI agent cannot: a 39.5 MB archive is ~53 MB of
+ * base64, roughly 13 million tokens, and even a 2 MB site exceeds a single
+ * context. `deliver: "path"` is no help either — it names a file on this host,
+ * on a share the caller cannot mount.
+ *
+ * So the archive gets an address. Same port, same bearer token, same Tailscale
+ * route the caller already reaches `/mcp` on, which is what makes it reachable
+ * without anyone configuring anything.
+ */
+export { EXPORT_DOWNLOAD_PREFIX }
 
 /**
  * Which part of the connector a tool belongs to. Logged so an auditor can scan
@@ -124,6 +144,10 @@ export function buildConnectorMcpServer(caller = 'client'): Server {
     ...TEMPLATE_TOOLS,
   ]
   const byName = new Map(ALL_TOOLS.map((t) => [t.name, t]))
+  // Recorded here because this is the only place that knows the full surface.
+  // `connector_environment` reports it so a client can tell a cached tools/list
+  // from the current one — see toolSurface.ts.
+  setToolSurface(ALL_TOOLS)
 
   server.setRequestHandler('tools/list', async () => ({
     tools: ALL_TOOLS.map((t) => ({
@@ -200,7 +224,9 @@ export async function handleMcpRequest(req: Request): Promise<Response | null> {
     })
   }
 
-  if (url.pathname !== MCP_ENDPOINT_PATH) return null
+  const isDownload = url.pathname.startsWith(EXPORT_DOWNLOAD_PREFIX)
+  const isUpload = url.pathname === UPLOAD_ROUTE || url.pathname === `${UPLOAD_ROUTE}/`
+  if (url.pathname !== MCP_ENDPOINT_PATH && !isDownload && !isUpload) return null
 
   // Order matters: Origin before auth, so a rebinding attempt is rejected
   // without the token ever being compared.
@@ -228,10 +254,198 @@ export async function handleMcpRequest(req: Request): Promise<Response | null> {
     return unauthorized()
   }
 
+  if (isDownload) return serveExport(req, url, caller)
+  if (isUpload) return receiveUpload(req, url, caller)
+
   const handler = createMcpHandler(() => buildConnectorMcpServer(caller), {
     legacy: 'stateless',
     onerror: (err: unknown) => console.error('[connector:mcp] transport error:', err),
   })
 
-  return handler.fetch(req)
+  // The whole call runs inside the request context so any tool that returns a
+  // URL can address it back to wherever this caller reached us from.
+  return withRequestContext(req, () => handler.fetch(req))
+}
+
+/**
+ * Serve one exported archive whole.
+ *
+ * Behind the same bearer token as `/mcp` — the archive is a full copy of a
+ * site's content, so it is exactly as sensitive as the tools that produced it.
+ * Authorisation has already run by the time this is called.
+ */
+function serveExport(req: Request, url: URL, caller: string): Response {
+  const id = decodeURIComponent(url.pathname.slice(EXPORT_DOWNLOAD_PREFIX.length))
+  const found = resolveExport(id)
+  if (!found.ok) {
+    logActivity({
+      section: 'content',
+      action: 'export-download',
+      outcome: 'FAILED',
+      detail: found.reason,
+      caller,
+    })
+    return new Response(JSON.stringify({ error: found.reason }), {
+      status: id && /^[A-Za-z0-9._-]+$/.test(id) ? 404 : 400,
+      headers: { 'content-type': 'application/json' },
+    })
+  }
+
+  const size = statSync(found.path).size
+  logActivity({
+    section: 'content',
+    action: 'export-download',
+    outcome: 'ok',
+    detail: `${id} (${size} bytes)`,
+    caller,
+  })
+
+  // HEAD lets a caller confirm the size before committing to the transfer,
+  // which is the difference between a failed 40 MB download and a decision.
+  if (req.method === 'HEAD') {
+    return new Response(null, {
+      headers: {
+        'content-type': 'application/zip',
+        'content-length': String(size),
+        'content-disposition': `attachment; filename="${id}"`,
+      },
+    })
+  }
+
+  // Compressed on the wire when the caller accepts it.
+  //
+  // The archive itself is a STORED zip — deliberately, because media is already
+  // compressed and stored entries let the CMS stream an export without holding
+  // it in memory. The cost is that the manifest, which is one large JSON text
+  // blob, ships uncompressed: measured on a 398-page site, 39,490,566 bytes of
+  // JSON in a 39,490,716-byte archive, which deflates to 7.46 MB — 5.3x.
+  //
+  // Transport compression collects that 5.3x without touching the archive
+  // format, so import stays byte-identical to what it has always parsed. It is
+  // streamed rather than buffered so a large archive does not cost a 40 MB
+  // allocation, and content-length is omitted because the compressed size is
+  // not known until the last chunk.
+  const acceptsGzip = /\bgzip\b/i.test(req.headers.get('accept-encoding') ?? '')
+  if (acceptsGzip) {
+    return new Response(Bun.file(found.path).stream().pipeThrough(new CompressionStream('gzip')), {
+      headers: {
+        'content-type': 'application/zip',
+        'content-encoding': 'gzip',
+        'content-disposition': `attachment; filename="${id}"`,
+        // The decompressed size, so a caller can check what it got against
+        // what the tool reported without trusting the transfer.
+        'x-archive-bytes': String(size),
+      },
+    })
+  }
+
+  return new Response(readFileSync(found.path), {
+    headers: {
+      'content-type': 'application/zip',
+      'content-length': String(size),
+      'content-disposition': `attachment; filename="${id}"`,
+    },
+  })
+}
+
+/**
+ * Receive one bundle and hold it for an import to name.
+ *
+ * The inbound mirror of `/exports/`, and behind the same bearer token: the two
+ * directions carry the same thing — a whole copy of a site — so they warrant
+ * the same guard rather than a second credential to distribute.
+ *
+ * Authorisation has already run by the time this is called.
+ */
+async function receiveUpload(req: Request, url: URL, caller: string): Promise<Response> {
+  const reject = (status: number, error: string): Response => {
+    logActivity({ section: 'content', action: 'import-upload', outcome: 'FAILED', detail: error, caller })
+    return new Response(JSON.stringify({ error }), {
+      status,
+      headers: { 'content-type': 'application/json' },
+    })
+  }
+
+  if (req.method !== 'POST') {
+    return reject(405, `Use POST to ${UPLOAD_ROUTE}. Received ${req.method}.`)
+  }
+
+  // Decompressed here, explicitly. A server does not get this for free the way
+  // an HTTP client does on the response side, and a bundle manifest deflates
+  // about 5x — so declining it would leave most of the transfer on the table
+  // for the one payload big enough to have prompted this route.
+  const encoding = (req.headers.get('content-encoding') ?? '').toLowerCase().trim()
+  let bytes: Uint8Array
+  try {
+    if (encoding === 'gzip' || encoding === 'deflate') {
+      const format = encoding === 'gzip' ? 'gzip' : 'deflate'
+      const stream = req.body?.pipeThrough(new DecompressionStream(format))
+      if (!stream) return reject(400, 'Empty body — send the bundle as the request body.')
+      bytes = new Uint8Array(await new Response(stream).arrayBuffer())
+    } else if (encoding && encoding !== 'identity') {
+      return reject(415, `Unsupported content-encoding "${encoding}". Use gzip, deflate, or none.`)
+    } else {
+      bytes = new Uint8Array(await req.arrayBuffer())
+    }
+  } catch (err) {
+    return reject(
+      400,
+      `Could not read the request body${encoding ? ` (content-encoding: ${encoding})` : ''}: ` +
+        `${err instanceof Error ? err.message : String(err)}`,
+    )
+  }
+  if (bytes.length === 0) return reject(400, 'Empty body — send the bundle as the request body.')
+
+  // ZIP unless it declares JSON, then confirmed against the bytes. A bundle
+  // named wrongly would otherwise be stored as one kind and fail later inside
+  // an import, where the cause is much harder to see than it is here.
+  const contentType = (req.headers.get('content-type') ?? '').toLowerCase()
+  const declared: UploadKind = contentType.includes('json') ? 'json' : 'zip'
+  const looksZip = bytes[0] === 0x50 && bytes[1] === 0x4b // "PK"
+  if (declared === 'zip' && !looksZip) {
+    return reject(
+      400,
+      'Body is not a ZIP archive (no PK signature). Send a site-bundle .zip, or set ' +
+        'content-type: application/json to upload a SiteBundle as JSON.',
+    )
+  }
+  if (declared === 'json' && looksZip) {
+    return reject(400, 'Body is a ZIP but content-type says JSON. Send content-type: application/zip.')
+  }
+  if (declared === 'json') {
+    try {
+      JSON.parse(new TextDecoder().decode(bytes))
+    } catch (err) {
+      return reject(400, `Body is not valid JSON: ${err instanceof Error ? err.message : String(err)}`)
+    }
+  }
+
+  // Verified before storing, so a corrupted transfer is refused rather than
+  // kept and discovered by an import already replacing a site's contents.
+  const expectedSha256 = url.searchParams.get('sha256') ?? req.headers.get('x-bundle-sha256') ?? undefined
+  const stored = saveUpload(bytes, declared, { expectedSha256: expectedSha256 ?? undefined })
+  if (!stored.ok) return reject(422, stored.reason)
+
+  const { upload } = stored
+  logActivity({
+    section: 'content',
+    action: 'import-upload',
+    outcome: 'ok',
+    detail: `${upload.uploadId} (${upload.bytes} bytes, ${upload.kind})`,
+    caller,
+  })
+
+  return new Response(
+    JSON.stringify({
+      uploadId: upload.uploadId,
+      bytes: upload.bytes,
+      sha256: upload.sha256,
+      kind: upload.kind,
+      expiresAt: new Date(upload.expiresAt).toISOString(),
+      note:
+        'Pass uploadId to connector_preview_import (dry run, writes nothing) and then to ' +
+        'connector_import_replace or connector_import_archive.',
+    }),
+    { status: 201, headers: { 'content-type': 'application/json' } },
+  )
 }

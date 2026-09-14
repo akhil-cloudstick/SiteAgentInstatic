@@ -916,8 +916,8 @@ export function DesignSystemsTab({
     return (
       <>
       <header className={styles.pageHeader} data-testid="design-systems-page-header">
-        <div className={styles.pageTitleBlock}>
-          <h1 className={styles.pageTitle}>{t('entry.navDesignSystems')}</h1>
+        <div className={`${styles.pageTitleBlock} mms-nav-duplicate-titleblock`}>
+          <h1 className={`${styles.pageTitle} mms-nav-duplicate-title`}>{t('entry.navDesignSystems')}</h1>
         </div>
         <div className={styles.headerTools} data-testid="design-systems-header-tools" aria-hidden>
           <div className={`${styles.searchWrap} ${styles.headerSearch}`} data-testid="design-systems-header-search">
@@ -994,8 +994,8 @@ export function DesignSystemsTab({
       {/* #5517 page header: title left, create action right — the create
           button leaves the sidebar so the list column starts at the tabs. */}
       <header className={styles.pageHeader} data-testid="design-systems-page-header">
-        <div className={styles.pageTitleBlock}>
-          <h1 className={styles.pageTitle}>{t('entry.navDesignSystems')}</h1>
+        <div className={`${styles.pageTitleBlock} mms-nav-duplicate-titleblock`}>
+          <h1 className={`${styles.pageTitle} mms-nav-duplicate-title`}>{t('entry.navDesignSystems')}</h1>
         </div>
         <div className={styles.headerTools} data-testid="design-systems-header-tools">
           {onCreate ? (

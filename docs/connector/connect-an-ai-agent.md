@@ -1,3 +1,5 @@
+> **Superseded by `mms-mcp-v2.md`.** Kept for reference; details below may no longer match the code.
+
 # Connect an AI agent to a client site
 
 How to give an AI assistant access to a client's website, so it can write pages, draft blog posts

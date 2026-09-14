@@ -1,0 +1,838 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MMS Connector</title>
+
+<style>
+  :root {
+    --ground:      #F1F4F3;
+    --surface:     #FFFFFF;
+    --surface-2:   #E7ECEA;
+    --ink:         #131E1C;
+    --ink-soft:    #3A4B48;
+    --muted:       #63736F;
+    --rule:        #CBD5D2;
+    --rule-soft:   #DFE6E4;
+    --accent:      #0D6357;
+    --accent-soft: #DCEEEA;
+    --signal:      #A6501B;
+    --signal-soft: #F6E9DD;
+
+    --font-mono: ui-monospace, "Cascadia Mono", "Cascadia Code", "SF Mono", "JetBrains Mono", Consolas, monospace;
+    --font-body: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    --font-ui:   "Segoe UI", system-ui, -apple-system, "Helvetica Neue", sans-serif;
+
+    --measure: 68ch;
+    --pad: clamp(1.25rem, 4vw, 3.5rem);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:      #0C1413;
+      --surface:     #141F1D;
+      --surface-2:   #1C2826;
+      --ink:         #E2EAE8;
+      --ink-soft:    #B6C4C1;
+      --muted:       #849793;
+      --rule:        #2C3B38;
+      --rule-soft:   #22302E;
+      --accent:      #55C6B2;
+      --accent-soft: #13322D;
+      --signal:      #DE9457;
+      --signal-soft: #33241A;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground:      #0C1413;
+    --surface:     #141F1D;
+    --surface-2:   #1C2826;
+    --ink:         #E2EAE8;
+    --ink-soft:    #B6C4C1;
+    --muted:       #849793;
+    --rule:        #2C3B38;
+    --rule-soft:   #22302E;
+    --accent:      #55C6B2;
+    --accent-soft: #13322D;
+    --signal:      #DE9457;
+    --signal-soft: #33241A;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--font-body);
+    font-size: 17px;
+    line-height: 1.62;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 78rem;
+    margin: 0 auto;
+    padding: var(--pad);
+    display: flex;
+    flex-direction: column;
+    gap: 4.5rem;
+  }
+
+  .col { max-width: var(--measure); }
+
+  p { margin: 0 0 1rem; }
+  p:last-child { margin-bottom: 0; }
+  strong { font-weight: 600; color: var(--ink); }
+  code, .mono { font-family: var(--font-mono); }
+
+  p code, li code, td code, dd code {
+    font-size: 0.82em;
+    background: var(--surface-2);
+    padding: 0.1em 0.36em;
+    border-radius: 3px;
+    color: var(--ink-soft);
+  }
+
+  /* ---------- masthead ---------- */
+
+  .masthead {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    padding-bottom: 2.5rem;
+    border-bottom: 2px solid var(--ink);
+  }
+
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0;
+  }
+
+  h1 {
+    font-family: var(--font-mono);
+    font-size: clamp(2.1rem, 5.5vw, 3.1rem);
+    line-height: 1.04;
+    letter-spacing: -0.035em;
+    font-weight: 600;
+    margin: 0;
+    text-wrap: balance;
+  }
+
+  .standfirst {
+    font-size: clamp(1.06rem, 2vw, 1.24rem);
+    line-height: 1.5;
+    color: var(--ink-soft);
+    max-width: 56ch;
+    margin: 0;
+  }
+
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 2.25rem;
+    font-family: var(--font-mono);
+    font-size: 0.76rem;
+    color: var(--muted);
+    padding-top: 0.5rem;
+  }
+  .meta span b { color: var(--ink-soft); font-weight: 500; letter-spacing: 0.02em; }
+  .meta span::before {
+    content: attr(data-k);
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    font-size: 0.9em;
+    margin-right: 0.6em;
+  }
+
+  /* ---------- sections ---------- */
+
+  section { display: flex; flex-direction: column; gap: 1.5rem; }
+
+  .sec-head {
+    display: flex;
+    align-items: baseline;
+    gap: 1rem;
+    border-bottom: 1px solid var(--rule);
+    padding-bottom: 0.7rem;
+  }
+
+  .sec-num {
+    font-family: var(--font-mono);
+    font-size: 0.74rem;
+    letter-spacing: 0.1em;
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+    flex: none;
+  }
+
+  h2 {
+    font-family: var(--font-mono);
+    font-size: clamp(1.15rem, 2.4vw, 1.42rem);
+    letter-spacing: -0.02em;
+    font-weight: 600;
+    margin: 0;
+    text-wrap: balance;
+  }
+
+  h3 { font-family: var(--font-ui); font-size: 0.98rem; font-weight: 650; margin: 0; }
+
+  /* ---------- verdict banner ---------- */
+
+  .verdict {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+    gap: 1px;
+    background: var(--rule);
+    border: 1px solid var(--rule);
+  }
+  .verdict > div {
+    background: var(--surface);
+    padding: 1.15rem 1.2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+  .verdict .n {
+    font-family: var(--font-mono);
+    font-size: 1.7rem;
+    letter-spacing: -0.03em;
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+  }
+  .verdict .n.warn { color: var(--signal); }
+  .verdict .n:not(.num) { font-size: 1.15rem; letter-spacing: -0.01em; line-height: 1.25; }
+  .verdict .n.num { font-size: 1.7rem; }
+  .verdict .l {
+    font-family: var(--font-ui);
+    font-size: 0.8rem;
+    line-height: 1.45;
+    color: var(--ink-soft);
+  }
+
+  /* ---------- callouts ---------- */
+
+  .note {
+    padding: 1.5rem clamp(1.1rem, 3vw, 1.9rem);
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+  }
+  .note.hot { background: var(--signal-soft); border-left: 3px solid var(--signal); }
+  .note.cool { background: var(--accent-soft); border-left: 3px solid var(--accent); }
+
+  .note .tag {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+  }
+  .note.hot .tag { color: var(--signal); }
+  .note.cool .tag { color: var(--accent); }
+
+  .note .lede {
+    font-family: var(--font-ui);
+    font-size: 1.1rem;
+    font-weight: 650;
+    line-height: 1.4;
+    margin: 0;
+    max-width: 50ch;
+  }
+  .note p { max-width: 68ch; color: var(--ink-soft); }
+
+  .note pre {
+    background: transparent;
+    border: none;
+    border-left: 2px solid currentColor;
+    padding: 0.1rem 0 0.1rem 0.9rem;
+    color: var(--ink);
+    font-size: 0.8rem;
+  }
+
+  /* ---------- diagram ---------- */
+
+  .figure { display: flex; flex-direction: column; gap: 0.9rem; }
+
+  .scroller {
+    overflow-x: auto;
+    background: var(--surface);
+    border: 1px solid var(--rule-soft);
+    padding: 1.5rem 1.25rem;
+  }
+  .scroller svg { display: block; min-width: 900px; width: 100%; height: auto; }
+
+  figcaption, .cap {
+    font-family: var(--font-mono);
+    font-size: 0.74rem;
+    color: var(--muted);
+    line-height: 1.55;
+  }
+
+  /* ---------- tables ---------- */
+
+  .tbl-wrap { overflow-x: auto; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: var(--font-ui);
+    font-size: 0.855rem;
+    line-height: 1.5;
+    min-width: 640px;
+  }
+
+  th {
+    text-align: left;
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 500;
+    padding: 0 1.1rem 0.65rem 0;
+    border-bottom: 1px solid var(--rule);
+    vertical-align: bottom;
+  }
+
+  td {
+    padding: 0.85rem 1.1rem 0.85rem 0;
+    border-bottom: 1px solid var(--rule-soft);
+    vertical-align: top;
+    color: var(--ink-soft);
+  }
+
+  td:first-child { color: var(--ink); font-weight: 600; width: 27%; }
+  th:last-child, td:last-child { padding-right: 0; }
+
+  td .mono { font-size: 0.85em; color: var(--muted); display: block; margin-top: 0.28rem; }
+
+  .pill {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 0.63rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 0.18em 0.5em;
+    border: 1px solid currentColor;
+    white-space: nowrap;
+  }
+  .pill.ok { color: var(--accent); }
+  .pill.no { color: var(--signal); }
+
+  /* ---------- decisions ---------- */
+
+  .decisions { display: flex; flex-direction: column; gap: 0; border-top: 1px solid var(--rule); }
+
+  .decision {
+    display: grid;
+    grid-template-columns: 3rem 1fr;
+    gap: 0 1.5rem;
+    padding: 1.5rem 0;
+    border-bottom: 1px solid var(--rule-soft);
+  }
+  .decision .d-n {
+    font-family: var(--font-mono);
+    font-size: 1.1rem;
+    color: var(--signal);
+    font-variant-numeric: tabular-nums;
+    line-height: 1.25;
+  }
+  .decision .d-b { display: flex; flex-direction: column; gap: 0.5rem; max-width: var(--measure); }
+  .decision p { font-size: 0.92rem; color: var(--ink-soft); margin: 0; }
+
+  .opts { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.15rem; }
+  .opts span {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    padding: 0.28em 0.6em;
+    color: var(--ink-soft);
+  }
+
+  /* ---------- stages ---------- */
+
+  .stages { display: flex; flex-direction: column; gap: 0; border-top: 1px solid var(--rule); }
+
+  .stage {
+    display: grid;
+    grid-template-columns: 6rem 1fr;
+    gap: 0 1.75rem;
+    padding: 1.55rem 0;
+    border-bottom: 1px solid var(--rule-soft);
+  }
+
+  .stage-id {
+    font-family: var(--font-mono);
+    font-size: 0.74rem;
+    letter-spacing: 0.1em;
+    color: var(--accent);
+    padding-top: 0.18rem;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .stage-body { display: flex; flex-direction: column; gap: 0.65rem; max-width: var(--measure); }
+  .stage-body p { font-size: 0.93rem; color: var(--ink-soft); margin: 0; }
+
+  .gate {
+    font-family: var(--font-ui);
+    font-size: 0.83rem;
+    line-height: 1.5;
+    background: var(--accent-soft);
+    color: var(--ink);
+    padding: 0.6rem 0.85rem;
+    border-left: 2px solid var(--accent);
+  }
+  .gate b {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--accent);
+    display: block;
+    margin-bottom: 0.2rem;
+    font-weight: 500;
+  }
+  .gate.stop { background: var(--signal-soft); border-left-color: var(--signal); }
+  .gate.stop b { color: var(--signal); }
+
+  /* ---------- lists ---------- */
+
+  .grid-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr));
+    gap: 1px;
+    background: var(--rule-soft);
+    border: 1px solid var(--rule-soft);
+  }
+  .grid-list li {
+    background: var(--surface);
+    padding: 1rem 1.15rem;
+    font-family: var(--font-ui);
+    font-size: 0.85rem;
+    line-height: 1.5;
+    color: var(--ink-soft);
+    display: flex;
+    flex-direction: column;
+    gap: 0.28rem;
+  }
+  .grid-list b {
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    color: var(--ink);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+
+  ol.checks {
+    margin: 0;
+    padding-left: 0;
+    list-style: none;
+    counter-reset: chk;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(21rem, 1fr));
+    gap: 0.5rem 2.5rem;
+  }
+  ol.checks li {
+    counter-increment: chk;
+    display: grid;
+    grid-template-columns: 1.9rem 1fr;
+    font-family: var(--font-ui);
+    font-size: 0.86rem;
+    line-height: 1.5;
+    color: var(--ink-soft);
+  }
+  ol.checks li::before {
+    content: counter(chk, decimal-leading-zero);
+    font-family: var(--font-mono);
+    font-size: 0.71rem;
+    color: var(--accent);
+    padding-top: 0.22rem;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .arms { display: grid; grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr)); gap: 2rem 3rem; }
+  .arm { display: flex; flex-direction: column; gap: 0.5rem; }
+  .arm .k {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+  .arm .k.dim { color: var(--muted); }
+  .arm p { font-size: 0.89rem; color: var(--ink-soft); margin: 0; }
+
+  pre {
+    margin: 0;
+    background: var(--surface);
+    border: 1px solid var(--rule-soft);
+    border-left: 2px solid var(--accent);
+    padding: 1.1rem 1.2rem;
+    overflow-x: auto;
+    font-family: var(--font-mono);
+    font-size: 0.79rem;
+    line-height: 1.72;
+    color: var(--ink-soft);
+  }
+  pre .c { color: var(--muted); }
+  pre .k { color: var(--accent); }
+
+  footer {
+    border-top: 2px solid var(--ink);
+    padding-top: 1.5rem;
+    font-family: var(--font-mono);
+    font-size: 0.74rem;
+    color: var(--muted);
+    line-height: 1.7;
+  }
+
+  @media (max-width: 40rem) {
+    .stage, .decision { grid-template-columns: 1fr; gap: 0.5rem; }
+    .meta { gap: 0.3rem 1.5rem; flex-direction: column; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="eyebrow">Reference</p>
+    <h1>MMS Connector</h1>
+    <p class="standfirst">A Model Context Protocol server for whole-site work: import a bundle, replace a site, export a snapshot, provision a new instance, publish everything.</p>
+    <div class="meta">
+      <span data-k="endpoint"><b>/connector-mcp</b></span>
+      <span data-k="tools"><b>34</b></span>
+      <span data-k="auth"><b>One bearer token</b></span>
+      <span data-k="scopes"><b>None — full access</b></span>
+    </div>
+  </header>
+
+  <div class="note cool"><p class="lede"><b>This is one of two MCP surfaces in this platform.</b> The Connector is a standalone service for migrating, importing, exporting and publishing whole sites. If you want a per-site key with granular permissions for day-to-day content work, you want <b>MMS MCP</b> instead — see <code>mms-mcp-v2.md</code>. The two have different endpoints, different token formats and different permission models.</p></div>
+  <section>
+    <div class="sec-head"><span class="sec-num">01</span><h2>What it is</h2></div>
+    <p>The MMS Connector is a Model Context Protocol server. It exposes the CMS as a set of tools any</p>
+    <p>MCP-capable AI client or CLI can call. You describe what you want in plain language; the client</p>
+    <p>picks the tool and fills in the arguments.</p>
+    <p>It is built for the whole-site jobs: load a site bundle, replace a site's contents, export a</p>
+    <p>snapshot, provision a new site, publish everything. It can also do ordinary row-level CRUD, but</p>
+    <p>that is not the reason it exists.</p>
+    <p>The service runs separately from the CMS and connects outward to one or more CMS instances using</p>
+    <p>credentials held on the server. <b>A caller never sees or supplies CMS credentials</b> — only the</p>
+    <p>connector's own bearer token.</p>
+  </section>
+  <section>
+    <div class="sec-head"><span class="sec-num">02</span><h2>Connecting</h2></div>
+    <p>You need two values: the <b>endpoint URL</b> and the <b>token</b>.</p>
+    <h3>Claude Code</h3>
+    <pre>claude mcp add --transport http mms-connector \
+  &lt;gateway-origin&gt;/connector-mcp \
+  --header "Authorization: Bearer &lt;token&gt;"</pre>
+    <p>Then <code>claude mcp list</code> to confirm, <code>claude mcp remove mms-connector</code> to undo.</p>
+    <h3>Any client that takes JSON config</h3>
+    <p>Cursor, Windsurf, Cline, VS Code Copilot and most others:</p>
+    <pre>{
+  "mcpServers": {
+    "mms-connector": {
+      "type": "http",
+      "url": "&lt;gateway-origin&gt;/connector-mcp",
+      "headers": { "Authorization": "Bearer &lt;token&gt;" }
+    }
+  }
+}</pre>
+    <p>Client-specific notes:</p>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Client</th><th>Where the config goes</th><th>Note</th></tr></thead>
+        <tbody>
+          <tr><td>Cursor</td><td>Settings → MCP → Add new MCP server</td><td>—</td></tr>
+          <tr><td>VS Code Copilot</td><td><code>.vscode/mcp.json</code>, or <code>MCP: Add Server</code></td><td>Switch Copilot Chat to <b>Agent</b> mode — MCP tools are not available in Ask mode</td></tr>
+          <tr><td>Windsurf</td><td>Settings → Cascade → MCP Servers</td><td>Uses the key <code>serverUrl</code>, not <code>url</code></td></tr>
+          <tr><td>Cline</td><td>MCP Servers → Configure → Edit Configuration</td><td>Set <code>"type": "streamableHttp"</code></td></tr>
+          <tr><td>n8n</td><td><b>MCP Client</b> node</td><td>Server Transport <code>HTTP Streamable</code>, Authentication <code>Header Auth</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <h3>Clients that only speak stdio</h3>
+    <p>Claude Desktop and Codex CLI cannot call an HTTP MCP server directly. Bridge with <code>mcp-remote</code></p>
+    <p>(from npm, so Node must be installed):</p>
+    <pre>{
+  "mcpServers": {
+    "mms-connector": {
+      "command": "npx",
+      "args": ["-y", "mcp-remote", "&lt;gateway-origin&gt;/connector-mcp",
+               "--header", "Authorization:${AUTH}"],
+      "env": { "AUTH": "Bearer &lt;token&gt;" }
+    }
+  }
+}</pre>
+    <p>The <code>${AUTH}</code> indirection is deliberate: the header value contains a space, which breaks argument</p>
+    <p>parsing when written inline. Putting it in <code>env</code> is the standard workaround.</p>
+    <p>Codex CLI uses the same idea in <code>~/.codex/config.toml</code> under <code>[mcp_servers.mms-connector]</code>.</p>
+    <h3>Checking the connection without an AI</h3>
+    <pre>curl -X POST &lt;gateway-origin&gt;/connector-mcp \
+  -H "Authorization: Bearer &lt;token&gt;" \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'</pre>
+    <p>A healthy response lists 34 tools. <code>401</code> means the token is wrong, missing, or the service was</p>
+    <p>restarted with a different one.</p>
+    <p>There is also an unauthenticated liveness probe: <code>GET &lt;connector-host&gt;/health</code> returns</p>
+    <p><code>{"ok":true,"service":"mms-connector-mcp"}</code>.</p>
+  </section>
+  <section>
+    <div class="sec-head"><span class="sec-num">03</span><h2>Naming a target</h2></div>
+    <p>The connector can be configured with several CMS instances. Each has a short name — its <b>target</b>.</p>
+    <ul>
+      <li>Every tool takes an optional <code>target</code> argument.</li>
+      <li>With exactly one configured, you can omit it.</li>
+      <li>With more than one, a call that does not name a target <b>refuses rather than guessing</b>.</li>
+      <li>A default can be set server-side, so <code>target</code> is only needed to override it.</li>
+    </ul>
+    <p>In practice you say *"connect to <code>&lt;target-name&gt;</code>"* once at the start of a session, and the client</p>
+    <p>carries it through the rest of the conversation.</p>
+    <p><code>connector_target</code> lists what is configured and which targets currently have an open session. Run</p>
+    <p>it first when you do not know the names.</p>
+    <p>A site created through <code>connector_create_site</code> enrols itself and becomes addressable without a</p>
+    <p>restart. Any other site has to be added to the server's allow-list, which fails closed on purpose.</p>
+  </section>
+  <section>
+    <div class="sec-head"><span class="sec-num">04</span><h2>Permissions — read this before handing the token out</h2></div>
+    <p><b>The Connector has no permission model.</b> There are no scopes, no roles, no per-token capability</p>
+    <p>lists. Anyone holding the token gets all 34 tools against every configured target — read, create,</p>
+    <p>edit, delete, publish, and clean-site replace.</p>
+    <p>That is a deliberate design, not an oversight, but it has consequences worth stating plainly:</p>
+    <ul>
+      <li>The token also authenticates the connector's own call to the control plane for target enrolment, which returns <b>live CMS credentials</b>. Treat it as an infrastructure secret, not a content credential.</li>
+      <li><b>There is no revocation list.</b> Rotating means restarting the service with a new token. The old one stops working at that moment, and every client using it breaks until re-issued.</li>
+      <li><b>If you need a scoped, revocable, per-site credential, use MMS MCP instead</b> (<code>mms-mcp-v2.md</code>). That surface has ten granular permissions, four presets, table narrowing, expiry and one-click revoke.</li>
+    </ul>
+    <h3>The four guards that do exist</h3>
+    <ol class="checks">
+      <li><b>The bearer token.</b> Minimum 32 characters, enforced at startup — the service refuses to open the port without one. Compared in constant time. Callers appear in the activity log as a non-reversible fingerprint, never as the token itself.</li>
+    </ol>
+    <ol class="checks">
+      <li><b>An Origin allow-list</b>, configured server-side. This is anti-DNS-rebinding, not authorization: requests with no Origin header at all are allowed, because that is what a server-to-server caller looks like. It is checked <em>before</em> the token, so the token is never compared on a rebinding attempt.</li>
+    </ol>
+    <ol class="checks">
+      <li><b>Typed confirmation phrases</b> on the two bulk-destructive tools. These are the real brake:</li>
+    </ol>
+    <p>   | Tool | Required <code>confirm</code> value |</p>
+    <p>   |---|---|</p>
+    <p>   | <code>connector_import_replace</code> | <code>REPLACE &lt;target&gt;</code> |</p>
+    <p>   | <code>connector_delete_rows</code> | <code>DELETE &lt;count&gt; FROM &lt;target&gt;</code> |</p>
+    <p>   The count is embedded in the delete phrase specifically so a confirmation cannot be reused for a</p>
+    <p>   larger batch than the one it was written for.</p>
+    <p>   Note what is <em>not</em> covered: <code>connector_delete_row</code> (singular), <code>connector_publish_row</code> and</p>
+    <p>   <code>connector_publish_site</code> carry warnings but require no confirmation phrase.</p>
+    <ol class="checks">
+      <li><b>CMS-side step-up.</b> The CMS — not the connector — demands a recent re-authentication before a full-site publish, a clean-site import, or any schema change. <code>connector_step_up</code> performs it. The connector does not pre-check this; the CMS refuses and the tool surfaces the error.</li>
+    </ol>
+  </section>
+  <section>
+    <div class="sec-head"><span class="sec-num">05</span><h2>The 34 tools</h2></div>
+    <p>Marked <b>R</b> read-only · <b>W</b> writes · <b>D</b> destructive and not reversible.</p>
+    <p>Every tool takes an optional <code>target</code>. Required arguments are marked <code>*</code>.</p>
+    <h3>Environment and verification — 4, all read-only</h3>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th></th><th>Tool</th><th>Arguments</th><th>What it does</th></tr></thead>
+        <tbody>
+          <tr><td>R</td><td><code>connector_doctor</code></td><td><code>fixtureDir</code></td><td>Verifies the conversion environment end to end: DOM globals, the base module registry, and a fixture conversion through the CMS's own <code>importHtml</code>/<code>cssToStyleRules</code>. Run first — a silent conversion failure looks like a content problem.</td></tr>
+          <tr><td>R</td><td><code>connector_environment</code></td><td>—</td><td>Runtime report: engine version, registered module ids, DOM-global state, <code>ready</code>, and <code>toolSurface.revision</code>.</td></tr>
+          <tr><td>R</td><td><code>connector_hash_rows</code></td><td><code>rows*</code></td><td>Canonical per-row hashes plus an aggregate digest. Order-independent. The digest is what an approval binds; each row hash is what a release sends as <code>If-Match</code>.</td></tr>
+          <tr><td>R</td><td><code>connector_verify_approval</code></td><td><code>approval*</code>, <code>observed*</code>, <code>releaseManifest*</code></td><td>Checks an approval against observed state and a release manifest, returning <b>every</b> failing binding at once rather than the first.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <h3>Sessions and targets — 3</h3>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th></th><th>Tool</th><th>Arguments</th><th>What it does</th></tr></thead>
+        <tbody>
+          <tr><td>R</td><td><code>connector_target</code></td><td>—</td><td>Lists configured targets and which have open sessions.</td></tr>
+          <tr><td>W</td><td><code>connector_connect</code></td><td><code>mfaCode</code></td><td>Opens a session using server-held credentials. Required before any import tool.</td></tr>
+          <tr><td>W</td><td><code>connector_disconnect</code></td><td>—</td><td>Drops one session, or all of them if no target is named.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <h3>Reading content — 5, all read-only</h3>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th></th><th>Tool</th><th>Arguments</th><th>What it does</th></tr></thead>
+        <tbody>
+          <tr><td>R</td><td><code>connector_list_tables</code></td><td>—</td><td>All content tables with ids, kinds and field definitions. Start here when you do not know a table id.</td></tr>
+          <tr><td>R</td><td><code>connector_get_table</code></td><td><code>tableId*</code></td><td>One table with complete field definitions. Use before changing fields, so the change is made against what is actually there.</td></tr>
+          <tr><td>R</td><td><code>connector_list_rows</code></td><td><code>tableId*</code>, <code>limit</code>, <code>offset</code>, <code>fields</code></td><td>Paginated rows. Returns <b>summaries by default</b> — id, slug, status, title, timestamps — because a full page row carries its entire body. <code>fields: "full"</code> for everything. Default 25, cap 200.</td></tr>
+          <tr><td>R</td><td><code>connector_get_row</code></td><td><code>rowId*</code></td><td>One row in full.</td></tr>
+          <tr><td>R</td><td><code>connector_publish_status</code></td><td>—</td><td>Whether the draft differs from what is live, and how many pages are published. Worth checking before <em>and</em> after any publish.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <h3>Writing content — 5</h3>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th></th><th>Tool</th><th>Arguments</th><th>What it does</th></tr></thead>
+        <tbody>
+          <tr><td>W</td><td><code>connector_create_row</code></td><td><code>tableId*</code>, <code>slug</code>, <code>cells</code></td><td>Creates a row as <b>draft</b> — not publicly visible until published. <code>cells</code> holds field values keyed by field id.</td></tr>
+          <tr><td>W</td><td><code>connector_update_row</code></td><td><code>rowId*</code>, <code>slug</code>, <code>cells</code></td><td>Changes field values or the slug. If the row is already published, <b>the live version does not change</b> until it is published again — the edit lands on the draft.</td></tr>
+          <tr><td>W</td><td><code>connector_set_row_status</code></td><td><code>rowId*</code>, <code>status*</code> (<code>draft</code>\</td><td><code>unpublished</code>)</td><td>The reversible way to take something off the site: unpublishing retracts the public route but keeps the content.</td></tr>
+          <tr><td><b>D</b></td><td><code>connector_delete_row</code></td><td><code>rowId*</code></td><td>Deletes a row. <b>No undo, no trash.</b> If the goal is to take a page off the site, use <code>connector_set_row_status</code> instead.</td></tr>
+          <tr><td><b>D</b></td><td><code>connector_delete_rows</code></td><td><code>rowIds*</code>, <code>confirm*</code></td><td>Bulk delete. <code>confirm</code> must be exactly <code>DELETE &lt;count&gt; FROM &lt;target&gt;</code>. Reports each row individually so a partial failure is visible.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <h3>Publishing — 2</h3>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th></th><th>Tool</th><th>Arguments</th><th>What it does</th></tr></thead>
+        <tbody>
+          <tr><td>W</td><td><code>connector_publish_row</code></td><td><code>rowId*</code></td><td>Publishes one row — <b>live immediately</b>. There is no previous-version rollback; unpublishing later retracts the route but does not restore earlier content.</td></tr>
+          <tr><td>W</td><td><code>connector_publish_site</code></td><td>—</td><td>Builds the site snapshot and every page version and takes the result live. The largest single action available here. Requires a recent step-up.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <h3>Import and export — 6</h3>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th></th><th>Tool</th><th>Arguments</th><th>What it does</th></tr></thead>
+        <tbody>
+          <tr><td>R</td><td><code>connector_preview_import</code></td><td><code>bundle</code> \</td><td><code>uploadId</code> \</td><td><code>path</code>, <code>strategy</code></td><td><b>Dry run — writes nothing.</b> Per-table counts of rows added and replaced, plus media and redirect totals. Always run this before importing. Pass exactly one source.</td></tr>
+          <tr><td>W</td><td><code>connector_import_draft</code></td><td><code>bundle*</code>, <code>strategy</code></td><td>Imports a bundle as <b>draft</b>. Imported rows have no active version, so nothing becomes publicly visible until a separate publish.</td></tr>
+          <tr><td>W</td><td><code>connector_import_archive</code></td><td><code>uploadId</code> \</td><td><code>path</code>, <code>strategy</code></td><td>Imports a bundle <b>ZIP</b>. A ZIP carries media files as well as content, which the JSON path does not.</td></tr>
+          <tr><td><b>D</b></td><td><code>connector_import_replace</code></td><td><code>bundle</code> \</td><td><code>uploadId</code> \</td><td><code>path</code>, <code>confirm*</code>, <code>previewOnly</code></td><td><b>Clean-site import.</b> Deletes every row, every non-system table, all media folders and all redirects, then inserts. Not reversible. <b>It also clears the published version</b> — public URLs keep serving the last deployment, with nothing in the admin saying so, until a new publish runs. <code>confirm</code> must be exactly <code>REPLACE &lt;target&gt;</code>.</td></tr>
+          <tr><td>R</td><td><code>connector_export_bundle</code></td><td><code>includeMedia</code>, <code>deliver</code>, <code>part</code>, <code>exportId</code></td><td>Downloads the site as a bundle archive. <b>A bundle export is not a rollback artefact</b> — it captures content, not the published state.</td></tr>
+          <tr><td>R</td><td><code>connector_export_manifest</code></td><td><code>rows</code>, <code>tableId</code>, <code>limit</code>, <code>offset</code></td><td>The manifest itself as JSON — tables, rows, redirects. This is the part worth diffing. Media bytes omitted.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>Two supporting HTTP routes exist on the same host and the same token:</p>
+    <ul>
+      <li><code>GET /exports/&lt;exportId&gt;</code> — download a whole archive in one request. Gzipped when accepted; <code>HEAD</code> supported for size checks.</li>
+      <li><code>POST /imports</code> — upload a bundle and get back an <code>uploadId</code> to pass to the import tools. Accepts gzip/deflate, and will verify a <code>sha256</code> if you supply one.</li>
+    </ul>
+    <h3>Structure and SEO — 5</h3>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th></th><th>Tool</th><th>Arguments</th><th>What it does</th></tr></thead>
+        <tbody>
+          <tr><td>W</td><td><code>connector_create_table</code></td><td><code>name*</code>, <code>slug*</code>, <code>kind*</code> (<code>data</code>\</td><td><code>postType</code>), <code>routeBase</code>, <code>singularLabel</code>, <code>pluralLabel</code></td><td>Creates a content table. Changes the public URL surface, so it needs a recent step-up. <code>postType</code> gives a routed collection whose entries get their own URLs.</td></tr>
+          <tr><td>W</td><td><code>connector_add_table_fields</code></td><td><code>tableId*</code>, <code>fields*</code></td><td>Adds or updates custom fields. Existing fields are preserved — the current list is read and merged. Needs step-up.</td></tr>
+          <tr><td>W</td><td><code>connector_add_seo_fields</code></td><td><code>tableId*</code></td><td>Adds the standard SEO set in one call: <code>canonicalUrl</code>, <code>ogTitle</code>, <code>ogDescription</code>, <code>ogImage</code>, <code>jsonLd</code>. Needs step-up.</td></tr>
+          <tr><td>R</td><td><code>connector_list_templates</code></td><td>—</td><td>Template pages and what each targets.</td></tr>
+          <tr><td>W</td><td><code>connector_create_entry_template</code></td><td><code>tableSlugs*</code>, <code>title</code>, <code>slug</code>, <code>priority</code></td><td>Creates the entry template a routed collection needs. <b>Without one, every entry returns 404</b> regardless of how the rows are published. Refuses a duplicate target+priority.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <h3>Media — 2</h3>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th></th><th>Tool</th><th>Arguments</th><th>What it does</th></tr></thead>
+        <tbody>
+          <tr><td>R</td><td><code>connector_list_media</code></td><td>—</td><td>Lists media assets.</td></tr>
+          <tr><td>W</td><td><code>connector_upload_media</code></td><td><code>path*</code>, <code>fileName</code></td><td>Uploads a file from a server-local path. Returns the media id, which is what image and featured-image fields store.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <h3>Provisioning — 1</h3>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th></th><th>Tool</th><th>Arguments</th><th>What it does</th></tr></thead>
+        <tbody>
+          <tr><td>W</td><td><code>connector_create_site</code></td><td><code>name*</code>, <code>ownerEmail</code>, <code>customDomain</code></td><td>Provisions a <b>new, empty CMS site</b> and returns its details. Each site is an isolated instance with its own database schema and login. The only tool that talks to the control plane rather than a CMS. The new site enrols itself as a target automatically.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+  <section>
+    <div class="sec-head"><span class="sec-num">06</span><h2>Setting up a routed collection</h2></div>
+    <p>The order matters. Doing it out of order produces a collection whose entries all 404.</p>
+    <ol class="checks">
+      <li><code>connector_connect</code>, then <code>connector_step_up</code> — schema changes need both.</li>
+      <li><code>connector_create_table</code> with <code>kind: "postType"</code> and a <code>routeBase</code>.</li>
+      <li><code>connector_add_seo_fields</code> — the SEO fields are not in the stock schema.</li>
+      <li><code>connector_add_table_fields</code> for anything else the collection needs.</li>
+      <li>**<code>connector_create_entry_template</code>** targeting the new table. Skipping this is the single most common mistake: rows publish successfully and every entry URL still returns 404.</li>
+      <li><code>connector_create_row</code> per entry, then <code>connector_publish_row</code>.</li>
+    </ol>
+  </section>
+  <section>
+    <div class="sec-head"><span class="sec-num">07</span><h2>What publishing actually does</h2></div>
+    <ul>
+      <li><b>Publishing is immediate and public.</b> There is no staging step between the tool call and the live site.</li>
+      <li><b>There is no version rollback.</b> Unpublishing retracts a route; it does not restore earlier content.</li>
+      <li><b>Publishing triggers a deployment to public hosting.</b> A clean publish response confirms the CMS side succeeded — it does not confirm the deployment reached the host. Check the live URL.</li>
+      <li><b>A clean-site replace clears the published version silently.</b> Public URLs continue serving the last deployment, and nothing in the admin indicates the mismatch, until a new publish runs.</li>
+    </ul>
+  </section>
+  <section>
+    <div class="sec-head"><span class="sec-num">08</span><h2>Reading large sites without blowing up the context</h2></div>
+    <ul>
+      <li><code>connector_list_rows</code> returns summaries by default. Ask for <code>fields: "full"</code> only when you need bodies.</li>
+      <li>Page with <code>limit</code> and <code>offset</code> — <em>"show me the next 25"</em>.</li>
+      <li><code>connector_export_manifest</code> accepts <code>rows: "none" | "summary" | "full"</code>, a <code>tableId</code> filter, and its own <code>limit</code>/<code>offset</code>. It also enforces a serialised-size budget and returns a <code>nextOffset</code>, so a very wide table pages automatically rather than truncating silently.</li>
+      <li><code>connector_export_bundle</code> splits large archives into parts. Take <code>exportId</code> from the first response and request <code>part: 2</code>, <code>part: 3</code> and so on — a part request without an <code>exportId</code> is refused rather than silently minting a fresh, unreassemblable archive.</li>
+    </ul>
+  </section>
+  <section>
+    <div class="sec-head"><span class="sec-num">09</span><h2>Limits worth knowing</h2></div>
+    <ul>
+      <li><b>Deletion has no trash.</b> No undo on any delete tool.</li>
+      <li><b>Redirects cannot be managed individually.</b> They arrive and leave with a bundle.</li>
+      <li><b>A bundle export is not a backup.</b> A real backup is the database plus the uploads directory.</li>
+      <li>**<code>connector_upload_media</code> reads from a server-local path**, not from your machine.</li>
+      <li>**<code>connector_preview_import</code> reports <code>unknownFields</code> only if the CMS emits it** — the response is passed through verbatim rather than synthesised, so treat its absence as "not reported", not as "none found".</li>
+      <li><b>Tool-surface drift.</b> If a client caches <code>tools/list</code>, compare <code>toolSurface.revision</code> from <code>connector_environment</code> against what it cached. A changed revision means the cache is stale.</li>
+    </ul>
+  </section>
+  <section>
+    <div class="sec-head"><span class="sec-num">10</span><h2>When something does not work</h2></div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Symptom</th><th>Cause</th></tr></thead>
+        <tbody>
+          <tr><td><code>401 Unauthorized</code></td><td>Token missing, wrong, or the service restarted with a new one. Request a current one.</td></tr>
+          <tr><td><code>403 Forbidden</code></td><td>The Origin header was rejected by the allow-list.</td></tr>
+          <tr><td><code>502</code></td><td>The connector is not reachable behind the gateway — usually not running.</td></tr>
+          <tr><td><em>"no target was named"</em></td><td>More than one target is configured and the request did not say which. Name one.</td></tr>
+          <tr><td><em>"Not connected to …"</em></td><td>Call <code>connector_connect</code> first.</td></tr>
+          <tr><td><em>"needs a recent step up"</em></td><td>Call <code>connector_step_up</code>, then retry.</td></tr>
+          <tr><td>Entry URLs 404 after publishing</td><td>The routed collection has no entry template. <code>connector_list_templates</code>, then <code>connector_create_entry_template</code>.</td></tr>
+          <tr><td>Conversion output looks wrong</td><td>Run <code>connector_doctor</code> — a broken conversion environment presents as a content problem.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+  <section>
+    <div class="sec-head"><span class="sec-num">11</span><h2>Handling the token</h2></div>
+    <ul>
+      <li>Anyone holding it has full read, write, publish and delete on <b>every</b> configured target, plus the ability to provision new sites.</li>
+      <li>It is an infrastructure secret. Do not paste it into shared documents, tickets or chat logs.</li>
+      <li>It grants no access to anything outside the configured targets, and it is never exchanged for CMS credentials on the client side.</li>
+      <li>To rotate: set a new value and restart the service. There is no revocation list, so the old token remains valid until that restart happens.</li>
+      <li>Every tool call is written to the activity log with a non-reversible fingerprint of the calling token.</li>
+    </ul>
+  </section>
+
+  <footer>
+    MMS Connector · Model Context Protocol over HTTPS · 34 tools · one bearer token, no scopes · every action logged
+  </footer>
+
+</div>
+</body>
+</html>

@@ -87,6 +87,23 @@ function getCurrentSymlinkPath(uploadsDir: string): string {
  *   /foo/      → foo/index.html
  *   /foo/bar   → foo/bar.html
  */
+/**
+ * Apply a site's trailing-slash policy to a route it is about to bake.
+ *
+ * The disk mapping below already understands both forms — `/foo/` becomes
+ * `foo/index.html` and `/foo` becomes `foo.html`. Nothing ever asked for the
+ * first form, so every site published flat regardless of the URLs it arrived
+ * with. This is the single place that decides, so the bake, the sitemap and the
+ * artefact reader cannot drift into disagreeing about a site's URL shape.
+ *
+ * `/` is already the site root and is returned untouched in both modes.
+ */
+export function applyRoutePolicy(urlPath: string, trailingSlash?: boolean): string {
+  if (urlPath === '/' || urlPath === '') return '/'
+  const bare = urlPath.replace(/\/+$/, '')
+  return trailingSlash ? `${bare}/` : bare
+}
+
 function urlToDiskRelPath(urlPath: string): string {
   // Remove leading slash for relative path construction
   const stripped = urlPath.startsWith('/') ? urlPath.slice(1) : urlPath
@@ -377,16 +394,45 @@ export async function readArtefact(uploadsDir: string, urlPath: string): Promise
     return null
   }
 
+  // A site publishes in one shape but is reachable in both: a visitor, an old
+  // inbound link or a static host's own redirect can ask for `/about-us` on a
+  // site baked as `about-us/index.html`, or the reverse. Missing here is not
+  // fatal — the request falls through to the live renderer, which normalises
+  // the slug — but it costs a full render for a page already sitting on disk.
+  // So the fast path checks the other shape too.
+  let alternateRelPath: string | null = null
+  try {
+    const flipped = urlPath.endsWith('/') ? urlPath.replace(/\/+$/, '') : `${urlPath}/`
+    const candidate = computeDiskRelPath(flipped)
+    if (candidate !== diskRelPath && flipped !== '') alternateRelPath = candidate
+  } catch {
+    alternateRelPath = null
+  }
+
   // Open through `current/<path>` so the OS follows the symlink atomically
   // inside open(2).  The same `filePath` value is used on every attempt —
   // each call to readFile re-resolves the `current` symlink at the OS level,
   // so after a swap the next attempt automatically reads from the new slot.
   const filePath = join(getPublishedDir(uploadsDir), 'current', diskRelPath)
+  const alternatePath = alternateRelPath
+    ? join(getPublishedDir(uploadsDir), 'current', alternateRelPath)
+    : null
 
   for (let attempt = 0; attempt < 5; attempt++) {
     try {
       return await readFile(filePath, 'utf-8')
     } catch (err) {
+      // Try the other URL shape before deciding this is a miss. Only a genuine
+      // "not there" is worth the second look — an IO error is handled below.
+      const notThere = isNodeError(err) && (err.code === 'ENOENT' || err.code === 'ENOTDIR')
+      if (notThere && alternatePath) {
+        try {
+          return await readFile(alternatePath, 'utf-8')
+        } catch {
+          // Neither shape is on disk. Fall through to the retry logic, which
+          // decides between a slot-swap race and a real miss.
+        }
+      }
       const code = isNodeError(err) ? err.code : null
       // Retriable errors from the atomic symlink protocol:
       //   ENOENT   — slot wipe race: the writer wiped the old slot between the

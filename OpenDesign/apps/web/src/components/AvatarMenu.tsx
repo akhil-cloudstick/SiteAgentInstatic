@@ -30,6 +30,7 @@ import { openExternalUrl } from '../providers/registry';
 import { amrPlansUrlForWorkspace } from '../runtime/amr-guidance';
 import { isMacPlatform } from '../utils/platform';
 import { useHubContext } from '../state/hubContext';
+import { isManagedSession } from '../state/managed';
 import { signOutOfHub } from '../state/hubSignOut';
 import {
   useWorkspaceBillingResponse,
@@ -91,6 +92,9 @@ export function AvatarMenu({
   const t = useT();
   const analytics = useAnalytics();
   const hubContext = useHubContext();
+  // Managed = opened from the MMSBUILD Product Hub. The operator owns the
+  // provider, key and model; nothing here is the tenant's to pick.
+  const managedSession = isManagedSession();
   // recvqfYKutwWlQ: gate the AMR upgrade entry on billing permission below,
   // not just plan tier — a team member without `canManageBilling` (owner-only)
   // can't act on an upgrade even when the tier itself is upgradeable.
@@ -670,7 +674,12 @@ export function AvatarMenu({
             </>
           ) : null}
 
-          {config.mode === 'api' ? (
+          {/* Provider + model picker. Hidden in a managed session: the AI
+              Gateway force-overwrites the model onto every request body
+              server-side, so this list would show a choice that is discarded
+              on the way out. It also fetches OpenRouter /models with
+              `config.apiKey`, which in managed mode is a placeholder. */}
+          {!managedSession && config.mode === 'api' ? (
             byokModelOptions.length > 0 ? (
               <div className="avatar-model-section">
                 <div className="avatar-select-row">
@@ -753,12 +762,11 @@ export function AvatarMenu({
             ) : null
           ) : null}
 
-          {/* The one link out to 设置 → 执行. #5517's popover has no such entry,
-              but #5517 also never moved CLI switching out of this popover — we
-              did (2026-07-21), so without this the place that switching moved TO
-              is unreachable from here. Pinned to the bottom of the scroll port
-              like the home switcher's, so a long model list cannot scroll it
-              away. */}
+          {/* The one link out to Settings → Execution. Hidden in a managed
+              session together with the pane it opens; `normalizeSettingsSection`
+              would otherwise redirect it to Instructions, which is not what this
+              row says it does. */}
+          {managedSession ? null : (
           <button
             type="button"
             className="avatar-item avatar-item--pinned"
@@ -773,6 +781,7 @@ export function AvatarMenu({
             </span>
             <span>{t('inlineSwitcher.openFullSettings')}</span>
           </button>
+          )}
 
           {onBack ? (
             <>

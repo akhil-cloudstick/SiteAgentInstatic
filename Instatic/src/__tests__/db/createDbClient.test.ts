@@ -12,7 +12,15 @@ async function withTempDir<T>(fn: (dir: string) => Promise<T>): Promise<T> {
   try {
     return await fn(dir)
   } finally {
-    await rm(dir, { recursive: true, force: true })
+    // Tolerant, because a leaked temp directory is the OS's problem while a
+    // throw in `finally` replaces the real result of the test — which is how a
+    // Windows file lock in cleanup got reported as a failing assertion here.
+    // Callers still close their clients; this is the backstop, not the fix.
+    try {
+      await rm(dir, { recursive: true, force: true })
+    } catch {
+      // ignore — see above
+    }
   }
 }
 
@@ -46,6 +54,12 @@ describe('createDbClient — DATABASE_URL dialect selection', () => {
 
         const { rows } = await db<{ count: number }>`select count(*) as count from schema_migrations`
         expect(rows[0]?.count).toBe(sqliteMigrations.length)
+
+        // Release the file before the directory is removed. Windows refuses to
+        // delete a file that is still open, so three live connections made the
+        // temp directory undeletable and the cleanup throw surfaced as this
+        // test failing — on Unix the same code is harmless.
+        db.close?.()
       }
     })
   })

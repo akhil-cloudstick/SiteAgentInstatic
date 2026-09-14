@@ -38,6 +38,19 @@ export const SiteSettingsSchema = Type.Object({
   metaDescription: Type.Optional(Type.String()),
   faviconUrl: Type.Optional(Type.String()),
   language: Type.Optional(Type.String()),
+  /**
+   * Publish routes as directories (`/about-us/`) instead of flat documents
+   * (`/about-us`). Absent or false keeps the flat form.
+   *
+   * Both conventions are valid and static hosts redirect between them, so the
+   * cost of the wrong one is not a broken URL — it is that every canonical,
+   * every redirect target and every inbound link on a migrated site gains a
+   * redirect hop. A site arriving from a generator that used trailing slashes
+   * keeps its exact URLs by turning this on; a site that never had them leaves
+   * it off. Which is why it is a per-site setting and not a platform default:
+   * flipping it globally would rewrite the URL of every page already published.
+   */
+  trailingSlash: Type.Optional(Type.Boolean()),
   /** Structured framework token settings — absent means framework disabled. */
   framework: Type.Optional(FrameworkSettingsSchema),
   /** Library of installed fonts — absent when no fonts added. */
@@ -91,6 +104,7 @@ export function parseSiteSettings(raw: unknown): SiteSettings {
     ...(typeof r.metaDescription === 'string' ? { metaDescription: r.metaDescription } : {}),
     ...(typeof r.faviconUrl === 'string' ? { faviconUrl: r.faviconUrl } : {}),
     ...(typeof r.language === 'string' ? { language: r.language } : {}),
+    ...(typeof r.trailingSlash === 'boolean' ? { trailingSlash: r.trailingSlash } : {}),
     framework,
     fonts,
     shortcuts,

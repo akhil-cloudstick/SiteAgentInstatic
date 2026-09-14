@@ -1,0 +1,741 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MMS MCP</title>
+
+<style>
+  :root {
+    --ground:      #F1F4F3;
+    --surface:     #FFFFFF;
+    --surface-2:   #E7ECEA;
+    --ink:         #131E1C;
+    --ink-soft:    #3A4B48;
+    --muted:       #63736F;
+    --rule:        #CBD5D2;
+    --rule-soft:   #DFE6E4;
+    --accent:      #0D6357;
+    --accent-soft: #DCEEEA;
+    --signal:      #A6501B;
+    --signal-soft: #F6E9DD;
+
+    --font-mono: ui-monospace, "Cascadia Mono", "Cascadia Code", "SF Mono", "JetBrains Mono", Consolas, monospace;
+    --font-body: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    --font-ui:   "Segoe UI", system-ui, -apple-system, "Helvetica Neue", sans-serif;
+
+    --measure: 68ch;
+    --pad: clamp(1.25rem, 4vw, 3.5rem);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:      #0C1413;
+      --surface:     #141F1D;
+      --surface-2:   #1C2826;
+      --ink:         #E2EAE8;
+      --ink-soft:    #B6C4C1;
+      --muted:       #849793;
+      --rule:        #2C3B38;
+      --rule-soft:   #22302E;
+      --accent:      #55C6B2;
+      --accent-soft: #13322D;
+      --signal:      #DE9457;
+      --signal-soft: #33241A;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground:      #0C1413;
+    --surface:     #141F1D;
+    --surface-2:   #1C2826;
+    --ink:         #E2EAE8;
+    --ink-soft:    #B6C4C1;
+    --muted:       #849793;
+    --rule:        #2C3B38;
+    --rule-soft:   #22302E;
+    --accent:      #55C6B2;
+    --accent-soft: #13322D;
+    --signal:      #DE9457;
+    --signal-soft: #33241A;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--font-body);
+    font-size: 17px;
+    line-height: 1.62;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 78rem;
+    margin: 0 auto;
+    padding: var(--pad);
+    display: flex;
+    flex-direction: column;
+    gap: 4.5rem;
+  }
+
+  .col { max-width: var(--measure); }
+
+  p { margin: 0 0 1rem; }
+  p:last-child { margin-bottom: 0; }
+  strong { font-weight: 600; color: var(--ink); }
+  code, .mono { font-family: var(--font-mono); }
+
+  p code, li code, td code, dd code {
+    font-size: 0.82em;
+    background: var(--surface-2);
+    padding: 0.1em 0.36em;
+    border-radius: 3px;
+    color: var(--ink-soft);
+  }
+
+  /* ---------- masthead ---------- */
+
+  .masthead {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    padding-bottom: 2.5rem;
+    border-bottom: 2px solid var(--ink);
+  }
+
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0;
+  }
+
+  h1 {
+    font-family: var(--font-mono);
+    font-size: clamp(2.1rem, 5.5vw, 3.1rem);
+    line-height: 1.04;
+    letter-spacing: -0.035em;
+    font-weight: 600;
+    margin: 0;
+    text-wrap: balance;
+  }
+
+  .standfirst {
+    font-size: clamp(1.06rem, 2vw, 1.24rem);
+    line-height: 1.5;
+    color: var(--ink-soft);
+    max-width: 56ch;
+    margin: 0;
+  }
+
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 2.25rem;
+    font-family: var(--font-mono);
+    font-size: 0.76rem;
+    color: var(--muted);
+    padding-top: 0.5rem;
+  }
+  .meta span b { color: var(--ink-soft); font-weight: 500; letter-spacing: 0.02em; }
+  .meta span::before {
+    content: attr(data-k);
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    font-size: 0.9em;
+    margin-right: 0.6em;
+  }
+
+  /* ---------- sections ---------- */
+
+  section { display: flex; flex-direction: column; gap: 1.5rem; }
+
+  .sec-head {
+    display: flex;
+    align-items: baseline;
+    gap: 1rem;
+    border-bottom: 1px solid var(--rule);
+    padding-bottom: 0.7rem;
+  }
+
+  .sec-num {
+    font-family: var(--font-mono);
+    font-size: 0.74rem;
+    letter-spacing: 0.1em;
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+    flex: none;
+  }
+
+  h2 {
+    font-family: var(--font-mono);
+    font-size: clamp(1.15rem, 2.4vw, 1.42rem);
+    letter-spacing: -0.02em;
+    font-weight: 600;
+    margin: 0;
+    text-wrap: balance;
+  }
+
+  h3 { font-family: var(--font-ui); font-size: 0.98rem; font-weight: 650; margin: 0; }
+
+  /* ---------- verdict banner ---------- */
+
+  .verdict {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+    gap: 1px;
+    background: var(--rule);
+    border: 1px solid var(--rule);
+  }
+  .verdict > div {
+    background: var(--surface);
+    padding: 1.15rem 1.2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+  .verdict .n {
+    font-family: var(--font-mono);
+    font-size: 1.7rem;
+    letter-spacing: -0.03em;
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+  }
+  .verdict .n.warn { color: var(--signal); }
+  .verdict .n:not(.num) { font-size: 1.15rem; letter-spacing: -0.01em; line-height: 1.25; }
+  .verdict .n.num { font-size: 1.7rem; }
+  .verdict .l {
+    font-family: var(--font-ui);
+    font-size: 0.8rem;
+    line-height: 1.45;
+    color: var(--ink-soft);
+  }
+
+  /* ---------- callouts ---------- */
+
+  .note {
+    padding: 1.5rem clamp(1.1rem, 3vw, 1.9rem);
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+  }
+  .note.hot { background: var(--signal-soft); border-left: 3px solid var(--signal); }
+  .note.cool { background: var(--accent-soft); border-left: 3px solid var(--accent); }
+
+  .note .tag {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+  }
+  .note.hot .tag { color: var(--signal); }
+  .note.cool .tag { color: var(--accent); }
+
+  .note .lede {
+    font-family: var(--font-ui);
+    font-size: 1.1rem;
+    font-weight: 650;
+    line-height: 1.4;
+    margin: 0;
+    max-width: 50ch;
+  }
+  .note p { max-width: 68ch; color: var(--ink-soft); }
+
+  .note pre {
+    background: transparent;
+    border: none;
+    border-left: 2px solid currentColor;
+    padding: 0.1rem 0 0.1rem 0.9rem;
+    color: var(--ink);
+    font-size: 0.8rem;
+  }
+
+  /* ---------- diagram ---------- */
+
+  .figure { display: flex; flex-direction: column; gap: 0.9rem; }
+
+  .scroller {
+    overflow-x: auto;
+    background: var(--surface);
+    border: 1px solid var(--rule-soft);
+    padding: 1.5rem 1.25rem;
+  }
+  .scroller svg { display: block; min-width: 900px; width: 100%; height: auto; }
+
+  figcaption, .cap {
+    font-family: var(--font-mono);
+    font-size: 0.74rem;
+    color: var(--muted);
+    line-height: 1.55;
+  }
+
+  /* ---------- tables ---------- */
+
+  .tbl-wrap { overflow-x: auto; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: var(--font-ui);
+    font-size: 0.855rem;
+    line-height: 1.5;
+    min-width: 640px;
+  }
+
+  th {
+    text-align: left;
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 500;
+    padding: 0 1.1rem 0.65rem 0;
+    border-bottom: 1px solid var(--rule);
+    vertical-align: bottom;
+  }
+
+  td {
+    padding: 0.85rem 1.1rem 0.85rem 0;
+    border-bottom: 1px solid var(--rule-soft);
+    vertical-align: top;
+    color: var(--ink-soft);
+  }
+
+  td:first-child { color: var(--ink); font-weight: 600; width: 27%; }
+  th:last-child, td:last-child { padding-right: 0; }
+
+  td .mono { font-size: 0.85em; color: var(--muted); display: block; margin-top: 0.28rem; }
+
+  .pill {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 0.63rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 0.18em 0.5em;
+    border: 1px solid currentColor;
+    white-space: nowrap;
+  }
+  .pill.ok { color: var(--accent); }
+  .pill.no { color: var(--signal); }
+
+  /* ---------- decisions ---------- */
+
+  .decisions { display: flex; flex-direction: column; gap: 0; border-top: 1px solid var(--rule); }
+
+  .decision {
+    display: grid;
+    grid-template-columns: 3rem 1fr;
+    gap: 0 1.5rem;
+    padding: 1.5rem 0;
+    border-bottom: 1px solid var(--rule-soft);
+  }
+  .decision .d-n {
+    font-family: var(--font-mono);
+    font-size: 1.1rem;
+    color: var(--signal);
+    font-variant-numeric: tabular-nums;
+    line-height: 1.25;
+  }
+  .decision .d-b { display: flex; flex-direction: column; gap: 0.5rem; max-width: var(--measure); }
+  .decision p { font-size: 0.92rem; color: var(--ink-soft); margin: 0; }
+
+  .opts { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.15rem; }
+  .opts span {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    padding: 0.28em 0.6em;
+    color: var(--ink-soft);
+  }
+
+  /* ---------- stages ---------- */
+
+  .stages { display: flex; flex-direction: column; gap: 0; border-top: 1px solid var(--rule); }
+
+  .stage {
+    display: grid;
+    grid-template-columns: 6rem 1fr;
+    gap: 0 1.75rem;
+    padding: 1.55rem 0;
+    border-bottom: 1px solid var(--rule-soft);
+  }
+
+  .stage-id {
+    font-family: var(--font-mono);
+    font-size: 0.74rem;
+    letter-spacing: 0.1em;
+    color: var(--accent);
+    padding-top: 0.18rem;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .stage-body { display: flex; flex-direction: column; gap: 0.65rem; max-width: var(--measure); }
+  .stage-body p { font-size: 0.93rem; color: var(--ink-soft); margin: 0; }
+
+  .gate {
+    font-family: var(--font-ui);
+    font-size: 0.83rem;
+    line-height: 1.5;
+    background: var(--accent-soft);
+    color: var(--ink);
+    padding: 0.6rem 0.85rem;
+    border-left: 2px solid var(--accent);
+  }
+  .gate b {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--accent);
+    display: block;
+    margin-bottom: 0.2rem;
+    font-weight: 500;
+  }
+  .gate.stop { background: var(--signal-soft); border-left-color: var(--signal); }
+  .gate.stop b { color: var(--signal); }
+
+  /* ---------- lists ---------- */
+
+  .grid-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr));
+    gap: 1px;
+    background: var(--rule-soft);
+    border: 1px solid var(--rule-soft);
+  }
+  .grid-list li {
+    background: var(--surface);
+    padding: 1rem 1.15rem;
+    font-family: var(--font-ui);
+    font-size: 0.85rem;
+    line-height: 1.5;
+    color: var(--ink-soft);
+    display: flex;
+    flex-direction: column;
+    gap: 0.28rem;
+  }
+  .grid-list b {
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    color: var(--ink);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+
+  ol.checks {
+    margin: 0;
+    padding-left: 0;
+    list-style: none;
+    counter-reset: chk;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(21rem, 1fr));
+    gap: 0.5rem 2.5rem;
+  }
+  ol.checks li {
+    counter-increment: chk;
+    display: grid;
+    grid-template-columns: 1.9rem 1fr;
+    font-family: var(--font-ui);
+    font-size: 0.86rem;
+    line-height: 1.5;
+    color: var(--ink-soft);
+  }
+  ol.checks li::before {
+    content: counter(chk, decimal-leading-zero);
+    font-family: var(--font-mono);
+    font-size: 0.71rem;
+    color: var(--accent);
+    padding-top: 0.22rem;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .arms { display: grid; grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr)); gap: 2rem 3rem; }
+  .arm { display: flex; flex-direction: column; gap: 0.5rem; }
+  .arm .k {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+  .arm .k.dim { color: var(--muted); }
+  .arm p { font-size: 0.89rem; color: var(--ink-soft); margin: 0; }
+
+  pre {
+    margin: 0;
+    background: var(--surface);
+    border: 1px solid var(--rule-soft);
+    border-left: 2px solid var(--accent);
+    padding: 1.1rem 1.2rem;
+    overflow-x: auto;
+    font-family: var(--font-mono);
+    font-size: 0.79rem;
+    line-height: 1.72;
+    color: var(--ink-soft);
+  }
+  pre .c { color: var(--muted); }
+  pre .k { color: var(--accent); }
+
+  footer {
+    border-top: 2px solid var(--ink);
+    padding-top: 1.5rem;
+    font-family: var(--font-mono);
+    font-size: 0.74rem;
+    color: var(--muted);
+    line-height: 1.7;
+  }
+
+  @media (max-width: 40rem) {
+    .stage, .decision { grid-template-columns: 1fr; gap: 0.5rem; }
+    .meta { gap: 0.3rem 1.5rem; flex-direction: column; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="eyebrow">Reference</p>
+    <h1>MMS MCP</h1>
+    <p class="standfirst">A scoped, revocable Model Context Protocol key for one site, with ten granular permissions — the credential to hand to an agent doing day-to-day content work.</p>
+    <div class="meta">
+      <span data-k="endpoint"><b>/mcp/&lt;site-slug&gt;</b></span>
+      <span data-k="tools"><b>29</b></span>
+      <span data-k="auth"><b>Per-site key</b></span>
+      <span data-k="scopes"><b>10 permissions · 4 presets</b></span>
+    </div>
+  </header>
+
+  <div class="note cool"><p class="lede"><b>This is one of two MCP surfaces in this platform.</b> MMS MCP issues a scoped, revocable key for <b>one site</b>, with ten granular permissions. It is the credential to hand to a person or an agent doing day-to-day content work. For whole-site migration, bundle import/export and provisioning, see <code>connector-guide-v2.md</code> — that surface uses a different endpoint, a different token, and has no permission model at all.</p></div>
+  <section>
+    <div class="sec-head"><span class="sec-num">01</span><h2>What it is</h2></div>
+    <p>MMS MCP turns a site into a set of tools an AI agent can call over the Model Context Protocol. The</p>
+    <p>agent reads and writes real content — entries, pages, media, design settings — through the same</p>
+    <p>paths the admin UI uses.</p>
+    <p>Each key is bound to exactly one site. A key issued for one site cannot address another, and says</p>
+    <p>so with a <code>401</code> rather than an empty result.</p>
+    <p>Transport is streamable HTTP answering with <code>application/json</code> — no SSE.</p>
+  </section>
+  <section>
+    <div class="sec-head"><span class="sec-num">02</span><h2>Turning it on for a site</h2></div>
+    <p>Two prerequisites, in order:</p>
+    <ol class="checks">
+      <li><b>The site must be running.</b> A key against a stopped site produces <code>site not running</code>.</li>
+      <li><b>The content tools need a bridge plugin installed on that site.</b> Media and design tools work without it; everything under <code>cms_*</code> does not. Install it from the console, or <code>POST /api/mcp/tenants/&lt;slug&gt;/install-bridge</code>.</li>
+    </ol>
+  </section>
+  <section>
+    <div class="sec-head"><span class="sec-num">03</span><h2>Creating a key</h2></div>
+    <h3>From the console</h3>
+    <p>Open <code>&lt;gateway-origin&gt;/operator/mcp</code>. Choose the site, give the key a label, pick a preset or</p>
+    <p>individual permissions, and optionally narrow it to specific tables and set an expiry.</p>
+    <p>The console shows the key <b>once</b>, together with a ready-made <code>claude mcp add</code> line and copy</p>
+    <p>buttons for the key, the endpoint and the command.</p>
+    <h3>Over HTTP</h3>
+    <pre>curl -X POST &lt;control-plane&gt;/api/mcp/agents \
+  -H 'content-type: application/json' \
+  -d '{"tenantSlug":"&lt;site-slug&gt;","label":"&lt;label&gt;","preset":"full"}'</pre>
+    <p>The plaintext key is returned once, in <code>agent.token</code>. An empty permission set is rejected — you</p>
+    <p>must pass either a <code>preset</code> or an explicit <code>permissions</code> array.</p>
+    <p>Related endpoints: <code>GET /api/mcp/presets</code>, <code>GET /api/mcp/agents?tenant=&lt;slug&gt;</code>,</p>
+    <p><code>GET /api/mcp/agents/&lt;keyId&gt;/reveal</code>, <code>POST /api/mcp/agents/&lt;keyId&gt;/revoke</code>,</p>
+    <p><code>GET /api/mcp/directory</code>, <code>GET /api/mcp/audit?tenant=&lt;slug&gt;</code>.</p>
+    <p>Unlike most secrets, a key here <b>can be re-revealed</b> from the console after issue. Revoking it</p>
+    <p>destroys that ability along with the key.</p>
+  </section>
+  <section>
+    <div class="sec-head"><span class="sec-num">04</span><h2>Permissions</h2></div>
+    <p>Ten permissions, checked twice — once to filter what the agent can see in <code>tools/list</code>, and again</p>
+    <p>inside every <code>tools/call</code>, so a client that hard-codes a tool name it never saw listed is still</p>
+    <p>refused.</p>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Permission</th><th>Grants</th></tr></thead>
+        <tbody>
+          <tr><td><code>read</code></td><td>List and read entries, tables, published snapshots, search</td></tr>
+          <tr><td><code>create</code></td><td>Create entries</td></tr>
+          <tr><td><code>edit</code></td><td>Update, move and mutate entries and their page trees</td></tr>
+          <tr><td><code>delete</code></td><td>Delete entries</td></tr>
+          <tr><td><code>publish</code></td><td>Publish an entry, republish the whole site</td></tr>
+          <tr><td><code>tables.manage</code></td><td>Create and change content tables</td></tr>
+          <tr><td><code>media.read</code></td><td>List media</td></tr>
+          <tr><td><code>media.write</code></td><td>Upload, replace, restore, re-folder, edit metadata</td></tr>
+          <tr><td><code>media.delete</code></td><td>Delete media</td></tr>
+          <tr><td><code>design.edit</code></td><td>Read and change site design settings</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <h3>Presets</h3>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Preset</th><th>Permissions</th></tr></thead>
+        <tbody>
+          <tr><td><code>read-only</code></td><td><code>read</code>, <code>media.read</code></td></tr>
+          <tr><td><code>author</code></td><td><code>read</code>, <code>create</code>, <code>edit</code>, <code>media.read</code>, <code>media.write</code></td></tr>
+          <tr><td><code>publisher</code></td><td><code>read</code>, <code>create</code>, <code>edit</code>, <code>publish</code>, <code>media.read</code>, <code>media.write</code></td></tr>
+          <tr><td><code>full</code></td><td>all ten</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p><b>There is no implicit default</b> — a key must be created with a preset or an explicit list.</p>
+    <h3>Narrowing to tables</h3>
+    <p>A second axis. <code>tables</code> defaults to <code>["*"]</code>; give it a list of table slugs and the key can only</p>
+    <p>touch those. Useful for an agent that should write blog posts and never touch pages.</p>
+    <h3>Expiry and revocation</h3>
+    <p>Set <code>expiresInDays</code> at creation. Revoke at any time from the console or over HTTP. An unknown,</p>
+    <p>revoked and expired key are all rejected identically and deliberately — the error does not reveal</p>
+    <p>which.</p>
+    <h3>The ceiling, stated plainly</h3>
+    <p>The gateway signs into the site as its <b>owner, with step-up pre-granted</b>. The CMS therefore</p>
+    <p>imposes no ceiling of its own. <b>The key's permission set is the only limit that exists.</b> Choose</p>
+    <p>it accordingly — <code>full</code> really does mean everything, including delete and republish.</p>
+    <p>Every call is written to an audit table, queryable per site.</p>
+  </section>
+  <section>
+    <div class="sec-head"><span class="sec-num">05</span><h2>The 29 tools</h2></div>
+    <h3>Content — <code>cms_*</code> (20)</h3>
+    <p><b>Read</b> — <code>cms_list_tables</code> · <code>cms_get_table</code> · <code>cms_list_entries</code> · <code>cms_get_entry</code> ·</p>
+    <p><code>cms_get_entry_by_slug</code> · <code>cms_search</code> · <code>cms_read_tree</code> · <code>cms_get_published_snapshot</code></p>
+    <p><b>Create</b> — <code>cms_create_entry</code> · <code>cms_create_entries</code> · <code>cms_create_table</code></p>
+    <p><b>Edit</b> — <code>cms_update_entry</code> · <code>cms_update_entries</code> · <code>cms_move_entry</code> · <code>cms_mutate_tree</code> ·</p>
+    <p><code>cms_replace_tree</code></p>
+    <p><b>Delete</b> — <code>cms_delete_entry</code> · <code>cms_delete_entries</code></p>
+    <p><b>Publish</b> — <code>cms_publish_entry</code> · <code>cms_republish_all</code></p>
+    <p>Pages live in the <code>pages</code> table and posts in <code>posts</code>. Page-tree edits go through <code>cms_mutate_tree</code>,</p>
+    <p>which applies a set of canonical operations — <code>insertNode</code>, <code>moveNode</code>, <code>updateNodeProps</code>,</p>
+    <p><code>setBreakpointOverride</code>, <code>wrapNode</code> and others — rather than accepting an arbitrary tree.</p>
+    <p><code>cms_replace_tree</code> swaps a whole tree at once.</p>
+    <h3>Media — <code>media_*</code> (7)</h3>
+    <p><code>media_list</code> · <code>media_upload</code> · <code>media_replace</code> · <code>media_update_metadata</code> · <code>media_set_folders</code> ·</p>
+    <p><code>media_restore</code> · <code>media_delete</code></p>
+    <p><code>media_upload</code> takes either <code>base64</code> content or a <code>sourceUrl</code>, which must be <code>https</code>. Loopback and</p>
+    <p>private addresses are blocked at the network layer.</p>
+    <h3>Design — <code>design_*</code> (2)</h3>
+    <p><code>design_read_site</code> · <code>design_update_site</code></p>
+  </section>
+  <section>
+    <div class="sec-head"><span class="sec-num">06</span><h2>Connecting a client</h2></div>
+    <h3>Claude Code</h3>
+    <pre>claude mcp add mms-cms --transport http \
+  &lt;gateway-origin&gt;/mcp/&lt;site-slug&gt; \
+  --header "Authorization: Bearer mmsmcp_…"</pre>
+    <p><code>claude mcp list</code> to confirm · <code>claude mcp remove mms-cms</code> to undo.</p>
+    <h3>JSON config — Cursor, VS Code Copilot, Windsurf, Cline, n8n</h3>
+    <pre>{
+  "mcpServers": {
+    "mms-cms": {
+      "type": "http",
+      "url": "&lt;gateway-origin&gt;/mcp/&lt;site-slug&gt;",
+      "headers": { "Authorization": "Bearer mmsmcp_…" }
+    }
+  }
+}</pre>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Client</th><th>Where</th><th>Note</th></tr></thead>
+        <tbody>
+          <tr><td>Cursor</td><td>Settings → MCP → Add new MCP server</td><td>—</td></tr>
+          <tr><td>VS Code Copilot</td><td><code>.vscode/mcp.json</code> or <code>MCP: Add Server</code></td><td>Agent mode only — MCP tools are unavailable in Ask mode</td></tr>
+          <tr><td>Windsurf</td><td>Settings → Cascade → MCP Servers</td><td>Key is <code>serverUrl</code></td></tr>
+          <tr><td>Cline</td><td>MCP Servers → Configure → Edit Configuration</td><td><code>"type": "streamableHttp"</code></td></tr>
+          <tr><td>n8n</td><td><b>MCP Client</b> node</td><td>Transport <code>HTTP Streamable</code>, Authentication <code>Header Auth</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <h3>Claude Desktop and Codex CLI — stdio bridge</h3>
+    <p>Neither speaks HTTP MCP directly. Bridge with <code>mcp-remote</code> (npm, needs Node):</p>
+    <pre>{
+  "mcpServers": {
+    "mms-cms": {
+      "command": "npx",
+      "args": ["-y", "mcp-remote", "&lt;gateway-origin&gt;/mcp/&lt;site-slug&gt;",
+               "--header", "Authorization:${AUTH}"],
+      "env": { "AUTH": "Bearer mmsmcp_…" }
+    }
+  }
+}</pre>
+    <p><code>${AUTH}</code> is not optional styling — the header value contains a space, which breaks inline</p>
+    <p>argument parsing.</p>
+    <p>Codex CLI: the same, in <code>~/.codex/config.toml</code> under <code>[mcp_servers.mms-cms]</code>.</p>
+    <h3>Browser assistants</h3>
+    <p>Web assistants that accept a remote MCP connector but provide no field for a custom header cannot</p>
+    <p>authenticate to this endpoint. Use a desktop client or the stdio bridge.</p>
+    <h3>Checking without an AI</h3>
+    <pre>curl -X POST &lt;gateway-origin&gt;/mcp/&lt;site-slug&gt; \
+  -H "Authorization: Bearer mmsmcp_…" \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'</pre>
+    <p>The number of tools returned <b>is</b> the permission readout — a narrow key sees a short list.</p>
+  </section>
+  <section>
+    <div class="sec-head"><span class="sec-num">07</span><h2>What an agent can and cannot do</h2></div>
+    <p><b>Can</b> — read any content it has <code>read</code> for · create and edit entries · restructure pages through</p>
+    <p>the canonical tree operations · manage media · change design settings · publish · create tables.</p>
+    <p><b>Cannot</b> — see or change the key's own permissions · address a different site · reach a table</p>
+    <p>outside its <code>tables</code> list · retrieve credentials · act after the key expires or is revoked.</p>
+  </section>
+  <section>
+    <div class="sec-head"><span class="sec-num">08</span><h2>When something does not work</h2></div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Message</th><th>Cause</th></tr></thead>
+        <tbody>
+          <tr><td><code>Invalid, revoked, or expired agent key</code></td><td>Exactly what it says — the three are deliberately indistinguishable.</td></tr>
+          <tr><td><code>This agent key is not valid for that site</code></td><td>The key belongs to another site.</td></tr>
+          <tr><td><code>site not running</code></td><td>Start the site first.</td></tr>
+          <tr><td><code>Table not found</code></td><td>Wrong slug, or the key's <code>tables</code> list excludes it.</td></tr>
+          <tr><td>Tool missing from <code>tools/list</code></td><td>The key lacks the permission. Check the grant, not the client.</td></tr>
+          <tr><td><code>cms_*</code> tools all missing</td><td>The bridge plugin is not installed on that site. Media and design tools working while content tools do not is the signature of this.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+  <section>
+    <div class="sec-head"><span class="sec-num">09</span><h2>Verifying a key end to end</h2></div>
+    <p>A smoke script exercises everything without an AI client. Run with <b>node</b>, from the <code>Operator</code></p>
+    <p>directory:</p>
+    <pre>cd s:\SiteAgentHub\Operator
+node control-plane/mcp/smoke.mjs --tenant &lt;site-slug&gt; --key mmsmcp_… --url http://127.0.0.1:4400</pre>
+    <p>It asserts <code>initialize</code>, prints <em>"N tools visible to this key"</em> with the full list, performs a real</p>
+    <p>read through each backend, and checks the negative cases: an ungranted tool is refused by name, a</p>
+    <p>bad key gets <code>401</code>, and the key cannot address a different site.</p>
+    <p>Add <code>--write --cleanup</code> to exercise the write path and clean up after itself.</p>
+    <p>Offline unit gate: <code>node --test Operator/control-plane/mcp/gateway.test.mjs</code></p>
+  </section>
+  <section>
+    <div class="sec-head"><span class="sec-num">10</span><h2>Good habits</h2></div>
+    <ul>
+      <li><b>Start read-only.</b> Issue <code>read-only</code> first, confirm the agent does what you expect, then widen.</li>
+      <li><b>One key per agent</b>, not one shared key — revoking then affects only that agent, and the audit trail stays meaningful.</li>
+      <li><b>Set an expiry</b> on anything issued for a fixed piece of work.</li>
+      <li>**<code>full</code> includes delete and republish.** If the agent only writes drafts, <code>author</code> is the honest grant.</li>
+      <li>**Narrow <code>tables</code>** when the job is confined to one collection.</li>
+      <li><b>Revoke on completion</b> rather than leaving keys live indefinitely.</li>
+    </ul>
+  </section>
+
+  <footer>
+    MMS MCP · Model Context Protocol over HTTPS · one key per site · ten permissions, four presets · every call audited
+  </footer>
+
+</div>
+</body>
+</html>

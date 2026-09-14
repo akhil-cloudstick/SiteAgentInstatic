@@ -104,6 +104,37 @@ describe('publishPage document head — page path', () => {
     expect(html).toContain('\\u003c/script')
   })
 
+  it('absolutises a relative og:image against the document canonical', () => {
+    // A media-picked image resolves to a root-relative public path, and every
+    // social crawler drops a relative og:image instead of resolving it.
+    const { html } = publishPage(page, site, registry, {
+      seo: {
+        canonicalUrl: 'https://globalnettech.com/about-us/',
+        ogImage: '/uploads/media/hero.jpg',
+      },
+    })
+    expect(html).toContain(
+      '<meta property="og:image" content="https://globalnettech.com/uploads/media/hero.jpg">',
+    )
+  })
+
+  it('leaves an already-absolute og:image untouched', () => {
+    const { html } = publishPage(page, site, registry, {
+      seo: {
+        canonicalUrl: 'https://globalnettech.com/about-us/',
+        ogImage: 'https://cdn.example.com/hero.jpg',
+      },
+    })
+    expect(html).toContain('<meta property="og:image" content="https://cdn.example.com/hero.jpg">')
+  })
+
+  it('keeps a relative og:image when the document has no canonical to resolve against', () => {
+    const { html } = publishPage(page, site, registry, {
+      seo: { ogTitle: 'No canonical', ogImage: '/uploads/media/hero.jpg' },
+    })
+    expect(html).toContain('<meta property="og:image" content="/uploads/media/hero.jpg">')
+  })
+
   it('drops a canonical that is not a safe URL rather than emitting it', () => {
     const { html } = publishPage(page, site, registry, {
       seo: documentSeoFromCells({ canonicalUrl: 'javascript:alert(1)' }),

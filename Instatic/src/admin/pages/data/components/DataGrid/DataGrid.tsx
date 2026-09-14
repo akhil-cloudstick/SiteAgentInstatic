@@ -26,7 +26,7 @@ import type {
   DataRowStatus,
   DataTable,
 } from '@core/data/schemas'
-import { LockSolidIcon } from '@admin/pages/data/icons'
+import { CircleAlertSolidIcon, LockSolidIcon } from '@admin/pages/data/icons'
 import { DataGridBulkActionBar } from './DataGridBulkActionBar'
 import { DataGridEmptyState } from './DataGridEmptyState'
 import { DataGridGroupHeader } from './DataGridGroupHeader'
@@ -61,6 +61,11 @@ interface DataGridProps {
   loading?: boolean
   error?: string | null
   readOnly?: boolean
+  /**
+   * True when this is a routed collection with no entry template targeting it.
+   * Its rows publish and read as Published, and every entry URL 404s.
+   */
+  missingEntryTemplate?: boolean
   /** Click on a row — typically opens the inspector. */
   onSelectRow: (rowId: string | null) => void
   /** Create a new row. Omit to hide the "Add row" toolbar button + empty-state CTA. */
@@ -106,6 +111,7 @@ export function DataGrid({
   loading = false,
   error = null,
   readOnly = false,
+  missingEntryTemplate = false,
   onSelectRow,
   onAddRow,
   onDeleteRow,
@@ -391,6 +397,25 @@ export function DataGrid({
           <LockSolidIcon size={13} aria-hidden="true" />
           <span className={styles.protectedNoteText}>
             Protected system content. Edit structure in Site; manage permitted custom fields here.
+          </span>
+        </div>
+      )}
+
+      {/*
+        * A routed collection with no entry template targeting it. Its rows
+        * publish, the admin reports them Published, and every entry URL 404s —
+        * `status` describes the row, not whether anything exists to render it.
+        * Nothing else in the UI says so, which is what makes the state worth a
+        * band: it is invisible from the grid and only shows up as a dead link
+        * on the live site.
+        */}
+      {missingEntryTemplate && (
+        <div role="alert" className={styles.templateWarning}>
+          <CircleAlertSolidIcon size={13} aria-hidden="true" />
+          <span className={styles.protectedNoteText}>
+            No entry template targets <strong>{table.slug}</strong>, so its entries return 404
+            even when published. Create a page in Site with Template enabled, targeting this
+            collection, containing one Outlet block.
           </span>
         </div>
       )}
