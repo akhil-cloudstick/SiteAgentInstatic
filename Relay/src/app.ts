@@ -25,6 +25,7 @@ import {
   NO_CONTENT_DIGEST,
   isGoAction,
   isId,
+  base64ToBytes,
   isSha256,
   keyFingerprint,
   parseGo,
@@ -505,11 +506,49 @@ async function transition(ticket: Ticket, b: Record<string, unknown>, actor: Act
   return out(200, { ticket: await deps.store.getTicket(ticket.id) })
 }
 
+/**
+ * Whose signature approves this property, resolved exactly as the Connector
+ * resolves it when it checks a GO: the property's own key when the
+ * configuration names one, the default approver otherwise, and a refusal —
+ * never a fallback — when a property names a key that cannot be used. The two
+ * sides must agree on who the approver is, or an approval means nothing.
+ */
+async function approverFor(
+  deps: Deps,
+  target: string,
+): Promise<
+  | { ok: true; publicKey: string; fingerprint: string; scope: 'property' | 'default' }
+  | { ok: false; status: number; reason: string }
+> {
+  const usable = async (key: string): Promise<string | null> => {
+    try {
+      return base64ToBytes(key).length === 32 ? await keyFingerprint(key) : null
+    } catch {
+      return null
+    }
+  }
+
+  const own = deps.config.propertyApprovers[target]
+  if (own !== undefined) {
+    const fingerprint = await usable(own)
+    return fingerprint
+      ? { ok: true, publicKey: own, fingerprint, scope: 'property' }
+      : {
+          ok: false,
+          status: 503,
+          reason: `The approver configured for "${target}" is not a usable Ed25519 public key, so no GO can be granted for it.`,
+        }
+  }
+
+  const fallback = deps.config.ownerPublicKey
+  const fingerprint = fallback ? await usable(fallback) : null
+  return fingerprint
+    ? { ok: true, publicKey: fallback, fingerprint, scope: 'default' }
+    : { ok: false, status: 503, reason: `No approver is configured for "${target}", so no GO can be granted.` }
+}
+
 async function grantGo(ticket: Ticket, b: Record<string, unknown>, actor: Actor, deps: Deps): Promise<Out> {
   if (actor.role !== 'owner') return refuse(403, 'Only the owner grants a GO.')
-  if (!deps.config.ownerPublicKey) {
-    return refuse(503, 'No owner public key is configured on the relay, so no GO can be granted.')
-  }
   if (ticket.type !== 'deploy-request') return refuse(422, 'A GO is granted on a deploy-request.')
   if (ticket.state !== 'awaiting_go') {
     return refuse(409, `This deploy-request is ${ticket.state}; a GO is granted only while awaiting_go.`, {
@@ -540,9 +579,14 @@ async function grantGo(ticket: Ticket, b: Record<string, unknown>, actor: Actor,
     return refuse(422, `This GO expires more than ${deps.config.goMaxTtlHours}h from now. Sign one with a shorter expiry.`)
   }
 
-  const fingerprint = await ownerFingerprint(deps)
-  if (!fingerprint || !(await verifyGoSignature(go, deps.config.ownerPublicKey))) {
-    return refuse(422, 'The GO signature does not verify against the owner key.', { ownerKeyFingerprint: fingerprint })
+  const approver = await approverFor(deps, ticket.target ?? '')
+  if (!approver.ok) return refuse(approver.status, approver.reason)
+  const fingerprint = approver.fingerprint
+  if (!(await verifyGoSignature(go, approver.publicKey))) {
+    return refuse(422, `The GO signature does not verify against the approver key for "${ticket.target}".`, {
+      ownerKeyFingerprint: fingerprint,
+      approverScope: approver.scope,
+    })
   }
   if (await deps.store.nonceUsed(go.nonce)) return refuse(409, 'This nonce has already been used by another GO.')
 

@@ -39,7 +39,7 @@ export interface CallResult {
   headers: Headers
 }
 
-export function relay(options: { ownerPublicKey?: string } = {}) {
+export function relay(options: { ownerPublicKey?: string; propertyApprovers?: Record<string, string> } = {}) {
   const store = new MemoryStore()
   const blobs = new MemoryBlobs()
   const events: RelayEvent[] = []
@@ -47,7 +47,12 @@ export function relay(options: { ownerPublicKey?: string } = {}) {
   const deps: Deps = {
     store,
     blobs,
-    config: { ownerPublicKey: options.ownerPublicKey ?? VECTORS.owner.publicKey, stallMinutes: 30, goMaxTtlHours: 4 },
+    config: {
+      ownerPublicKey: options.ownerPublicKey ?? VECTORS.owner.publicKey,
+      propertyApprovers: options.propertyApprovers ?? {},
+      stallMinutes: 30,
+      goMaxTtlHours: 4,
+    },
     now: () => new Date(now),
     notify: (event) => events.push(event),
   }

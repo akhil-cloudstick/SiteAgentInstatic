@@ -20,7 +20,7 @@ const envWith = (vars: Partial<Env>): Env => ({ RELAY_DB: {} as never, RELAY_ART
 const get = (path: string, env: Env, method = 'GET') =>
   worker.fetch(new Request(`https://relay.test${path}`, { method }), env, ctx)
 
-test('health needs no login and returns only live, version and the owner key fingerprint', async () => {
+test('health needs no login and returns only live, version, the owner key fingerprint and the property approvers', async () => {
   const res = await get('/api/health', envWith({ ...CONFIGURED, OWNER_PUBLIC_KEY: VECTORS.owner.publicKey }))
   expect(res.status).toBe(200)
   expect(res.headers.get('cache-control')).toBe('no-store')
@@ -29,6 +29,7 @@ test('health needs no login and returns only live, version and the owner key fin
     live: true,
     version: RELAY_VERSION,
     ownerKeyFingerprint: VECTORS.owner.fingerprint,
+    approvers: {},
   })
 })
 
@@ -37,6 +38,7 @@ test('health reports not live when the relay is unconfigured or has no usable ow
     live: false,
     version: RELAY_VERSION,
     ownerKeyFingerprint: null,
+    approvers: {},
   })
   expect(await (await get('/api/health', envWith(CONFIGURED))).json()).toMatchObject({ live: false, ownerKeyFingerprint: null })
 

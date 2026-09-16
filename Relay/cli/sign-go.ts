@@ -446,7 +446,14 @@ switch (command) {
       ...fields,
       signature: sign(null, Buffer.from(goMessage(fields), 'utf8'), privateKey).toString('base64'),
     }
-    console.error(`signed with owner key ${publicKeyOf(privateKey).fingerprint}; expires ${go.expiresAt}; single use`)
+    // Naming the property alongside the fingerprint is what lets the signer
+    // check they used the right key: the approver is per property, so the same
+    // fingerprint must appear for this target in the relay's /api/health and in
+    // the Connector's GO policy, or the GO will be refused by one of them.
+    console.error(
+      `signed with approver key ${publicKeyOf(privateKey).fingerprint} for "${go.target}"; ` +
+        `expires ${go.expiresAt}; single use`,
+    )
     if (legacy) {
       console.error(
         'note: this key file uses the older PBKDF2 protection (2,048 rounds). Run ' +

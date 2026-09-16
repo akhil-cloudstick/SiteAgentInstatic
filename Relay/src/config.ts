@@ -15,6 +15,13 @@ export interface Env {
   RELAY_DB: D1Database
   RELAY_ARTEFACTS: R2Bucket
   OWNER_PUBLIC_KEY?: string
+  /**
+   * JSON object: property name → base64 raw Ed25519 public key of that
+   * property's approver, e.g. {"sheeltron":"<base64>"}. Unparseable JSON keeps
+   * the relay shut rather than silently approving properties with the platform
+   * key.
+   */
+  PROPERTY_APPROVERS?: string
   ACCESS_TEAM_DOMAIN?: string
   ACCESS_AUD?: string
   ROLE_OWNER_EMAIL?: string
@@ -74,10 +81,37 @@ export function readConfig(env: Env): ConfigRead {
     problems.push(`GO_MAX_TTL_HOURS must be greater than 0 and at most ${GO_TTL_CEILING_HOURS}`)
   }
 
+  // Fail-closed on a malformed map: a typo here must not leave properties
+  // approvable by the platform key, which is the one outcome this setting
+  // exists to prevent.
+  const propertyApprovers: Record<string, string> = {}
+  const rawApprovers = value('PROPERTY_APPROVERS')
+  if (rawApprovers) {
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(rawApprovers)
+    } catch {
+      problems.push('PROPERTY_APPROVERS is not valid JSON')
+    }
+    if (parsed !== undefined) {
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+        problems.push('PROPERTY_APPROVERS must be a JSON object of property name → base64 public key')
+      } else {
+        for (const [property, key] of Object.entries(parsed as Record<string, unknown>)) {
+          if (typeof key !== 'string' || !key.trim()) {
+            problems.push(`PROPERTY_APPROVERS["${property}"] must be a base64 public key`)
+            continue
+          }
+          propertyApprovers[property.trim()] = key.trim()
+        }
+      }
+    }
+  }
+
   if (problems.length > 0) return { ok: false, problems }
   return {
     ok: true,
-    relay: { ownerPublicKey: value('OWNER_PUBLIC_KEY'), stallMinutes, goMaxTtlHours },
+    relay: { ownerPublicKey: value('OWNER_PUBLIC_KEY'), propertyApprovers, stallMinutes, goMaxTtlHours },
     access: { teamDomain, aud, ownerEmail, builderEmails, builderTokenIds, validatorTokenId },
     webhookUrl: value('NOTIFY_WEBHOOK_URL'),
     publicUrl: value('PUBLIC_URL').replace(/\/$/, ''),

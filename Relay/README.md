@@ -98,6 +98,15 @@ The full step-by-step guide, with every dashboard click, is **`DEPLOY.md`**. In 
    `ROLE_BUILDER_EMAILS`, `ROLE_VALIDATOR_TOKEN_ID`, `PUBLIC_URL`, and `OWNER_PUBLIC_KEY` once the
    owner sends it. Optionally `ROLE_BUILDER_TOKEN_IDS`: service token IDs that act as the builder,
    for tooling that opens tickets and uploads artefacts without a browser.
+
+   Also optional, and the one that matters once more than one property is served:
+   `PROPERTY_APPROVERS`, a JSON object of property name → that property's approver public key, e.g.
+   `{"sheeltron":"<base64>"}`. A property listed there is approved by its own key alone —
+   `OWNER_PUBLIC_KEY` does not approve it — and a property whose key is unusable is refused rather
+   than falling back, so a misconfigured property never becomes approvable by the platform's key.
+   Malformed JSON keeps the relay shut instead. The same map lives in the Connector's
+   `go-policy.json` under `targets`; both sides must agree, and `/api/health` prints each
+   fingerprint so they can be compared without logging in.
 6. `npx wrangler secret put NOTIFY_WEBHOOK_URL`
 7. `npx wrangler deploy`, then attach the custom domain to the Worker.
 8. As each identity, `GET /api/whoami` must return the right role.
@@ -115,6 +124,10 @@ bun cli/sign-go.ts keygen --out <a path outside any git repository>
 It prints `ownerPublicKey` and `fingerprint`. The public key goes into `OWNER_PUBLIC_KEY` here and
 into `S:\SiteAgentHub\Connector\go-policy.json` (template: `go-policy.example.json`). The private key
 never leaves that machine; `keygen` refuses to write inside a git working tree.
+
+For a property whose own owner designates the approver, put that key in `PROPERTY_APPROVERS` here
+and under `targets` in `go-policy.json` instead. `sign` names the property and the key fingerprint it
+signed with, which is what both sides must list for that property.
 
 ## Tests (from `S:\SiteAgentHub\Relay`)
 
