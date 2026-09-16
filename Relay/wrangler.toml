@@ -1,0 +1,83 @@
+# Deploy Relay — Cloudflare Worker. Deploy runbook: README.md.
+name = "deploy-relay"
+main = "src/index.ts"
+compatibility_date = "2026-09-01"
+
+# The relay runs on its workers.dev address, with Cloudflare Access switched on
+# for that address in the dashboard — it is the only front door. If a custom
+# domain is attached later, protect it with Access and set this back to false,
+# so workers.dev does not stay open as a second door.
+workers_dev = true
+
+[[d1_databases]]
+binding = "RELAY_DB"
+database_name = "deploy-relay"
+# Replace with the database_id printed by: npx wrangler d1 create deploy-relay   (DEPLOY.md step 3)
+database_id = "6cc24c6c-b84d-47e7-868a-09b53eef8278"
+migrations_dir = "migrations"
+
+[[r2_buckets]]
+binding = "RELAY_ARTEFACTS"
+bucket_name = "deploy-relay-artefacts"
+
+[triggers]
+crons = ["*/5 * * * *"]
+
+[vars]
+# The owner's Ed25519 public key — fingerprint b24cc51f0c688fbb.
+OWNER_PUBLIC_KEY = "IbuwxxkoUKlL6vPcfpjb8LMukD0n1tEev5UMu/f3hks="
+# e.g. yourteam.cloudflareaccess.com
+ACCESS_TEAM_DOMAIN = "zaivm.cloudflareaccess.com"
+# The Access application's AUD tag.
+ACCESS_AUD = "2c9c3954c701ac55e94faffb04b92841773f900d9254830c8e310abc3845399e"
+# Until the owner's email arrives: a reserved .invalid address nobody can log in with, so the relay
+# runs for the builder and validator while no one can act as the owner.
+ROLE_OWNER_EMAIL = "gear1.dinesh@gmail.com"
+# Comma-separated.
+ROLE_BUILDER_EMAILS = "akhil@cloudstick.io"
+# Optional, comma-separated: Access service token IDs for builder tooling (opening tickets, uploading
+# artefacts without a browser).
+ROLE_BUILDER_TOKEN_IDS = "20588f5243181416229b5e5c59218dac.access"
+# The validator's Access service token ID.
+ROLE_VALIDATOR_TOKEN_ID = "3c96e2510e2f7b8e7d0248684d25ad91.access"
+STALL_MINUTES = "30"
+GO_MAX_TTL_HOURS = "4"
+# e.g. https://relay.example.com — used for links in notifications.
+PUBLIC_URL = "https://deploy-relay.leroiftp.workers.dev"
+# NOTIFY_WEBHOOK_URL is a secret: npx wrangler secret put NOTIFY_WEBHOOK_URL
+
+# ---------------------------------------------------------------------------
+# Test deployment — its own Worker, database, bucket and a TEST owner key, so
+# nothing here can touch the real relay or honour a real owner's GO.
+# Deploy with: npx wrangler deploy --env test      (steps: TEST-DEPLOY.md)
+# ---------------------------------------------------------------------------
+[env.test]
+name = "deploy-relay-test"
+# A test has no custom domain: it runs on workers.dev, with Cloudflare Access
+# switched on for that address in the dashboard.
+workers_dev = true
+
+[[env.test.d1_databases]]
+binding = "RELAY_DB"
+database_name = "deploy-relay-test"
+database_id = "REPLACE_WITH_ID_FROM_wrangler_d1_create_deploy-relay-test"
+migrations_dir = "migrations"
+
+[[env.test.r2_buckets]]
+binding = "RELAY_ARTEFACTS"
+bucket_name = "deploy-relay-artefacts-test"
+
+[env.test.triggers]
+crons = ["*/5 * * * *"]
+
+[env.test.vars]
+# A TEST owner key from `bun cli/sign-go.ts keygen` — never the real owner's.
+OWNER_PUBLIC_KEY = ""
+ACCESS_TEAM_DOMAIN = ""
+ACCESS_AUD = ""
+ROLE_OWNER_EMAIL = ""
+ROLE_BUILDER_EMAILS = ""
+ROLE_VALIDATOR_TOKEN_ID = ""
+STALL_MINUTES = "30"
+GO_MAX_TTL_HOURS = "4"
+PUBLIC_URL = ""

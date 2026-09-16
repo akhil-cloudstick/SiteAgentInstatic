@@ -1,0 +1,13 @@
+{
+  "name": "deploy-relay",
+  "private": true,
+  "version": "0.2.0",
+  "description": "Ticket relay between builder, validator and owner. Owner-signed GOs, append-only history, JSONL export.",
+  "type": "module",
+  "scripts": {
+    "test": "bun test",
+    "vectors": "bun cli/gen-test-vectors.ts",
+    "migrate": "npx wrangler d1 migrations apply deploy-relay --remote",
+    "deploy": "npx wrangler deploy"
+  }
+}

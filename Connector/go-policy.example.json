@@ -1,0 +1,4 @@
+{
+  "ownerPublicKey": "PASTE the ownerPublicKey printed by: bun cli/sign-go.ts keygen (run by the owner)",
+  "ungated": ["sheeltron-staging"]
+}

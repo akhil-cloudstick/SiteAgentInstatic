@@ -5,11 +5,15 @@
  *                                          published snapshot (gated by
  *                                          `pages.publish` + step-up).
  *                                          Records an audit event with the
- *                                          page count.
+ *                                          page count. An `If-Match` header
+ *                                          carrying a draft site hash makes
+ *                                          the publish conditional: 412 when
+ *                                          the draft about to be baked is not
+ *                                          exactly that document.
  *   GET  /cms/api/cms/publish/status  — return the freshness of the
  *                                          current draft vs. the latest
- *                                          published snapshot (gated by
- *                                          `site.read`).
+ *                                          published snapshot, and the draft
+ *                                          site hash (gated by `site.read`).
  *
  * Publish is step-up gated because it's the single highest-blast-radius
  * site action — one click replaces every public page on the live host.
@@ -22,11 +26,26 @@ import type { DbClient } from '../../db/client'
 import { requireCapability, requireStepUp } from '../../auth/authz'
 import { createAuditEvent } from '../../repositories/audit'
 import { getDraftPublishStatus } from '../../repositories/publish'
-import { publishDraftSite } from '../../publish/publishSite'
+import { DraftChangedError, publishDraftSite } from '../../publish/publishSite'
 import { RuntimeScriptBuildError } from '../../publish/runtime/buildError'
 import { jsonResponse, methodNotAllowed } from '../../http'
 import type { CmsHandlerOptions } from './shared'
 import { requestAuditContext } from './shared'
+
+/**
+ * The expected draft site hash from `If-Match`, if one was sent.
+ *
+ * Accepts the bare hex or a quoted (optionally weak) entity tag, since HTTP
+ * callers differ on which they send. Anything else is a malformed precondition
+ * and is refused rather than ignored — a caller who asked for a conditional
+ * publish must never get an unconditional one.
+ */
+function expectedDraftSiteHash(req: Request): { ok: true; value?: string } | { ok: false } {
+  const raw = req.headers.get('if-match')
+  if (raw === null) return { ok: true }
+  const value = raw.trim().replace(/^W\//, '').replace(/^"(.*)"$/, '$1')
+  return /^[0-9a-f]{64}$/.test(value) ? { ok: true, value } : { ok: false }
+}
 
 export async function handlePublishRoutes(
   req: Request,
@@ -42,12 +61,31 @@ export async function handlePublishRoutes(
     const stepUp = await requireStepUp(req, db, user)
     if (stepUp) return stepUp
 
+    const expected = expectedDraftSiteHash(req)
+    if (!expected.ok) {
+      return jsonResponse(
+        { error: 'If-Match must be the 64-hex draftSiteHash reported by GET /cms/api/cms/publish/status.' },
+        { status: 400 },
+      )
+    }
+
     // publishDraftSite flushes the collab relay itself (see publishFlush.ts),
     // so the snapshot includes edits still inside the debounce window.
     let result: Awaited<ReturnType<typeof publishDraftSite>>
     try {
-      result = await publishDraftSite(db, user.id, options.uploadsDir)
+      result = await publishDraftSite(
+        db,
+        user.id,
+        options.uploadsDir,
+        expected.value ? { expectedDraftSiteHash: expected.value } : {},
+      )
     } catch (err) {
+      if (err instanceof DraftChangedError) {
+        return jsonResponse(
+          { error: err.message, expectedDraftSiteHash: err.expected, draftSiteHash: err.actual },
+          { status: 412 },
+        )
+      }
       if (err instanceof RuntimeScriptBuildError) {
         return jsonResponse({ error: err.message }, { status: 422 })
       }
@@ -58,7 +96,10 @@ export async function handlePublishRoutes(
       action: 'publish',
       targetType: 'site',
       targetId: 'default',
-      metadata: { publishedPages: result.publishedPages },
+      metadata: {
+        publishedPages: result.publishedPages,
+        ...(expected.value ? { expectedDraftSiteHash: expected.value } : {}),
+      },
       ...requestAuditContext(req),
     })
 

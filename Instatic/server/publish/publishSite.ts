@@ -28,6 +28,7 @@ import { nextDataRowVersionNumber } from '../repositories/data'
 import {
   getDraftSiteDocument,
   persistSitePublish,
+  siteContentHash,
   type PublishedPageSnapshot,
   type PublishedPageVersionWrite,
 } from '../repositories/publish'
@@ -50,12 +51,37 @@ import {
   writeStaticAsset,
 } from './staticArtefact'
 import { buildPublishedSiteCssBundle } from './siteCssBundle'
+import { getPublishedContentClassNames } from './contentClassNames'
 import { bakePublishedDataRowArtefacts } from './bakeDataRows'
 import { bumpPublishVersion, getPublishVersion, withPublishLock } from './publishState'
 import { runPublishFlush } from './publishFlush'
 
 interface PublishResult {
   publishedPages: number
+}
+
+export interface PublishDraftSiteOptions {
+  /**
+   * Publish only if the draft about to be baked hashes to exactly this
+   * `siteContentHash`. Compared after the collab flush and under the publish
+   * lock — the only point at which the hash describes what is really published.
+   */
+  expectedDraftSiteHash?: string
+}
+
+/** An expected-hash publish found a different draft. Nothing was written. */
+export class DraftChangedError extends Error {
+  override readonly name = 'DraftChangedError'
+  readonly expected: string
+  readonly actual: string
+  constructor(expected: string, actual: string) {
+    super(
+      `The draft site has changed since the expected hash was taken (expected ${expected}, ` +
+        `the draft is now ${actual}). Nothing was published.`,
+    )
+    this.expected = expected
+    this.actual = actual
+  }
 }
 
 /**
@@ -83,6 +109,7 @@ export async function publishDraftSite(
   db: DbClient,
   adminUserId: string,
   uploadsDir?: string,
+  options: PublishDraftSiteOptions = {},
 ): Promise<PublishResult> {
   // Flush the collab relay so the published snapshot includes edits still
   // inside the debounce window (publish bakes exactly what the admins see).
@@ -90,13 +117,14 @@ export async function publishDraftSite(
   await runPublishFlush()
   // Serialize against every other publish so the version read→bake→bump window
   // can't interleave and mis-stamp baked hole shells (ISS-038).
-  return withPublishLock(() => publishDraftSiteLocked(db, adminUserId, uploadsDir))
+  return withPublishLock(() => publishDraftSiteLocked(db, adminUserId, uploadsDir, options))
 }
 
 async function publishDraftSiteLocked(
   db: DbClient,
   adminUserId: string,
-  uploadsDir?: string,
+  uploadsDir: string | undefined,
+  options: PublishDraftSiteOptions,
 ): Promise<PublishResult> {
   // ── Phase 1: read inputs + run every expensive non-DB build ──────────────
   // Dependency installs (`bun install` on a cold cache) and per-page esbuild
@@ -107,6 +135,17 @@ async function publishDraftSiteLocked(
   // paths under that same lock, so reading outside the transaction is stable.
   const site = await getDraftSiteDocument(db)
   if (!site) throw new Error('draft site not found')
+
+  // An expected-hash publish is checked HERE — after the collab flush, under
+  // the publish lock, on the exact document about to be baked. Checked any
+  // earlier, an edit still in the debounce window would be flushed in and
+  // published under a hash that never described it.
+  if (options.expectedDraftSiteHash !== undefined) {
+    const actual = siteContentHash(site)
+    if (actual !== options.expectedDraftSiteHash) {
+      throw new DraftChangedError(options.expectedDraftSiteHash, actual)
+    }
+  }
 
   const runtime = normalizeSiteRuntimeConfig(site.runtime)
   const dependencyCache = Object.keys(runtime.dependencyLock.packages).length > 0
@@ -227,11 +266,14 @@ async function publishDraftSiteLocked(
           if (!assetsByPath.has(publicPath)) assetsByPath.set(publicPath, encoder.encode(file.content))
         }
       }
+      const contentClassNames = await getPublishedContentClassNames(db, nextPublishVersion)
       for (const snapshot of snapshots) {
         const page = snapshot.site.pages.find((p) => p.id === snapshot.pageRowId)
         if (!page || isTemplatePage(page)) continue // template pages only ever wrap; never baked at their own slug
         const mediaAssets = await prefetchMediaAssets(page, snapshot.site, registry, db)
-        collectCssFiles(buildPublishedSiteCssBundle(snapshot.site, registry, page, nextPublishVersion, { mediaAssets }))
+        collectCssFiles(
+          buildPublishedSiteCssBundle(snapshot.site, registry, page, nextPublishVersion, { mediaAssets, contentClassNames }),
+        )
       }
       for (const asset of runtimeAssetFiles) {
         if (!assetsByPath.has(asset.publicPath)) assetsByPath.set(asset.publicPath, asset.bytes)

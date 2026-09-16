@@ -28,7 +28,10 @@ import {
   publishRow,
   publishSite,
   publishStatus,
+  withTableSlug,
 } from '../http/rows'
+import { GO_INPUT_PROP } from '../go/message'
+import { currentRowsDigest, runGated, siteDigestReport } from './goTool'
 
 const ok = (value: unknown): ToolResult => ({
   content: [{ type: 'text', text: JSON.stringify(value, null, 2) }],
@@ -77,7 +80,7 @@ export const CRUD_TOOLS: ConnectorTool[] = [
       type: 'object',
       properties: {
         target: { type: 'string', description: 'Which configured CMS. Required when more than one is configured.' },
-        tableId: { type: 'string', description: 'e.g. posts, pages, components, layouts' },
+        tableId: { type: 'string', description: 'Table id or slug, e.g. posts, pages, components, layouts' },
         limit: { type: 'number', description: 'Rows per page. Defaults to 25, capped at 200.' },
         offset: { type: 'number', description: 'Rows to skip, for paging.' },
         fields: {
@@ -91,17 +94,20 @@ export const CRUD_TOOLS: ConnectorTool[] = [
       additionalProperties: false,
     },
     handler: async (a) =>
-      guarded(async () =>
-        ok(
-          await listRows(requireSession(str(a.target)), str(a.tableId), {
-            limit: typeof a.limit === 'number' ? a.limit : undefined,
-            offset: typeof a.offset === 'number' ? a.offset : undefined,
-            // Summary unless full is asked for by name. Defaulting the other way
-            // is what made "list the posts" pull the whole site.
-            fields: a.fields === 'full' ? 'full' : 'summary',
-          }),
-        ),
-      ),
+      guarded(async () => {
+        const session = requireSession(str(a.target))
+        return ok(
+          await withTableSlug(session, str(a.tableId), (tableId) =>
+            listRows(session, tableId, {
+              limit: typeof a.limit === 'number' ? a.limit : undefined,
+              offset: typeof a.offset === 'number' ? a.offset : undefined,
+              // Summary unless full is asked for by name. Defaulting the other way
+              // is what made "list the posts" pull the whole site.
+              fields: a.fields === 'full' ? 'full' : 'summary',
+            }),
+          ),
+        )
+      }),
   },
 
   {
@@ -137,14 +143,17 @@ export const CRUD_TOOLS: ConnectorTool[] = [
       additionalProperties: false,
     },
     handler: async (a) =>
-      guarded(async () =>
-        ok(
-          await createRow(requireSession(str(a.target)), str(a.tableId), {
-            slug: typeof a.slug === 'string' ? a.slug : undefined,
-            cells: (a.cells as Record<string, unknown>) ?? {},
-          }),
-        ),
-      ),
+      guarded(async () => {
+        const session = requireSession(str(a.target))
+        return ok(
+          await withTableSlug(session, str(a.tableId), (tableId) =>
+            createRow(session, tableId, {
+              slug: typeof a.slug === 'string' ? a.slug : undefined,
+              cells: (a.cells as Record<string, unknown>) ?? {},
+            }),
+          ),
+        )
+      }),
   },
 
   {
@@ -180,44 +189,54 @@ export const CRUD_TOOLS: ConnectorTool[] = [
     description:
       'DELETE a row. DESTRUCTIVE AND NOT REVERSIBLE — there is no undo and no trash. If the goal is ' +
       'to take a page off the site while keeping its content, use connector_set_row_status with ' +
-      'unpublished instead: that retracts the public route and leaves the row intact.',
+      'unpublished instead: that retracts the public route and leaves the row intact. On a gated ' +
+      'target it also requires go — an owner-signed GO for delete whose sha256 is ' +
+      'connector_rows_digest of this row.',
     inputSchema: {
       type: 'object',
       properties: {
         target: { type: 'string', description: 'Which configured CMS. Required when more than one is configured.' },
         rowId: { type: 'string' },
+        go: GO_INPUT_PROP,
       },
       required: ['rowId'],
       additionalProperties: false,
     },
-    handler: async (a) => guarded(async () => ok(await deleteRow(requireSession(str(a.target)), str(a.rowId)))),
+    handler: async (a) =>
+      guarded(async () => {
+        const session = requireSession(str(a.target))
+        const rowId = str(a.rowId)
+        return runGated(a, 'delete', { kind: 'rows', session, rowIds: [rowId] }, () => deleteRow(session, rowId))
+      }),
   },
 
   {
     name: 'connector_set_row_status',
     description:
       'Set a row to draft or unpublished. WRITES. Unpublishing retracts the public route while ' +
-      'keeping the content — the reversible way to take something off the site.',
+      'keeping the content — the reversible way to take something off the site. On a gated target ' +
+      'it also requires go — an owner-signed GO for set-status-draft or set-status-unpublished ' +
+      '(matching status) whose sha256 is connector_rows_digest of this row.',
     inputSchema: {
       type: 'object',
       properties: {
         target: { type: 'string', description: 'Which configured CMS. Required when more than one is configured.' },
         rowId: { type: 'string' },
         status: { type: 'string', enum: ['draft', 'unpublished'] },
+        go: GO_INPUT_PROP,
       },
       required: ['rowId', 'status'],
       additionalProperties: false,
     },
     handler: async (a) =>
-      guarded(async () =>
-        ok(
-          await setRowStatus(
-            requireSession(str(a.target)),
-            str(a.rowId),
-            a.status === 'draft' ? 'draft' : 'unpublished',
-          ),
-        ),
-      ),
+      guarded(async () => {
+        const session = requireSession(str(a.target))
+        const rowId = str(a.rowId)
+        const status = a.status === 'draft' ? ('draft' as const) : ('unpublished' as const)
+        return runGated(a, `set-status-${status}`, { kind: 'rows', session, rowIds: [rowId] }, () =>
+          setRowStatus(session, rowId, status),
+        )
+      }),
   },
 
   {
@@ -225,17 +244,25 @@ export const CRUD_TOOLS: ConnectorTool[] = [
     description:
       'PUBLISH one row — it becomes publicly visible immediately. There is no previous-version ' +
       'rollback: unpublishing later retracts the route but does not restore earlier content. ' +
-      'Confirm with the person asking before publishing anything you did not just create.',
+      'Confirm with the person asking before publishing anything you did not just create. On a ' +
+      'gated target it also requires go — an owner-signed GO for publish-row whose sha256 is ' +
+      'connector_rows_digest of this row, taken after its last edit.',
     inputSchema: {
       type: 'object',
       properties: {
         target: { type: 'string', description: 'Which configured CMS. Required when more than one is configured.' },
         rowId: { type: 'string' },
+        go: GO_INPUT_PROP,
       },
       required: ['rowId'],
       additionalProperties: false,
     },
-    handler: async (a) => guarded(async () => ok(await publishRow(requireSession(str(a.target)), str(a.rowId)))),
+    handler: async (a) =>
+      guarded(async () => {
+        const session = requireSession(str(a.target))
+        const rowId = str(a.rowId)
+        return runGated(a, 'publish-row', { kind: 'rows', session, rowIds: [rowId] }, () => publishRow(session, rowId))
+      }),
   },
 
   {
@@ -244,7 +271,34 @@ export const CRUD_TOOLS: ConnectorTool[] = [
       'PUBLISH THE WHOLE SITE — builds the site snapshot and every page version, and takes the ' +
       'result live. This is the largest single action available here and affects every page at ' +
       'once. Requires a recent step-up authentication; if it fails with a step-up error, run ' +
-      'connector_step_up first.',
+      'connector_step_up first. On a gated target it also requires go — an owner-signed GO for ' +
+      'publish whose sha256 is the bundle the most recent import under GO landed and whose ' +
+      'contentDigest is the draft site hash (both from connector_site_digest). The CMS re-checks ' +
+      'the draft hash itself after flushing in-flight edits, and refuses with 412 if it changed.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        target: { type: 'string', description: 'Which configured CMS. Required when more than one is configured.' },
+        go: GO_INPUT_PROP,
+      },
+      additionalProperties: false,
+    },
+    handler: async (a) =>
+      guarded(async () => {
+        const session = requireSession(str(a.target))
+        // The signed draft hash goes to the CMS as the publish precondition, so
+        // an edit that lands after this check is still refused.
+        return runGated(a, 'publish', { kind: 'site', session }, (go) => publishSite(session, go?.contentDigest))
+      }),
+  },
+
+  {
+    name: 'connector_site_digest',
+    description:
+      'The two values a site-publish GO must name: sha256 — the bundle the most recent import under ' +
+      'GO landed on this target — and contentDigest — the draft site hash as the CMS holds it now. ' +
+      'Read-only. Take it after the between-steps check and immediately before the owner signs: any ' +
+      'later change to the draft makes the publish refuse.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -252,7 +306,32 @@ export const CRUD_TOOLS: ConnectorTool[] = [
       },
       additionalProperties: false,
     },
-    handler: async (a) => guarded(async () => ok(await publishSite(requireSession(str(a.target))))),
+    handler: async (a) => guarded(async () => ok(await siteDigestReport(requireSession(str(a.target)), a))),
+  },
+
+  {
+    name: 'connector_rows_digest',
+    description:
+      'The sha256 a GO must name for a row action (publish-row, set-status-draft, ' +
+      'set-status-unpublished, delete): the rows digest of exactly these rows as the CMS holds them ' +
+      'now — the same aggregate connector_hash_rows computes. Read-only. Take it after the last ' +
+      'edit and immediately before the owner signs: any later change to these rows makes the GO ' +
+      'refuse.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        target: { type: 'string', description: 'Which configured CMS. Required when more than one is configured.' },
+        rowIds: { type: 'array', items: { type: 'string' }, description: 'The rows the action will touch.' },
+      },
+      required: ['rowIds'],
+      additionalProperties: false,
+    },
+    handler: async (a) =>
+      guarded(async () => {
+        const rowIds = Array.isArray(a.rowIds) ? (a.rowIds as unknown[]).map(String) : []
+        if (rowIds.length === 0) return fail('rowIds is empty.')
+        return ok(await currentRowsDigest(requireSession(str(a.target)), rowIds))
+      }),
   },
 
   {

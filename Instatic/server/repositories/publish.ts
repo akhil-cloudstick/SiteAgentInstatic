@@ -60,6 +60,12 @@ interface DraftPublishStatus {
   draftPages: number
   publishedPages: number
   lastPublishedAt?: string
+  /**
+   * `siteContentHash` of the draft as it stands now — the value an
+   * expected-hash publish (`If-Match` on POST /publish) is compared against.
+   * Null when no draft site exists yet.
+   */
+  draftSiteHash: string | null
 }
 
 interface PublishStatusRow {
@@ -221,6 +227,7 @@ export async function getDraftPublishStatus(db: DbClient): Promise<DraftPublishS
       draftMatchesPublished: false,
       draftPages: 0,
       publishedPages: 0,
+      draftSiteHash: null,
     }
   }
 
@@ -260,6 +267,7 @@ export async function getDraftPublishStatus(db: DbClient): Promise<DraftPublishS
     draftPages: draftSite.pages.length,
     publishedPages: publishedRows.length,
     ...(lastPublishedAt ? { lastPublishedAt: new Date(lastPublishedAt).toISOString() } : {}),
+    draftSiteHash,
   }
 }
 

@@ -11,9 +11,12 @@ import { readFileSync } from 'node:fs'
 import { basename, extname, resolve } from 'node:path'
 import type { ConnectorTool, ToolResult } from './tools'
 import { requireSession } from '../http/store'
+import { InstaticHttpError, type InstaticSession } from '../http/session'
 import { resolveTarget } from '../http/config'
 import { reachableFrom } from './requestContext'
-import { deleteRow } from '../http/rows'
+import { deleteRow, publishRow, withTableSlug } from '../http/rows'
+import { GO_INPUT_PROP } from '../go/message'
+import { runGated } from './goTool'
 import {
   stepUp,
   getTable,
@@ -21,7 +24,12 @@ import {
   addTableFields,
   uploadMedia,
   listMedia,
+  getSiteShell,
+  installGoogleFont,
+  saveSiteShell,
   type DataField,
+  type FontEntry,
+  type SiteShell,
 } from '../http/admin'
 
 /**
@@ -87,6 +95,145 @@ export const SEO_FIELDS: DataField[] = [
   { id: 'jsonLd', type: 'longText', label: 'JSON-LD structured data' },
 ]
 
+interface FontRequest {
+  family: string
+  variants: string[]
+  subsets: string[]
+}
+
+interface FontResult {
+  family: string
+  status: 'installed' | 'already-installed' | 'failed'
+  id?: string
+  variants?: string[]
+  subsets?: string[]
+  files?: number
+  error?: string
+}
+
+function parseFontRequests(raw: unknown): FontRequest[] | string {
+  if (!Array.isArray(raw) || raw.length === 0) return 'fonts is empty.'
+  const strings = (v: unknown): string[] =>
+    Array.isArray(v) ? v.map((s) => String(s).trim()).filter(Boolean) : []
+  const requests: FontRequest[] = []
+  for (const item of raw) {
+    const r = (item ?? {}) as Record<string, unknown>
+    const family = str(r.family).trim()
+    if (!family) return 'Every font needs a family.'
+    const variants = strings(r.variants)
+    if (variants.length === 0) return `${family}: variants is empty.`
+    const subsets = strings(r.subsets)
+    requests.push({ family, variants, subsets: subsets.length > 0 ? subsets : ['latin'] })
+  }
+  return requests
+}
+
+const unionOf = (a: readonly string[], b: readonly string[]): string[] => [...new Set([...a, ...b])]
+
+function googleFontIn(site: SiteShell, family: string): FontEntry | undefined {
+  const lower = family.toLowerCase()
+  return site.settings?.fonts?.items?.find((f) => f.source === 'google' && f.family.toLowerCase() === lower)
+}
+
+/**
+ * The shell with these entries in its font library, merged the way the editor's
+ * font picker merges them: a re-installed family replaces its entry rather than
+ * adding a second, and tokens pointing at the old entry follow it to the new id.
+ */
+function withFonts(site: SiteShell, entries: readonly FontEntry[]): SiteShell {
+  const settings = site.settings ?? {}
+  const items = [...(settings.fonts?.items ?? [])]
+  const tokens = settings.fonts?.tokens?.map((token) => ({ ...token }))
+  for (const entry of entries) {
+    const lower = entry.family.toLowerCase()
+    const index = items.findIndex(
+      (f) => f.id === entry.id || (f.source === entry.source && f.family.toLowerCase() === lower),
+    )
+    if (index < 0) {
+      items.push(entry)
+      continue
+    }
+    const previousId = items[index]!.id
+    items[index] = { ...entry, updatedAt: Date.now() }
+    for (const token of tokens ?? []) {
+      if (token.familyId === previousId) token.familyId = entry.id
+    }
+  }
+  return {
+    ...site,
+    settings: { ...settings, fonts: { ...settings.fonts, items, ...(tokens ? { tokens } : {}) } },
+  }
+}
+
+async function installGoogleFonts(
+  session: InstaticSession,
+  requests: readonly FontRequest[],
+): Promise<{ fonts: FontResult[]; saved: boolean; seq?: number }> {
+  let { site, seq } = await getSiteShell(session)
+  const results: FontResult[] = []
+  const installed: FontEntry[] = []
+
+  for (const request of requests) {
+    const current = googleFontIn(site, request.family)
+    if (
+      current &&
+      current.files.length > 0 &&
+      request.variants.every((v) => current.variants.includes(v)) &&
+      request.subsets.every((s) => current.subsets.includes(s))
+    ) {
+      results.push({
+        family: current.family,
+        status: 'already-installed',
+        id: current.id,
+        variants: current.variants,
+        subsets: current.subsets,
+        files: current.files.length,
+      })
+      continue
+    }
+    try {
+      const entry = await installGoogleFont(session, {
+        family: request.family,
+        // The CMS wipes the family's files before writing, so keep what is already there.
+        variants: unionOf(current?.variants ?? [], request.variants),
+        subsets: unionOf(current?.subsets ?? [], request.subsets),
+      })
+      installed.push(entry)
+      results.push({
+        family: entry.family,
+        status: 'installed',
+        id: entry.id,
+        variants: entry.variants,
+        subsets: entry.subsets,
+        files: entry.files.length,
+      })
+    } catch (err) {
+      // Keep going: one family the CMS refuses should not cost the others.
+      results.push({ family: request.family, status: 'failed', error: err instanceof Error ? err.message : String(err) })
+    }
+  }
+
+  if (installed.length === 0) return { fonts: results, saved: false }
+
+  // One retry. A 409 means another session changed the shell after it was
+  // read; the downloaded entries are merged onto the fresh shell, not re-installed.
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const saved = await saveSiteShell(session, withFonts(site, installed), seq)
+      return { fonts: results, saved: true, seq: saved.seq }
+    } catch (err) {
+      if (attempt === 0 && err instanceof InstaticHttpError && err.status === 409) {
+        ;({ site, seq } = await getSiteShell(session))
+        continue
+      }
+      throw new Error(
+        `The font files were downloaded but the site settings were not saved, so the site does not ` +
+          `use them yet. Re-run to retry. ${err instanceof Error ? err.message : String(err)}`,
+      )
+    }
+  }
+}
+
 export const ADMIN_TOOLS: ConnectorTool[] = [
   {
     name: 'connector_step_up',
@@ -119,7 +266,9 @@ export const ADMIN_TOOLS: ConnectorTool[] = [
       'Delete MANY rows in one call. DESTRUCTIVE AND NOT REVERSIBLE — no undo, no trash. ' +
       'Requires confirm to be exactly "DELETE <count> FROM <target>". Reports each row ' +
       'individually so a partial failure is visible rather than hidden. If the intent is to take ' +
-      'pages off the site while keeping them, use connector_set_row_status with unpublished.',
+      'pages off the site while keeping them, use connector_set_row_status with unpublished. On a ' +
+      'gated target it also requires go — one owner-signed GO for delete whose sha256 is ' +
+      'connector_rows_digest of exactly these rows.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -129,6 +278,7 @@ export const ADMIN_TOOLS: ConnectorTool[] = [
           type: 'string',
           description: 'Exactly "DELETE <count> FROM <target>", e.g. "DELETE 12 FROM staging".',
         },
+        go: GO_INPUT_PROP,
       },
       required: ['rowIds', 'confirm'],
       additionalProperties: false,
@@ -150,19 +300,66 @@ export const ADMIN_TOOLS: ConnectorTool[] = [
         }
 
         const session = requireSession(target)
-        const deleted: string[] = []
-        const failed: { rowId: string; error: string }[] = []
-        for (const rowId of rowIds) {
-          try {
-            await deleteRow(session, rowId)
-            deleted.push(rowId)
-          } catch (err) {
-            // Keep going: stopping at the first failure leaves the caller
-            // unable to tell which rows went and which stayed.
-            failed.push({ rowId, error: err instanceof Error ? err.message : String(err) })
+        // One GO for the whole batch: its sha256 is the rows digest of exactly
+        // this set, so it cannot delete a row it did not name.
+        return runGated(a, 'delete', { kind: 'rows', session, rowIds }, async () => {
+          const deleted: string[] = []
+          const failed: { rowId: string; error: string }[] = []
+          for (const rowId of rowIds) {
+            try {
+              await deleteRow(session, rowId)
+              deleted.push(rowId)
+            } catch (err) {
+              // Keep going: stopping at the first failure leaves the caller
+              // unable to tell which rows went and which stayed.
+              failed.push({ rowId, error: err instanceof Error ? err.message : String(err) })
+            }
           }
-        }
-        return ok({ requested: rowIds.length, deleted: deleted.length, failed })
+          return { requested: rowIds.length, deleted: deleted.length, failed }
+        })
+      }),
+  },
+
+  {
+    name: 'connector_publish_rows',
+    description:
+      'PUBLISH MANY rows in one call — each becomes publicly visible immediately, with no ' +
+      'previous-version rollback. Reports each row individually so a partial failure is visible ' +
+      'rather than hidden. On a gated target it requires go — ONE owner-signed GO for publish-row ' +
+      'whose sha256 is connector_rows_digest of exactly these rows, taken after their last edit.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        target: targetProp,
+        rowIds: { type: 'array', items: { type: 'string' }, description: 'Row ids to publish.' },
+        go: GO_INPUT_PROP,
+      },
+      required: ['rowIds'],
+      additionalProperties: false,
+    },
+    handler: async (a) =>
+      guarded(async () => {
+        const rowIds = Array.isArray(a.rowIds) ? (a.rowIds as unknown[]).map(String) : []
+        if (rowIds.length === 0) return fail('rowIds is empty.')
+        const session = requireSession(str(a.target))
+        // One GO for the set, bound to the digest of exactly these rows — the
+        // same shape as connector_delete_rows, so eight articles need one
+        // signature rather than eight.
+        return runGated(a, 'publish-row', { kind: 'rows', session, rowIds }, async () => {
+          const published: string[] = []
+          const failed: { rowId: string; error: string }[] = []
+          for (const rowId of rowIds) {
+            try {
+              await publishRow(session, rowId)
+              published.push(rowId)
+            } catch (err) {
+              // Keep going, for the same reason as delete_rows: stopping at the
+              // first failure hides which rows went live and which did not.
+              failed.push({ rowId, error: err instanceof Error ? err.message : String(err) })
+            }
+          }
+          return { requested: rowIds.length, published: published.length, failed }
+        })
       }),
   },
 
@@ -178,7 +375,10 @@ export const ADMIN_TOOLS: ConnectorTool[] = [
       additionalProperties: false,
     },
     handler: async (a) =>
-      guarded(async () => ok(await getTable(requireSession(str(a.target)), str(a.tableId)))),
+      guarded(async () => {
+        const session = requireSession(str(a.target))
+        return ok(await withTableSlug(session, str(a.tableId), (tableId) => getTable(session, tableId)))
+      }),
   },
 
   {
@@ -253,15 +453,14 @@ export const ADMIN_TOOLS: ConnectorTool[] = [
       additionalProperties: false,
     },
     handler: async (a) =>
-      guarded(async () =>
-        ok(
-          await addTableFields(
-            requireSession(str(a.target)),
-            str(a.tableId),
-            (a.fields as DataField[]) ?? [],
+      guarded(async () => {
+        const session = requireSession(str(a.target))
+        return ok(
+          await withTableSlug(session, str(a.tableId), (tableId) =>
+            addTableFields(session, tableId, (a.fields as DataField[]) ?? []),
           ),
-        ),
-      ),
+        )
+      }),
   },
 
   {
@@ -281,9 +480,51 @@ export const ADMIN_TOOLS: ConnectorTool[] = [
       additionalProperties: false,
     },
     handler: async (a) =>
-      guarded(async () =>
-        ok(await addTableFields(requireSession(str(a.target)), str(a.tableId), SEO_FIELDS)),
-      ),
+      guarded(async () => {
+        const session = requireSession(str(a.target))
+        return ok(
+          await withTableSlug(session, str(a.tableId), (tableId) => addTableFields(session, tableId, SEO_FIELDS)),
+        )
+      }),
+  },
+
+  {
+    name: 'connector_install_google_fonts',
+    description:
+      'Install Google font families into a site, so CSS that names the family (font-family: ' +
+      '"Space Grotesk") uses it. The CMS downloads the woff2 files and serves them itself; ' +
+      'published pages never load Google. WRITES the draft site settings (settings.fonts) — ' +
+      'nothing is public until the next publish, and on a gated target that publish GO must be ' +
+      'taken after this call. Safe to re-run: a family already installed with every requested ' +
+      'variant and subset is skipped. A replace import rewrites the site settings, so run it ' +
+      'again after one. Variants use Google names: "400", "700", "400italic".',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        target: targetProp,
+        fonts: {
+          type: 'array',
+          description: 'e.g. [{ "family": "Space Grotesk", "variants": ["400", "700"], "subsets": ["latin"] }]',
+          items: {
+            type: 'object',
+            properties: {
+              family: { type: 'string', description: 'The exact Google family name.' },
+              variants: { type: 'array', items: { type: 'string' } },
+              subsets: { type: 'array', items: { type: 'string' }, description: 'Defaults to ["latin"].' },
+            },
+            required: ['family', 'variants'],
+          },
+        },
+      },
+      required: ['fonts'],
+      additionalProperties: false,
+    },
+    handler: async (a) =>
+      guarded(async () => {
+        const requests = parseFontRequests(a.fonts)
+        if (typeof requests === 'string') return fail(requests)
+        return ok(await installGoogleFonts(requireSession(str(a.target)), requests))
+      }),
   },
 
   {

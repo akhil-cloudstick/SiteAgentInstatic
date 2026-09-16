@@ -464,4 +464,39 @@ describe('CMS publishing', () => {
     expect(state.siteSnapshots).toEqual([])
     expect(state.dataRowVersions).toEqual([])
   })
+
+  it('reports the draft site hash that an expected-hash publish is checked against', async () => {
+    const { db } = createPublishFakeDb()
+    await seedSiteAndPage(db, 'Hashed draft')
+    const before = await getDraftPublishStatus(db)
+    expect(before.draftSiteHash).toMatch(/^[0-9a-f]{64}$/)
+
+    await saveDataRowDraft(db, 'page_home', {
+      cells: pageToCells({ ...makeHomePage('Edited draft') }),
+      slug: 'index',
+    }, 'admin_1')
+    const after = await getDraftPublishStatus(db)
+    expect(after.draftSiteHash).toMatch(/^[0-9a-f]{64}$/)
+    expect(after.draftSiteHash).not.toBe(before.draftSiteHash)
+  })
+
+  it('refuses an expected-hash publish when the draft differs, writing nothing, and publishes when it matches', async () => {
+    const { state, db } = createPublishFakeDb()
+    await seedSiteAndPage(db, 'Signed draft')
+    const signed = (await getDraftPublishStatus(db)).draftSiteHash!
+
+    await saveDataRowDraft(db, 'page_home', {
+      cells: pageToCells({ ...makeHomePage('Edited after signing') }),
+      slug: 'index',
+    }, 'admin_1')
+    await expect(
+      publishDraftSite(db, 'admin_1', undefined, { expectedDraftSiteHash: signed }),
+    ).rejects.toThrow(/draft site has changed/)
+    expect(state.siteSnapshots).toEqual([])
+    expect(state.dataRowVersions).toEqual([])
+
+    const current = (await getDraftPublishStatus(db)).draftSiteHash!
+    const result = await publishDraftSite(db, 'admin_1', undefined, { expectedDraftSiteHash: current })
+    expect(result).toMatchObject({ publishedPages: 1 })
+  })
 })

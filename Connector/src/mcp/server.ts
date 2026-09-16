@@ -87,6 +87,24 @@ function summarize(
       return 'error'
     }
   }
+  const gatedTools = [
+    'connector_import_replace',
+    'connector_import_archive',
+    'connector_publish_site',
+    'connector_publish_row',
+    'connector_set_row_status',
+    'connector_delete_row',
+    'connector_delete_rows',
+    'connector_publish_rows',
+  ]
+  if (gatedTools.includes(toolName)) {
+    // Which GO authorized it. The nonce is not a secret; it is what ties this
+    // line to the relay ticket and the GO ledger.
+    const go = args.go as { ticketId?: unknown; nonce?: unknown } | undefined
+    return go && typeof go === 'object'
+      ? `go ticket=${String(go.ticketId)} nonce=${String(go.nonce)}`
+      : 'ungated'
+  }
   if (toolName === 'connector_hash_rows') {
     const rows = Array.isArray(args.rows) ? args.rows.length : 0
     return `rows=${rows}`

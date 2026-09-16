@@ -177,6 +177,7 @@ export const CmsPublishStatusSchema = Type.Object({
   draftPages: Type.Number(),
   publishedPages: Type.Number(),
   lastPublishedAt: Type.Optional(Type.String()),
+  draftSiteHash: Type.Optional(Type.Union([Type.String(), Type.Null()])),
 })
 
 export type CmsPublishStatus = Static<typeof CmsPublishStatusSchema>

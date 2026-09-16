@@ -1,0 +1,5 @@
+{
+  "_note": "ownerPublicKey is the owner's (fingerprint b24cc51f0c688fbb, received 2026-09-14). import/publish/row/delete tools refuse on every target except the ungated ones without a GO signed by this key.",
+  "ownerPublicKey": "IbuwxxkoUKlL6vPcfpjb8LMukD0n1tEev5UMu/f3hks=",
+  "ungated": ["sheeltron-staging"]
+}

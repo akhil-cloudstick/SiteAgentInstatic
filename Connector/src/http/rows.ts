@@ -16,7 +16,7 @@
  * to remember that a stale step-up means the publish fails.
  */
 
-import type { InstaticSession } from './session'
+import { InstaticHttpError, type InstaticSession } from './session'
 
 export interface DataRow {
   id: string
@@ -37,6 +37,31 @@ export interface DataRow {
 export async function listTables(session: InstaticSession): Promise<unknown> {
   const res = await session.request('/data/tables', { method: 'GET', context: 'list tables' })
   return res.json()
+}
+
+/**
+ * Run a table call by id, falling back to the table's slug.
+ *
+ * Callers name a table the way it reads — "news" — while the CMS routes only by
+ * id, and a custom table's id is generated (`n1tozRulkDeu8H21nKdJz`). The id is
+ * tried first, so a call that already names it costs nothing extra; only a 404
+ * looks the slug up and retries once. Any other failure, or a name that is
+ * neither an id nor a slug, surfaces the original error.
+ */
+export async function withTableSlug<T>(
+  session: InstaticSession,
+  tableId: string,
+  run: (tableId: string) => Promise<T>,
+): Promise<T> {
+  try {
+    return await run(tableId)
+  } catch (err) {
+    if (!(err instanceof InstaticHttpError) || err.status !== 404) throw err
+    const { tables } = (await listTables(session)) as { tables?: { id: string; slug?: string }[] }
+    const bySlug = tables?.find((t) => t.slug === tableId && t.id !== tableId)
+    if (!bySlug) throw err
+    return run(bySlug.id)
+  }
 }
 
 /**
@@ -143,9 +168,21 @@ export async function publishRow(session: InstaticSession, rowId: string): Promi
   return res.json()
 }
 
-/** Publish the whole site: builds the site snapshot and page versions. Needs step-up. */
-export async function publishSite(session: InstaticSession): Promise<unknown> {
-  const res = await session.request('/publish', { method: 'POST', context: 'full-site publish' })
+/**
+ * Publish the whole site: builds the site snapshot and page versions. Needs step-up.
+ *
+ * With `expectedDraftSiteHash`, the CMS publishes only if the draft it is about
+ * to bake — after flushing in-flight editor changes, under its publish lock —
+ * hashes to exactly that value, and answers 412 otherwise. Checking the hash
+ * here instead would miss an edit still in the editor's debounce window, which
+ * the publish flushes in.
+ */
+export async function publishSite(session: InstaticSession, expectedDraftSiteHash?: string): Promise<unknown> {
+  const res = await session.request('/publish', {
+    method: 'POST',
+    headers: expectedDraftSiteHash ? { 'if-match': `"${expectedDraftSiteHash}"` } : undefined,
+    context: 'full-site publish',
+  })
   return res.json()
 }
 
@@ -155,4 +192,17 @@ export async function publishStatus(session: InstaticSession): Promise<unknown> 
     context: 'publish status',
   })
   return res.json()
+}
+
+/** The draft site hash the CMS reports — what an expected-hash publish is compared against. Null when there is no draft. */
+export async function draftSiteHash(session: InstaticSession): Promise<string | null> {
+  const status = (await publishStatus(session)) as { draftSiteHash?: unknown }
+  if (status.draftSiteHash === null) return null
+  if (typeof status.draftSiteHash === 'string' && /^[0-9a-f]{64}$/.test(status.draftSiteHash)) {
+    return status.draftSiteHash
+  }
+  throw new Error(
+    'The CMS publish status carries no draftSiteHash, so it is running a build from before the ' +
+      'expected-hash publish. Restart it on the current build.',
+  )
 }
