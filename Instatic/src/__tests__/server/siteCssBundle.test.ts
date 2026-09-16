@@ -339,4 +339,38 @@ describe('buildSiteCssBundle', () => {
     expect(before.framework.content).not.toContain('.bg-primary')
     expect(after.framework.content).toContain('.bg-primary')
   })
+
+  it('style.css keeps class rules that content HTML uses, with their dependants', () => {
+    const site = makeSite()
+    site.styleRules = {
+      'article-quote': {
+        id: 'article-quote',
+        name: 'article-quote',
+        kind: 'class',
+        selector: '.article-quote',
+        order: 0,
+        styles: { paddingTop: '28px' },
+        contextStyles: {},
+        createdAt: 0,
+        updatedAt: 0,
+      },
+      'quote-cite': {
+        id: 'quote-cite',
+        name: '.article-quote cite',
+        kind: 'ambient',
+        selector: '.article-quote cite',
+        order: 1,
+        styles: { display: 'block' },
+        contextStyles: {},
+        createdAt: 0,
+        updatedAt: 0,
+      },
+    }
+    site.pages = [makePage({ root: { moduleId: 'base.text', props: { text: 'Hi' } } })]
+
+    expect(buildSiteCssBundle(site, registry).style.content).not.toContain('.article-quote')
+    const withContent = buildSiteCssBundle(site, registry, undefined, { contentClassNames: new Set(['article-quote']) })
+    expect(withContent.style.content).toContain('padding-top: 28px')
+    expect(withContent.style.content).toContain('.article-quote cite')
+  })
 })

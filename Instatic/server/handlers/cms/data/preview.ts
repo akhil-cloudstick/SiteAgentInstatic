@@ -22,8 +22,9 @@ import type { DbClient } from '../../../db/client'
 import type { DataRow, DataRowCells, PublishedDataRow } from '@core/data/schemas'
 import { resolveTemplateChain, composeTemplateChain } from '@core/templates'
 import { buildRouteFrame } from '@core/templates/contextFrames'
-import { publishPage } from '@core/publisher'
+import { collectContentClassNames, publishPage } from '@core/publisher'
 import { buildSiteCssBundle } from '../../../publish/siteCssBundle'
+import { getPublishedContentClassNames } from '../../../publish/contentClassNames'
 import { buildPublishedSiteModuleJsMap } from '../../../publish/moduleJsBundle'
 import { getPublishVersion } from '../../../publish/publishState'
 import { prefetchLoopData, publishedDataRowToLoopItem } from '../../../publish/loopPrefetch'
@@ -114,7 +115,13 @@ export async function handleRowPreview(
     templateContext,
     loopData,
   })
-  const cssBundle = buildSiteCssBundle(snapshot.site, registry, merged, { mediaAssets })
+  // The published content's classes plus the draft's own — the draft may use
+  // a class no published row does yet.
+  const contentClassNames = new Set([
+    ...(await getPublishedContentClassNames(db)),
+    ...collectContentClassNames([draftCells]),
+  ])
+  const cssBundle = buildSiteCssBundle(snapshot.site, registry, merged, { mediaAssets, contentClassNames })
 
   const published = publishPage(merged, snapshot.site, registry, {
     templateContext,

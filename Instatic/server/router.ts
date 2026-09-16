@@ -23,6 +23,7 @@ import { hardenUploadResponse, serveAdminApp, serveStaticFile } from './static'
 import { registry } from '@core/module-engine'
 import type { CssBundleFile, SiteCssBundleId } from '@core/publisher'
 import { buildPublishedSiteCssBundle } from './publish/siteCssBundle'
+import { getPublishedContentClassNames } from './publish/contentClassNames'
 import { mediaStorageRegistry } from '@core/plugins/mediaStorageRegistry'
 
 const VITE_DEV_URL = 'http://localhost:5173'
@@ -693,10 +694,16 @@ async function rebuildSiteCssFromSnapshot(
   const snapshot = await getLatestSnapshotForVersion(db, version)
   if (!snapshot) return null
 
+  // The same content classes the renders at this version used — without them
+  // the rebuilt `style` file would hash differently and never match.
+  const contentClassNames = await getPublishedContentClassNames(db, version)
   const pages = bundleId === 'userStyles' ? snapshot.site.pages : snapshot.site.pages.slice(0, 1)
   for (const page of pages) {
     const mediaAssets = await prefetchMediaAssets(page, snapshot.site, registry, db)
-    const file: CssBundleFile = buildPublishedSiteCssBundle(snapshot.site, registry, page, version, { mediaAssets })[bundleId]
+    const file: CssBundleFile = buildPublishedSiteCssBundle(snapshot.site, registry, page, version, {
+      mediaAssets,
+      contentClassNames,
+    })[bundleId]
     if (file.hash === requestedHash) return file.content
   }
   // Page-agnostic view (every enabled stylesheet) — covers a hash that
@@ -709,7 +716,7 @@ async function rebuildSiteCssFromSnapshot(
     registry,
     undefined,
     version,
-    { mediaAssets: fallbackMediaAssets },
+    { mediaAssets: fallbackMediaAssets, contentClassNames },
   )[bundleId]
   if (fallback.hash === requestedHash) return fallback.content
 

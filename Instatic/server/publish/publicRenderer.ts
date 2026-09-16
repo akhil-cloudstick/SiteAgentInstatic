@@ -6,6 +6,7 @@ import { buildRouteFrame } from '@core/templates/contextFrames'
 import { getDataRow } from '../repositories/data/rows'
 import { resolveMediaIdsToPaths } from '@core/loops/sources/dataRows'
 import { buildPublishedSiteCssBundle } from './siteCssBundle'
+import { getPublishedContentClassNames } from './contentClassNames'
 import { buildPublishedSiteModuleJsMap } from './moduleJsBundle'
 import { resolveTemplateChain, resolveNotFoundTemplate, composeTemplateChain } from '@core/templates'
 import type { TemplateRenderDataContext } from '@core/templates/dynamicBindings'
@@ -101,7 +102,11 @@ async function renderMergedTemplate(
     templateContext,
     loopData,
   })
-  const cssBundle = buildPublishedSiteCssBundle(snapshot.site, registry, merged, publishVersion, { mediaAssets })
+  const contentClassNames = await getPublishedContentClassNames(ctx.db, publishVersion)
+  const cssBundle = buildPublishedSiteCssBundle(snapshot.site, registry, merged, publishVersion, {
+    mediaAssets,
+    contentClassNames,
+  })
   const published = publishPage(merged, snapshot.site, registry, {
     templateContext,
     runtimeAssets: snapshot.runtimeAssets,

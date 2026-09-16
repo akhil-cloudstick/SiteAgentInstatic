@@ -22,6 +22,7 @@ import type { SiteDocument } from '@core/page-tree'
 import { generateClassCSS } from './classCss'
 import type { ResponsiveCssOptions } from './responsiveBackground'
 import { collectUsedStyleRuleIds, treeShakeStyleRules } from './styleRuleTreeShake'
+import { collectScriptClassNames } from './contentClassNames'
 
 /**
  * Collect all user-authored CSS class declarations for the classes referenced
@@ -34,15 +35,29 @@ import { collectUsedStyleRuleIds, treeShakeStyleRules } from './styleRuleTreeSha
  * Sanitised via sanitizeModuleCSS (Constraint #228).
  *
  * @param site The site containing the class registry, page nodes, and VCs.
+ * @param contentClassNames Classes that content HTML uses — kept although no node references them.
  * @returns A CSS string of all used class-name rules, or empty string if none.
  */
-export function collectClassCSS(site: SiteDocument, options: ResponsiveCssOptions = {}): string {
+export function collectClassCSS(
+  site: SiteDocument,
+  options: ResponsiveCssOptions = {},
+  contentClassNames?: ReadonlySet<string>,
+): string {
   // Defensive guard: corrupted/partial snapshots may have classes undefined
   if (!site.styleRules) return ''
+
+  // Classes the site's own scripts switch on: `.pillar.visible` styles nothing
+  // until the reveal script runs, so without this the rule is shaken out and
+  // the page keeps its dimmed pre-animation look forever.
+  const scriptClassNames = collectScriptClassNames(site.files ?? [])
+  const usedNames = scriptClassNames.size === 0
+    ? contentClassNames
+    : new Set([...(contentClassNames ?? []), ...scriptClassNames])
 
   const usedClasses = treeShakeStyleRules(
     site.styleRules,
     collectUsedStyleRuleIds(site),
+    usedNames,
   )
 
   if (Object.keys(usedClasses).length === 0) return ''

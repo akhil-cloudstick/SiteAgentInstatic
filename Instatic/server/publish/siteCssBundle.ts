@@ -54,6 +54,15 @@ import { getPublishVersion, registerVersionedCacheReset } from './publishState'
 type PageInvariantBundles = Pick<SiteCssBundle, 'reset' | 'framework' | 'style'>
 
 /**
+ * The responsive-media inputs, plus the classes published content HTML uses
+ * (`getPublishedContentClassNames`) — class rules named there are kept in
+ * `style` although no node references them.
+ */
+export interface SiteCssBundleOptions extends ResponsiveCssOptions {
+  contentClassNames?: ReadonlySet<string>
+}
+
+/**
  * Build the four site CSS files from a `SiteDocument`.
  *
  * `reset`, `framework`, and `style` are page-invariant — they depend only on
@@ -72,7 +81,7 @@ export function buildSiteCssBundle(
   site: SiteDocument,
   registry: IModuleRegistry,
   page?: Page,
-  options: ResponsiveCssOptions = {},
+  options: SiteCssBundleOptions = {},
 ): SiteCssBundle {
   return {
     ...computePageInvariantBundles(site, registry, options),
@@ -103,7 +112,7 @@ export function buildPublishedSiteCssBundle(
   registry: IModuleRegistry,
   page?: Page,
   publishVersion: number = getPublishVersion(),
-  options: ResponsiveCssOptions = {},
+  options: SiteCssBundleOptions = {},
 ): SiteCssBundle {
   return {
     ...memoizedPageInvariantBundles(site, registry, publishVersion, options),
@@ -115,12 +124,12 @@ export function buildPublishedSiteCssBundle(
 function computePageInvariantBundles(
   site: SiteDocument,
   registry: IModuleRegistry,
-  options: ResponsiveCssOptions,
+  options: SiteCssBundleOptions,
 ): PageInvariantBundles {
   return {
     reset: makeBundleFile('reset', PUBLISHER_RESET_CSS),
     framework: makeBundleFile('framework', buildFrameworkCss(site, registry)),
-    style: makeBundleFile('style', collectClassCSS(site, options)),
+    style: makeBundleFile('style', collectClassCSS(site, options, options.contentClassNames)),
   }
 }
 
@@ -131,7 +140,12 @@ function computePageInvariantBundles(
 // Deliberately NOT keyed on the site object: every consumer loads the snapshot
 // fresh (DB JSON parse per query), so an identity key would never hit — that
 // was exactly the bug that made every Layer B miss re-walk the whole site.
-let pageInvariantCache: { version: number; mediaSignature: string; bundles: PageInvariantBundles } | null = null
+let pageInvariantCache: {
+  version: number
+  mediaSignature: string
+  contentSignature: string
+  bundles: PageInvariantBundles
+} | null = null
 registerVersionedCacheReset(() => {
   pageInvariantCache = null
 })
@@ -144,14 +158,20 @@ function memoizedPageInvariantBundles(
   site: SiteDocument,
   registry: IModuleRegistry,
   version: number,
-  options: ResponsiveCssOptions,
+  options: SiteCssBundleOptions,
 ): PageInvariantBundles {
   const mediaSignature = styleMediaSignature(site, options)
-  if (pageInvariantCache && pageInvariantCache.version === version && pageInvariantCache.mediaSignature === mediaSignature) {
+  const contentSignature = options.contentClassNames ? [...options.contentClassNames].sort().join(' ') : ''
+  if (
+    pageInvariantCache
+    && pageInvariantCache.version === version
+    && pageInvariantCache.mediaSignature === mediaSignature
+    && pageInvariantCache.contentSignature === contentSignature
+  ) {
     return pageInvariantCache.bundles
   }
   const bundles = computePageInvariantBundles(site, registry, options)
-  pageInvariantCache = { version, mediaSignature, bundles }
+  pageInvariantCache = { version, mediaSignature, contentSignature, bundles }
   return bundles
 }
 

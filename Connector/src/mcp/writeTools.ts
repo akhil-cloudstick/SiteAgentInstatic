@@ -29,7 +29,7 @@ import { basename, resolve } from 'node:path'
 import { unzipSync, strFromU8 } from 'fflate'
 import { previewBundle, importBundle, exportBundle } from '../http/client'
 import { ensureExportDir, resolveExport, EXPORT_DOWNLOAD_PREFIX } from './exportStore'
-import { resolveBundleSource } from './bundleSource'
+import { RELAY_SHA256_PROP, resolveBundleSourceWithRelay } from './bundleSource'
 import { callerRootUrl } from './requestContext'
 
 const ok = (value: unknown): ToolResult => ({
@@ -160,12 +160,13 @@ export const WRITE_TOOLS: ConnectorTool[] = [
       'Dry run. Reports what an import WOULD change — per-table counts of rows added and replaced, ' +
       'plus totals for media and redirects, and unknownFields. Writes nothing. Always run this ' +
       'before importing, because the counts are the only honest answer to "what is about to ' +
-      'happen". Name the bundle with uploadId (POST it to /imports first — this is the route for ' +
-      'a bundle of any size), or pass it inline, or give a path on the server. Exactly one.',
+      'happen". Name the bundle with relaySha256 (a bundle artefact on the relay — the route for a ' +
+      'real site), uploadId (POSTed to /imports), an inline bundle, or a path on the server. Exactly one.',
     inputSchema: {
       type: 'object',
       properties: {
         target: { type: 'string', description: 'Which configured CMS. Required when more than one is configured.' },
+        relaySha256: RELAY_SHA256_PROP,
         bundle: { type: 'object', description: 'A SiteBundle object, inline. Only practical for small bundles.' },
         uploadId: {
           type: 'string',
@@ -191,10 +192,11 @@ export const WRITE_TOOLS: ConnectorTool[] = [
     handler: async (args) =>
       guarded(async () => {
         const session = requireSession(typeof args.target === 'string' ? args.target : undefined)
-        const source = resolveBundleSource({
+        const source = await resolveBundleSourceWithRelay({
           bundle: args.bundle,
           path: typeof args.path === 'string' ? args.path : undefined,
           uploadId: typeof args.uploadId === 'string' ? args.uploadId : undefined,
+          relaySha256: typeof args.relaySha256 === 'string' ? args.relaySha256 : undefined,
         })
         if (!source.ok) return fail(source.reason)
 

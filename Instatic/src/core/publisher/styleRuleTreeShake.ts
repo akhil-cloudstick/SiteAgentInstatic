@@ -58,6 +58,8 @@ function selectorCanMatch(
   )
 }
 
+const NO_CONTENT_CLASS_NAMES: ReadonlySet<string> = new Set()
+
 /**
  * Select only registry rules that can affect the current document trees.
  *
@@ -66,18 +68,24 @@ function selectorCanMatch(
  * in at least one selector-list alternative. Class-free selectors and raw
  * stylesheet blocks stay conservative because their reach cannot be inferred
  * from node class ids alone.
+ *
+ * `contentClassNames` are the classes content HTML uses (see
+ * `collectContentClassNames`): a class rule named there counts as used even
+ * though no node references its id.
  */
 export function treeShakeStyleRules(
   styleRules: Record<string, StyleRule>,
   usedIds: ReadonlySet<string>,
+  contentClassNames: ReadonlySet<string> = NO_CONTENT_CLASS_NAMES,
 ): Record<string, StyleRule> {
   const knownClassNames = new Set<string>()
   const usedClassNames = new Set<string>()
+  const isUsed = (rule: StyleRule) => usedIds.has(rule.id) || contentClassNames.has(rule.name)
 
   for (const rule of Object.values(styleRules)) {
     if (rule.kind !== 'class') continue
     knownClassNames.add(rule.name)
-    if (usedIds.has(rule.id)) usedClassNames.add(rule.name)
+    if (isUsed(rule)) usedClassNames.add(rule.name)
   }
 
   const selected: Record<string, StyleRule> = {}
@@ -86,7 +94,7 @@ export function treeShakeStyleRules(
 
     if (rule.kind === 'class') {
       if (
-        usedIds.has(rule.id)
+        isUsed(rule)
         && selectorCanMatch(rule.selector, knownClassNames, usedClassNames)
       ) {
         selected[rule.id] = rule

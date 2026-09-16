@@ -207,3 +207,156 @@ export function resolveUpload(id: string, now = Date.now()): UploadLookup {
     },
   }
 }
+
+// ---------------------------------------------------------------------------
+// Uploads in parts — for a caller that can send tool arguments but not HTTP
+// ---------------------------------------------------------------------------
+
+/** Largest decoded part accepted. A caller sending base64 through tool arguments will use far less. */
+export const UPLOAD_PART_MAX_BYTES = 8 * 1024 * 1024
+
+/** Most parts one upload may be split into. */
+export const UPLOAD_MAX_PARTS = 2000
+
+export type UploadPartResult =
+  | { ok: true; done: false; parts: number; received: number[]; missing: number[]; expiresAt: number }
+  | { ok: true; done: true; parts: number; upload: StoredUpload }
+  | { ok: false; reason: string }
+
+/** Where incomplete part sets wait — inside the upload directory, so they move with it. */
+function partsRoot(): string {
+  return resolve(uploadDir(), '.parts')
+}
+
+const partFile = (setDir: string, part: number): string =>
+  resolve(setDir, `part-${String(part).padStart(4, '0')}.bin`)
+
+/**
+ * Discard part sets not completed within the upload TTL.
+ *
+ * Same trigger as `pruneExpiredUploads` — a request, not a timer — and the same
+ * attitude to failure: a directory that will not delete is housekeeping, never
+ * a reason to refuse the part someone is sending.
+ */
+export function pruneExpiredPartSets(now = Date.now()): number {
+  const root = partsRoot()
+  if (!existsSync(root)) return 0
+  let removed = 0
+  for (const name of readdirSync(root)) {
+    const setDir = resolve(root, name)
+    try {
+      if (now - statSync(setDir).mtimeMs <= uploadTtlMs()) continue
+      rmSync(setDir, { recursive: true, force: true })
+      removed++
+    } catch {
+      // ignore — see above
+    }
+  }
+  return removed
+}
+
+/**
+ * Receive one part of a bundle; on the last one, reassemble, verify and store it.
+ *
+ * The inbound mirror of `connector_export_bundle`'s parts, for a caller whose
+ * only channel is tool arguments. Every check runs before anything is written —
+ * the B0.6d lesson — so a refused call leaves nothing behind.
+ *
+ * A part set is keyed by the whole bundle's sha256 and its part count, not by a
+ * session id the caller has to carry: parts can arrive in any order, a lost
+ * response can simply be resent, and two calls for the same bytes can only ever
+ * build the same bundle. The finished bundle goes through `saveUpload`, so it is
+ * exactly what `POST /imports` would have stored.
+ */
+export function saveUploadPart(
+  input: { sha256: string; parts: number; part: number; data: Uint8Array; kind?: UploadKind },
+  now = Date.now(),
+): UploadPartResult {
+  const sha256 = input.sha256.trim().toLowerCase()
+  if (!/^[0-9a-f]{64}$/.test(sha256)) {
+    return { ok: false, reason: 'sha256 must be the 64-hex sha256 of the WHOLE bundle. Nothing was stored.' }
+  }
+  if (!Number.isInteger(input.parts) || input.parts < 1 || input.parts > UPLOAD_MAX_PARTS) {
+    return { ok: false, reason: `parts must be a whole number from 1 to ${UPLOAD_MAX_PARTS}. Nothing was stored.` }
+  }
+  if (!Number.isInteger(input.part) || input.part < 1 || input.part > input.parts) {
+    return { ok: false, reason: `part must be a whole number from 1 to ${input.parts}. Nothing was stored.` }
+  }
+  if (input.data.length === 0) return { ok: false, reason: 'This part is empty. Nothing was stored.' }
+  if (input.data.length > UPLOAD_PART_MAX_BYTES) {
+    return {
+      ok: false,
+      reason:
+        `This part is ${input.data.length} bytes; the limit is ${UPLOAD_PART_MAX_BYTES} per part. ` +
+        'Split the bundle into more parts. Nothing was stored.',
+    }
+  }
+
+  pruneExpiredPartSets(now)
+  const setDir = resolve(partsRoot(), `${sha256}-${input.parts}`)
+  const file = partFile(setDir, input.part)
+  if (existsSync(file)) {
+    // A resend after a lost response is fine; a different part under the same
+    // number is how a corrupted bundle gets assembled, so it is refused.
+    if (sha256Of(new Uint8Array(readFileSync(file))) !== sha256Of(input.data)) {
+      return {
+        ok: false,
+        reason:
+          `Part ${input.part} was already received with different bytes. Nothing was stored. If the ` +
+          'bundle itself changed, it has a new sha256 — send its parts under that.',
+      }
+    }
+  } else {
+    mkdirSync(setDir, { recursive: true })
+    writeFileSync(file, input.data)
+  }
+
+  const received: number[] = []
+  const missing: number[] = []
+  for (let p = 1; p <= input.parts; p++) (existsSync(partFile(setDir, p)) ? received : missing).push(p)
+  if (missing.length > 0) {
+    return { ok: true, done: false, parts: input.parts, received, missing, expiresAt: now + uploadTtlMs() }
+  }
+
+  const chunks = received.map((p) => new Uint8Array(readFileSync(partFile(setDir, p))))
+  const bytes = new Uint8Array(chunks.reduce((n, c) => n + c.length, 0))
+  let offset = 0
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset)
+    offset += chunk.length
+  }
+
+  const discard = (reason: string): UploadPartResult => {
+    rmSync(setDir, { recursive: true, force: true })
+    return { ok: false, reason }
+  }
+
+  const actual = sha256Of(bytes)
+  if (actual !== sha256) {
+    return discard(
+      `All ${input.parts} parts arrived, but they reassemble to sha256 ${actual}, not ${sha256}. ` +
+        'The parts were discarded and nothing was stored. Check each part number and its bytes, then ' +
+        'send them again.',
+    )
+  }
+
+  let kind: UploadKind
+  if (bytes[0] === 0x50 && bytes[1] === 0x4b) {
+    kind = 'zip'
+  } else {
+    try {
+      JSON.parse(new TextDecoder().decode(bytes))
+      kind = 'json'
+    } catch {
+      return discard('The reassembled bytes are neither a ZIP archive nor JSON, so they are not a site bundle. Nothing was stored.')
+    }
+  }
+  if (input.kind && input.kind !== kind) {
+    return discard(`kind says ${input.kind}, but the reassembled bytes are ${kind}. Nothing was stored.`)
+  }
+
+  const stored = saveUpload(bytes, kind, { expectedSha256: sha256, now })
+  rmSync(setDir, { recursive: true, force: true })
+  if (!stored.ok) return { ok: false, reason: stored.reason }
+  return { ok: true, done: true, parts: input.parts, upload: stored.upload }
+}

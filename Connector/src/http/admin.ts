@@ -149,3 +149,87 @@ export async function listMedia(session: InstaticSession): Promise<unknown> {
   const res = await session.request('/media', { method: 'GET', context: 'list media' })
   return res.json()
 }
+
+// ---------------------------------------------------------------------------
+// Fonts
+// ---------------------------------------------------------------------------
+
+/** One family in `site.settings.fonts.items`, as the CMS stores it. */
+export interface FontEntry {
+  id: string
+  source: 'google' | 'custom'
+  family: string
+  variants: string[]
+  subsets: string[]
+  files: unknown[]
+  [key: string]: unknown
+}
+
+export interface FontToken {
+  familyId?: string
+  [key: string]: unknown
+}
+
+/** The draft site shell — everything but pages. Only the fonts are typed; the rest round-trips untouched. */
+export interface SiteShell {
+  settings?: {
+    fonts?: { items?: FontEntry[]; tokens?: FontToken[]; [key: string]: unknown }
+    [key: string]: unknown
+  }
+  [key: string]: unknown
+}
+
+/** The draft site shell and its sync seq — the base a shell save is checked against. */
+export async function getSiteShell(session: InstaticSession): Promise<{ site: SiteShell; seq: number }> {
+  const res = await session.request('/site', { method: 'GET', context: 'read site shell' })
+  return (await res.json()) as { site: SiteShell; seq: number }
+}
+
+/**
+ * Download a Google family's woff2 files into the site's uploads and return its
+ * entry. On-disk work only: the entry reaches the site through `saveSiteShell`.
+ * The CMS wipes the family's directory before writing, so the selection must
+ * name every variant the site keeps, not only the new ones.
+ */
+export async function installGoogleFont(
+  session: InstaticSession,
+  selection: { family: string; variants: string[]; subsets: string[] },
+): Promise<FontEntry> {
+  const res = await session.request('/fonts/install', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(selection),
+    context: `install font ${selection.family}`,
+  })
+  return ((await res.json()) as { font: FontEntry }).font
+}
+
+/**
+ * Save a changed site shell and nothing else. Incremental, with the seq the
+ * shell was read at, so a shell another session changed in between is refused
+ * with 409 instead of silently overwritten.
+ */
+export async function saveSiteShell(
+  session: InstaticSession,
+  site: SiteShell,
+  shellBaseSeq: number,
+): Promise<{ seq: number }> {
+  const res = await session.request('/site-document', {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      mode: 'incremental',
+      site,
+      changedPages: [],
+      deletedPageIds: [],
+      changedComponents: [],
+      deletedComponentIds: [],
+      changedLayouts: [],
+      deletedLayoutIds: [],
+      baseSeqs: {},
+      shellBaseSeq,
+    }),
+    context: 'save site shell',
+  })
+  return (await res.json()) as { seq: number }
+}
