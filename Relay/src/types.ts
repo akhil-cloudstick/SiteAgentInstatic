@@ -147,9 +147,17 @@ export type ExportLine =
   | ({ type: 'flag' } & FlagRecord)
 
 export interface RelayEvent {
-  event: 'ticket_created' | 'state_changed' | 'validator_stalled'
+  event: 'ticket_created' | 'state_changed' | 'validator_stalled' | 'message_posted'
   ticketId: string
   state: string
   title: string
   at: string
+  /**
+   * Set on `message_posted`: which message, by whom, and of what kind — never
+   * its text. A notification is read by whoever receives it, so its content
+   * stays typed fields for the same reason the rest of this event is.
+   */
+  messageId?: string
+  author?: string
+  kind?: string
 }

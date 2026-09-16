@@ -35,6 +35,7 @@ import {
   type BundlePreview,
   type BundleRowConflict,
   type BundleUnknownField,
+  type BundleFieldsNotCreated,
   type BundleUnresolvedClass,
   type SiteBundle,
 } from '@core/data/bundleSchema'
@@ -69,9 +70,11 @@ export async function handleImportPreviewRoute(
   // as "your homepage will be renamed to index-2", which an operator would
   // either abort on or accept and end up with no page at `/`. The wipe is what
   // the preview must diff against, not the rows the wipe is about to remove.
+  let strategy: ReturnType<typeof resolveImportStrategy>
   let isReplace: boolean
   try {
-    isReplace = resolveImportStrategy(url) === 'replace'
+    strategy = resolveImportStrategy(url)
+    isReplace = strategy === 'replace'
   } catch (err) {
     if (!(err instanceof InvalidImportStrategyError)) throw err
     return jsonResponse({ error: err.message }, { status: 400 })
@@ -83,6 +86,7 @@ export async function handleImportPreviewRoute(
 
   const rowConflicts: BundleRowConflict[] = []
   const unknownFields: BundleUnknownField[] = []
+  const fieldsNotCreated: BundleFieldsNotCreated[] = []
   const localTablesById = new Map(localTables.map((t) => [t.id, t]))
 
   // For each bundle table, compute the diff against local row ids and active slugs.
@@ -108,6 +112,10 @@ export async function handleImportPreviewRoute(
       unknownFields.push(
         ...findUnknownFields(table, localTablesById.get(table.id), bundleRowsForTable),
       )
+      if (strategy === 'merge-add') {
+        const uncreated = findFieldsNotCreated(table, localTablesById.get(table.id))
+        if (uncreated) fieldsNotCreated.push(uncreated)
+      }
 
       const willReplace = bundleRowIdsForTable.filter((id) => localRowIds.has(id)).length
       const willAdd = bundleRowIdsForTable.filter((id) => !localRowIds.has(id)).length
@@ -159,6 +167,7 @@ export async function handleImportPreviewRoute(
       redirects: bundle.redirects?.length ?? 0,
     },
     unresolvedClasses,
+    fieldsNotCreated,
     destructiveEffects,
   }
 
@@ -283,6 +292,23 @@ function nextAvailableSlug(slug: string, reservedSlugs: Set<string>): string {
  * class is the correct call. Refusing the bundle would reject it for the one
  * thing it got right, so this reports and does not block.
  */
+/**
+ * Fields the bundle's table defines that the destination's does not, for a
+ * strategy that never touches an existing table's field list.
+ *
+ * Returns null when the table is new (it arrives with its fields) or when every
+ * field already exists — the two cases with nothing to report.
+ */
+export function findFieldsNotCreated(
+  table: DataTable,
+  local: DataTable | undefined,
+): BundleFieldsNotCreated | null {
+  if (!local) return null
+  const existing = new Set(local.fields.map((field) => field.id))
+  const fieldIds = table.fields.filter((field) => !existing.has(field.id)).map((field) => field.id)
+  return fieldIds.length > 0 ? { tableId: table.id, tableName: table.name, fieldIds } : null
+}
+
 export function findUnresolvedClasses(bundle: SiteBundle): BundleUnresolvedClass[] {
   const ruleIds = new Set(Object.keys(bundle.site?.styleRules ?? {}))
   // No registry at all means nothing to resolve against — every class would be

@@ -1,4 +1,9 @@
 {
   "ownerPublicKey": "PASTE the ownerPublicKey printed by: bun cli/sign-go.ts keygen (run by the owner)",
+  "targets": {
+    "example-property": {
+      "ownerPublicKey": "PASTE the approver key this property's own owner designated — it alone approves this property"
+    }
+  },
   "ungated": ["sheeltron-staging"]
 }

@@ -23,7 +23,7 @@ import { draftSiteHash, getRow } from '../http/rows'
 import type { InstaticSession } from '../http/session'
 import { rowsDigest, type RowHashEntry } from '../hash/row'
 import { goMessage, parseGo, type Go, type GoAction } from './message'
-import { loadGoPolicy } from './policy'
+import { approverFor, loadGoPolicy } from './policy'
 import { isSpent, lastSuccessfulImport, recordOutcome, trySpend } from './ledger'
 
 /**
@@ -118,13 +118,16 @@ export async function checkGo(
   if (policy.ungated.includes(input.target)) return { ok: true, gated: false }
 
   const { action, binding } = input
-  if (!policy.ownerKey || !policy.ownerKeyFingerprint) {
+  // Whose signature approves THIS property: its own approver key when the
+  // policy names one, the default approver otherwise.
+  const approver = approverFor(policy, input.target)
+  if (!approver.ok) {
     return {
       ok: false,
-      reason: `"${input.target}" needs an owner-signed GO for "${action}", and the GO policy has ${policy.keyProblem}.`,
+      reason: `"${input.target}" needs an owner-signed GO for "${action}", and the GO policy has ${approver.problem}.`,
     }
   }
-  const fingerprint = policy.ownerKeyFingerprint
+  const fingerprint = approver.fingerprint
 
   if (input.go === undefined || input.go === null) {
     return {
@@ -138,8 +141,13 @@ export async function checkGo(
   if (!parsed.ok) return parsed
   const go = parsed.go
 
-  if (!verifyGoSignature(go, policy.ownerKey)) {
-    return { ok: false, reason: `The GO signature does not verify against the owner key ${fingerprint}.` }
+  if (!verifyGoSignature(go, approver.key)) {
+    return {
+      ok: false,
+      reason:
+        `The GO signature does not verify against the owner key ${fingerprint}, which approves ` +
+        `"${input.target}".`,
+    }
   }
   if (go.action !== action) {
     return {

@@ -15,6 +15,7 @@ import { resolveTarget } from '../http/config'
 import type { InstaticSession } from '../http/session'
 import type { Go, GoAction } from '../go/message'
 import { checkGo, currentSiteDigest, goRefusal, runUnderGo, type GoBinding } from '../go/verify'
+import { connectorRevision } from './revision'
 
 export { currentRowsDigest } from '../go/verify'
 
@@ -40,7 +41,14 @@ export async function runGated<T>(
   if (!gate.ok) return fail(goRefusal(gate.reason))
   const result = await runUnderGo(gate, run)
   if (!result.ok) return fail(goRefusal(result.reason))
-  return ok(result.receipt ? { result: result.result, go: result.receipt } : result.result)
+  // A deploy that ran under a GO names the build that ran it, so the record on
+  // the relay pins a version rather than "whatever was deployed that day".
+  // An ungated target keeps the response it always had.
+  return ok(
+    result.receipt
+      ? { result: result.result, go: result.receipt, connector: connectorRevision() }
+      : result.result,
+  )
 }
 
 /** What a site-publish GO must name on the target these arguments resolve to. */

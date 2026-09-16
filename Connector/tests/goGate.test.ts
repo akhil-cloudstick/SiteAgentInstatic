@@ -218,6 +218,62 @@ test('the Connector verifies the shared vectors exactly as the relay does', () =
   }
 })
 
+test('the approver is per property — a property key approves its own site and nothing else', async () => {
+  writePolicy({
+    ownerPublicKey: VECTORS.owner.publicKey,
+    targets: { beta: { ownerPublicKey: VECTORS.other.publicKey } },
+    ungated: ['alpha-staging'],
+  })
+  const { uploadId, sha256 } = upload()
+
+  // beta's own approver signs for beta.
+  const own = await call('connector_import_replace', {
+    target: 'beta',
+    confirm: 'REPLACE beta',
+    uploadId,
+    go: signGo({ target: 'beta', sha256 }, OTHER),
+  })
+  expect(own.isError).toBeUndefined()
+  expect(JSON.stringify(parse(own))).toContain(VECTORS.other.fingerprint)
+
+  // The platform's default key does NOT approve a property that named its own.
+  cmsCalls = []
+  const byDefaultKey = await call('connector_import_replace', {
+    target: 'beta',
+    confirm: 'REPLACE beta',
+    uploadId,
+    go: signGo({ target: 'beta', sha256 }, OWNER),
+  })
+  expect(refusal(byDefaultKey)).toContain(VECTORS.other.fingerprint)
+  expect(writes()).toEqual([])
+
+  // A property with no entry of its own still uses the default approver.
+  cmsCalls = []
+  const fallback = await replaceAlpha({ uploadId, go: signGo({ sha256 }) })
+  expect(fallback.isError).toBeUndefined()
+  expect(JSON.stringify(parse(fallback))).toContain(VECTORS.owner.fingerprint)
+})
+
+test('a property whose own approver key is unusable refuses, and never falls back to the default key', async () => {
+  writePolicy({
+    ownerPublicKey: VECTORS.owner.publicKey,
+    targets: { beta: { ownerPublicKey: 'not-a-key' } },
+    ungated: ['alpha-staging'],
+  })
+  const { uploadId, sha256 } = upload()
+
+  for (const key of [OTHER, OWNER]) {
+    const r = await call('connector_import_replace', {
+      target: 'beta',
+      confirm: 'REPLACE beta',
+      uploadId,
+      go: signGo({ target: 'beta', sha256 }, key),
+    })
+    expect(refusal(r)).toContain('not a base64 raw 32-byte Ed25519 key for "beta"')
+  }
+  expect(cmsCalls).toEqual([])
+})
+
 test('no GO on a gated target — every deploy-class tool refuses, nothing sent to the CMS', async () => {
   const json = upload()
   const zip = uploadZip()

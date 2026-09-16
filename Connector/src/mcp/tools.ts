@@ -102,6 +102,9 @@ export const CONNECTOR_TOOLS: ConnectorTool[] = [
       const cssStyleSheet = typeof globalThis.CSSStyleSheet !== 'undefined'
       return ok({
         bunVersion: typeof Bun !== 'undefined' ? Bun.version : 'unknown',
+        // The build that is answering: pin this, and a later mismatch is drift
+        // you meant to see rather than a mystery failure.
+        build: connectorRevision(),
         moduleIds: registeredModuleIds(),
         domParser,
         cssStyleSheet,

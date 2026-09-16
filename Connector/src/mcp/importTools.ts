@@ -20,6 +20,8 @@ import { resolveTarget } from '../http/config'
 import { GO_INPUT_PROP } from '../go/message'
 import { checkGo, describeGo, goRefusal, runUnderGo } from '../go/verify'
 import { runGated } from './goTool'
+import { connectorRevision } from './revision'
+import { projectPublish } from './publishProjection'
 import { saveUploadPart, UPLOAD_MAX_PARTS, UPLOAD_PART_MAX_BYTES } from './uploadStore'
 
 const ok = (value: unknown): ToolResult => ({
@@ -187,6 +189,43 @@ export const IMPORT_TOOLS: ConnectorTool[] = [
   },
 
   {
+    name: 'connector_publish_projection',
+    description:
+      'What a bundle WOULD publish, computed from the bundle alone — no target, no CMS, writes ' +
+      'nothing. Runs the publisher\'s own tree-shake, route resolution and entry-template lookup, ' +
+      'and reports how many style rules survive publishing and which class rules lose their CSS, ' +
+      'the resolved public routes, whether each collection has an entry template, and warnings for ' +
+      'what a shape check cannot see: a bundle whose CSS nearly all disappears on publish, or a ' +
+      'collection whose rows publish no page. Run it before asking for an import. Name the bundle ' +
+      'with relaySha256, uploadId, path or an inline bundle — exactly one.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        relaySha256: RELAY_SHA256_PROP,
+        bundle: { type: 'object', description: 'A SiteBundle object, inline.' },
+        uploadId: { type: 'string', description: 'A bundle already POSTed to /imports.' },
+        path: { type: 'string', description: 'Or a site-bundle .zip on the SERVER filesystem.' },
+      },
+      additionalProperties: false,
+    },
+    handler: async (a) =>
+      guarded(async () => {
+        const source = await resolveBundleSourceWithRelay({
+          bundle: a.bundle,
+          path: str(a.path) || undefined,
+          uploadId: str(a.uploadId) || undefined,
+          relaySha256: str(a.relaySha256) || undefined,
+        })
+        if (!source.ok) return fail(source.reason)
+        return ok({
+          bundleSource: source.value.source,
+          ...(source.value.sha256 ? { sha256: source.value.sha256 } : {}),
+          publishProjection: projectPublish(source.value.bundle),
+        })
+      }),
+  },
+
+  {
     name: 'connector_import_replace',
     description:
       'CLEAN-SITE IMPORT. Deletes EVERY row, every non-system table, all media folders and all ' +
@@ -281,6 +320,9 @@ export const IMPORT_TOOLS: ConnectorTool[] = [
           bundleSource: resolved.source,
           ...(resolved.sha256 ? { sha256: resolved.sha256 } : {}),
           ...(resolved.archive ? { mediaFilesInArchive: resolved.mediaFilesInArchive } : {}),
+          // What the publisher would do with it, not only what the bundle says
+          // about itself: the CSS that survives, the routes, the templates.
+          publishProjection: projectPublish(resolved.bundle),
         }
         if (a.previewOnly === true || !gate.ok) {
           return ok({ previewOnly: true, preview: previewReport, go: describeGo(gate) })
@@ -295,7 +337,12 @@ export const IMPORT_TOOLS: ConnectorTool[] = [
             : importBundle(session, resolved.bundle, 'replace'),
         )
         if (!run.ok) return fail(goRefusal(run.reason))
-        return ok({ preview: previewReport, result: run.result, ...(run.receipt ? { go: run.receipt } : {}) })
+        return ok({
+          preview: previewReport,
+          result: run.result,
+          // An import that ran under a GO names the build that ran it.
+          ...(run.receipt ? { go: run.receipt, connector: connectorRevision() } : {}),
+        })
       }),
   },
 ]

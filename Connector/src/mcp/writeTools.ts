@@ -28,6 +28,7 @@ import { createHash } from 'node:crypto'
 import { basename, resolve } from 'node:path'
 import { unzipSync, strFromU8 } from 'fflate'
 import { previewBundle, importBundle, exportBundle } from '../http/client'
+import { projectPublish } from './publishProjection'
 import { ensureExportDir, resolveExport, EXPORT_DOWNLOAD_PREFIX } from './exportStore'
 import { RELAY_SHA256_PROP, resolveBundleSourceWithRelay } from './bundleSource'
 import { callerRootUrl } from './requestContext'
@@ -212,6 +213,10 @@ export const WRITE_TOOLS: ConnectorTool[] = [
           // media bytes are separate entries, and the preview only ever sees
           // the manifest. Reported so the number is visible rather than absent.
           ...(source.value.archive ? { mediaFilesInArchive: source.value.mediaFilesInArchive } : {}),
+          // The CMS preview checks the bundle against the target; this reports
+          // what the PUBLISHER would then do with it — the CSS that survives
+          // its tree-shake, the routes, the entry templates.
+          publishProjection: projectPublish(source.value.bundle),
         })
       }),
   },

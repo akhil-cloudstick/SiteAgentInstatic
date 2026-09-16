@@ -416,6 +416,19 @@ async function postMessage(ticket: Ticket, b: Record<string, unknown>, actor: Ac
   }
   await deps.store.insertMessage(message)
   if (actor.role === 'validator') await validatorActive(ticket, at, deps)
+  // Every message fires the notifier, not only the stall timer: a thread that
+  // waits for the other side's next poll is the courier delay in miniature,
+  // which is the thing this relay replaces.
+  deps.notify({
+    event: 'message_posted',
+    ticketId: ticket.id,
+    state: ticket.state,
+    title: ticket.title,
+    at,
+    messageId: message.id,
+    author: actor.role,
+    kind,
+  })
   return out(201, { message })
 }
 

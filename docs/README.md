@@ -5,6 +5,8 @@ Product-internal docs stay inside their product (see [Where else docs live](#whe
 
 | Folder | What's in it |
 |---|---|
+| [`current-state/`](#current-state) | **Start here** — how the whole platform works today, in plain language, with diagrams |
+| [`prd/`](#prd) | Where the platform is going — the target architecture and the requirements, each with its acceptance test |
 | [`platform/`](#platform) | MMSBUILD product vision, the client's plan, scale & tenancy |
 | [`architecture/`](#architecture) | SiteAgent build plan, runtime topology, DB design, glossary, pending work |
 | [`integration/`](#integration) | OpenDesign ↔ CMS — "Share to CMS", the build rule, compliance |
@@ -12,11 +14,34 @@ Product-internal docs stay inside their product (see [Where else docs live](#whe
 | [`opendesign/`](#opendesign) | MMS-Design (OpenDesign) — shared web build |
 | [`upgrades/`](#upgrades) | Vendored-fork upgrade runbooks, reports and version comparisons (both products) |
 | [`connector/`](#connector) | MMS Connector + per-site MCP endpoint |
+| [`relay/`](#relay) | Approval-signature test vectors shared by the Relay and the Connector |
 | [`operator/`](#operator) | Operator-facing setup runbooks |
 | [`client/`](#client) | Client-facing handover notes |
 | [`CHANGELOG.md`](./CHANGELOG.md) | Plain-language log of what changed, newest first |
 
 ---
+
+## current-state
+
+The whole platform as it works **today**, written so someone with no knowledge of the codebase can follow it — no file names, no ports, no internals. Read this before anything else in `platform/`.
+
+| File | Read it for |
+|---|---|
+| [`mmsbuild-current-state.md`](./current-state/mmsbuild-current-state.md) | The five parts, what is isolated per project, design → live pipeline, **how many websites a project can hold and why**, machine access, approvals, today vs the plan |
+| [`mmsbuild-current-state.html`](./current-state/mmsbuild-current-state.html) | The same material as a visual page — 8 diagrams, light + dark, printable. Hand-authored; do not regenerate it from the Markdown |
+
+## prd
+
+Where the platform is going. The target architecture, and the requirements that get it there — every requirement carrying the test that proves it. Read `current-state/` first; these documents are written as an extension of it.
+
+| File | Read it for |
+|---|---|
+| [`mmsbuild-target-architecture.md`](./prd/mmsbuild-target-architecture.md) | The system re-drawn to meet the goal: the four levels, per-project CMS destination, the approver registry, the proof chain, fail-closed everywhere, and the reuse inventory that makes it affordable |
+| [`mmsbuild-target-architecture.html`](./prd/mmsbuild-target-architecture.html) | The same as a visual page — 8 diagrams, light + dark, printable |
+| [`mmsbuild-prd.md`](./prd/mmsbuild-prd.md) | The requirements: 7 phases, every requirement with its acceptance test, the 40-criterion acceptance matrix, the open questions answered, and the verified status of the six items claimed as already built |
+| [`mmsbuild-prd.html`](./prd/mmsbuild-prd.html) | The same as a visual page — requirement cards with phase, status and acceptance id, plus the full matrix |
+
+Both `.html` files are hand-authored and must not be regenerated from the Markdown.
 
 ## platform
 
@@ -98,9 +123,18 @@ Both vendored forks, together — the runbooks reference each other.
 
 | File | Read it for |
 |---|---|
-| [`mms-mcp.md`](./connector/mms-mcp.md) | One MCP endpoint per site — scoped agent access to a tenant |
-| [`connect-an-ai-agent.md`](./connector/connect-an-ai-agent.md) | How to give an AI assistant access to a client site |
-| [`connector-guide.html`](./connector/connector-guide.html) · [`connector-plan.html`](./connector/connector-plan.html) · [`connector-mcp.html`](./connector/connector-mcp.html) · [`connector-handover.html`](./connector/connector-handover.html) | Rendered connector guides |
+| [`connector-guide-v2.md`](./connector/connector-guide-v2.md) | **Current** — the full MMS Connector tool reference (supersedes the older `.html` guides) |
+| [`mms-mcp-v2.md`](./connector/mms-mcp-v2.md) | **Current** — the per-site MCP endpoint, its tools and its permission model |
+| [`mms-mcp.md`](./connector/mms-mcp.md) | Superseded by `mms-mcp-v2.md` |
+| [`connect-an-ai-agent.md`](./connector/connect-an-ai-agent.md) | Superseded by `mms-mcp-v2.md` |
+| [`build-v2-html.mjs`](./connector/build-v2-html.mjs) | The md → html renderer for the two v2 guides. The markdown is the source of truth — never hand-edit the generated `.html` |
+| [`connector-guide-v2.html`](./connector/connector-guide-v2.html) · [`mms-mcp-v2.html`](./connector/mms-mcp-v2.html) · [`connector-guide.html`](./connector/connector-guide.html) · [`connector-plan.html`](./connector/connector-plan.html) · [`connector-mcp.html`](./connector/connector-mcp.html) · [`connector-handover.html`](./connector/connector-handover.html) | Rendered connector guides |
+
+## relay
+
+| File | Read it for |
+|---|---|
+| [`go-test-vectors.json`](./relay/go-test-vectors.json) | The shared approval-signature test cases. Both the Relay and the Connector verify against these — they are what keeps two independent implementations in agreement |
 
 ## operator
 

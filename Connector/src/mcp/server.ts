@@ -30,6 +30,7 @@ import { logActivity, callerFingerprint } from '../audit/log'
 import { resolveExport, EXPORT_DOWNLOAD_PREFIX } from './exportStore'
 import { saveUpload, UPLOAD_ROUTE, type UploadKind } from './uploadStore'
 import { setToolSurface } from './toolSurface'
+import { describeArgIssues, validateToolArguments } from './validateArgs'
 import { withRequestContext } from './requestContext'
 import { readFileSync, statSync } from 'node:fs'
 
@@ -192,15 +193,31 @@ export function buildConnectorMcpServer(caller = 'client'): Server {
         isError: true,
       }
     }
+    const args = request.params.arguments ?? {}
+    // An argument the tool never declared is a caller error, and one that is
+    // ignored instead of refused becomes a run that did something else.
+    const issues = validateToolArguments(tool.inputSchema, args)
+    if (issues.length > 0) {
+      const message = describeArgIssues(tool.name, issues)
+      logActivity({
+        section: sectionOf(tool.name),
+        action: tool.name.replace(/^connector_/, ''),
+        outcome: 'FAILED',
+        detail: issues.map((i) => `${i.path || '(root)'}: ${i.problem}`).join('; '),
+        caller,
+      })
+      return { content: [{ type: 'text', text: JSON.stringify({ error: message, issues }, null, 2) }], isError: true }
+    }
+
     const started = Date.now()
     try {
-      const result = await tool.handler(request.params.arguments ?? {})
+      const result = await tool.handler(args)
       logActivity({
         section: sectionOf(tool.name),
         action: tool.name.replace(/^connector_/, ''),
         outcome: result.isError ? 'FAILED' : 'ok',
         ms: Date.now() - started,
-        detail: summarize(tool.name, request.params.arguments ?? {}, result),
+        detail: summarize(tool.name, args, result),
         caller,
       })
       return result

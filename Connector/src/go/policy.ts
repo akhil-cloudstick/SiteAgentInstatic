@@ -4,7 +4,18 @@
  * `go-policy.json` next to the Connector (or wherever `MMS_CONNECTOR_GO_POLICY`
  * points):
  *
- *   { "ownerPublicKey": "<base64 raw Ed25519 key>", "ungated": ["sheeltron-staging"] }
+ *   {
+ *     "ownerPublicKey": "<base64 raw Ed25519 key>",
+ *     "targets": { "sheeltron": { "ownerPublicKey": "<base64 raw Ed25519 key>" } },
+ *     "ungated": ["sheeltron-staging"]
+ *   }
+ *
+ * The approver is per property. A target listed in `targets` is approved by that
+ * property's own key; `ownerPublicKey` approves every target with no entry of
+ * its own, which is what a single-property pilot uses. A `targets` entry whose
+ * key is unusable refuses that target outright instead of falling back to the
+ * default — a property whose approver is misconfigured must never become
+ * approvable by the platform's own key.
  *
  * Fail-closed in the same direction as the target allowlist
  * (`Operator/control-plane/lib/connectorAllowlist.mjs`). A missing or unreadable
@@ -31,12 +42,22 @@ export const GO_POLICY_ENV = 'MMS_CONNECTOR_GO_POLICY'
 /** SPKI DER header for an Ed25519 public key; the raw 32 bytes follow it. */
 const ED25519_SPKI_PREFIX = Buffer.from('302a300506032b6570032100', 'hex')
 
+/** One approver's key, or why the file yields none for it. */
+export interface Approver {
+  key?: KeyObject
+  fingerprint?: string
+  /** Why `key` is absent, for the refusal message. */
+  problem?: string
+}
+
 export interface GoPolicy {
   /** Absent when the file names no usable key — gated targets then refuse. */
   ownerKey?: KeyObject
   ownerKeyFingerprint?: string
   /** Why `ownerKey` is absent, for the refusal message. */
   keyProblem?: string
+  /** Per-property approvers, by resolved target name. */
+  targets: Record<string, Approver>
   ungated: string[]
 }
 
@@ -90,20 +111,62 @@ export function loadGoPolicy(): GoPolicyLoad {
     return { ok: false, reason: `${file} must hold a JSON object, so no gated action can run.` }
   }
 
-  const p = parsed as { ownerPublicKey?: unknown; ungated?: unknown }
+  const p = parsed as { ownerPublicKey?: unknown; targets?: unknown; ungated?: unknown }
   const policy: GoPolicy = {
+    targets: {},
     ungated: Array.isArray(p.ungated) ? p.ungated.map((s) => String(s).trim()).filter(Boolean) : [],
   }
 
-  const b64 = typeof p.ownerPublicKey === 'string' ? p.ownerPublicKey.trim() : ''
-  const owner = b64 ? ownerKeyFromBase64(b64) : undefined
-  if (owner) {
+  const owner = readApprover(p.ownerPublicKey)
+  if (owner.key) {
     policy.ownerKey = owner.key
-    policy.ownerKeyFingerprint = keyFingerprint(owner.raw)
+    policy.ownerKeyFingerprint = owner.fingerprint
   } else {
-    policy.keyProblem = b64
-      ? 'an ownerPublicKey that is not a base64 raw 32-byte Ed25519 key'
-      : 'no ownerPublicKey set'
+    policy.keyProblem = owner.problem
+  }
+
+  if (p.targets && typeof p.targets === 'object' && !Array.isArray(p.targets)) {
+    for (const [name, entry] of Object.entries(p.targets as Record<string, unknown>)) {
+      const target = name.trim()
+      if (!target) continue
+      const key = entry && typeof entry === 'object' && !Array.isArray(entry)
+        ? (entry as { ownerPublicKey?: unknown }).ownerPublicKey
+        : entry
+      policy.targets[target] = readApprover(key)
+    }
   }
   return { ok: true, policy }
+}
+
+function readApprover(raw: unknown): Approver {
+  const b64 = typeof raw === 'string' ? raw.trim() : ''
+  const parsed = b64 ? ownerKeyFromBase64(b64) : undefined
+  if (parsed) return { key: parsed.key, fingerprint: keyFingerprint(parsed.raw) }
+  return {
+    problem: b64
+      ? 'an ownerPublicKey that is not a base64 raw 32-byte Ed25519 key'
+      : 'no ownerPublicKey set',
+  }
+}
+
+/**
+ * Whose signature approves this property.
+ *
+ * A property with its own entry is approved by that key alone: an entry that
+ * names an unusable key refuses, rather than quietly handing approval of a
+ * client's site back to the platform's key.
+ */
+export function approverFor(
+  policy: GoPolicy,
+  target: string,
+): { ok: true; key: KeyObject; fingerprint: string; scope: 'property' | 'default' } | { ok: false; problem: string } {
+  const own = policy.targets[target]
+  if (own) {
+    return own.key && own.fingerprint
+      ? { ok: true, key: own.key, fingerprint: own.fingerprint, scope: 'property' }
+      : { ok: false, problem: `${own.problem} for "${target}"` }
+  }
+  return policy.ownerKey && policy.ownerKeyFingerprint
+    ? { ok: true, key: policy.ownerKey, fingerprint: policy.ownerKeyFingerprint, scope: 'default' }
+    : { ok: false, problem: policy.keyProblem ?? 'no ownerPublicKey set' }
 }

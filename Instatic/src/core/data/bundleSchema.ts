@@ -344,6 +344,25 @@ export const BundleUnresolvedClassSchema = Type.Object({
 export type BundleUnresolvedClass = Static<typeof BundleUnresolvedClassSchema>
 
 /**
+ * Fields a `merge-add` run will not create.
+ *
+ * `merge-add` never overwrites, which for a table that already exists means its
+ * field list is left exactly as it is. A bundle that adds a field to an
+ * existing table therefore imports rows whose cells address a field that will
+ * never exist — the values land and stay invisible, with nothing in the result
+ * counters saying so. Reported here so the sender sees it before the run rather
+ * than on the site afterwards.
+ */
+export const BundleFieldsNotCreatedSchema = Type.Object({
+  tableId: Type.String(),
+  tableName: Type.String(),
+  /** Field ids present in the bundle's table and absent from the destination's. */
+  fieldIds: Type.Array(Type.String()),
+})
+
+export type BundleFieldsNotCreated = Static<typeof BundleFieldsNotCreatedSchema>
+
+/**
  * Read-only diff returned by `POST /cms/api/cms/import/preview`.
  * Shows the operator what would happen before they commit an import.
  */
@@ -372,6 +391,11 @@ export const BundlePreviewSchema = Type.Object({
    * Advisory — a non-empty list is worth reading, not a reason to refuse.
    */
   unresolvedClasses: Type.Optional(Type.Array(BundleUnresolvedClassSchema)),
+  /**
+   * `merge-add` only: fields this run leaves uncreated on tables that already
+   * exist. See `BundleFieldsNotCreatedSchema`.
+   */
+  fieldsNotCreated: Type.Optional(Type.Array(BundleFieldsNotCreatedSchema)),
   /**
    * Things this import destroys that the bundle does not carry, and which no
    * count above describes. `replace` clears the published version along with
