@@ -3,6 +3,7 @@
 import http from 'node:http';
 import { timingSafeEqual } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
+import { networkInterfaces } from 'node:os';
 import { dirname, resolve as resolvePath } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import config from './lib/env.mjs';
@@ -58,6 +59,30 @@ function onPrivateInterface(req) {
   if (ip === '127.0.0.1' || ip === '::1') return true;
   const [a, b] = ip.split('.').map(Number);
   return a === 100 && b >= 64 && b <= 127; // Tailscale's CGNAT range
+}
+
+/** This machine's tailnet address, or null when it is not on one. */
+function tailnetAddress() {
+  for (const list of Object.values(networkInterfaces())) {
+    for (const nic of list ?? []) {
+      if (nic.family !== 'IPv4' || nic.internal) continue;
+      const [a, b] = nic.address.split('.').map(Number);
+      if (a === 100 && b >= 64 && b <= 127) return nic.address;
+    }
+  }
+  return null;
+}
+
+async function serveBoard(req, res, method) {
+  if (method !== 'GET' && method !== 'HEAD') return send(res, 405, { error: 'Use GET.' });
+  if (!onPrivateInterface(req)) return send(res, 404, { error: 'Not found.' });
+  try {
+    const html = await readFile(BOARD_FILE, 'utf8');
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
+    return res.end(method === 'HEAD' ? undefined : html);
+  } catch {
+    return send(res, 503, { error: 'The board has not been generated: run node docs/board/build-board.mjs' });
+  }
 }
 
 function readJson(req) {
@@ -185,17 +210,7 @@ const server = http.createServer(async (req, res) => {
     // Tenant Hub (login / invite / two-card home) — the HTML surface tenants use.
     if (await handleHub(req, res, method, path)) return;
 
-    if (path === '/board' || path === '/board/') {
-      if (method !== 'GET' && method !== 'HEAD') return send(res, 405, { error: 'Use GET.' });
-      if (!onPrivateInterface(req)) return send(res, 404, { error: 'Not found.' });
-      try {
-        const html = await readFile(BOARD_FILE, 'utf8');
-        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
-        return res.end(method === 'HEAD' ? undefined : html);
-      } catch {
-        return send(res, 503, { error: 'The board has not been generated: run node docs/board/build-board.mjs' });
-      }
-    }
+    if (path === '/board' || path === '/board/') return serveBoard(req, res, method);
 
     if (path === '/api/health') {
       return send(res, 200, { ok: true, running: rt.listRunning() });
@@ -418,6 +433,29 @@ server.listen(config.controlPlanePort, '127.0.0.1', async () => {
   // Open the funnel only now the gated server is up (never point it at ungated code).
   await openFunnel();
 });
+
+// The delivery board on the tailnet, and nothing else.
+//
+// The control plane itself stays on loopback: its admin surface needs no
+// session yet, so widening it to give the other party a read-only board would
+// hand them everything else with it. This is a separate listener bound to the
+// tailnet address alone, serving one file.
+const boardHost = tailnetAddress();
+if (boardHost) {
+  const boardPort = Number(process.env.BOARD_PORT || 4460);
+  http
+    .createServer(async (req, res) => {
+      const p = new URL(req.url, 'http://x').pathname;
+      if (p !== '/' && p !== '/board' && p !== '/board/') return send(res, 404, { error: 'Not found.' });
+      return serveBoard(req, res, req.method);
+    })
+    .listen(boardPort, boardHost, () => {
+      console.log(`[board] delivery board  : http://${boardHost}:${boardPort}/board   (tailnet only, read-only)`);
+    })
+    .on('error', (err) => console.error('[board] not served:', err.message));
+} else {
+  console.log('[board] no tailnet address on this machine; the board is served on loopback only');
+}
 
 // --- graceful shutdown: stop tenant instances so none are orphaned ---
 function shutdown() {
