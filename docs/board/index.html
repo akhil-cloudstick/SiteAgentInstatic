@@ -1,0 +1,872 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MMSBUILD delivery board</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #fbfaf7; --fg: #1a1a1a; --muted: #5d5d5d; --line: #e2ded6; --card: #fff;
+    --todo: #8a8a8a; --doing: #c47f17; --built: #1f7a4d; --blocked: #b3261e; --pending: #6b6b6b;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #14161a; --fg: #f2f2f0; --muted: #a6a6a6; --line: #2c3037; --card: #1b1e24; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 32px 20px 64px; background: var(--bg); color: var(--fg);
+         font: 15px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 1040px; margin: 0 auto; }
+  h1 { font-size: 26px; margin: 0 0 6px; letter-spacing: -0.02em; }
+  h2 { font-size: 18px; margin: 0 0 4px; letter-spacing: -0.01em; }
+  .meta, .summary, .note, .depends { color: var(--muted); }
+  .meta { font-size: 13px; margin: 0 0 20px; }
+  .meta code { font-size: 12px; }
+  .legend { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px; margin: 0 0 28px; font-size: 13px; }
+  .legend p { margin: 4px 0; }
+  .module { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px; margin: 0 0 18px; }
+  .summary { margin: 0 0 10px; font-size: 14px; }
+  .counts { margin: 0 0 12px; }
+  details.task { border-top: 1px solid var(--line); padding: 10px 0 4px; }
+  details.task summary { cursor: pointer; display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+  details.task summary::-webkit-details-marker { display: none; }
+  .task-title { font-weight: 600; flex: 1 1 auto; min-width: 200px; }
+  .id { font: 600 12px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace; color: var(--muted); }
+  .note, .depends { font-size: 13px; margin: 8px 0 0; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 6px; font-size: 13.5px; }
+  th { text-align: left; font-weight: 600; color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
+  th, td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  td.id { white-space: nowrap; }
+  .chip { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 12px; font-weight: 600;
+          border: 1px solid currentColor; white-space: nowrap; }
+  .todo { color: var(--todo); } .doing { color: var(--doing); } .built { color: var(--built); } .blocked { color: var(--blocked); }
+  .v-pending { color: var(--pending); } .v-pass { color: var(--built); } .v-fail { color: var(--blocked); }
+  @media (max-width: 560px) { body { padding: 20px 14px 48px; } table { font-size: 13px; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>MMSBUILD delivery board</h1>
+  <p class="meta">
+    Modules are the phases of <code>docs/prd/mmsbuild-prd.md</code>, tasks are its requirements, subtasks its acceptance criteria — ids unchanged.<br>
+    Generated 2026-09-16 11:47 UTC from commit <code>c865d10</code>.
+  </p>
+  <div class="legend">
+    <p><strong>Build</strong> is ours: <span class="chip todo">Not started</span> <span class="chip doing">In progress</span> <span class="chip built">Built</span> <span class="chip blocked">Blocked</span></p>
+    <p><strong>Acceptance run</strong> is yours, and we never set it: <span class="chip v-pending">Not yet verified</span> <span class="chip v-pass">Verified</span> <span class="chip v-fail">Failed</span></p>
+    <p>Modules are the PRD's phases, tasks are its requirements, subtasks are its acceptance criteria. Ids match the PRD exactly, so an acceptance run maps to this board line for line. `status` is ours — what is built. `verified` belongs to the acceptance run and is never set by us.</p>
+    <p>Totals — tasks: <span class="chip todo">19 not started</span> <span class="chip doing">9 in progress</span> <span class="chip built">3 built</span> &nbsp;·&nbsp; acceptance criteria: <span class="chip todo">36 not started</span> <span class="chip doing">4 in progress</span> <span class="chip built">16 built</span></p>
+  </div>
+  <section class="module">
+    <h2><span class="id">P0</span> Phase 0 — Close the surface</h2>
+    <p class="summary">Every requirement after this one assumes an authenticated admin.</p>
+    <p class="counts"><span class="chip todo">2 not started</span></p>
+    <details class="task" >
+      <summary>
+        <span class="id">R14</span>
+        <span class="task-title">Admin authentication</span>
+        <span class="chip todo">Not started</span>
+        <span class="counts"><span class="chip todo">1 not started</span></span>
+      </summary>
+      <p class="note">Password hashing, signed sessions and invites already exist elsewhere in the system; reuse rather than rewrite.</p>
+      <table>
+        <thead><tr><th>Acceptance</th><th>Pass means</th><th>Build</th><th>Acceptance run</th></tr></thead>
+        <tbody>
+        <tr>
+          <td class="id">AC-D14.1</td>
+          <td>Unauthenticated admin request refused; the console requires sign-in</td>
+          <td><span class="chip todo">Not started</span></td>
+          <td><span class="chip v-pending">Not yet verified</span></td>
+        </tr>
+        </tbody>
+      </table>
+    </details>
+    <details class="task" >
+      <summary>
+        <span class="id">NEW-1</span>
+        <span class="task-title">The admin surface reveals no secret it does not have to</span>
+        <span class="chip todo">Not started</span>
+        <span class="counts"><span class="chip todo">2 not started</span></span>
+      </summary>
+      <p class="depends">Depends on R14</p>
+      <table>
+        <thead><tr><th>Acceptance</th><th>Pass means</th><th>Build</th><th>Acceptance run</th></tr></thead>
+        <tbody>
+        <tr>
+          <td class="id">NEW-1a</td>
+          <td>A minted machine key cannot be read back in plaintext</td>
+          <td><span class="chip todo">Not started</span></td>
+          <td><span class="chip v-pending">Not yet verified</span></td>
+        </tr>
+        <tr>
+          <td class="id">NEW-1b</td>
+          <td>A project listing leaks no usable invite link or capacity token</td>
+          <td><span class="chip todo">Not started</span></td>
+          <td><span class="chip v-pending">Not yet verified</span></td>
+        </tr>
+        </tbody>
+      </table>
+    </details>
+  </section>
+  <section class="module">
+    <h2><span class="id">P1</span> Phase 1 — The levels</h2>
+    <p class="summary">Operator and Business above Project, with roles that hold when the interface is bypassed.</p>
+    <p class="counts"><span class="chip todo">4 not started</span></p>
+    <details class="task" >
+      <summary>
+        <span class="id">R1</span>
+        <span class="task-title">Operator and Business levels above Project</span>
+        <span class="chip todo">Not started</span>
+        <span class="counts"><span class="chip todo">2 not started</span></span>
+      </summary>
+      <p class="depends">Depends on R14</p><p class="note">Per-project isolation beneath it is already real and database-enforced; this adds the levels above.</p>
+      <table>
+        <thead><tr><th>Acceptance</th><th>Pass means</th><th>Build</th><th>Acceptance run</th></tr></thead>
+        <tbody>
+        <tr>
+          <td class="id">AC-A1.1</td>
+          <td>The Operator → Business → Project chain is queryable; each level resolves its children</td>
+          <td><span class="chip todo">Not started</span></td>
+          <td><span class="chip v-pending">Not yet verified</span></td>
+        </tr>
+        <tr>
+          <td class="id">AC-A1.2</td>
+          <td>Cross-Business read and write denied at the server; no foreign data in any listing</td>
+          <td><span class="chip todo">Not started</span></td>
+          <td><span class="chip v-pending">Not yet verified</span></td>
+        </tr>
+        </tbody>
+      </table>
+    </details>
+    <details class="task" >
+      <summary>
+        <span class="id">R3</span>
+        <span class="task-title">Roles, and more than one person per project</span>
+        <span class="chip todo">Not started</span>
+        <span class="counts"><span class="chip todo">2 not started</span></span>
+      </summary>
+      <p class="depends">Depends on R1</p><p class="note">Adopt the CMS's existing four roles and ~40 capabilities rather than duplicating them.</p>
+      <table>
+        <thead><tr><th>Acceptance</th><th>Pass means</th><th>Build</th><th>Acceptance run</th></tr></thead>
+        <tbody>
+        <tr>
+          <td class="id">AC-A3.1</td>
+          <td>Publisher-role action allowed; the same action denied to an author role</td>
+          <td><span class="chip todo">Not started</span></td>
+          <td><span class="chip v-pending">Not yet verified</span></td>
+        </tr>
+        <tr>
+          <td class="id">AC-A3.2</td>
+          <td>The denial holds when the interface is bypassed</td>
+          <td><span class="chip todo">Not started</span></td>
+          <td><span class="chip v-pending">Not yet verified</span></td>
+        </tr>
+        </tbody>
+      </table>
+    </details>
+    <details class="task" >
+      <summary>
+        <span class="id">NEW-2</span>
+        <span class="task-title">Inviting a second person must not overwrite the first</span>
+        <span class="chip todo">Not started</span>
+        <span class="counts"><span class="chip todo">1 not started</span></span>
+      </summary>
+      <p class="depends">Depends on R1</p><p class="note">Concrete blocker under R3: today the invite path overwrites the existing account.</p>
+      <table>
+        <thead><tr><th>Acceptance</th><th>Pass means</th><th>Build</th><th>Acceptance run</th></tr></thead>
+        <tbody>
+        <tr>
+          <td class="id">NEW-2a</td>
+          <td>A second invite adds an account rather than replacing the first</td>
+          <td><span class="chip todo">Not started</span></td>
+          <td><span class="chip v-pending">Not yet verified</span></td>
+        </tr>
+        </tbody>
+      </table>
+    </details>
+    <details class="task" >
+      <summary>
+        <span class="id">NEW-3</span>
+        <span class="task-title">A portal sign-in arrives with its own role, not as the owner</span>
+        <span class="chip todo">Not started</span>
+        <span class="counts"><span class="chip todo">2 not started</span></span>
+      </summary>
+      <p class="depends">Depends on R3</p><p class="note">The wire format already carries a role field and recognises four role names.</p>
+      <table>
+        <thead><tr><th>Acceptance</th><th>Pass means</th><th>Build</th><th>Acceptance run</th></tr></thead>
+        <tbody>
+        <tr>
+          <td class="id">NEW-3a</td>
+          <td>An author role is denied an owner-only action inside the CMS</td>
+          <td><span class="chip todo">Not started</span></td>
+          <td><span class="chip v-pending">Not yet verified</span></td>
+        </tr>
+        <tr>
+          <td class="id">NEW-3b</td>
+          <td>Step-up is demanded, not pre-satisfied</td>
+          <td><span class="chip todo">Not started</span></td>
+          <td><span class="chip v-pending">Not yet verified</span></td>
+        </tr>
+        </tbody>
+      </table>
+    </details>
+  </section>
+  <section class="module">
+    <h2><span class="id">P2</span> Phase 2 — Scoped visibility and branding</h2>
+    <p class="summary">Counts without the work, and an Operator's own branding.</p>
+    <p class="counts"><span class="chip todo">1 not started</span></p>
+    <details class="task" >
+      <summary>
+        <span class="id">R5</span>
+        <span class="task-title">Platform Owner sees counts, not work; Operators are branded</span>
+        <span class="chip todo">Not started</span>
+        <span class="counts"><span class="chip todo">2 not started</span></span>
+      </summary>
+      <p class="depends">Depends on R1, R3</p><p class="note">Branding is a single global value today.</p>
+      <table>
+        <thead><tr><th>Acceptance</th><th>Pass means</th><th>Build</th><th>Acceptance run</th></tr></thead>
+        <tbody>
+        <tr>
+          <td class="id">AC-A5.1</td>
+          <td>Counts visible to the platform-owner role; opening the work denied</td>
+          <td><span class="chip todo">Not started</span></td>
+          <td><span class="chip v-pending">Not yet verified</span></td>
+        </tr>
+        <tr>
+          <td class="id">AC-A5.2</td>
+          <td>Operator branding renders on the named surfaces</td>
+          <td><span class="chip todo">Not started</span></td>
+          <td><span class="chip v-pending">Not yet verified</span></td>
+        </tr>
+        </tbody>
+      </table>
+    </details>
+  </section>
+  <section class="module">
+    <h2><span class="id">P3</span> Phase 3 — One project, one website</h2>
+    <p class="summary">A second design can never silently destroy the first.</p>
+    <p class="counts"><span class="chip todo">2 not started</span></p>
+    <details class="task" >
+      <summary>
+        <span class="id">R2</span>
+        <span class="task-title">A second website cannot silently destroy the first</span>
+        <span class="chip todo">Not started</span>
+        <span class="counts"><span class="chip todo">1 not started</span></span>
+      </summary>
+      <p class="depends">Depends on R1</p>
+      <table>
+        <thead><tr><th>Acceptance</th><th>Pass means</th><th>Build</th><th>Acceptance run</th></tr></thead>
+        <tbody>
+        <tr>
+          <td class="id">AC-A2.1</td>
+          <td>A second design is refused or lands distinctly; site A still resolves with A's content</td>
+          <td><span class="chip todo">Not started</span></td>
+          <td><span class="chip v-pending">Not yet verified</span></td>
+        </tr>
+        </tbody>
+      </table>
+    </details>
+    <details class="task" >
+      <summary>
+        <span class="id">R4</span>
+        <span class="task-title">The CMS destination belongs to the project</span>
+        <span class="chip todo">Not started</span>
+        <span class="counts"><span class="chip todo">2 not started</span></span>
+      </summary>
+      <p class="depends">Depends on R1, R2</p>
+      <table>
+        <thead><tr><th>Acceptance</th><th>Pass means</th><th>Build</th><th>Acceptance run</th></tr></thead>
+        <tbody>
+        <tr>
+          <td class="id">AC-A2.2</td>
+          <td>A design's destination cannot be pointed at another project's CMS</td>
+          <td><span class="chip todo">Not started</span></td>
+          <td><span class="chip v-pending">Not yet verified</span></td>
+        </tr>
+        <tr>
+          <td class="id">AC-A2.3</td>
+          <td>Publishing to A changes A's domain and not B's, verified by fetching both</td>
+          <td><span class="chip todo">Not started</span></td>
+          <td><span class="chip v-pending">Not yet verified</span></td>
+        </tr>
+        </tbody>
+      </table>
+    </details>
+  </section>
+  <section class="module">
+    <h2><span class="id">P4</span> Phase 4 — Governance, with proof</h2>
+    <p class="summary">NEW-4 first: nothing in the approver work functions until both ends agree.</p>
+    <p class="counts"><span class="chip todo">1 not started</span> <span class="chip doing">3 in progress</span> <span class="chip built">2 built</span></p>
+    <details class="task" open>
+      <summary>
+        <span class="id">NEW-4</span>
+        <span class="task-title">The issuing side resolves per-property approvers too</span>
+        <span class="chip built">Built</span>
+        <span class="counts"><span class="chip built">1 built</span></span>
+      </summary>
+      <p class="depends">Depends on R1</p><p class="note">Built 2026-09-16 (commit c865d10): the relay resolves the approver per property on the same rule the Connector applies — property key alone, no fallback for a property whose key is unusable, malformed configuration keeps the relay shut. Reaches the live relay only when the relay account holder redeploys it.</p>
+      <table>
+        <thead><tr><th>Acceptance</th><th>Pass means</th><th>Build</th><th>Acceptance run</th></tr></thead>
+        <tbody>
+        <tr>
+          <td class="id">NEW-4a</td>
+          <td>A property-specific approval is issued and then accepted by the checking side</td>
+          <td><span class="chip built">Built</span></td>
+          <td><span class="chip v-pending">Not yet verified</span></td>
+        </tr>
+        </tbody>
+      </table>
+    </details>
+    <details class="task" open>
+      <summary>
+        <span class="id">R6</span>
+        <span class="task-title">Per-property approver: registration, delegation, rotation</span>
+        <span class="chip doing">In progress</span>
+        <span class="counts"><span class="chip todo">2 not started</span> <span class="chip built">2 built</span></span>
+      </summary>
+      <p class="depends">Depends on R1, NEW-4</p><p class="note">Both ends now resolve a per-property approver. Registration, delegation up Project → Business → Operator, and rotation/revocation as first-class operations are not built.</p>
+      <table>
+        <thead><tr><th>Acceptance</th><th>Pass means</th><th>Build</th><th>Acceptance run</th></tr></thead>
+        <tbody>
+        <tr>
+          <td class="id">AC-B6.1</td>
+          <td>P's approver accepted; another property's approver refused for the same action</td>
+          <td><span class="chip built">Built</span></td>
+          <td><span class="chip v-pending">Not yet verified</span></td>
+        </tr>
+        <tr>
+          <td class="id">AC-B6.2</td>
+          <td>After rotation: old identity refused, new identity accepted</td>
+          <td><span class="chip todo">Not started</span></td>
+          <td><span class="chip v-pending">Not yet verified</span></td>
+        </tr>
+        <tr>
+          <td class="id">AC-B6.3</td>
+          <td>No identity satisfies two properties — a key approving P1 fails on P2</td>
+          <td><span class="chip built">Built</span></td>
+          <td><span class="chip v-pending">Not yet verified</span></td>
+        </tr>
+        <tr>
+          <td class="id">AC-B6.4</td>
+          <td>Business approver covers its own projects, never another Business's</td>
+          <td><span class="chip todo">Not started</span></td>
+          <td><span class="chip v-pending">Not yet verified</span></td>
+        </tr>
+        </tbody>
+      </table>
+    </details>
+    <details class="task" open>
+      <summary>
+        <span class="id">R7</span>
+        <span class="task-title">Import and publish each gated, bound, and gated separately</span>
+        <span class="chip doing">In progress</span>
+        <span class="counts"><span class="chip built">6 built</span></span>
+      </summary>
+      <p class="depends">Depends on R6</p><p class="note">The gate covers eight actions, binds the artefact, expires, is single-use and spends before acting. Outstanding: a property exempted from the gate must not be able to stay exempt in production.</p>
+      <table>
+        <thead><tr><th>Acceptance</th><th>Pass means</th><th>Build</th><th>Acceptance run</th></tr></thead>
+        <tbody>
+        <tr>
+          <td class="id">AC-B7.1</td>
+          <td>Import with no approval: refused, nothing imported</td>
+          <td><span class="chip built">Built</span></td>
+          <td><span class="chip v-pending">Not yet verified</span></td>
+        </tr>
+        <tr>
+          <td class="id">AC-B7.2</td>
+          <td>Approval bound to a different artefact: refused</td>
+          <td><span class="chip built">Built</span></td>
+          <td><span class="chip v-pending">Not yet verified</span></td>
+        </tr>
+        <tr>
+          <td class="id">AC-B7.3</td>
+          <td>Expired approval: refused</td>
+          <td><span class="chip built">Built</span></td>
+          <td><span class="chip v-pending">Not yet verified</span></td>
+        </tr>
+        <tr>
+          <td class="id">AC-B7.4</td>
+          <td>A spent approval presented again: refused</td>
+          <td><span class="chip built">Built</span></td>
+          <td><span class="chip v-pending">Not yet verified</span></td>
+        </tr>
+        <tr>
+          <td class="id">AC-B7.5</td>
+          <td>Import and publish need separate approvals; rows inspectable between them</td>
+          <td><span class="chip built">Built</span></td>
+          <td><span class="chip v-pending">Not yet verified</span></td>
+        </tr>
+        <tr>
+          <td class="id">AC-B7.6</td>
+          <td>B7.1–B7.4 still refused when the caller holds valid machine credentials</td>
+          <td><span class="chip built">Built</span></td>
+          <td><span class="chip v-pending">Not yet verified</span></td>
+        </tr>
+        </tbody>
+      </table>
+    </details>
+    <details class="task" open>
+      <summary>
+        <span class="id">R8</span>
+        <span class="task-title">Fail-closed everywhere</span>
+        <span class="chip doing">In progress</span>
+        <span class="counts"><span class="chip todo">2 not started</span> <span class="chip built">1 built</span></span>
+      </summary>
+      <p class="depends">Depends on R7</p><p class="note">The approval policy fails closed. The importability check passes the share through when it crashes, and the pre-flight does not block (R11).</p>
+      <table>
+        <thead><tr><th>Acceptance</th><th>Pass means</th><th>Build</th><th>Acceptance run</th></tr></thead>
+        <tbody>
+        <tr>
+          <td class="id">AC-B8.1</td>
+          <td>A crashed importability check blocks, distinguishably from a success</td>
+          <td><span class="chip todo">Not started</span></td>
+          <td><span class="chip v-pending">Not yet verified</span></td>
+        </tr>
+        <tr>
+          <td class="id">AC-B8.2</td>
+          <td>Missing or unreadable policy: every gated action refuses</td>
+          <td><span class="chip built">Built</span></td>
+          <td><span class="chip v-pending">Not yet verified</span></td>
+        </tr>
+        <tr>
+          <td class="id">AC-B8.3</td>
+          <td>A check that cannot run yields failure, never a zero-findings pass</td>
+          <td><span class="chip todo">Not started</span></td>
+          <td><span class="chip v-pending">Not yet verified</span></td>
+        </tr>
+        </tbody>
+      </table>
+    </details>
+    <details class="task" >
+      <summary>
+        <span class="id">R9</span>
+        <span class="task-title">The proof chain: receipt, live verification, known-good, immutability</span>
+        <span class="chip todo">Not started</span>
+        <span class="counts"><span class="chip todo">3 not started</span> <span class="chip doing">1 in progress</span></span>
+      </summary>
+      <p class="depends">Depends on R7</p><p class="note">None of receipt, live verification, known-good retention or rollback exists on the platform publish path. Adopt the studio deploy path's deploy record and reachability verifier. The current publish wipes the previous generation first, so retention must come before AC-B9.3 is possible. The build revision exists on responses and in the activity log but is not yet written into a durable deploy record.</p>
+      <table>
+        <thead><tr><th>Acceptance</th><th>Pass means</th><th>Build</th><th>Acceptance run</th></tr></thead>
+        <tbody>
+        <tr>
+          <td class="id">AC-B9.1</td>
+          <td>A receipt per publish with every named field present</td>
+          <td><span class="chip todo">Not started</span></td>
+          <td><span class="chip v-pending">Not yet verified</span></td>
+        </tr>
+        <tr>
+          <td class="id">AC-B9.2</td>
+          <td>Verification fetches the site; a missing route serving a fallback is caught as FAIL</td>
+          <td><span class="chip todo">Not started</span></td>
+          <td><span class="chip v-pending">Not yet verified</span></td>
+        </tr>
+        <tr>
+          <td class="id">AC-B9.3</td>
+          <td>A known-good bundle is retained and reconstructs the prior state</td>
+          <td><span class="chip todo">Not started</span></td>
+          <td><span class="chip v-pending">Not yet verified</span></td>
+        </tr>
+        <tr>
+          <td class="id">AC-B9.4</td>
+          <td>Editing or deleting a past receipt is denied</td>
+          <td><span class="chip doing">In progress</span></td>
+          <td><span class="chip v-pending">Not yet verified</span></td>
+        </tr>
+        </tbody>
+      </table>
+    </details>
+    <details class="task" open>
+      <summary>
+        <span class="id">R10</span>
+        <span class="task-title">The two ends do not trust each other</span>
+        <span class="chip built">Built</span>
+        <span class="counts"><span class="chip built">2 built</span></span>
+      </summary>
+      <p class="depends">Depends on R6</p><p class="note">Two implementations sharing no code, pinned by shared test vectors. The vectors must grow to cover per-property resolution.</p>
+      <table>
+        <thead><tr><th>Acceptance</th><th>Pass means</th><th>Build</th><th>Acceptance run</th></tr></thead>
+        <tbody>
+        <tr>
+          <td class="id">AC-B10.1</td>
+          <td>Verification succeeds with the issuing side offline, using unshared code</td>
+          <td><span class="chip built">Built</span></td>
+          <td><span class="chip v-pending">Not yet verified</span></td>
+        </tr>
+        <tr>
+          <td class="id">AC-B10.2</td>
+          <td>A tampered approval fails on the acting side; both sides pass the shared suite</td>
+          <td><span class="chip built">Built</span></td>
+          <td><span class="chip v-pending">Not yet verified</span></td>
+        </tr>
+        </tbody>
+      </table>
+    </details>
+  </section>
+  <section class="module">
+    <h2><span class="id">P5</span> Phase 5 — The repeatable push</h2>
+    <p class="summary">A new site pushed with zero developer round trips.</p>
+    <p class="counts"><span class="chip todo">1 not started</span> <span class="chip doing">3 in progress</span></p>
+    <details class="task" open>
+      <summary>
+        <span class="id">R11</span>
+        <span class="task-title">Pre-flight is the gate</span>
+        <span class="chip doing">In progress</span>
+        <span class="counts"><span class="chip todo">1 not started</span> <span class="chip doing">1 in progress</span> <span class="chip built">1 built</span></span>
+      </summary>
+      <p class="depends">Depends on R8</p><p class="note">The pre-flight computes its findings from the real publishing logic and reports all four items. It does not block on them, and it does not yet cover the publish path.</p>
+      <table>
+        <thead><tr><th>Acceptance</th><th>Pass means</th><th>Build</th><th>Acceptance run</th></tr></thead>
+        <tbody>
+        <tr>
+          <td class="id">AC-C11.1</td>
+          <td>A known-broken bundle is reported and blocked before import</td>
+          <td><span class="chip todo">Not started</span></td>
+          <td><span class="chip v-pending">Not yet verified</span></td>
+        </tr>
+        <tr>
+          <td class="id">AC-C11.2</td>
+          <td>Surviving-rule count, dropped rules, routes and what-is-missing, all parseable</td>
+          <td><span class="chip built">Built</span></td>
+          <td><span class="chip v-pending">Not yet verified</span></td>
+        </tr>
+        <tr>
+          <td class="id">AC-C11.3</td>
+          <td>Predicted routes equal published routes</td>
+          <td><span class="chip doing">In progress</span></td>
+          <td><span class="chip v-pending">Not yet verified</span></td>
+        </tr>
+        </tbody>
+      </table>
+    </details>
+    <details class="task" open>
+      <summary>
+        <span class="id">R12</span>
+        <span class="task-title">Fonts: idempotent install, and survival across a replace</span>
+        <span class="chip doing">In progress</span>
+        <span class="counts"><span class="chip todo">1 not started</span> <span class="chip built">1 built</span></span>
+      </summary>
+      <p class="note">Install is genuinely idempotent. Nothing preserves or reinstalls fonts across a replace-style import.</p>
+      <table>
+        <thead><tr><th>Acceptance</th><th>Pass means</th><th>Build</th><th>Acceptance run</th></tr></thead>
+        <tbody>
+        <tr>
+          <td class="id">AC-C12.1</td>
+          <td>Font install returns ids; re-running changes nothing</td>
+          <td><span class="chip built">Built</span></td>
+          <td><span class="chip v-pending">Not yet verified</span></td>
+        </tr>
+        <tr>
+          <td class="id">AC-C12.2</td>
+          <td>Intended fonts render on the live page after a replace-style import</td>
+          <td><span class="chip todo">Not started</span></td>
+          <td><span class="chip v-pending">Not yet verified</span></td>
+        </tr>
+        </tbody>
+      </table>
+    </details>
+    <details class="task" open>
+      <summary>
+        <span class="id">R-SEO</span>
+        <span class="task-title">Per-page SEO renders unconditionally</span>
+        <span class="chip doing">In progress</span>
+        <span class="counts"><span class="chip doing">1 in progress</span></span>
+      </summary>
+      <p class="note">Partly there; must be verified as rendering from the core path rather than an installed extra.</p>
+      <table>
+        <thead><tr><th>Acceptance</th><th>Pass means</th><th>Build</th><th>Acceptance run</th></tr></thead>
+        <tbody>
+        <tr>
+          <td class="id">AC-C-SEO</td>
+          <td>SEO fields render in the served page from the core renderer, no add-on</td>
+          <td><span class="chip doing">In progress</span></td>
+          <td><span class="chip v-pending">Not yet verified</span></td>
+        </tr>
+        </tbody>
+      </table>
+    </details>
+    <details class="task" >
+      <summary>
+        <span class="id">R13</span>
+        <span class="task-title">A staging project the studio drives itself</span>
+        <span class="chip todo">Not started</span>
+        <span class="counts"><span class="chip todo">2 not started</span></span>
+      </summary>
+      <p class="depends">Depends on R11, R12</p>
+      <table>
+        <thead><tr><th>Acceptance</th><th>Pass means</th><th>Build</th><th>Acceptance run</th></tr></thead>
+        <tbody>
+        <tr>
+          <td class="id">AC-C13.1</td>
+          <td>Studio completes preview → import → publish with zero developer actions</td>
+          <td><span class="chip todo">Not started</span></td>
+          <td><span class="chip v-pending">Not yet verified</span></td>
+        </tr>
+        <tr>
+          <td class="id">AC-C13.2</td>
+          <td>Milestone — a new site pushed with zero developer round trips</td>
+          <td><span class="chip todo">Not started</span></td>
+          <td><span class="chip v-pending">Not yet verified</span></td>
+        </tr>
+        </tbody>
+      </table>
+    </details>
+  </section>
+  <section class="module">
+    <h2><span class="id">P6</span> Phase 6 — Productionisation</h2>
+    <p class="summary">Safe replace, complete clear-all, and an honest cold start.</p>
+    <p class="counts"><span class="chip doing">2 in progress</span></p>
+    <details class="task" open>
+      <summary>
+        <span class="id">R15</span>
+        <span class="task-title">Safe replace, and a complete clear-all</span>
+        <span class="chip doing">In progress</span>
+        <span class="counts"><span class="chip todo">1 not started</span> <span class="chip built">1 built</span></span>
+      </summary>
+      <p class="depends">Depends on R9</p><p class="note">The clear-all covers all four stores and snapshots first, but nothing reads that snapshot back and the replace path takes no snapshot at all.</p>
+      <table>
+        <thead><tr><th>Acceptance</th><th>Pass means</th><th>Build</th><th>Acceptance run</th></tr></thead>
+        <tbody>
+        <tr>
+          <td class="id">AC-D15.1</td>
+          <td>Prior published state recoverable after a replace</td>
+          <td><span class="chip todo">Not started</span></td>
+          <td><span class="chip v-pending">Not yet verified</span></td>
+        </tr>
+        <tr>
+          <td class="id">AC-D15.2</td>
+          <td>A deleted page stays gone from every store after clear-all</td>
+          <td><span class="chip built">Built</span></td>
+          <td><span class="chip v-pending">Not yet verified</span></td>
+        </tr>
+        </tbody>
+      </table>
+    </details>
+    <details class="task" open>
+      <summary>
+        <span class="id">R16</span>
+        <span class="task-title">Cold-start clarity</span>
+        <span class="chip doing">In progress</span>
+        <span class="counts"><span class="chip todo">1 not started</span></span>
+      </summary>
+      <p class="note">The waiting page is correct; the administrative view collapses &quot;not up yet&quot; into &quot;not installed&quot;.</p>
+      <table>
+        <thead><tr><th>Acceptance</th><th>Pass means</th><th>Build</th><th>Acceptance run</th></tr></thead>
+        <tbody>
+        <tr>
+          <td class="id">AC-D16.1</td>
+          <td>A cold studio returns &quot;starting&quot;, not something that reads as &quot;not installed&quot;</td>
+          <td><span class="chip todo">Not started</span></td>
+          <td><span class="chip v-pending">Not yet verified</span></td>
+        </tr>
+        </tbody>
+      </table>
+    </details>
+  </section>
+  <section class="module">
+    <h2><span class="id">E</span> Security acceptance — the locked ten</h2>
+    <p class="summary">Run by someone other than the builder, on a throwaway or staging project, never on a live site. Five have no control at all today.</p>
+    <p class="counts"><span class="chip todo">8 not started</span> <span class="chip doing">1 in progress</span> <span class="chip built">1 built</span></p>
+    <details class="task" >
+      <summary>
+        <span class="id">E1</span>
+        <span class="task-title">Secret access blocked</span>
+        <span class="chip todo">Not started</span>
+        <span class="counts"><span class="chip todo">1 not started</span></span>
+      </summary>
+      <p class="depends">Depends on NEW-1</p><p class="note">Covered by NEW-1.</p>
+      <table>
+        <thead><tr><th>Acceptance</th><th>Pass means</th><th>Build</th><th>Acceptance run</th></tr></thead>
+        <tbody>
+        <tr>
+          <td class="id">E1</td>
+          <td>Covered by NEW-1a / NEW-1b</td>
+          <td><span class="chip todo">Not started</span></td>
+          <td><span class="chip v-pending">Not yet verified</span></td>
+        </tr>
+        </tbody>
+      </table>
+    </details>
+    <details class="task" >
+      <summary>
+        <span class="id">E2</span>
+        <span class="task-title">Network and tool allowlists enforced</span>
+        <span class="chip todo">Not started</span>
+        <span class="counts"><span class="chip todo">1 not started</span></span>
+      </summary>
+      <p class="note">No test and no control today — net-new.</p>
+      <table>
+        <thead><tr><th>Acceptance</th><th>Pass means</th><th>Build</th><th>Acceptance run</th></tr></thead>
+        <tbody>
+        <tr>
+          <td class="id">E2</td>
+          <td>New test needed</td>
+          <td><span class="chip todo">Not started</span></td>
+          <td><span class="chip v-pending">Not yet verified</span></td>
+        </tr>
+        </tbody>
+      </table>
+    </details>
+    <details class="task" >
+      <summary>
+        <span class="id">E3</span>
+        <span class="task-title">Prompt-injection attempts rejected</span>
+        <span class="chip todo">Not started</span>
+        <span class="counts"><span class="chip todo">1 not started</span></span>
+      </summary>
+      <p class="note">No test and no control today — net-new.</p>
+      <table>
+        <thead><tr><th>Acceptance</th><th>Pass means</th><th>Build</th><th>Acceptance run</th></tr></thead>
+        <tbody>
+        <tr>
+          <td class="id">E3</td>
+          <td>New test needed</td>
+          <td><span class="chip todo">Not started</span></td>
+          <td><span class="chip v-pending">Not yet verified</span></td>
+        </tr>
+        </tbody>
+      </table>
+    </details>
+    <details class="task" >
+      <summary>
+        <span class="id">E4</span>
+        <span class="task-title">Spending limits enforced</span>
+        <span class="chip todo">Not started</span>
+        <span class="counts"><span class="chip todo">1 not started</span></span>
+      </summary>
+      <p class="note">No spend cap exists. An accepted omission until now; to become a real control.</p>
+      <table>
+        <thead><tr><th>Acceptance</th><th>Pass means</th><th>Build</th><th>Acceptance run</th></tr></thead>
+        <tbody>
+        <tr>
+          <td class="id">E4</td>
+          <td>New test and a real spend cap needed</td>
+          <td><span class="chip todo">Not started</span></td>
+          <td><span class="chip v-pending">Not yet verified</span></td>
+        </tr>
+        </tbody>
+      </table>
+    </details>
+    <details class="task" >
+      <summary>
+        <span class="id">E5</span>
+        <span class="task-title">Cross-account access blocked</span>
+        <span class="chip todo">Not started</span>
+        <span class="counts"><span class="chip todo">1 not started</span></span>
+      </summary>
+      <p class="depends">Depends on R1</p><p class="note">Covered by AC-A1.2.</p>
+      <table>
+        <thead><tr><th>Acceptance</th><th>Pass means</th><th>Build</th><th>Acceptance run</th></tr></thead>
+        <tbody>
+        <tr>
+          <td class="id">E5</td>
+          <td>Covered by AC-A1.2</td>
+          <td><span class="chip todo">Not started</span></td>
+          <td><span class="chip v-pending">Not yet verified</span></td>
+        </tr>
+        </tbody>
+      </table>
+    </details>
+    <details class="task" open>
+      <summary>
+        <span class="id">E6</span>
+        <span class="task-title">Expired and replayed permits rejected</span>
+        <span class="chip built">Built</span>
+        <span class="counts"><span class="chip built">1 built</span></span>
+      </summary>
+      <p class="depends">Depends on R7</p><p class="note">Covered by AC-B7.3 and AC-B7.4.</p>
+      <table>
+        <thead><tr><th>Acceptance</th><th>Pass means</th><th>Build</th><th>Acceptance run</th></tr></thead>
+        <tbody>
+        <tr>
+          <td class="id">E6</td>
+          <td>Covered by AC-B7.3, AC-B7.4</td>
+          <td><span class="chip built">Built</span></td>
+          <td><span class="chip v-pending">Not yet verified</span></td>
+        </tr>
+        </tbody>
+      </table>
+    </details>
+    <details class="task" >
+      <summary>
+        <span class="id">E7</span>
+        <span class="task-title">CSRF and secure-cookie behaviour</span>
+        <span class="chip todo">Not started</span>
+        <span class="counts"><span class="chip todo">1 not started</span></span>
+      </summary>
+      <p class="note">No test and no control today — net-new.</p>
+      <table>
+        <thead><tr><th>Acceptance</th><th>Pass means</th><th>Build</th><th>Acceptance run</th></tr></thead>
+        <tbody>
+        <tr>
+          <td class="id">E7</td>
+          <td>New test needed</td>
+          <td><span class="chip todo">Not started</span></td>
+          <td><span class="chip v-pending">Not yet verified</span></td>
+        </tr>
+        </tbody>
+      </table>
+    </details>
+    <details class="task" >
+      <summary>
+        <span class="id">E8</span>
+        <span class="task-title">Unsafe HTML and script input neutralised</span>
+        <span class="chip todo">Not started</span>
+        <span class="counts"><span class="chip todo">1 not started</span></span>
+      </summary>
+      <p class="note">No test and no control today — net-new.</p>
+      <table>
+        <thead><tr><th>Acceptance</th><th>Pass means</th><th>Build</th><th>Acceptance run</th></tr></thead>
+        <tbody>
+        <tr>
+          <td class="id">E8</td>
+          <td>New test needed</td>
+          <td><span class="chip todo">Not started</span></td>
+          <td><span class="chip v-pending">Not yet verified</span></td>
+        </tr>
+        </tbody>
+      </table>
+    </details>
+    <details class="task" open>
+      <summary>
+        <span class="id">E9</span>
+        <span class="task-title">Audit-record tampering prevented</span>
+        <span class="chip doing">In progress</span>
+        <span class="counts"><span class="chip doing">1 in progress</span></span>
+      </summary>
+      <p class="depends">Depends on R9</p><p class="note">Covered by AC-B9.4; the approval store is already append-only.</p>
+      <table>
+        <thead><tr><th>Acceptance</th><th>Pass means</th><th>Build</th><th>Acceptance run</th></tr></thead>
+        <tbody>
+        <tr>
+          <td class="id">E9</td>
+          <td>Covered by AC-B9.4</td>
+          <td><span class="chip doing">In progress</span></td>
+          <td><span class="chip v-pending">Not yet verified</span></td>
+        </tr>
+        </tbody>
+      </table>
+    </details>
+    <details class="task" >
+      <summary>
+        <span class="id">E10</span>
+        <span class="task-title">Failed deployment and rollback exercised</span>
+        <span class="chip todo">Not started</span>
+        <span class="counts"><span class="chip todo">1 not started</span></span>
+      </summary>
+      <p class="depends">Depends on R9</p><p class="note">Covered by AC-B9.3 plus a rollback receipt; no rollback exists today.</p>
+      <table>
+        <thead><tr><th>Acceptance</th><th>Pass means</th><th>Build</th><th>Acceptance run</th></tr></thead>
+        <tbody>
+        <tr>
+          <td class="id">E10</td>
+          <td>Covered by AC-B9.3, plus a rollback receipt</td>
+          <td><span class="chip todo">Not started</span></td>
+          <td><span class="chip v-pending">Not yet verified</span></td>
+        </tr>
+        </tbody>
+      </table>
+    </details>
+  </section>
+</main>
+</body>
+</html>

@@ -1,0 +1,317 @@
+{
+  "title": "MMSBUILD delivery board",
+  "source": "docs/prd/mmsbuild-prd.md",
+  "note": "Modules are the PRD's phases, tasks are its requirements, subtasks are its acceptance criteria. Ids match the PRD exactly, so an acceptance run maps to this board line for line. `status` is ours — what is built. `verified` belongs to the acceptance run and is never set by us.",
+  "legend": {
+    "status": {
+      "todo": "Not started",
+      "doing": "In progress",
+      "built": "Built and committed here",
+      "blocked": "Waiting on something named in `blockedBy`"
+    },
+    "verified": {
+      "pending": "Not yet run by the other party",
+      "pass": "Acceptance run passed",
+      "fail": "Acceptance run failed"
+    }
+  },
+  "modules": [
+    {
+      "id": "P0",
+      "title": "Phase 0 — Close the surface",
+      "summary": "Every requirement after this one assumes an authenticated admin.",
+      "tasks": [
+        {
+          "id": "R14",
+          "title": "Admin authentication",
+          "status": "todo",
+          "dependsOn": [],
+          "note": "Password hashing, signed sessions and invites already exist elsewhere in the system; reuse rather than rewrite.",
+          "subtasks": [
+            { "id": "AC-D14.1", "text": "Unauthenticated admin request refused; the console requires sign-in", "status": "todo", "verified": "pending" }
+          ]
+        },
+        {
+          "id": "NEW-1",
+          "title": "The admin surface reveals no secret it does not have to",
+          "status": "todo",
+          "dependsOn": ["R14"],
+          "subtasks": [
+            { "id": "NEW-1a", "text": "A minted machine key cannot be read back in plaintext", "status": "todo", "verified": "pending" },
+            { "id": "NEW-1b", "text": "A project listing leaks no usable invite link or capacity token", "status": "todo", "verified": "pending" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "P1",
+      "title": "Phase 1 — The levels",
+      "summary": "Operator and Business above Project, with roles that hold when the interface is bypassed.",
+      "tasks": [
+        {
+          "id": "R1",
+          "title": "Operator and Business levels above Project",
+          "status": "todo",
+          "dependsOn": ["R14"],
+          "note": "Per-project isolation beneath it is already real and database-enforced; this adds the levels above.",
+          "subtasks": [
+            { "id": "AC-A1.1", "text": "The Operator → Business → Project chain is queryable; each level resolves its children", "status": "todo", "verified": "pending" },
+            { "id": "AC-A1.2", "text": "Cross-Business read and write denied at the server; no foreign data in any listing", "status": "todo", "verified": "pending" }
+          ]
+        },
+        {
+          "id": "R3",
+          "title": "Roles, and more than one person per project",
+          "status": "todo",
+          "dependsOn": ["R1"],
+          "note": "Adopt the CMS's existing four roles and ~40 capabilities rather than duplicating them.",
+          "subtasks": [
+            { "id": "AC-A3.1", "text": "Publisher-role action allowed; the same action denied to an author role", "status": "todo", "verified": "pending" },
+            { "id": "AC-A3.2", "text": "The denial holds when the interface is bypassed", "status": "todo", "verified": "pending" }
+          ]
+        },
+        {
+          "id": "NEW-2",
+          "title": "Inviting a second person must not overwrite the first",
+          "status": "todo",
+          "dependsOn": ["R1"],
+          "note": "Concrete blocker under R3: today the invite path overwrites the existing account.",
+          "subtasks": [
+            { "id": "NEW-2a", "text": "A second invite adds an account rather than replacing the first", "status": "todo", "verified": "pending" }
+          ]
+        },
+        {
+          "id": "NEW-3",
+          "title": "A portal sign-in arrives with its own role, not as the owner",
+          "status": "todo",
+          "dependsOn": ["R3"],
+          "note": "The wire format already carries a role field and recognises four role names.",
+          "subtasks": [
+            { "id": "NEW-3a", "text": "An author role is denied an owner-only action inside the CMS", "status": "todo", "verified": "pending" },
+            { "id": "NEW-3b", "text": "Step-up is demanded, not pre-satisfied", "status": "todo", "verified": "pending" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "P2",
+      "title": "Phase 2 — Scoped visibility and branding",
+      "summary": "Counts without the work, and an Operator's own branding.",
+      "tasks": [
+        {
+          "id": "R5",
+          "title": "Platform Owner sees counts, not work; Operators are branded",
+          "status": "todo",
+          "dependsOn": ["R1", "R3"],
+          "note": "Branding is a single global value today.",
+          "subtasks": [
+            { "id": "AC-A5.1", "text": "Counts visible to the platform-owner role; opening the work denied", "status": "todo", "verified": "pending" },
+            { "id": "AC-A5.2", "text": "Operator branding renders on the named surfaces", "status": "todo", "verified": "pending" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "P3",
+      "title": "Phase 3 — One project, one website",
+      "summary": "A second design can never silently destroy the first.",
+      "tasks": [
+        {
+          "id": "R2",
+          "title": "A second website cannot silently destroy the first",
+          "status": "todo",
+          "dependsOn": ["R1"],
+          "subtasks": [
+            { "id": "AC-A2.1", "text": "A second design is refused or lands distinctly; site A still resolves with A's content", "status": "todo", "verified": "pending" }
+          ]
+        },
+        {
+          "id": "R4",
+          "title": "The CMS destination belongs to the project",
+          "status": "todo",
+          "dependsOn": ["R1", "R2"],
+          "subtasks": [
+            { "id": "AC-A2.2", "text": "A design's destination cannot be pointed at another project's CMS", "status": "todo", "verified": "pending" },
+            { "id": "AC-A2.3", "text": "Publishing to A changes A's domain and not B's, verified by fetching both", "status": "todo", "verified": "pending" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "P4",
+      "title": "Phase 4 — Governance, with proof",
+      "summary": "NEW-4 first: nothing in the approver work functions until both ends agree.",
+      "tasks": [
+        {
+          "id": "NEW-4",
+          "title": "The issuing side resolves per-property approvers too",
+          "status": "built",
+          "dependsOn": ["R1"],
+          "note": "Built 2026-09-16 (commit c865d10): the relay resolves the approver per property on the same rule the Connector applies — property key alone, no fallback for a property whose key is unusable, malformed configuration keeps the relay shut. Reaches the live relay only when the relay account holder redeploys it.",
+          "subtasks": [
+            { "id": "NEW-4a", "text": "A property-specific approval is issued and then accepted by the checking side", "status": "built", "verified": "pending" }
+          ]
+        },
+        {
+          "id": "R6",
+          "title": "Per-property approver: registration, delegation, rotation",
+          "status": "doing",
+          "dependsOn": ["R1", "NEW-4"],
+          "note": "Both ends now resolve a per-property approver. Registration, delegation up Project → Business → Operator, and rotation/revocation as first-class operations are not built.",
+          "subtasks": [
+            { "id": "AC-B6.1", "text": "P's approver accepted; another property's approver refused for the same action", "status": "built", "verified": "pending" },
+            { "id": "AC-B6.2", "text": "After rotation: old identity refused, new identity accepted", "status": "todo", "verified": "pending" },
+            { "id": "AC-B6.3", "text": "No identity satisfies two properties — a key approving P1 fails on P2", "status": "built", "verified": "pending" },
+            { "id": "AC-B6.4", "text": "Business approver covers its own projects, never another Business's", "status": "todo", "verified": "pending" }
+          ]
+        },
+        {
+          "id": "R7",
+          "title": "Import and publish each gated, bound, and gated separately",
+          "status": "doing",
+          "dependsOn": ["R6"],
+          "note": "The gate covers eight actions, binds the artefact, expires, is single-use and spends before acting. Outstanding: a property exempted from the gate must not be able to stay exempt in production.",
+          "subtasks": [
+            { "id": "AC-B7.1", "text": "Import with no approval: refused, nothing imported", "status": "built", "verified": "pending" },
+            { "id": "AC-B7.2", "text": "Approval bound to a different artefact: refused", "status": "built", "verified": "pending" },
+            { "id": "AC-B7.3", "text": "Expired approval: refused", "status": "built", "verified": "pending" },
+            { "id": "AC-B7.4", "text": "A spent approval presented again: refused", "status": "built", "verified": "pending" },
+            { "id": "AC-B7.5", "text": "Import and publish need separate approvals; rows inspectable between them", "status": "built", "verified": "pending" },
+            { "id": "AC-B7.6", "text": "B7.1–B7.4 still refused when the caller holds valid machine credentials", "status": "built", "verified": "pending" }
+          ]
+        },
+        {
+          "id": "R8",
+          "title": "Fail-closed everywhere",
+          "status": "doing",
+          "dependsOn": ["R7"],
+          "note": "The approval policy fails closed. The importability check passes the share through when it crashes, and the pre-flight does not block (R11).",
+          "subtasks": [
+            { "id": "AC-B8.1", "text": "A crashed importability check blocks, distinguishably from a success", "status": "todo", "verified": "pending" },
+            { "id": "AC-B8.2", "text": "Missing or unreadable policy: every gated action refuses", "status": "built", "verified": "pending" },
+            { "id": "AC-B8.3", "text": "A check that cannot run yields failure, never a zero-findings pass", "status": "todo", "verified": "pending" }
+          ]
+        },
+        {
+          "id": "R9",
+          "title": "The proof chain: receipt, live verification, known-good, immutability",
+          "status": "todo",
+          "dependsOn": ["R7"],
+          "note": "None of receipt, live verification, known-good retention or rollback exists on the platform publish path. Adopt the studio deploy path's deploy record and reachability verifier. The current publish wipes the previous generation first, so retention must come before AC-B9.3 is possible. The build revision exists on responses and in the activity log but is not yet written into a durable deploy record.",
+          "subtasks": [
+            { "id": "AC-B9.1", "text": "A receipt per publish with every named field present", "status": "todo", "verified": "pending" },
+            { "id": "AC-B9.2", "text": "Verification fetches the site; a missing route serving a fallback is caught as FAIL", "status": "todo", "verified": "pending" },
+            { "id": "AC-B9.3", "text": "A known-good bundle is retained and reconstructs the prior state", "status": "todo", "verified": "pending" },
+            { "id": "AC-B9.4", "text": "Editing or deleting a past receipt is denied", "status": "doing", "verified": "pending" }
+          ]
+        },
+        {
+          "id": "R10",
+          "title": "The two ends do not trust each other",
+          "status": "built",
+          "dependsOn": ["R6"],
+          "note": "Two implementations sharing no code, pinned by shared test vectors. The vectors must grow to cover per-property resolution.",
+          "subtasks": [
+            { "id": "AC-B10.1", "text": "Verification succeeds with the issuing side offline, using unshared code", "status": "built", "verified": "pending" },
+            { "id": "AC-B10.2", "text": "A tampered approval fails on the acting side; both sides pass the shared suite", "status": "built", "verified": "pending" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "P5",
+      "title": "Phase 5 — The repeatable push",
+      "summary": "A new site pushed with zero developer round trips.",
+      "tasks": [
+        {
+          "id": "R11",
+          "title": "Pre-flight is the gate",
+          "status": "doing",
+          "dependsOn": ["R8"],
+          "note": "The pre-flight computes its findings from the real publishing logic and reports all four items. It does not block on them, and it does not yet cover the publish path.",
+          "subtasks": [
+            { "id": "AC-C11.1", "text": "A known-broken bundle is reported and blocked before import", "status": "todo", "verified": "pending" },
+            { "id": "AC-C11.2", "text": "Surviving-rule count, dropped rules, routes and what-is-missing, all parseable", "status": "built", "verified": "pending" },
+            { "id": "AC-C11.3", "text": "Predicted routes equal published routes", "status": "doing", "verified": "pending" }
+          ]
+        },
+        {
+          "id": "R12",
+          "title": "Fonts: idempotent install, and survival across a replace",
+          "status": "doing",
+          "dependsOn": [],
+          "note": "Install is genuinely idempotent. Nothing preserves or reinstalls fonts across a replace-style import.",
+          "subtasks": [
+            { "id": "AC-C12.1", "text": "Font install returns ids; re-running changes nothing", "status": "built", "verified": "pending" },
+            { "id": "AC-C12.2", "text": "Intended fonts render on the live page after a replace-style import", "status": "todo", "verified": "pending" }
+          ]
+        },
+        {
+          "id": "R-SEO",
+          "title": "Per-page SEO renders unconditionally",
+          "status": "doing",
+          "dependsOn": [],
+          "note": "Partly there; must be verified as rendering from the core path rather than an installed extra.",
+          "subtasks": [
+            { "id": "AC-C-SEO", "text": "SEO fields render in the served page from the core renderer, no add-on", "status": "doing", "verified": "pending" }
+          ]
+        },
+        {
+          "id": "R13",
+          "title": "A staging project the studio drives itself",
+          "status": "todo",
+          "dependsOn": ["R11", "R12"],
+          "subtasks": [
+            { "id": "AC-C13.1", "text": "Studio completes preview → import → publish with zero developer actions", "status": "todo", "verified": "pending" },
+            { "id": "AC-C13.2", "text": "Milestone — a new site pushed with zero developer round trips", "status": "todo", "verified": "pending" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "P6",
+      "title": "Phase 6 — Productionisation",
+      "summary": "Safe replace, complete clear-all, and an honest cold start.",
+      "tasks": [
+        {
+          "id": "R15",
+          "title": "Safe replace, and a complete clear-all",
+          "status": "doing",
+          "dependsOn": ["R9"],
+          "note": "The clear-all covers all four stores and snapshots first, but nothing reads that snapshot back and the replace path takes no snapshot at all.",
+          "subtasks": [
+            { "id": "AC-D15.1", "text": "Prior published state recoverable after a replace", "status": "todo", "verified": "pending" },
+            { "id": "AC-D15.2", "text": "A deleted page stays gone from every store after clear-all", "status": "built", "verified": "pending" }
+          ]
+        },
+        {
+          "id": "R16",
+          "title": "Cold-start clarity",
+          "status": "doing",
+          "dependsOn": [],
+          "note": "The waiting page is correct; the administrative view collapses \"not up yet\" into \"not installed\".",
+          "subtasks": [
+            { "id": "AC-D16.1", "text": "A cold studio returns \"starting\", not something that reads as \"not installed\"", "status": "todo", "verified": "pending" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "E",
+      "title": "Security acceptance — the locked ten",
+      "summary": "Run by someone other than the builder, on a throwaway or staging project, never on a live site. Five have no control at all today.",
+      "tasks": [
+        { "id": "E1", "title": "Secret access blocked", "status": "todo", "dependsOn": ["NEW-1"], "note": "Covered by NEW-1.", "subtasks": [ { "id": "E1", "text": "Covered by NEW-1a / NEW-1b", "status": "todo", "verified": "pending" } ] },
+        { "id": "E2", "title": "Network and tool allowlists enforced", "status": "todo", "dependsOn": [], "note": "No test and no control today — net-new.", "subtasks": [ { "id": "E2", "text": "New test needed", "status": "todo", "verified": "pending" } ] },
+        { "id": "E3", "title": "Prompt-injection attempts rejected", "status": "todo", "dependsOn": [], "note": "No test and no control today — net-new.", "subtasks": [ { "id": "E3", "text": "New test needed", "status": "todo", "verified": "pending" } ] },
+        { "id": "E4", "title": "Spending limits enforced", "status": "todo", "dependsOn": [], "note": "No spend cap exists. An accepted omission until now; to become a real control.", "subtasks": [ { "id": "E4", "text": "New test and a real spend cap needed", "status": "todo", "verified": "pending" } ] },
+        { "id": "E5", "title": "Cross-account access blocked", "status": "todo", "dependsOn": ["R1"], "note": "Covered by AC-A1.2.", "subtasks": [ { "id": "E5", "text": "Covered by AC-A1.2", "status": "todo", "verified": "pending" } ] },
+        { "id": "E6", "title": "Expired and replayed permits rejected", "status": "built", "dependsOn": ["R7"], "note": "Covered by AC-B7.3 and AC-B7.4.", "subtasks": [ { "id": "E6", "text": "Covered by AC-B7.3, AC-B7.4", "status": "built", "verified": "pending" } ] },
+        { "id": "E7", "title": "CSRF and secure-cookie behaviour", "status": "todo", "dependsOn": [], "note": "No test and no control today — net-new.", "subtasks": [ { "id": "E7", "text": "New test needed", "status": "todo", "verified": "pending" } ] },
+        { "id": "E8", "title": "Unsafe HTML and script input neutralised", "status": "todo", "dependsOn": [], "note": "No test and no control today — net-new.", "subtasks": [ { "id": "E8", "text": "New test needed", "status": "todo", "verified": "pending" } ] },
+        { "id": "E9", "title": "Audit-record tampering prevented", "status": "doing", "dependsOn": ["R9"], "note": "Covered by AC-B9.4; the approval store is already append-only.", "subtasks": [ { "id": "E9", "text": "Covered by AC-B9.4", "status": "doing", "verified": "pending" } ] },
+        { "id": "E10", "title": "Failed deployment and rollback exercised", "status": "todo", "dependsOn": ["R9"], "note": "Covered by AC-B9.3 plus a rollback receipt; no rollback exists today.", "subtasks": [ { "id": "E10", "text": "Covered by AC-B9.3, plus a rollback receipt", "status": "todo", "verified": "pending" } ] }
+      ]
+    }
+  ]
+}
