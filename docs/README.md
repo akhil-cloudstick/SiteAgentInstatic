@@ -40,6 +40,7 @@ Where the platform is going. The target architecture, and the requirements that 
 | [`mmsbuild-target-architecture.html`](./prd/mmsbuild-target-architecture.html) | The same as a visual page — 8 diagrams, light + dark, printable |
 | [`mmsbuild-prd.md`](./prd/mmsbuild-prd.md) | The requirements: 7 phases, every requirement with its acceptance test, the 40-criterion acceptance matrix, the open questions answered, and the verified status of the six items claimed as already built |
 | [`mmsbuild-prd.html`](./prd/mmsbuild-prd.html) | The same as a visual page — requirement cards with phase, status and acceptance id, plus the full matrix |
+| [`mmsbuild-prd-simple.html`](./prd/mmsbuild-prd-simple.html) | **The easy version.** The same PRD in short sentences and pictures, with one running example. Start here if you are new |
 
 Both `.html` files are hand-authored and must not be regenerated from the Markdown.
 

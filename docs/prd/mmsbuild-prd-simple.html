@@ -1,0 +1,1285 @@
+<!doctype html>
+<!--
+  MMSBUILD PRD in Plain English
+
+  A beginner-friendly, picture-first version of mmsbuild-prd.md and mmsbuild-prd.html.
+  Hand-authored. Short sentences on purpose. No external libraries — every diagram
+  is inline SVG or plain HTML, so the page works offline except for the web fonts.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MMSBUILD PRD in Plain English</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=JetBrains+Mono:wght@500;700&display=swap">
+<style>
+  /* ---------- tokens: light (default) ---------- */
+  :root {
+    --ground:   #FBF7F0;
+    --surface:  #FFFFFF;
+    --sunk:     #F3ECE0;
+    --ink:      #1C1B18;
+    --ink-2:    #57514A;
+    --ink-3:    #8A8278;
+    --line:     #E6DCCB;
+    --navy:     #141B2D;
+    --navy-ink: #F4EFE6;
+    --navy-2:   #B9B2A6;
+    --accent:   #E0701A;
+    --accent-ink: #A34E0C;
+    --accent-soft: #FBE3CF;
+    --bar-mute: #F2C49C;
+
+    --done:     #2E8B57;
+    --part:     #C7890F;
+    --todo:     #C7443C;
+    --done-bg:  #E4F2EA;
+    --part-bg:  #FBF0D9;
+    --todo-bg:  #FAE5E3;
+
+    --lv1: #8E5BD9;  --lv1-bg: #EFE6FB;
+    --lv2: #1E9E92;  --lv2-bg: #DDF3F1;
+    --lv3: #2F86C9;  --lv3-bg: #DEEDF8;
+    --lv4: #E0701A;  --lv4-bg: #FBE3CF;
+
+    --shadow: 0 1px 2px rgba(40,30,15,.06), 0 6px 18px rgba(40,30,15,.06);
+    --r: 12px;
+    --display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+    --body: "Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, Consolas, monospace;
+  }
+  /* ---------- tokens: dark, when the OS asks and no explicit light choice ---------- */
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:#14161B; --surface:#1C1F26; --sunk:#232730; --ink:#EDE8DF; --ink-2:#B5AEA3; --ink-3:#857E74;
+      --line:#2F343D; --navy:#0C111D; --navy-ink:#EDE8DF; --navy-2:#9A958C;
+      --accent:#F28A3C; --accent-ink:#F7A566; --accent-soft:#3A2717; --bar-mute:#6B4527;
+      --done:#2E9A6A; --part:#BA8A0E; --todo:#D9536F;
+      --done-bg:#16291F; --part-bg:#2C2410; --todo-bg:#2E1820;
+      --lv1:#B08AEB; --lv1-bg:#271E36; --lv2:#3FC2B5; --lv2-bg:#132C2A;
+      --lv3:#5BA6E0; --lv3-bg:#152536; --lv4:#F28A3C; --lv4-bg:#3A2717;
+      --shadow: 0 1px 2px rgba(0,0,0,.35), 0 6px 18px rgba(0,0,0,.3);
+    }
+  }
+  /* ---------- tokens: explicit dark choice ---------- */
+  :root[data-theme="dark"] {
+    --ground:#14161B; --surface:#1C1F26; --sunk:#232730; --ink:#EDE8DF; --ink-2:#B5AEA3; --ink-3:#857E74;
+    --line:#2F343D; --navy:#0C111D; --navy-ink:#EDE8DF; --navy-2:#9A958C;
+    --accent:#F28A3C; --accent-ink:#F7A566; --accent-soft:#3A2717; --bar-mute:#6B4527;
+    --done:#2E9A6A; --part:#BA8A0E; --todo:#D9536F;
+    --done-bg:#16291F; --part-bg:#2C2410; --todo-bg:#2E1820;
+    --lv1:#B08AEB; --lv1-bg:#271E36; --lv2:#3FC2B5; --lv2-bg:#132C2A;
+    --lv3:#5BA6E0; --lv3-bg:#152536; --lv4:#F28A3C; --lv4-bg:#3A2717;
+    --shadow: 0 1px 2px rgba(0,0,0,.35), 0 6px 18px rgba(0,0,0,.3);
+  }
+
+  /* ---------- base ---------- */
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; scroll-padding-top: 64px; }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+  body {
+    margin: 0; background: var(--ground); color: var(--ink);
+    font: 17px/1.6 var(--body); -webkit-font-smoothing: antialiased;
+  }
+  h1, h2, h3, h4 { font-family: var(--display); letter-spacing: -.015em; text-wrap: balance; margin: 0; }
+  p { margin: 0; }
+  a { color: inherit; }
+  :focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+  .wrap { max-width: 1040px; margin: 0 auto; padding-inline: 20px; }
+  .code { font-family: var(--mono); font-size: 12.5px; font-weight: 700; letter-spacing: .01em;
+          background: var(--sunk); color: var(--ink-2); padding: 2px 7px; border-radius: 5px; white-space: nowrap; }
+
+  /* ---------- header ---------- */
+  header.top { background: var(--navy); color: var(--navy-ink); padding-block: 44px 36px; }
+  .kicker { font: 700 12px/1 var(--body); letter-spacing: .16em; text-transform: uppercase; color: var(--accent); }
+  header.top h1 { font-size: clamp(34px, 5.4vw, 56px); line-height: 1.04; margin-top: 12px; font-weight: 800; }
+  header.top .sub { margin-top: 14px; font-size: 20px; color: var(--navy-2); max-width: 44ch; }
+  .howto { margin-top: 26px; display: flex; flex-wrap: wrap; gap: 10px; }
+  .howto span { border: 1px solid rgba(255,255,255,.16); border-radius: 999px; padding: 6px 14px; font-size: 14px; color: var(--navy-ink); }
+  .howto b { color: var(--accent); }
+
+  /* ---------- nav ---------- */
+  nav.jump { position: sticky; top: 0; z-index: 10; background: var(--ground); border-bottom: 1px solid var(--line); }
+  nav.jump .wrap { display: flex; gap: 6px; overflow-x: auto; padding-block: 10px; scrollbar-width: thin; }
+  nav.jump a { flex: none; text-decoration: none; font-size: 14px; padding: 5px 12px; border-radius: 999px;
+               color: var(--ink-2); border: 1px solid var(--line); background: var(--surface); }
+  nav.jump a:hover { color: var(--ink); border-color: var(--accent); }
+  nav.jump a.ph { font-family: var(--mono); font-size: 12.5px; font-weight: 700; }
+
+  /* ---------- sections ---------- */
+  main { padding-block: 16px 80px; }
+  section.block { padding-block: 52px 8px; display: grid; gap: 22px; }
+  section.block + section.block { border-top: 1px solid var(--line); }
+  .eyebrow { font: 700 12px/1 var(--body); letter-spacing: .14em; text-transform: uppercase; color: var(--accent-ink); }
+  .phase-tag { display: inline-flex; align-items: center; gap: 8px; }
+  .phase-tag .n { font-family: var(--mono); font-weight: 700; font-size: 13px; background: var(--navy); color: var(--navy-ink);
+                  border-radius: 6px; padding: 3px 8px; letter-spacing: 0; }
+  h2 { font-size: clamp(28px, 3.6vw, 38px); line-height: 1.1; font-weight: 800; }
+  h3 { font-size: 21px; line-height: 1.2; font-weight: 700; }
+  .inshort { font-size: 21px; line-height: 1.45; max-width: 46ch; color: var(--ink); }
+  .inshort b { color: var(--accent-ink); }
+  .lines { display: grid; gap: 6px; max-width: 64ch; padding-left: 0; margin: 0; list-style: none; }
+  .lines li { padding-left: 22px; position: relative; }
+  .lines li::before { content: ""; position: absolute; left: 4px; top: .7em; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+  .muted { color: var(--ink-2); }
+  .small { font-size: 14.5px; }
+
+  /* ---------- example box ---------- */
+  .example { background: var(--sunk); border-radius: var(--r); padding: 18px 20px 18px; display: grid; gap: 8px; max-width: 720px; }
+  .example .lab { font: 700 11.5px/1 var(--body); letter-spacing: .14em; text-transform: uppercase; color: var(--ink-3); }
+  .example p { font-size: 16.5px; }
+  .example b { color: var(--ink); }
+
+  /* ---------- status chips ---------- */
+  .st { display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; font-weight: 700; border-radius: 999px;
+        padding: 3px 11px 3px 8px; white-space: nowrap; }
+  .st::before { font-family: var(--mono); font-size: 13px; line-height: 1; }
+  .st.done { background: var(--done-bg); color: var(--done); }   .st.done::before { content: "✓"; }
+  .st.part { background: var(--part-bg); color: var(--part); }   .st.part::before { content: "◐"; }
+  .st.todo { background: var(--todo-bg); color: var(--todo); }   .st.todo::before { content: "✕"; }
+  .st.note { background: var(--sunk); color: var(--ink-2); }     .st.note::before { content: "!"; }
+  @media (prefers-color-scheme: light) { .st.part { color: #8F6108; } }
+  :root[data-theme="light"] .st.part { color: #8F6108; }
+
+  /* ---------- lists of builds / tests ---------- */
+  .two { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 18px; align-items: start; }
+  .list { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; }
+  .list h4 { font: 700 12px/1 var(--body); letter-spacing: .14em; text-transform: uppercase; color: var(--ink-3);
+             padding: 14px 16px 10px; }
+  .row { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 4px 12px; align-items: center;
+         padding: 11px 16px; border-top: 1px solid var(--line); font-size: 15.5px; }
+  .row.test { grid-template-columns: auto minmax(0,1fr); align-items: baseline; }
+  .row .code { align-self: baseline; }
+
+  /* ---------- flows (HTML step chains) ---------- */
+  .flow { display: flex; flex-wrap: wrap; align-items: stretch; gap: 8px; }
+  .step { flex: 1 1 130px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r);
+          padding: 14px 14px 13px; display: grid; gap: 4px; align-content: start; position: relative; }
+  .step .k { font-family: var(--mono); font-size: 12px; font-weight: 700; color: var(--accent-ink); }
+  .step .t { font-family: var(--display); font-weight: 700; font-size: 18px; line-height: 1.15; }
+  .step .d { font-size: 14px; color: var(--ink-2); line-height: 1.4; }
+  .step.gate { background: var(--navy); border-color: var(--navy); color: var(--navy-ink); }
+  .step.gate .d { color: var(--navy-2); }
+  .step.gate .k { color: var(--accent); }
+  .step.good { border-color: var(--done); box-shadow: inset 0 0 0 1px var(--done); }
+  .arrow { flex: 0 0 auto; align-self: center; color: var(--ink-3); font-size: 20px; line-height: 1; }
+  @media (max-width: 640px) { .flow { flex-direction: column; } .arrow { transform: rotate(90deg); align-self: flex-start; margin-left: 18px; } }
+
+  /* ---------- compare panels ---------- */
+  .compare { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+  .panel { border-radius: var(--r); padding: 18px 20px; display: grid; gap: 10px; align-content: start;
+           background: var(--surface); border: 1px solid var(--line); }
+  .panel.bad  { background: var(--todo-bg); border-color: transparent; }
+  .panel.good { background: var(--done-bg); border-color: transparent; }
+  .panel .ph { display: flex; align-items: center; gap: 10px; }
+  .panel h3 { font-size: 19px; }
+  .panel svg.icon { width: 40px; height: 40px; flex: none; }
+  .panel p { font-size: 16px; }
+
+  /* ---------- cards ---------- */
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 16px 18px;
+          display: grid; gap: 8px; align-content: start; }
+  .card h3 { font-size: 18px; }
+  .card p { font-size: 15.5px; color: var(--ink-2); }
+  .card .top { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+  .card.lift { box-shadow: var(--shadow); }
+
+  /* ---------- word list ---------- */
+  .words { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 0; border: 1px solid var(--line);
+           border-radius: var(--r); background: var(--surface); overflow: hidden; }
+  .word { padding: 14px 18px; border-bottom: 1px solid var(--line); border-right: 1px solid var(--line); display: grid; gap: 3px; }
+  .word dt { font-family: var(--display); font-weight: 700; font-size: 18px; }
+  .word dd { margin: 0; font-size: 15px; color: var(--ink-2); }
+  .word dd i { color: var(--ink-3); }
+
+  /* ---------- figures ---------- */
+  figure { margin: 0; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; }
+  figure .canvas { padding: 20px 18px; overflow-x: auto; }
+  figure svg.dia { display: block; width: 100%; height: auto; min-width: 560px; color: var(--ink); }
+  figure svg.dia.fit { min-width: 0; }
+  figure svg.dia.chart { max-width: 780px; margin-inline: auto; }
+  .charts { display: grid; grid-template-columns: minmax(0, 1fr); gap: 18px; }
+  figcaption { border-top: 1px solid var(--line); background: var(--sunk); padding: 10px 18px; font-size: 14px; color: var(--ink-2); }
+  figcaption b { color: var(--ink); }
+
+  /* svg classes */
+  .s-box   { fill: var(--surface); stroke: var(--line); stroke-width: 1.5; }
+  .s-sunk  { fill: var(--sunk); stroke: none; }
+  .s-lv1 { fill: var(--lv1-bg); stroke: var(--lv1); stroke-width: 2; }
+  .s-lv2 { fill: var(--lv2-bg); stroke: var(--lv2); stroke-width: 2; }
+  .s-lv3 { fill: var(--lv3-bg); stroke: var(--lv3); stroke-width: 2; }
+  .s-lv4 { fill: var(--lv4-bg); stroke: var(--lv4); stroke-width: 2; }
+  .s-bad   { fill: var(--todo-bg); stroke: var(--todo); stroke-width: 2; }
+  .s-good  { fill: var(--done-bg); stroke: var(--done); stroke-width: 2; }
+  .s-link  { fill: none; stroke: var(--ink-3); stroke-width: 2; }
+  .s-dash  { fill: none; stroke: var(--ink-3); stroke-width: 2; stroke-dasharray: 5 5; }
+  .s-red   { fill: none; stroke: var(--todo); stroke-width: 2.5; stroke-dasharray: 6 5; }
+  .s-grid  { fill: none; stroke: var(--line); stroke-width: 1; }
+  .s-bar   { fill: var(--bar-mute); }
+  .s-bar.hot { fill: var(--accent); }
+  .s-hit   { fill: transparent; cursor: default; }
+  .t-main  { fill: var(--ink); font: 700 15px var(--body); }
+  .t-sub   { fill: var(--ink-2); font: 400 13px var(--body); }
+  .t-lab   { fill: var(--ink-3); font: 700 11px var(--body); letter-spacing: .12em; text-transform: uppercase; }
+  .t-head  { fill: var(--ink); font: 800 16px var(--display); letter-spacing: .02em; }
+  .t-red   { fill: var(--todo); font: 700 14px var(--body); }
+  .t-green { fill: var(--done); font: 700 14px var(--body); }
+  .t-val   { fill: var(--ink); font: 700 14px var(--mono); }
+  .t-tick  { fill: var(--ink-3); font: 500 12px var(--mono); }
+  .mk-grey { fill: var(--ink-3); }
+  .mk-red  { fill: var(--todo); }
+  g.bar:focus { outline: none; }
+  g.bar:focus .s-hit, g.bar:hover .s-hit { fill: var(--sunk); }
+
+  /* ---------- stacked scope bar ---------- */
+  .stack { display: flex; gap: 2px; height: 34px; border-radius: 8px; overflow: hidden; }
+  .stack > div { display: flex; align-items: center; justify-content: center; font: 700 14px var(--mono); color: #fff; }
+  .stack .d { background: var(--done); } .stack .p { background: var(--part); } .stack .x { background: var(--todo); }
+  .legend { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: 15px; }
+  .legend b { font-family: var(--mono); }
+
+  /* ---------- percentage bars ---------- */
+  .pbar { display: grid; gap: 6px; }
+  .pbar .lab { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; font-size: 15.5px; }
+  .pbar .lab b { font-family: var(--mono); }
+  .track { height: 18px; background: var(--sunk); border-radius: 5px; overflow: hidden; }
+  .fill { height: 100%; border-radius: 0 5px 5px 0; }
+  .fill.bad { background: var(--todo); } .fill.good { background: var(--done); }
+
+  /* ---------- road map ---------- */
+  .road { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; position: relative; }
+  .road li { display: grid; grid-template-columns: 56px minmax(0,1fr) auto; gap: 16px; align-items: start; padding-block: 12px; position: relative; }
+  .road li::before { content: ""; position: absolute; left: 27px; top: 0; bottom: 0; width: 2px; background: var(--line); }
+  .road li:first-child::before { top: 30px; }
+  .road li:last-child::before { bottom: calc(100% - 30px); }
+  .road .dot { position: relative; z-index: 1; width: 56px; height: 40px; border-radius: 10px; background: var(--navy); color: var(--navy-ink);
+               display: grid; place-items: center; font: 700 15px var(--mono); }
+  .road li.big .dot { background: var(--accent); color: #fff; }
+  .road h3 { font-size: 20px; }
+  .road p { font-size: 15.5px; color: var(--ink-2); margin-top: 2px; }
+  .road .n { font: 700 13px var(--mono); color: var(--ink-3); white-space: nowrap; padding-top: 10px; }
+  .road a { text-decoration: none; }
+  .road a:hover h3 { color: var(--accent-ink); }
+
+  /* ---------- key diagram (html) ---------- */
+  .keys { display: grid; gap: 10px; }
+  .keyrow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .keyicon { width: 30px; height: 30px; flex: none; color: var(--accent); }
+  .site { font-size: 14.5px; border-radius: 8px; padding: 5px 10px; background: var(--surface); border: 1px solid var(--line); }
+  .keyline { color: var(--ink-3); }
+
+  /* ---------- ladder ---------- */
+  .ladder { display: grid; gap: 0; max-width: 760px; }
+  .rung { display: grid; grid-template-columns: 34px minmax(0,1fr) minmax(0, 220px); gap: 12px; align-items: center;
+          padding: 12px 16px; background: var(--surface); border: 1px solid var(--line); border-top: 0; }
+  .rung:first-child { border-top: 1px solid var(--line); border-radius: var(--r) var(--r) 0 0; }
+  .rung:last-child { border-radius: 0 0 var(--r) var(--r); background: var(--todo-bg); }
+  .rung .q { font-size: 16px; }
+  .rung .a { font-size: 14.5px; font-weight: 700; color: var(--done); }
+  .rung:last-child .a { color: var(--todo); }
+  .rung .i { font: 700 13px var(--mono); width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center;
+             background: var(--sunk); color: var(--ink-2); }
+  @media (max-width: 560px) { .rung { grid-template-columns: 34px minmax(0,1fr); } .rung .a { grid-column: 2; } }
+
+  /* ---------- receipt ---------- */
+  .receipt { background: var(--surface); color: var(--ink); max-width: 400px; font-family: var(--mono); font-size: 13.5px;
+             padding: 22px 22px 18px; border-radius: 4px; box-shadow: var(--shadow); border: 1px solid var(--line);
+             transform: rotate(-.6deg); }
+  .receipt .rh { font-weight: 700; text-align: center; letter-spacing: .12em; }
+  .receipt .rs { text-align: center; color: var(--ink-3); font-size: 11.5px; margin-top: 2px; }
+  .receipt hr { border: 0; border-top: 1.5px dashed var(--line); margin: 12px 0; }
+  .receipt .kv { display: flex; justify-content: space-between; gap: 12px; padding-block: 3px; }
+  .receipt .kv span:first-child { color: var(--ink-2); }
+  .receipt .kv span:last-child { font-weight: 700; text-align: right; }
+  .receipt .ok { color: var(--done); }
+  .receipt .stamp { margin-top: 10px; text-align: center; font-weight: 700; color: var(--todo); border: 2px solid var(--todo);
+                    border-radius: 6px; padding: 4px; letter-spacing: .14em; transform: rotate(-3deg); display: inline-block; }
+  .receipt-wrap { display: grid; grid-template-columns: minmax(0, 400px) minmax(0, 1fr); gap: 28px; align-items: center; }
+  @media (max-width: 760px) { .receipt-wrap { grid-template-columns: 1fr; } .receipt { transform: none; } }
+
+  /* ---------- mock screens ---------- */
+  .mock { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  .mock .bar { display: flex; align-items: center; gap: 8px; padding: 9px 12px; background: var(--sunk); border-bottom: 1px solid var(--line); font-size: 13px; }
+  .mock .bar i { width: 9px; height: 9px; border-radius: 50%; background: var(--line); display: inline-block; }
+  .mock .logo { font-family: var(--display); font-weight: 800; font-size: 17px; margin-left: 6px; }
+  .mock .body { padding: 14px; display: grid; gap: 8px; font-size: 15px; }
+  .mock .mrow { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px; background: var(--sunk); }
+  .mock .btn { font-size: 13px; font-weight: 700; padding: 4px 10px; border-radius: 6px; border: 1px solid var(--line); color: var(--ink-3); }
+
+  /* ---------- role grid ---------- */
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: 15px; }
+  th, td { padding: 10px 14px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+  th { font: 700 12px/1.2 var(--body); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); background: var(--sunk); white-space: nowrap; }
+  tbody tr:last-child td { border-bottom: 0; }
+  td.c { text-align: center; }
+  .yes { color: var(--done); font-weight: 700; } .no { color: var(--todo); font-weight: 700; }
+  tr.grp td { background: var(--sunk); font-weight: 700; font-family: var(--display); font-size: 16px; }
+
+  /* ---------- Q&A ---------- */
+  .qa { display: grid; gap: 14px; }
+  .qa .item { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 16px 20px; display: grid; gap: 8px; }
+  .qa .q { font-family: var(--display); font-weight: 700; font-size: 19px; }
+  .qa .ans { display: inline-block; font-weight: 700; color: var(--accent-ink); }
+
+  /* ---------- tooltip ---------- */
+  #tip { position: fixed; z-index: 50; pointer-events: none; background: var(--navy); color: var(--navy-ink);
+         font-size: 14px; padding: 7px 11px; border-radius: 8px; box-shadow: var(--shadow); max-width: 260px; }
+
+  footer { border-top: 1px solid var(--line); padding-block: 26px 48px; color: var(--ink-3); font-size: 14.5px; }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <p class="kicker">MMSBUILD · The plan, simply</p>
+    <h1>MMSBUILD PRD in Plain English</h1>
+    <p class="sub">A plan for what MMSBUILD must become. Every item has a test, so we can prove it.</p>
+    <div class="howto">
+      <span><b>21</b> things to build</span>
+      <span><b>7</b> phases, in order</span>
+      <span><b>40</b> tests</span>
+      <span>Read top to bottom. One idea at a time.</span>
+    </div>
+  </div>
+</header>
+
+<nav class="jump" aria-label="Jump to a section">
+  <div class="wrap">
+    <a href="#goal">The goal</a>
+    <a href="#words">Words</a>
+    <a href="#rules">The 4 rules</a>
+    <a href="#checked">6 items checked</a>
+    <a href="#road">Road map</a>
+    <a class="ph" href="#p0">P0</a><a class="ph" href="#p1">P1</a><a class="ph" href="#p2">P2</a>
+    <a class="ph" href="#p3">P3</a><a class="ph" href="#p4">P4</a><a class="ph" href="#p5">P5</a><a class="ph" href="#p6">P6</a>
+    <a href="#safety">Safety tests</a>
+    <a href="#questions">Big questions</a>
+    <a href="#risks">Risks</a>
+    <a href="#alltests">All 40 tests</a>
+  </div>
+</nav>
+
+<main class="wrap">
+
+<!-- =============================== GOAL =============================== -->
+<section class="block" id="goal">
+  <p class="eyebrow">Start here</p>
+  <h2>The goal: a website factory</h2>
+  <p class="inshort">Many businesses use it. They ask for a change. The change goes live <b>with proof</b>.</p>
+
+  <div class="flow" role="list" aria-label="The factory line">
+    <div class="step" role="listitem"><span class="k">1</span><span class="t">Ask</span><span class="d">A business asks for a change.</span></div>
+    <span class="arrow" aria-hidden="true">→</span>
+    <div class="step" role="listitem"><span class="k">2</span><span class="t">Build</span><span class="d">The change gets made.</span></div>
+    <span class="arrow" aria-hidden="true">→</span>
+    <div class="step gate" role="listitem"><span class="k">3</span><span class="t">Approve</span><span class="d">The right person says yes.</span></div>
+    <span class="arrow" aria-hidden="true">→</span>
+    <div class="step" role="listitem"><span class="k">4</span><span class="t">Go live</span><span class="d">It appears on the real website.</span></div>
+    <span class="arrow" aria-hidden="true">→</span>
+    <div class="step good" role="listitem"><span class="k">5</span><span class="t">Prove it</span><span class="d">The system checks the live site and keeps a record.</span></div>
+  </div>
+
+  <div class="example">
+    <span class="lab">Example</span>
+    <p><b>Green Kitchen</b> has a website. The owner says: <i>"Add a page for our new salads."</i></p>
+    <p>The page is built. The owner approves it. It goes live. The system opens the live site, sees the page is really there, and saves a record.</p>
+  </div>
+
+  <ul class="lines">
+    <li><b>"Proof"</b> means a saved record. Not just someone saying "it's done".</li>
+    <li><b>"Many businesses"</b> means hundreds of customers, each kept separate.</li>
+    <li>Today's sites (Sheeltron and others) are <b>tests</b>. They are not the final goal.</li>
+  </ul>
+</section>
+
+<!-- =============================== WORDS =============================== -->
+<section class="block" id="words">
+  <p class="eyebrow">Before we go on</p>
+  <h2>Words you will see</h2>
+  <p class="muted">You only need these. Everything else is explained where it appears.</p>
+
+  <dl class="words">
+    <div class="word"><dt>Platform</dt><dd>MMSBUILD itself. There is one.</dd></div>
+    <div class="word"><dt>Operator</dt><dd>An <b>agency</b> that sells MMSBUILD to its own customers. <i>Example: BrightLeaf Agency.</i></dd></div>
+    <div class="word"><dt>Business</dt><dd>A company that owns websites. <i>Example: Green Kitchen.</i></dd></div>
+    <div class="word"><dt>Project</dt><dd><b>One website.</b> Kept fully separate from all others.</dd></div>
+    <div class="word"><dt>MMS-Design</dt><dd>The design tool. AI builds the pages here.</dd></div>
+    <div class="word"><dt>MMS-CMS</dt><dd>The editor. Content lives here. The <b>Publish</b> button is here.</dd></div>
+    <div class="word"><dt>Import</dt><dd>Loading a finished design <b>into</b> the CMS.</dd></div>
+    <div class="word"><dt>Publish</dt><dd>Making the website <b>live</b> for everyone.</dd></div>
+    <div class="word"><dt>Approver</dt><dd>The person allowed to say "yes, do it".</dd></div>
+    <div class="word"><dt>Approval</dt><dd>A signed "yes". Like a signature on a form.</dd></div>
+    <div class="word"><dt>Receipt</dt><dd>A saved record that proves what went live.</dd></div>
+    <div class="word"><dt>Test code</dt><dd>A label like <span class="code">AC-A2.1</span>. It links to the full PRD. No need to remember it.</dd></div>
+  </dl>
+</section>
+
+<!-- =============================== RULES =============================== -->
+<section class="block" id="rules">
+  <p class="eyebrow">Never broken</p>
+  <h2>The 4 rules</h2>
+  <p class="inshort">Everything in the plan must follow these. <b>Rules 1 and 2</b> matter most.</p>
+
+  <div class="cards">
+    <div class="card lift"><div class="top"><h3>1 · Own approver</h3></div><p>Each website has its own approver. No master key.</p></div>
+    <div class="card lift"><div class="top"><h3>2 · Stop if broken</h3></div><p>If a safety check breaks, the change stops.</p></div>
+    <div class="card"><div class="top"><h3>3 · One site each</h3></div><p>One project = one domain = one website.</p></div>
+    <div class="card"><div class="top"><h3>4 · One publisher</h3></div><p>Only the CMS can make a site live.</p></div>
+  </div>
+
+  <h3>Rule 1 — each website has its own approver</h3>
+  <div class="compare">
+    <div class="panel bad">
+      <div class="ph"><span class="st todo">Not allowed</span></div>
+      <h3>One master key</h3>
+      <div class="keys">
+        <div class="keyrow">
+          <svg class="keyicon" viewBox="0 0 32 32" aria-hidden="true"><circle cx="10" cy="16" r="6" fill="none" stroke="currentColor" stroke-width="3"/><path d="M16 16h13M24 16v5M28 16v4" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>
+          <span class="keyline">opens →</span>
+          <span class="site">Green Kitchen</span><span class="site">Corner Cafe</span><span class="site">Shoe Shop</span>
+        </div>
+      </div>
+      <p>One key can say yes to <b>every</b> website. If it leaks, everything is at risk.</p>
+    </div>
+    <div class="panel good">
+      <div class="ph"><span class="st done">Required</span></div>
+      <h3>One key per website</h3>
+      <div class="keys">
+        <div class="keyrow"><svg class="keyicon" viewBox="0 0 32 32" aria-hidden="true"><circle cx="10" cy="16" r="6" fill="none" stroke="currentColor" stroke-width="3"/><path d="M16 16h13M24 16v5" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg><span class="keyline">→</span><span class="site">Green Kitchen only</span></div>
+        <div class="keyrow"><svg class="keyicon" viewBox="0 0 32 32" aria-hidden="true"><circle cx="10" cy="16" r="6" fill="none" stroke="currentColor" stroke-width="3"/><path d="M16 16h13M28 16v5" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg><span class="keyline">→</span><span class="site">Corner Cafe only</span></div>
+        <div class="keyrow"><svg class="keyicon" viewBox="0 0 32 32" aria-hidden="true"><circle cx="10" cy="16" r="6" fill="none" stroke="currentColor" stroke-width="3"/><path d="M16 16h13M22 16v4M27 16v5" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg><span class="keyline">→</span><span class="site">Shoe Shop only</span></div>
+      </div>
+      <p>Green Kitchen's key works <b>only</b> on Green Kitchen. Like each shop having its own manager.</p>
+    </div>
+  </div>
+
+  <h3>Rule 2 — if a check breaks, stop</h3>
+  <div class="compare">
+    <div class="panel bad">
+      <div class="ph">
+        <svg class="icon" viewBox="0 0 40 40" aria-hidden="true"><rect x="8" y="18" width="24" height="18" rx="3" fill="var(--todo)"/><path d="M13 18v-6a7 7 0 0 1 13-3.5" fill="none" stroke="var(--todo)" stroke-width="3.5" stroke-linecap="round"/></svg>
+        <h3>Wrong: fails open</h3>
+      </div>
+      <p>The checker crashes. The page goes live <b>anyway</b>.</p>
+      <p class="small muted">Like a door that swings open when the power goes out.</p>
+    </div>
+    <div class="panel good">
+      <div class="ph">
+        <svg class="icon" viewBox="0 0 40 40" aria-hidden="true"><rect x="8" y="18" width="24" height="18" rx="3" fill="var(--done)"/><path d="M13 18v-6a7 7 0 0 1 14 0v6" fill="none" stroke="var(--done)" stroke-width="3.5" stroke-linecap="round"/></svg>
+        <h3>Right: fails closed</h3>
+      </div>
+      <p>The checker crashes. The page is <b>stopped</b>. You see "blocked", not "success".</p>
+      <p class="small muted">Like a door that stays locked when the power goes out.</p>
+    </div>
+  </div>
+</section>
+
+<!-- =============================== 6 ITEMS =============================== -->
+<section class="block" id="checked">
+  <p class="eyebrow">The PRD's first finding</p>
+  <h2>6 items the partner said were done</h2>
+  <p class="inshort">The PRD checked each one. <b>2</b> were fully done. <b>3</b> were partly done. <b>1</b> was labelled wrong.</p>
+  <p class="small muted">These results are from when the PRD was written.</p>
+
+  <div class="cards">
+    <div class="card"><div class="top"><h3>Font install</h3><span class="st done">Done</span></div><p>Adds fonts to a site. Running it twice changes nothing.</p></div>
+    <div class="card"><div class="top"><h3>Strict settings</h3><span class="st done">Done</span></div><p>A wrong setting now gives an error. Before, it was quietly ignored.</p></div>
+    <div class="card"><div class="top"><h3>Approver per website</h3><span class="st part">Partly</span></div><p>One side supports it. Both sides must agree before it works. No way yet to add or change approvers.</p></div>
+    <div class="card"><div class="top"><h3>Pre-check</h3><span class="st part">Partly</span></div><p>It spots problems. But it does <b>not stop</b> them. It also skips the publish step.</p></div>
+    <div class="card"><div class="top"><h3>Version stamp</h3><span class="st part">Partly</span></div><p>The software knows its version. The saved records do not store it.</p></div>
+    <div class="card"><div class="top"><h3>New-item alerts</h3><span class="st note">Mislabelled</span></div><p>This was done earlier, not now. It only works if an alert address is set up.</p></div>
+  </div>
+</section>
+
+<!-- =============================== ROAD MAP =============================== -->
+<section class="block" id="road">
+  <p class="eyebrow">The big picture</p>
+  <h2>The road map: 7 phases</h2>
+  <p class="inshort">Do them <b>in this order</b>. Each phase needs the one before it.</p>
+
+  <ol class="road">
+    <li><span class="dot">P0</span><a href="#p0"><h3>Lock the admin door</h3><p>Sign-in required. No secrets shown.</p></a><span class="n">1 test</span></li>
+    <li><span class="dot">P1</span><a href="#p1"><h3>Add levels and people</h3><p>Agency → Business → Website. Many people, each with a role.</p></a><span class="n">4 tests</span></li>
+    <li><span class="dot">P2</span><a href="#p2"><h3>Who sees what</h3><p>Platform owner sees numbers only. Agencies show their own logo.</p></a><span class="n">2 tests</span></li>
+    <li><span class="dot">P3</span><a href="#p3"><h3>One project, one website</h3><p>A second design can never erase the first website.</p></a><span class="n">3 tests</span></li>
+    <li class="big"><span class="dot">P4</span><a href="#p4"><h3>Approvals with proof</h3><p>The biggest phase. Own approvers, two approvals, receipts, undo.</p></a><span class="n">19 tests</span></li>
+    <li><span class="dot">P5</span><a href="#p5"><h3>Push a site with no developer</h3><p>The design tool tests and ships by itself.</p></a><span class="n">8 tests</span></li>
+    <li><span class="dot">P6</span><a href="#p6"><h3>Make it safe for real use</h3><p>Safe replace, clean delete, clear "starting" message.</p></a><span class="n">3 tests</span></li>
+  </ol>
+
+  <div class="charts">
+    <figure>
+      <div class="canvas">
+        <svg class="dia fit chart" viewBox="0 0 720 292" role="img" aria-label="Bar chart of tests per phase. Phase 0 has 1, Phase 1 has 4, Phase 2 has 2, Phase 3 has 3, Phase 4 has 19, Phase 5 has 8, Phase 6 has 3.">
+          <g>
+            <line class="s-grid" x1="230" y1="30" x2="230" y2="280"/>
+            <line class="s-grid" x1="342.5" y1="30" x2="342.5" y2="280"/>
+            <line class="s-grid" x1="455" y1="30" x2="455" y2="280"/>
+            <line class="s-grid" x1="567.5" y1="30" x2="567.5" y2="280"/>
+            <line class="s-grid" x1="680" y1="30" x2="680" y2="280"/>
+            <text class="t-tick" x="230" y="20" text-anchor="middle">0</text>
+            <text class="t-tick" x="342.5" y="20" text-anchor="middle">5</text>
+            <text class="t-tick" x="455" y="20" text-anchor="middle">10</text>
+            <text class="t-tick" x="567.5" y="20" text-anchor="middle">15</text>
+            <text class="t-tick" x="680" y="20" text-anchor="middle">20</text>
+          </g>
+          <g class="bar" tabindex="0" data-tip="Phase 0 · Lock the admin door — 1 test">
+            <rect class="s-hit" x="0" y="31" width="720" height="34" rx="6"/>
+            <text class="t-sub" x="218" y="53" text-anchor="end">P0 · Admin door</text>
+            <path class="s-bar" d="M230 40h18.5a4 4 0 0 1 4 4v8a4 4 0 0 1 -4 4h-18.5z"/>
+            <text class="t-val" x="260.5" y="53">1</text>
+          </g>
+          <g class="bar" tabindex="0" data-tip="Phase 1 · Levels and people — 4 tests">
+            <rect class="s-hit" x="0" y="67" width="720" height="34" rx="6"/>
+            <text class="t-sub" x="218" y="89" text-anchor="end">P1 · Levels and people</text>
+            <path class="s-bar" d="M230 76h86a4 4 0 0 1 4 4v8a4 4 0 0 1 -4 4h-86z"/>
+            <text class="t-val" x="328" y="89">4</text>
+          </g>
+          <g class="bar" tabindex="0" data-tip="Phase 2 · Who sees what — 2 tests">
+            <rect class="s-hit" x="0" y="103" width="720" height="34" rx="6"/>
+            <text class="t-sub" x="218" y="125" text-anchor="end">P2 · Who sees what</text>
+            <path class="s-bar" d="M230 112h41a4 4 0 0 1 4 4v8a4 4 0 0 1 -4 4h-41z"/>
+            <text class="t-val" x="283" y="125">2</text>
+          </g>
+          <g class="bar" tabindex="0" data-tip="Phase 3 · One project, one website — 3 tests">
+            <rect class="s-hit" x="0" y="139" width="720" height="34" rx="6"/>
+            <text class="t-sub" x="218" y="161" text-anchor="end">P3 · One site each</text>
+            <path class="s-bar" d="M230 148h63.5a4 4 0 0 1 4 4v8a4 4 0 0 1 -4 4h-63.5z"/>
+            <text class="t-val" x="305.5" y="161">3</text>
+          </g>
+          <g class="bar" tabindex="0" data-tip="Phase 4 · Approvals with proof — 19 tests, the biggest phase">
+            <rect class="s-hit" x="0" y="175" width="720" height="34" rx="6"/>
+            <text class="t-main" x="218" y="197" text-anchor="end">P4 · Approvals</text>
+            <path class="s-bar hot" d="M230 184h423.5a4 4 0 0 1 4 4v8a4 4 0 0 1 -4 4h-423.5z"/>
+            <text class="t-val" x="665.5" y="197">19</text>
+          </g>
+          <g class="bar" tabindex="0" data-tip="Phase 5 · No-developer push — 8 tests">
+            <rect class="s-hit" x="0" y="211" width="720" height="34" rx="6"/>
+            <text class="t-sub" x="218" y="233" text-anchor="end">P5 · No-developer push</text>
+            <path class="s-bar" d="M230 220h176a4 4 0 0 1 4 4v8a4 4 0 0 1 -4 4h-176z"/>
+            <text class="t-val" x="418" y="233">8</text>
+          </g>
+          <g class="bar" tabindex="0" data-tip="Phase 6 · Safe for real use — 3 tests">
+            <rect class="s-hit" x="0" y="247" width="720" height="34" rx="6"/>
+            <text class="t-sub" x="218" y="269" text-anchor="end">P6 · Safe for real use</text>
+            <path class="s-bar" d="M230 256h63.5a4 4 0 0 1 4 4v8a4 4 0 0 1 -4 4h-63.5z"/>
+            <text class="t-val" x="305.5" y="269">3</text>
+          </g>
+        </svg>
+      </div>
+      <figcaption><b>Tests per phase.</b> Phase 4 holds almost half of all 40 tests.</figcaption>
+    </figure>
+
+    <figure>
+      <div class="canvas" style="display:grid; gap:16px;">
+        <p style="font-family:var(--display); font-weight:700; font-size:19px;">How much is built? <span class="muted" style="font-family:var(--body); font-weight:400; font-size:15px;">(21 items)</span></p>
+        <div class="stack" role="img" aria-label="Of 21 items: 1 done, 8 partly done, 12 not built yet.">
+          <div class="d" style="flex: 1" title="Done: 1"></div>
+          <div class="p" style="flex: 8" title="Partly done: 8">8</div>
+          <div class="x" style="flex: 12" title="Not built yet: 12">12</div>
+        </div>
+        <div class="legend">
+          <span class="st done">Done <b>1</b></span>
+          <span class="st part">Partly <b>8</b></span>
+          <span class="st todo">Not yet <b>12</b></span>
+        </div>
+        <p class="small muted">Most of the work is still ahead. That is normal for a plan.</p>
+      </div>
+      <figcaption><b>Status of all 21 items</b>, as the PRD records it.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<!-- =============================== P0 =============================== -->
+<section class="block" id="p0">
+  <p class="eyebrow phase-tag"><span class="n">P0</span> Phase 0</p>
+  <h2>Lock the admin door</h2>
+  <p class="inshort">Today the admin page has <b>no sign-in</b>. Fix that first.</p>
+
+  <div class="compare">
+    <div class="panel bad">
+      <div class="ph">
+        <svg class="icon" viewBox="0 0 40 40" aria-hidden="true"><rect x="9" y="5" width="22" height="31" rx="2" fill="none" stroke="var(--todo)" stroke-width="3"/><path d="M9 5l12 5v29l-12-3z" fill="var(--todo)"/></svg>
+        <h3>Today: door open</h3>
+      </div>
+      <p>Anyone who finds the admin address can:</p>
+      <ul class="lines small">
+        <li>delete a website</li>
+        <li>create a machine key</li>
+        <li>read an existing key</li>
+      </ul>
+    </div>
+    <div class="panel good">
+      <div class="ph">
+        <svg class="icon" viewBox="0 0 40 40" aria-hidden="true"><rect x="9" y="5" width="22" height="31" rx="2" fill="var(--done)"/><circle cx="25" cy="21" r="2.2" fill="var(--done-bg)"/></svg>
+        <h3>Goal: door locked</h3>
+      </div>
+      <p>Admins must sign in first.</p>
+      <p>Even signed-in admins <b>never see secret keys</b> after they are made.</p>
+    </div>
+  </div>
+
+  <p class="small muted"><b>Why first?</b> Every later phase needs a safe admin area. Building on an open one means doing the work twice.</p>
+
+  <div class="two">
+    <div class="list">
+      <h4>What gets built</h4>
+      <div class="row"><span>Admin sign-in</span><span class="st todo">Not yet</span></div>
+      <div class="row"><span>Never show secret keys <span class="small muted">(added by the PRD)</span></span><span class="st todo">Not yet</span></div>
+    </div>
+    <div class="list">
+      <h4>How we test it</h4>
+      <div class="row test"><span class="code">AC-D14.1</span><span>Try an admin action without signing in. It must be refused.</span></div>
+      <div class="row test"><span class="code">NEW-1</span><span>Make a key, then try to read it back. The key must stay hidden.</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- =============================== P1 =============================== -->
+<section class="block" id="p1">
+  <p class="eyebrow phase-tag"><span class="n">P1</span> Phase 1</p>
+  <h2>Add levels and people</h2>
+  <p class="inshort">Add <b>agencies</b> and <b>businesses</b> above websites. Let many people work on one website.</p>
+
+  <figure>
+    <div class="canvas">
+      <svg class="dia" viewBox="0 0 900 360" role="img" aria-label="Four levels. The platform sits on top. Below it, BrightLeaf Agency, and directly under the platform, Corner Cafe. BrightLeaf Agency owns Green Kitchen. Green Kitchen owns two websites. Corner Cafe owns one website.">
+        <defs>
+          <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="mk-grey"/></marker>
+        </defs>
+        <!-- links -->
+        <path class="s-link" d="M450 64V86H290V106" marker-end="url(#ah)"/>
+        <path class="s-dash" d="M450 86H660V198" marker-end="url(#ah)"/>
+        <text class="t-sub" x="672" y="150">direct</text>
+        <path class="s-link" d="M290 156V198" marker-end="url(#ah)"/>
+        <path class="s-link" d="M290 248V270H180V290" marker-end="url(#ah)"/>
+        <path class="s-link" d="M290 270H420V290" marker-end="url(#ah)"/>
+        <path class="s-link" d="M660 248V290" marker-end="url(#ah)"/>
+        <!-- level 1 -->
+        <rect class="s-lv1" x="360" y="16" width="180" height="48" rx="10"/>
+        <text class="t-main" x="450" y="45" text-anchor="middle">MMSBUILD</text>
+        <!-- level 2 -->
+        <rect class="s-lv2" x="180" y="108" width="220" height="48" rx="10"/>
+        <text class="t-main" x="290" y="137" text-anchor="middle">BrightLeaf Agency</text>
+        <!-- level 3 -->
+        <rect class="s-lv3" x="180" y="200" width="220" height="48" rx="10"/>
+        <text class="t-main" x="290" y="229" text-anchor="middle">Green Kitchen</text>
+        <rect class="s-lv3" x="560" y="200" width="200" height="48" rx="10"/>
+        <text class="t-main" x="660" y="229" text-anchor="middle">Corner Cafe</text>
+        <!-- level 4 -->
+        <rect class="s-lv4" x="70" y="292" width="220" height="48" rx="10"/>
+        <text class="t-main" x="180" y="321" text-anchor="middle">greenkitchen.com</text>
+        <rect class="s-lv4" x="300" y="292" width="240" height="48" rx="10"/>
+        <text class="t-main" x="420" y="321" text-anchor="middle">greenkitchen-catering.com</text>
+        <rect class="s-lv4" x="560" y="292" width="200" height="48" rx="10"/>
+        <text class="t-main" x="660" y="321" text-anchor="middle">cornercafe.com</text>
+        <!-- level labels -->
+        <text class="t-lab" x="890" y="44" text-anchor="end">Platform</text>
+        <text class="t-lab" x="890" y="136" text-anchor="end">Agency</text>
+        <text class="t-lab" x="890" y="228" text-anchor="end">Business</text>
+        <text class="t-lab" x="890" y="320" text-anchor="end">Website</text>
+      </svg>
+    </div>
+    <figcaption><b>The 4 levels.</b> Today only the bottom row exists. Phase 1 adds the two middle rows.</figcaption>
+  </figure>
+
+  <ul class="lines">
+    <li>Every record knows its <b>full address</b>: agency → business → website.</li>
+    <li>If a search has no address, it returns <b>nothing</b>. Not everything.</li>
+    <li>So Green Kitchen can never see Corner Cafe's data.</li>
+  </ul>
+
+  <h3>People and roles</h3>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Green Kitchen's team</th><th>Role</th><th class="c">Write a page</th><th class="c">Publish</th><th class="c">Delete a site</th></tr></thead>
+      <tbody>
+        <tr><td>Priya</td><td>Owner</td><td class="c yes">✓ Yes</td><td class="c yes">✓ Yes</td><td class="c yes">✓ Yes</td></tr>
+        <tr><td>Maya</td><td>Publisher</td><td class="c yes">✓ Yes</td><td class="c yes">✓ Yes</td><td class="c no">✕ No</td></tr>
+        <tr><td>Sam</td><td>Writer</td><td class="c yes">✓ Yes</td><td class="c no">✕ No</td><td class="c no">✕ No</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="small muted">Example roles. The CMS already has a role system like this. The plan reuses it.</p>
+
+  <div class="compare">
+    <div class="panel bad">
+      <h3>Problem 1: invites overwrite</h3>
+      <p>Invite Maya. Then invite Sam. <b>Maya's account is replaced.</b></p>
+      <p class="small">Fix: a new invite adds a person. It never replaces one.</p>
+    </div>
+    <div class="panel bad">
+      <h3>Problem 2: everyone enters as owner</h3>
+      <p>Sam signs in and reaches the CMS as <b>owner</b>. The password re-check is skipped too.</p>
+      <p class="small">Fix: Sam enters as a writer. Extra checks still apply.</p>
+    </div>
+  </div>
+
+  <div class="two">
+    <div class="list">
+      <h4>What gets built</h4>
+      <div class="row"><span>Agency and business levels</span><span class="st todo">Not yet</span></div>
+      <div class="row"><span>Roles and many people</span><span class="st todo">Not yet</span></div>
+      <div class="row"><span>Fix: invites overwrite <span class="small muted">(added)</span></span><span class="st todo">Not yet</span></div>
+      <div class="row"><span>Fix: everyone is owner <span class="small muted">(added)</span></span><span class="st todo">Not yet</span></div>
+    </div>
+    <div class="list">
+      <h4>How we test it</h4>
+      <div class="row test"><span class="code">AC-A1.1</span><span>Make 1 agency, 2 businesses, 2 sites each. Each level lists its children.</span></div>
+      <div class="row test"><span class="code">AC-A1.2</span><span>Green Kitchen tries to read or change Corner Cafe. Refused.</span></div>
+      <div class="row test"><span class="code">AC-A3.1</span><span>Maya can publish. Sam cannot.</span></div>
+      <div class="row test"><span class="code">AC-A3.2</span><span>Sam tries a direct call, skipping the screen. Still refused.</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- =============================== P2 =============================== -->
+<section class="block" id="p2">
+  <p class="eyebrow phase-tag"><span class="n">P2</span> Phase 2</p>
+  <h2>Who sees what</h2>
+  <p class="inshort">The platform owner sees <b>numbers, not work</b>. Agencies show <b>their own logo</b>.</p>
+
+  <div class="compare">
+    <div class="mock" aria-label="Example platform owner screen">
+      <div class="bar"><i></i><i></i><i></i><span class="logo">MMSBUILD</span><span class="muted">· Platform owner view</span></div>
+      <div class="body">
+        <div class="mrow"><span><b>BrightLeaf Agency</b> · 12 businesses · 30 sites</span></div>
+        <div class="mrow"><span><b>Green Kitchen</b> · 2 sites · Active</span><span class="btn">Open work · Blocked</span></div>
+        <div class="mrow"><span><b>Corner Cafe</b> · 1 site · Active</span><span class="btn">Open work · Blocked</span></div>
+        <p class="small muted">Counts are visible. The actual pages are not.</p>
+      </div>
+    </div>
+    <div class="mock" aria-label="Example agency-branded screen">
+      <div class="bar"><i></i><i></i><i></i><span class="logo" style="color:var(--lv2)">BrightLeaf</span><span class="muted">· what Green Kitchen sees</span></div>
+      <div class="body">
+        <div class="mrow"><span>Your websites</span></div>
+        <div class="mrow"><span>greenkitchen.com</span><span class="st done">Live</span></div>
+        <div class="mrow"><span>greenkitchen-catering.com</span><span class="st done">Live</span></div>
+        <p class="small muted">The agency's logo replaces the platform's.</p>
+      </div>
+    </div>
+  </div>
+
+  <ul class="lines">
+    <li>If platform staff must open a business's work, that is a special mode.</li>
+    <li>It is <b>logged</b> as "platform staff, acting as Green Kitchen".</li>
+  </ul>
+
+  <div class="two">
+    <div class="list">
+      <h4>What gets built</h4>
+      <div class="row"><span>Numbers-only view, plus the agency's own logo</span><span class="st todo">Not yet</span></div>
+    </div>
+    <div class="list">
+      <h4>How we test it</h4>
+      <div class="row test"><span class="code">AC-A5.1</span><span>Platform owner sees counts. Opening a site's work is refused.</span></div>
+      <div class="row test"><span class="code">AC-A5.2</span><span>BrightLeaf's customers see the BrightLeaf logo.</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- =============================== P3 =============================== -->
+<section class="block" id="p3">
+  <p class="eyebrow phase-tag"><span class="n">P3</span> Phase 3</p>
+  <h2>One project, one website</h2>
+  <p class="inshort">Today, sharing a second design <b>erases the first website</b>. With no warning.</p>
+
+  <figure>
+    <div class="canvas">
+      <svg class="dia" viewBox="0 0 900 320" role="img" aria-label="Left, today: design A and design B both go to one shared destination and one website, so sharing B erases A. Right, the goal: design A goes only to website A, design B goes only to website B, and a link from design A to website B is blocked.">
+        <defs>
+          <marker id="ah2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="mk-grey"/></marker>
+          <marker id="ah3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="mk-red"/></marker>
+        </defs>
+        <!-- panel backgrounds -->
+        <rect class="s-sunk" x="0" y="0" width="430" height="320" rx="12"/>
+        <rect class="s-sunk" x="470" y="0" width="430" height="320" rx="12"/>
+        <text class="t-head" x="20" y="32">TODAY</text>
+        <text class="t-head" x="490" y="32">GOAL</text>
+
+        <!-- today -->
+        <rect class="s-box" x="20" y="56" width="180" height="42" rx="9"/>
+        <text class="t-main" x="110" y="82" text-anchor="middle">Design A</text>
+        <rect class="s-box" x="230" y="56" width="180" height="42" rx="9"/>
+        <text class="t-main" x="320" y="82" text-anchor="middle">Design B</text>
+        <path class="s-link" d="M110 98V118H215V138" marker-end="url(#ah2)"/>
+        <path class="s-link" d="M320 98V118H215" />
+        <rect class="s-box" x="95" y="140" width="240" height="42" rx="9"/>
+        <text class="t-main" x="215" y="166" text-anchor="middle">One shared destination</text>
+        <path class="s-link" d="M215 182V210" marker-end="url(#ah2)"/>
+        <rect class="s-bad" x="95" y="212" width="240" height="42" rx="9"/>
+        <text class="t-main" x="215" y="238" text-anchor="middle">Only one website</text>
+        <text class="t-red" x="215" y="286" text-anchor="middle">✕ Sharing B erases A</text>
+
+        <!-- goal -->
+        <rect class="s-box" x="490" y="56" width="180" height="42" rx="9"/>
+        <text class="t-main" x="580" y="82" text-anchor="middle">Design A</text>
+        <rect class="s-box" x="700" y="56" width="180" height="42" rx="9"/>
+        <text class="t-main" x="790" y="82" text-anchor="middle">Design B</text>
+        <path class="s-link" d="M580 98V210" marker-end="url(#ah2)"/>
+        <path class="s-link" d="M790 98V210" marker-end="url(#ah2)"/>
+        <path class="s-red" d="M620 98L748 210" marker-end="url(#ah3)"/>
+        <rect x="642" y="138" width="86" height="26" rx="6" fill="var(--todo-bg)"/>
+        <text class="t-red" x="685" y="156" text-anchor="middle">✕ blocked</text>
+        <rect class="s-good" x="490" y="212" width="180" height="42" rx="9"/>
+        <text class="t-main" x="580" y="238" text-anchor="middle">Website A</text>
+        <rect class="s-good" x="700" y="212" width="180" height="42" rx="9"/>
+        <text class="t-main" x="790" y="238" text-anchor="middle">Website B</text>
+        <text class="t-green" x="685" y="286" text-anchor="middle">✓ Each design reaches only its own site</text>
+      </svg>
+    </div>
+    <figcaption><b>Today vs goal.</b> The fix: the destination belongs to the <b>project</b>, not the design tool.</figcaption>
+  </figure>
+
+  <div class="example">
+    <span class="lab">Example</span>
+    <p>Green Kitchen has <b>greenkitchen.com</b> live. They design a catering site and share it.</p>
+    <p><b>Today:</b> greenkitchen.com is wiped and replaced. It looks like a normal update.</p>
+    <p><b>Goal:</b> the system says "this project already has a website", or the catering site becomes its own project. greenkitchen.com stays safe.</p>
+  </div>
+
+  <div class="two">
+    <div class="list">
+      <h4>What gets built</h4>
+      <div class="row"><span>A second site can't erase the first</span><span class="st todo">Not yet</span></div>
+      <div class="row"><span>Each design sends only to its own project</span><span class="st todo">Not yet</span></div>
+    </div>
+    <div class="list">
+      <h4>How we test it</h4>
+      <div class="row test"><span class="code">AC-A2.1</span><span>Share design B into a project with site A. Site A must still work.</span></div>
+      <div class="row test"><span class="code">AC-A2.2</span><span>Try to aim a design at another project. Not possible.</span></div>
+      <div class="row test"><span class="code">AC-A2.3</span><span>Publish to site A. Site B must not change.</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- =============================== P4 =============================== -->
+<section class="block" id="p4">
+  <p class="eyebrow phase-tag"><span class="n">P4</span> Phase 4 · the biggest</p>
+  <h2>Approvals with proof</h2>
+  <p class="inshort">The right person says yes. The system checks the live site. It keeps a record. It can <b>undo</b>.</p>
+
+  <h3>Part A — finding the right approver</h3>
+  <p class="muted">The system asks these questions, top to bottom.</p>
+  <div class="ladder" role="list">
+    <div class="rung" role="listitem"><span class="i">1</span><span class="q">Does this website have its own approver?</span><span class="a">Yes → use them</span></div>
+    <div class="rung" role="listitem"><span class="i">2</span><span class="q">If not: does its business have one, and share it?</span><span class="a">Yes → use them</span></div>
+    <div class="rung" role="listitem"><span class="i">3</span><span class="q">If not: does its agency have one, and share it?</span><span class="a">Yes → use them</span></div>
+    <div class="rung" role="listitem"><span class="i">4</span><span class="q">Nobody found?</span><span class="a">✕ STOP. Nothing happens.</span></div>
+  </div>
+
+  <div class="cards">
+    <div class="card"><h3>Add</h3><p>Give a website its approver.</p></div>
+    <div class="card"><h3>Share down</h3><p>A business approver can cover its own sites. Never another business.</p></div>
+    <div class="card"><h3>Swap</h3><p>New approver works at once. The old one stops at once.</p></div>
+    <div class="card"><h3>Remove</h3><p>No approver means everything risky is refused.</p></div>
+  </div>
+
+  <div class="example">
+    <span class="lab">Must be true first</span>
+    <p>Two systems handle approvals. One <b>gives</b> the yes. One <b>checks</b> the yes.</p>
+    <p>Both must agree <b>who the approver is</b>. If they disagree, a valid yes gets rejected.</p>
+  </div>
+
+  <h3>Part B — two separate approvals</h3>
+  <div class="flow">
+    <div class="step" role="listitem"><span class="k">file</span><span class="t">Website package</span><span class="d">Fixed. Can't change after approval.</span></div>
+    <span class="arrow" aria-hidden="true">→</span>
+    <div class="step gate" role="listitem"><span class="k">approval 1</span><span class="t">Load into CMS</span><span class="d">Needs its own yes.</span></div>
+    <span class="arrow" aria-hidden="true">→</span>
+    <div class="step" role="listitem"><span class="k">pause</span><span class="t">Look at it</span><span class="d">Check what landed.</span></div>
+    <span class="arrow" aria-hidden="true">→</span>
+    <div class="step gate" role="listitem"><span class="k">approval 2</span><span class="t">Make it live</span><span class="d">A second, separate yes.</span></div>
+    <span class="arrow" aria-hidden="true">→</span>
+    <div class="step good" role="listitem"><span class="k">proof</span><span class="t">Check + receipt</span><span class="d">Open the live site. Save a record.</span></div>
+  </div>
+  <p class="small muted">One yes can never cover both steps. That pause in the middle is on purpose.</p>
+
+  <h3>Part C — when an approval is refused</h3>
+  <div class="cards">
+    <div class="card"><div class="top"><h3>No approval</h3><span class="st todo">Refused</span></div><p>Nobody said yes. Nothing loads.</p></div>
+    <div class="card"><div class="top"><h3>Wrong file</h3><span class="st todo">Refused</span></div><p>The yes was for a different package.</p></div>
+    <div class="card"><div class="top"><h3>Expired</h3><span class="st todo">Refused</span></div><p>The yes was too old. It lasts a few hours.</p></div>
+    <div class="card"><div class="top"><h3>Already used</h3><span class="st todo">Refused</span></div><p>Each yes works once. Like a train ticket.</p></div>
+  </div>
+  <p class="small muted">These refusals happen on the server. Having a password or machine key does not get around them.</p>
+
+  <h3>Part D — the receipt</h3>
+  <div class="receipt-wrap">
+    <div class="receipt" aria-label="Example receipt">
+      <div class="rh">PUBLISH RECEIPT</div>
+      <div class="rs">EXAMPLE · NOT REAL DATA</div>
+      <hr>
+      <div class="kv"><span>Website</span><span>greenkitchen.com</span></div>
+      <div class="kv"><span>Approved package</span><span>7f3a…c21e</span></div>
+      <div class="kv"><span>Send-out id</span><span>deploy-0412</span></div>
+      <div class="kv"><span>Live check</span><span class="ok">✓ passed</span></div>
+      <div class="kv"><span>Time</span><span>16 Sep · 14:05</span></div>
+      <div class="kv"><span>Last good version</span><span>deploy-0411</span></div>
+      <div class="kv"><span>Made by build</span><span>v1.8.2</span></div>
+      <hr>
+      <div style="text-align:center"><span class="stamp">CANNOT BE EDITED</span></div>
+    </div>
+    <div style="display:grid; gap:12px;">
+      <ul class="lines">
+        <li>Every publish makes one receipt.</li>
+        <li>It can never be changed or deleted.</li>
+        <li>The <b>live check</b> really opens the site. A "page missing" screen counts as a fail.</li>
+        <li>Before every publish, the last good version is <b>saved</b>. So we can undo.</li>
+      </ul>
+      <div class="example">
+        <span class="lab">Why it matters</span>
+        <p>Today a site is called "live" just because the upload finished. Nobody opens it to check.</p>
+      </div>
+    </div>
+  </div>
+
+  <h3>Part E — no check may fail open</h3>
+  <div class="cards">
+    <div class="card"><h3>Checker crashes</h3><p>Stop the change. Show "blocked".</p></div>
+    <div class="card"><h3>Pre-check finds problems</h3><p>Stop the load. Don't just warn.</p></div>
+    <div class="card"><h3>Rules file missing</h3><p>Refuse every risky action.</p></div>
+    <div class="card"><h3>Live site unreachable</h3><p>Mark it failed. Keep the last good version.</p></div>
+  </div>
+
+  <div class="two">
+    <div class="list">
+      <h4>What gets built</h4>
+      <div class="row"><span>Both systems agree on the approver <span class="small muted">(added)</span></span><span class="st todo">Not yet</span></div>
+      <div class="row"><span>Approver per website: add, share, swap</span><span class="st part">Partly</span></div>
+      <div class="row"><span>Two separate approvals</span><span class="st part">Partly</span></div>
+      <div class="row"><span>Stop if a check breaks</span><span class="st part">Partly</span></div>
+      <div class="row"><span>Receipt, live check, undo</span><span class="st todo">Not yet</span></div>
+      <div class="row"><span>Two systems check each other</span><span class="st done">Done</span></div>
+    </div>
+    <div class="list">
+      <h4>How we test it (19 tests)</h4>
+      <div class="row test"><span class="code">B6.1–B6.4</span><span>Right approver works. Wrong one fails. Swapped key stops working. No master key.</span></div>
+      <div class="row test"><span class="code">B7.1–B7.6</span><span>No, wrong, old or used approvals are all refused. Even with a valid password.</span></div>
+      <div class="row test"><span class="code">B8.1–B8.3</span><span>Crash the checker: blocked. Remove the rules file: blocked.</span></div>
+      <div class="row test"><span class="code">B9.1–B9.4</span><span>Receipt has every field. Live check catches a missing page. Undo works. Receipt can't be edited.</span></div>
+      <div class="row test"><span class="code">B10.1–B10.2</span><span>A tampered approval is caught, even when the other system is offline.</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- =============================== P5 =============================== -->
+<section class="block" id="p5">
+  <p class="eyebrow phase-tag"><span class="n">P5</span> Phase 5</p>
+  <h2>Push a new site with no developer</h2>
+  <p class="inshort">The design tool tests and ships a site <b>by itself</b>. Target: <b>zero</b> messages to a developer.</p>
+
+  <div class="flow">
+    <div class="step" role="listitem"><span class="k">1</span><span class="t">Design</span><span class="d">The tool builds the site.</span></div>
+    <span class="arrow" aria-hidden="true">→</span>
+    <div class="step" role="listitem"><span class="k">2</span><span class="t">Own test site</span><span class="d">A practice website, just for testing.</span></div>
+    <span class="arrow" aria-hidden="true">→</span>
+    <div class="step gate" role="listitem"><span class="k">3</span><span class="t">Pre-check</span><span class="d">Will it look right once live?</span></div>
+    <span class="arrow" aria-hidden="true">→</span>
+    <div class="step" role="listitem"><span class="k">4</span><span class="t">Load, look, publish</span><span class="d">With both approvals.</span></div>
+    <span class="arrow" aria-hidden="true">→</span>
+    <div class="step good" role="listitem"><span class="k">5</span><span class="t">Live</span><span class="d">Checked and receipted.</span></div>
+  </div>
+
+  <h3>Why the pre-check must <i>stop</i> bad sites</h3>
+  <figure>
+    <div class="canvas" style="display:grid; gap:18px;">
+      <div class="pbar">
+        <div class="lab"><span><b>Version 4</b> of a real site · styles kept after publishing</span><span><b>8</b> of 617 · 1%</span></div>
+        <div class="track"><div class="fill bad" style="width:1.3%"></div></div>
+        <span class="st todo" style="justify-self:start">Went live looking broken</span>
+      </div>
+      <div class="pbar">
+        <div class="lab"><span><b>Version 7</b> · the fixed build</span><span><b>600</b> of 666 · 90%</span></div>
+        <div class="track"><div class="fill good" style="width:90.1%"></div></div>
+        <span class="st done" style="justify-self:start">Looked right</span>
+      </div>
+    </div>
+    <figcaption><b>Real numbers from an earlier site.</b> Version 4 lost almost all its styling. Someone spotted it by eye, after it was live. The pre-check must catch this <b>before</b>.</figcaption>
+  </figure>
+  <p class="small muted">Note: this broken build was version <b>4</b>, not version 7. The PRD corrects that.</p>
+
+  <div class="cards">
+    <div class="card"><h3>What the pre-check reports</h3><p>Styles kept. Styles dropped. Pages that will exist. What is missing.</p></div>
+    <div class="card"><h3>Fonts must survive</h3><p>A full re-load wipes fonts. They must come back by themselves.</p></div>
+    <div class="card"><h3>SEO tags</h3><p>Page title, description and share preview appear. No add-on needed.</p></div>
+  </div>
+
+  <div class="two">
+    <div class="list">
+      <h4>What gets built</h4>
+      <div class="row"><span>Pre-check that blocks, not just warns</span><span class="st part">Partly</span></div>
+      <div class="row"><span>Fonts: install, and survive a re-load</span><span class="st part">Partly</span></div>
+      <div class="row"><span>SEO tags on every page</span><span class="st part">Partly</span></div>
+      <div class="row"><span>The design tool's own test site</span><span class="st todo">Not yet</span></div>
+    </div>
+    <div class="list">
+      <h4>How we test it</h4>
+      <div class="row test"><span class="code">C11.1–C11.3</span><span>Feed in a broken site: blocked before loading. Pages predicted = pages made.</span></div>
+      <div class="row test"><span class="code">C12.1–C12.2</span><span>Install fonts twice: no change. After a re-load, fonts still show.</span></div>
+      <div class="row test"><span class="code">C-SEO</span><span>SEO tags appear on the live page.</span></div>
+      <div class="row test"><span class="code">C13.1–C13.2</span><span><b>Milestone:</b> a new site goes live with zero developer help.</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- =============================== P6 =============================== -->
+<section class="block" id="p6">
+  <p class="eyebrow phase-tag"><span class="n">P6</span> Phase 6</p>
+  <h2>Make it safe for real use</h2>
+  <p class="inshort">Three clean-ups: <b>safe replace</b>, <b>clean delete</b>, and a <b>clear "starting" message</b>.</p>
+
+  <h3>1 · A page lives in 4 places</h3>
+  <figure>
+    <div class="canvas">
+      <svg class="dia" viewBox="0 0 900 200" role="img" aria-label="A deleted page must be removed from four places: the database, the saved files, the memory copy, and the edit history. If any one is missed, the page can come back.">
+        <defs>
+          <marker id="ah4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="mk-grey"/></marker>
+        </defs>
+        <rect class="s-box" x="20" y="20" width="195" height="64" rx="10"/>
+        <text class="t-main" x="117.5" y="48" text-anchor="middle">Database</text>
+        <text class="t-sub" x="117.5" y="68" text-anchor="middle">the saved content</text>
+        <rect class="s-box" x="240" y="20" width="195" height="64" rx="10"/>
+        <text class="t-main" x="337.5" y="48" text-anchor="middle">Saved files</text>
+        <text class="t-sub" x="337.5" y="68" text-anchor="middle">the built pages</text>
+        <rect class="s-box" x="460" y="20" width="195" height="64" rx="10"/>
+        <text class="t-main" x="557.5" y="48" text-anchor="middle">Memory copy</text>
+        <text class="t-sub" x="557.5" y="68" text-anchor="middle">a fast cache</text>
+        <rect class="s-bad" x="680" y="20" width="200" height="64" rx="10"/>
+        <text class="t-main" x="780" y="48" text-anchor="middle">Edit history</text>
+        <text class="t-sub" x="780" y="68" text-anchor="middle">can bring pages back!</text>
+        <path class="s-link" d="M117.5 84V120H450V144" marker-end="url(#ah4)"/>
+        <path class="s-link" d="M337.5 84V120"/>
+        <path class="s-link" d="M557.5 84V120"/>
+        <path class="s-link" d="M780 84V120H450"/>
+        <rect class="s-good" x="300" y="146" width="300" height="42" rx="10"/>
+        <text class="t-main" x="450" y="172" text-anchor="middle">Delete must clear all 4</text>
+      </svg>
+    </div>
+    <figcaption><b>A clean delete.</b> Miss one place, and a deleted page can come back.</figcaption>
+  </figure>
+
+  <h3>2 · Safe replace</h3>
+  <div class="compare">
+    <div class="panel bad"><h3>Today</h3><p>A full re-load deletes the <b>whole publish history</b>. No backup. No undo.</p></div>
+    <div class="panel good"><h3>Goal</h3><p>Keep the history, or save a backup first. Undo must work.</p></div>
+  </div>
+
+  <h3>3 · A clear "starting" message</h3>
+  <div class="cards">
+    <div class="card"><div class="top"><h3>Starting…</h3><span class="st part">Wait</span></div><p>The design tool takes a few minutes to wake up.</p></div>
+    <div class="card"><div class="top"><h3>Crashed</h3><span class="st todo">Broken</span></div><p>Something went wrong. Needs a fix.</p></div>
+    <div class="card"><div class="top"><h3>Not installed</h3><span class="st note">Missing</span></div><p>It was never set up.</p></div>
+  </div>
+  <p class="small muted">Today "starting" looks the same as "not installed". People reinstall things that were fine. These three must look different.</p>
+
+  <div class="two">
+    <div class="list">
+      <h4>What gets built</h4>
+      <div class="row"><span>Safe replace + clean delete</span><span class="st part">Partly</span></div>
+      <div class="row"><span>Clear "starting" message</span><span class="st part">Partly</span></div>
+    </div>
+    <div class="list">
+      <h4>How we test it</h4>
+      <div class="row test"><span class="code">AC-D15.1</span><span>After a full re-load, the old version can be brought back.</span></div>
+      <div class="row test"><span class="code">AC-D15.2</span><span>Delete a page. It never comes back, from any of the 4 places.</span></div>
+      <div class="row test"><span class="code">AC-D16.1</span><span>A waking tool shows "starting", not "not installed".</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- =============================== SAFETY =============================== -->
+<section class="block" id="safety">
+  <p class="eyebrow">Security</p>
+  <h2>10 safety tests</h2>
+  <p class="inshort">Someone <b>other than the builder</b> runs these. Always on a test site. Never on a live one.</p>
+
+  <div class="stack" role="img" aria-label="Of 10 safety tests: 5 are already covered by other tests, 5 need a new test.">
+    <div class="d" style="flex:5">5 covered</div>
+    <div class="x" style="flex:5">5 need a new test</div>
+  </div>
+
+  <div class="cards">
+    <div class="card"><div class="top"><h3>Secrets stay hidden</h3><span class="st done">Covered</span></div><p>Keys and passwords can't be read.</p></div>
+    <div class="card"><div class="top"><h3>Allowed list only</h3><span class="st todo">New test</span></div><p>Only approved sites and tools can be reached.</p></div>
+    <div class="card"><div class="top"><h3>AI can't be tricked</h3><span class="st todo">New test</span></div><p>Hidden instructions in content are ignored.</p></div>
+    <div class="card"><div class="top"><h3>Spending limits</h3><span class="st todo">New test</span></div><p>Costs stop at a limit. No limit exists yet.</p></div>
+    <div class="card"><div class="top"><h3>No peeking</h3><span class="st done">Covered</span></div><p>One business can't reach another's data.</p></div>
+    <div class="card"><div class="top"><h3>No reused approvals</h3><span class="st done">Covered</span></div><p>Old or used approvals are refused.</p></div>
+    <div class="card"><div class="top"><h3>Safe sign-in cookies</h3><span class="st todo">New test</span></div><p>Sign-in can't be hijacked from another site.</p></div>
+    <div class="card"><div class="top"><h3>Harmful code blocked</h3><span class="st todo">New test</span></div><p>Dangerous code in content is made harmless.</p></div>
+    <div class="card"><div class="top"><h3>Records can't be faked</h3><span class="st done">Covered</span></div><p>Past records can't be edited.</p></div>
+    <div class="card"><div class="top"><h3>Failed launch + undo</h3><span class="st done">Covered</span></div><p>A failed publish can be rolled back.</p></div>
+  </div>
+  <p class="small muted">This list was not written down anywhere before. The PRD writes it for the first time.</p>
+</section>
+
+<!-- =============================== QUESTIONS =============================== -->
+<section class="block" id="questions">
+  <p class="eyebrow">Answered by the PRD</p>
+  <h2>5 big questions</h2>
+
+  <div class="qa">
+    <div class="item">
+      <p class="q">Should there be one publisher, or two?</p>
+      <p><span class="ans">One.</span> Only the CMS publishes.</p>
+      <p class="muted">The design tool already has a good "is the site really live?" check. The CMS will <b>borrow</b> it, not build a new one.</p>
+    </div>
+    <div class="item">
+      <p class="q">Where are approval records kept?</p>
+      <p><span class="ans">In the approval system.</span> Its records can't be edited.</p>
+      <p class="muted">Receipts go there too. The other side keeps its own separate copy. They are compared, never merged.</p>
+    </div>
+    <div class="item">
+      <p class="q">How are approvers added and changed?</p>
+      <p><span class="ans">Four actions:</span> add, share down, swap, remove.</p>
+      <p class="muted">Both systems read the <b>same</b> approver list. A swap takes effect at once.</p>
+    </div>
+    <div class="item">
+      <p class="q">Can the design tool test on its own?</p>
+      <p><span class="ans">Yes.</span> It gets its own practice website.</p>
+      <p class="muted">That practice site follows the <b>same approval rules</b> as a real one. Otherwise the test proves nothing.</p>
+    </div>
+    <div class="item">
+      <p class="q">Was the "no styles" site version 7?</p>
+      <p><span class="ans">No — version 4.</span> Version 7 was the fix.</p>
+      <p class="muted">This matters. The pre-check limit is set using that example.</p>
+    </div>
+  </div>
+</section>
+
+<!-- =============================== RISKS =============================== -->
+<section class="block" id="risks">
+  <p class="eyebrow">Be ready for</p>
+  <h2>What could go wrong</h2>
+
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Risk</th><th>What happens</th><th>What we do</th></tr></thead>
+      <tbody>
+        <tr><td><b>Approval systems disagree</b></td><td>Valid approvals get rejected. Phase 4 stalls.</td><td>Fix this first in Phase 4.</td></tr>
+        <tr><td><b>No undo exists</b></td><td>A bad publish can't be reversed.</td><td>Save the last good version before checking.</td></tr>
+        <tr><td><b>Built but not running</b></td><td>Tests fail on things we think are done.</td><td>Test only what is actually running.</td></tr>
+        <tr><td><b>No second tester</b></td><td>Results can't be trusted.</td><td>Name a separate tester early.</td></tr>
+        <tr><td><b>5 safety tests missing</b></td><td>Gaps stay unnoticed.</td><td>Write those tests as new work.</td></tr>
+        <tr><td><b>Some sites publish another way</b></td><td>They get no receipt or undo.</td><td>Move them onto the CMS publisher.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>What we are NOT doing</h3>
+  <div class="cards">
+    <div class="card"><h3>Many sites in one project</h3><p>Not planned. One project stays one website.</p></div>
+    <div class="card"><h3>Relaxing the rules</h3><p>The 4 rules never bend.</p></div>
+    <div class="card"><h3>Rebuilding what works</h3><p>Separation, sharing to the CMS, and roles are extended, not redone.</p></div>
+  </div>
+</section>
+
+<!-- =============================== ALL TESTS =============================== -->
+<section class="block" id="alltests">
+  <p class="eyebrow">Cheat sheet</p>
+  <h2>All 40 tests</h2>
+  <p class="muted">Each test gives a clear pass or fail. "Refused" always means the <b>server</b> refuses.</p>
+
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Code</th><th>Passes when…</th></tr></thead>
+      <tbody>
+        <tr class="grp"><td colspan="2">Phase 0 · Lock the admin door</td></tr>
+        <tr><td><span class="code">AC-D14.1</span></td><td>An admin action without sign-in is refused.</td></tr>
+
+        <tr class="grp"><td colspan="2">Phase 1 · Levels and people</td></tr>
+        <tr><td><span class="code">AC-A1.1</span></td><td>Agency → business → website can all be listed.</td></tr>
+        <tr><td><span class="code">AC-A1.2</span></td><td>One business can't read or change another's site.</td></tr>
+        <tr><td><span class="code">AC-A3.1</span></td><td>A publisher can publish. A writer can't.</td></tr>
+        <tr><td><span class="code">AC-A3.2</span></td><td>The writer is still refused when skipping the screen.</td></tr>
+
+        <tr class="grp"><td colspan="2">Phase 2 · Who sees what</td></tr>
+        <tr><td><span class="code">AC-A5.1</span></td><td>Platform owner sees counts, but can't open the work.</td></tr>
+        <tr><td><span class="code">AC-A5.2</span></td><td>An agency's customers see the agency's logo.</td></tr>
+
+        <tr class="grp"><td colspan="2">Phase 3 · One project, one website</td></tr>
+        <tr><td><span class="code">AC-A2.1</span></td><td>A second design doesn't erase the first site.</td></tr>
+        <tr><td><span class="code">AC-A2.2</span></td><td>A design can't be aimed at another project.</td></tr>
+        <tr><td><span class="code">AC-A2.3</span></td><td>Publishing site A leaves site B unchanged.</td></tr>
+
+        <tr class="grp"><td colspan="2">Phase 4 · Approvals with proof</td></tr>
+        <tr><td><span class="code">AC-B6.1</span></td><td>The site's own approver works. Another site's approver doesn't.</td></tr>
+        <tr><td><span class="code">AC-B6.2</span></td><td>After a swap, the old key fails and the new one works.</td></tr>
+        <tr><td><span class="code">AC-B6.3</span></td><td>No single key works on two sites.</td></tr>
+        <tr><td><span class="code">AC-B6.4</span></td><td>A business approver covers only its own sites.</td></tr>
+        <tr><td><span class="code">AC-B7.1</span></td><td>No approval: refused, nothing loaded.</td></tr>
+        <tr><td><span class="code">AC-B7.2</span></td><td>Approval for a different file: refused.</td></tr>
+        <tr><td><span class="code">AC-B7.3</span></td><td>Expired approval: refused.</td></tr>
+        <tr><td><span class="code">AC-B7.4</span></td><td>Already-used approval: refused.</td></tr>
+        <tr><td><span class="code">AC-B7.5</span></td><td>Loading and publishing need two separate approvals.</td></tr>
+        <tr><td><span class="code">AC-B7.6</span></td><td>All of the above still refused with a valid machine key.</td></tr>
+        <tr><td><span class="code">AC-B8.1</span></td><td>A crashed checker blocks the change, clearly.</td></tr>
+        <tr><td><span class="code">AC-B8.2</span></td><td>A missing rules file blocks every risky action.</td></tr>
+        <tr><td><span class="code">AC-B8.3</span></td><td>A check that can't run counts as a fail.</td></tr>
+        <tr><td><span class="code">AC-B9.1</span></td><td>Every publish makes a full receipt.</td></tr>
+        <tr><td><span class="code">AC-B9.2</span></td><td>The live check catches a missing page.</td></tr>
+        <tr><td><span class="code">AC-B9.3</span></td><td>The last good version is saved and can be restored.</td></tr>
+        <tr><td><span class="code">AC-B9.4</span></td><td>Old receipts can't be edited or deleted.</td></tr>
+        <tr><td><span class="code">AC-B10.1</span></td><td>An approval is checked even when the other system is offline.</td></tr>
+        <tr><td><span class="code">AC-B10.2</span></td><td>A tampered approval is caught. Both systems pass the shared tests.</td></tr>
+
+        <tr class="grp"><td colspan="2">Phase 5 · Push with no developer</td></tr>
+        <tr><td><span class="code">AC-C11.1</span></td><td>A broken site is blocked before loading.</td></tr>
+        <tr><td><span class="code">AC-C11.2</span></td><td>The pre-check lists styles kept, styles dropped, pages, and what's missing.</td></tr>
+        <tr><td><span class="code">AC-C11.3</span></td><td>Pages predicted = pages made.</td></tr>
+        <tr><td><span class="code">AC-C12.1</span></td><td>Installing fonts twice changes nothing.</td></tr>
+        <tr><td><span class="code">AC-C12.2</span></td><td>Fonts still show after a full re-load.</td></tr>
+        <tr><td><span class="code">AC-C-SEO</span></td><td>SEO tags appear on the live page. No add-on needed.</td></tr>
+        <tr><td><span class="code">AC-C13.1</span></td><td>The design tool runs load → look → publish with no developer.</td></tr>
+        <tr><td><span class="code">AC-C13.2</span></td><td><b>Milestone:</b> a new site goes live with zero developer messages.</td></tr>
+
+        <tr class="grp"><td colspan="2">Phase 6 · Safe for real use</td></tr>
+        <tr><td><span class="code">AC-D15.1</span></td><td>After a full re-load, the old version can be restored.</td></tr>
+        <tr><td><span class="code">AC-D15.2</span></td><td>A deleted page never comes back.</td></tr>
+        <tr><td><span class="code">AC-D16.1</span></td><td>A waking tool says "starting", not "not installed".</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    The simple version of <b>mmsbuild-prd.md</b>. For every detail, read that file. Examples on this page (Green Kitchen, BrightLeaf, Corner Cafe, the receipt) are made up to explain the ideas.
+  </div>
+</footer>
+
+<div id="tip" role="tooltip" hidden></div>
+
+<script>
+  (function () {
+    var tip = document.getElementById('tip');
+    function place(x, y) {
+      var w = tip.offsetWidth, h = tip.offsetHeight;
+      var left = Math.min(Math.max(8, x + 14), window.innerWidth - w - 8);
+      var top = y - h - 12;
+      if (top < 8) top = y + 16;
+      tip.style.left = left + 'px';
+      tip.style.top = top + 'px';
+    }
+    document.querySelectorAll('[data-tip]').forEach(function (el) {
+      el.addEventListener('mousemove', function (e) { tip.textContent = el.dataset.tip; tip.hidden = false; place(e.clientX, e.clientY); });
+      el.addEventListener('mouseleave', function () { tip.hidden = true; });
+      el.addEventListener('focus', function () {
+        var r = el.getBoundingClientRect();
+        tip.textContent = el.dataset.tip; tip.hidden = false; place(r.left + r.width / 2, r.top);
+      });
+      el.addEventListener('blur', function () { tip.hidden = true; });
+    });
+  })();
+</script>
+
+</body>
+</html>
