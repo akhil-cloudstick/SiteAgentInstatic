@@ -137,20 +137,23 @@ create table if not exists siteagent_control.tenant_users (
   created_at        timestamptz not null default now(),
   updated_at        timestamptz not null default now()
 );
--- Invite token, encrypted at rest (AES-256-GCM). The *hash* is what we match on;
--- this reversible copy only exists so the operator console can show the pending
--- invite link inline (stable, until accepted) without re-minting on every view.
--- A raw DB leak still can't replay it — decrypting needs the enc key (.state/enc.key).
+-- Legacy: a reversible copy of the invite token, once kept so the console could
+-- re-show a pending link. No longer written (NEW-1): an admin listing must not
+-- hand out a usable invite. The link is shown once, when minted; the *hash* is
+-- what we match on, so a link already shared keeps working until accepted or
+-- replaced. The column stays only so older rows migrate; the update wipes them.
 alter table siteagent_control.tenant_users add column if not exists invite_token_enc text;
+update siteagent_control.tenant_users set invite_token_enc = null where invite_token_enc is not null;
 
 -- ---------------------------------------------------------------------------
 -- MCP agent keys — external AI agents that drive a tenant's CMS over MCP.
 --
--- One row per issued key. `token_enc` is a reversible copy (same rationale as
--- the invite token above: the console can re-show a key the operator already
--- minted) while `token_hash` is what an inbound bearer is matched against, so
--- verification never needs the enc key. Revoking is a timestamp, never a
--- delete, so the audit trail keeps pointing at a real row.
+-- One row per issued key. `token_hash` is what an inbound bearer is matched
+-- against, so verification never needs the plaintext. `token_enc` is legacy: a
+-- reversible copy the console once used to re-show a key. It is no longer
+-- written and is wiped below (NEW-1) — a minted key is shown exactly once.
+-- Revoking is a timestamp, never a delete, so the audit trail keeps pointing at
+-- a real row.
 --
 -- `permissions` and `tables` are the per-key profile the MCP gateway enforces:
 -- permissions is the granted verb set (read/create/edit/publish/...), tables
@@ -170,6 +173,8 @@ create table if not exists siteagent_control.mcp_agents (
   revoked_at   timestamptz,
   created_at   timestamptz not null default now()
 );
+
+update siteagent_control.mcp_agents set token_enc = null where token_enc is not null;
 
 create index if not exists mcp_agents_tenant on siteagent_control.mcp_agents (tenant_slug);
 create index if not exists mcp_agents_token  on siteagent_control.mcp_agents (token_hash);
@@ -216,3 +221,19 @@ alter table siteagent_control.settings add column if not exists media_keys_enc  
 -- and login lands straight in that product.
 alter table siteagent_control.settings add column if not exists design_active boolean not null default true;
 alter table siteagent_control.settings add column if not exists cms_active    boolean not null default true;
+
+-- ---------------------------------------------------------------------------
+-- Operator console administrators (R14). Every admin/operator action requires
+-- one signed in. Only the scrypt hash is stored. `updated_at` doubles as the
+-- session version: resetting a password bumps it, which ends every session
+-- signed before the reset. Created and reset from the CLI only:
+--   npm run admin:create -- --email <email>      (from Operator/)
+create table if not exists siteagent_control.admin_users (
+  id            bigserial primary key,
+  email         text not null unique,
+  password_hash text not null,
+  status        text not null default 'active',  -- active|disabled
+  created_at    timestamptz not null default now(),
+  updated_at    timestamptz not null default now(),
+  last_login_at timestamptz
+);

@@ -15,7 +15,9 @@ export default defineConfig({
   // Behind the Tailscale funnel the public Origin (…ts.net:8443) differs from the
   // proxied host, so every form POST was rejected with "Cross-site POST form
   // submissions are forbidden". Disabled so the funnel-exposed console works.
-  // CLIENT-TEST ONLY — see pending.md (re-enable for a production/authed setup).
+  // Cross-site POSTs are refused another way since R14: the admin session cookie
+  // is SameSite=Strict, so a forged form arrives signed out and the middleware
+  // sends it to sign-in. (A full CSRF review is security item E7.)
   security: { checkOrigin: false },
   // allowedHosts lets the Vite dev server accept requests proxied in over
   // Tailscale Funnel (Host: <node>.<tailnet>.ts.net); without it Vite replies

@@ -1,14 +1,28 @@
 ---
 import Layout from '../layouts/Layout.astro';
-const CP = 'http://127.0.0.1:4400';
+import { cpFetch, cookiePath, sessionCookieOptions, INVITE_FLASH_COOKIE } from '../lib/cp';
 let error = '';
+
+// A freshly minted invite link is shown ONCE (NEW-1): the registry keeps only
+// its hash, so the listing can never hand it out again. It rides a short-lived
+// HttpOnly cookie across the post-redirect-get below.
+const flashInvite = (slug, url) => {
+  if (!url) return;
+  Astro.cookies.set(INVITE_FLASH_COOKIE, { slug, url }, sessionCookieOptions(Astro.request, 600));
+};
 
 if (Astro.request.method === 'POST') {
   const f = await Astro.request.formData();
   const intent = f.get('intent');
   try {
-    if (intent === 'add') {
-      const r = await fetch(`${CP}/api/tenants`, {
+    if (intent === 'invite') {
+      const slug = String(f.get('slug') || '');
+      const r = await cpFetch(Astro.cookies, `/api/tenants/${slug}/invite`, { method: 'POST' });
+      const j = await r.json();
+      if (!r.ok || !j.url) throw new Error(j.error || 'invite failed');
+      flashInvite(slug, j.url);
+    } else if (intent === 'add') {
+      const r = await cpFetch(Astro.cookies, `/api/tenants`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: f.get('name'),
@@ -20,12 +34,13 @@ if (Astro.request.method === 'POST') {
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || 'provision failed');
+      flashInvite(j.slug, j.inviteUrl);
     } else if (intent === 'deploy') {
-      const r = await fetch(`${CP}/api/tenants/${f.get('slug')}/deploy`, { method: 'POST' });
+      const r = await cpFetch(Astro.cookies, `/api/tenants/${f.get('slug')}/deploy`, { method: 'POST' });
       const j = await r.json();
       if (!r.ok || j.ok === false) throw new Error(j.error || 'deploy failed');
     } else if (intent === 'edit') {
-      const r = await fetch(`${CP}/api/tenants/${f.get('slug')}/update`, {
+      const r = await cpFetch(Astro.cookies, `/api/tenants/${f.get('slug')}/update`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           displayName: f.get('displayName'),
@@ -42,14 +57,14 @@ if (Astro.request.method === 'POST') {
       const j = await r.json();
       if (!r.ok || j.ok === false) throw new Error(j.error || 'update failed');
     } else if (intent === 'repair') {
-      const r = await fetch(`${CP}/api/tenants/${f.get('slug')}/repair`, { method: 'POST' });
+      const r = await cpFetch(Astro.cookies, `/api/tenants/${f.get('slug')}/repair`, { method: 'POST' });
       const j = await r.json();
       if (!r.ok || j.ok === false) throw new Error(j.error || 'Cloudflare repair failed');
     } else if (intent === 'start') {
-      await fetch(`${CP}/api/tenants/${f.get('slug')}/start`, { method: 'POST' });
+      await cpFetch(Astro.cookies, `/api/tenants/${f.get('slug')}/start`, { method: 'POST' });
     } else if (intent === 'remove') {
       const cf = f.get('deleteCf') ? '?cf=1' : '';
-      await fetch(`${CP}/api/tenants/${f.get('slug')}${cf}`, { method: 'DELETE' });
+      await cpFetch(Astro.cookies, `/api/tenants/${f.get('slug')}${cf}`, { method: 'DELETE' });
     }
     if (!error) return Astro.redirect(import.meta.env.BASE_URL);
   } catch (e) { error = e.message; }
@@ -57,8 +72,10 @@ if (Astro.request.method === 'POST') {
 
 let tenants = [];
 try {
-  const res = await fetch(`${CP}/api/tenants`);
-  tenants = (await res.json()).tenants || [];
+  const res = await cpFetch(Astro.cookies, `/api/tenants`);
+  const j = await res.json().catch(() => ({}));
+  if (res.ok) tenants = j.tenants || [];
+  else error = j.error || `Could not list tenants (${res.status})`;
 } catch (e) {
   error = `Control plane not reachable on :4400 — is it running? (${e.message})`;
 }
@@ -83,6 +100,13 @@ const PROGRESS_PCT = { new: 12, db_ready: 40, up: 72, seeded: 92 };
 // The tenant currently mid-provision drives the progress modal (auto-refresh advances it).
 const prov = tenants.find((t) => t.status === 'provisioning') || null;
 const fmtDate = (s) => (s ? new Date(s).toLocaleString() : '—');
+
+// The invite link minted by the POST that redirected here. Kept while the
+// provisioning modal auto-reloads the page, dropped on the first settled view.
+let justMinted = null;
+try { justMinted = Astro.cookies.get(INVITE_FLASH_COOKIE)?.json() ?? null; } catch { justMinted = null; }
+if (justMinted && !prov) Astro.cookies.delete(INVITE_FLASH_COOKIE, { path: cookiePath() });
+const COPY_ICON = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>';
 ---
 <Layout title="Tenants">
   {prov && (
@@ -94,6 +118,12 @@ const fmtDate = (s) => (s ? new Date(s).toLocaleString() : '—');
       <p class="hint" style="margin:0 0 14px">This runs in the background (~30–60s). You can keep working.</p>
       <div class="bar indet"><div class="fill" style={`width:${PROGRESS_PCT[prov.provision_state] || 8}%`}></div></div>
       <p class="prog">{PROGRESS[prov.provision_state] || 'Working'}<span class="dots"></span></p>
+      {justMinted && justMinted.slug === prov.slug && (
+        <div class="banner ok" style="margin:14px 0 0">
+          <strong>Invite link — shown once.</strong> Copy it now to share with the tenant.
+          <div class="row-actions invite-once"><code>{justMinted.url}</code><button class="iconbtn copy" type="button" data-copy={justMinted.url} title="Copy the one-time invite link" aria-label="Copy invite link" set:html={COPY_ICON}></button></div>
+        </div>
+      )}
     </dialog>
     <script is:inline>
       const d = document.getElementById('provDlg');
@@ -115,6 +145,12 @@ const fmtDate = (s) => (s ? new Date(s).toLocaleString() : '—');
   <h1>Tenants</h1>
   <p class="sub">Each tenant is an isolated <strong>native Instatic</strong> instance — its own Postgres schema, port, and uploads. No Docker.</p>
   {error && <div class="banner err">{error}</div>}
+  {justMinted && (
+    <div class="banner ok">
+      <strong>Invite link for <code>{justMinted.slug}</code> — shown once.</strong> Copy it now and share it with the tenant. It stays valid until they set a password or you issue a new link; it will not be shown again.
+      <div class="row-actions invite-once"><code>{justMinted.url}</code><button class="iconbtn copy" type="button" data-copy={justMinted.url} title="Copy the one-time invite link" aria-label="Copy invite link" set:html={COPY_ICON}></button></div>
+    </div>
+  )}
 
   <div class="card">
     <form method="POST" class="js-busy" data-busy="Provisioning tenant">
@@ -158,9 +194,9 @@ const fmtDate = (s) => (s ? new Date(s).toLocaleString() : '—');
                 ? (t.running
                     ? (<div class="row-actions"><a href={t.instance_url} target="_blank" rel="noreferrer">hub login ↗</a><button class="iconbtn copy" type="button" data-copy={t.instance_url} title="Copy the tenant's hub login link (one login → two cards)" aria-label="Copy hub login link"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button></div>)
                     : (<span class="pill warn">stopped</span>))
-                : (t.invite_url
-                    ? (<div class="row-actions"><a href={t.invite_url} target="_blank" rel="noreferrer" title="One-time link the tenant opens to set their password">invite link ↗</a><button class="iconbtn copy" type="button" data-copy={t.invite_url} title="Copy the one-time invite link to share with the tenant" aria-label="Copy invite link"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button><div class="hint" style="width:100%;margin-top:2px">awaiting password setup</div></div>)
-                    : (<button class="ghost" type="button" onclick={`saInvite('${t.slug}')`} title="Generate a one-time invite link for this tenant to share">Generate invite</button>))}</td>
+                : (t.invite_pending
+                    ? (<div class="row-actions"><span class="pill warn" title="A one-time invite link is out; the tenant has not set a password yet">Invite pending</span><form method="POST" onsubmit="return confirm('Issue a new invite link? The previous link stops working.')"><input type="hidden" name="intent" value="invite" /><input type="hidden" name="slug" value={t.slug} /><button class="ghost" type="submit" title="Issue a new one-time invite link (shown once); the previous link stops working">New invite link</button></form><div class="hint" style="width:100%;margin-top:2px">awaiting password setup</div></div>)
+                    : (<form method="POST"><input type="hidden" name="intent" value="invite" /><input type="hidden" name="slug" value={t.slug} /><button class="ghost" type="submit" title="Generate a one-time invite link for this tenant to share (shown once)">Generate invite</button></form>))}</td>
               <td>{(t.custom_domain || t.pages_url)
                 ? (<a href={t.custom_domain ? `https://${t.custom_domain}` : t.pages_url} target="_blank" rel="noreferrer">{(t.custom_domain || t.pages_url).replace('https://', '')} ↗</a>)
                 : (<span class="hint">not published</span>)}
@@ -293,27 +329,11 @@ const fmtDate = (s) => (s ? new Date(s).toLocaleString() : '—');
     button.iconbtn{background:transparent;border:0;padding:2px;color:var(--mut);cursor:pointer;display:inline-flex;align-items:center;line-height:0}
     button.iconbtn:hover{color:var(--ink)}
     button.iconbtn.ok{color:var(--ok)}
+    .invite-once{margin-top:6px;flex-wrap:nowrap}
+    .invite-once code{word-break:break-all;color:var(--ink)}
   </style>
 
   <script is:inline>
-    // (Re)generate a one-time invite link for a tenant, then reload so the stable
-    // link renders inline in the Instance column (it stays valid until the tenant
-    // sets a password — we never re-mint on view, which is what used to invalidate
-    // an already-shared link). Only shown as a fallback for legacy/expired invites.
-    async function saInvite(slug) {
-      try {
-        // Local access hits the control-plane directly on :4400; through the public
-        // gateway the API is same-origin (/api). Pick by hostname.
-        const isLocal = location.hostname === '127.0.0.1' || location.hostname === 'localhost';
-        const apiBase = isLocal ? 'http://127.0.0.1:4400' : '';
-        const r = await fetch(apiBase + '/api/tenants/' + slug + '/invite', { method: 'POST' });
-        const j = await r.json();
-        if (!r.ok || !j.url) throw new Error(j.error || 'failed');
-        location.reload();
-      } catch (e) { alert('Invite failed: ' + e.message); }
-    }
-    window.saInvite = saInvite;
-
     // Close a <dialog> when the backdrop is clicked — EXCEPT "locked" ones (the
     // progress/busy modals), which must stay open until the operation succeeds/fails.
     document.querySelectorAll('dialog').forEach((dlg) => {

@@ -44,6 +44,17 @@ const CONTROL_PLANE_URL_ENV = 'MMS_CONTROL_PLANE_URL'
 const controlPlaneUrl = (): string =>
   (process.env[CONTROL_PLANE_URL_ENV] ?? 'http://127.0.0.1:4400').replace(/\/+$/, '')
 
+/**
+ * The control plane refuses its admin routes without a signed-in administrator
+ * (R14). Site creation is the one it accepts from the connector instead, on the
+ * same bearer the connector already uses for its managed-target list.
+ */
+const CONTROL_PLANE_TOKEN_ENV = 'MMS_CONNECTOR_MCP_TOKEN'
+const controlPlaneAuth = (): Record<string, string> => {
+  const token = process.env[CONTROL_PLANE_TOKEN_ENV]?.trim()
+  return token ? { authorization: `Bearer ${token}` } : {}
+}
+
 const ok = (value: unknown): ToolResult => ({
   content: [{ type: 'text', text: JSON.stringify(value, null, 2) }],
 })
@@ -598,7 +609,7 @@ export const ADMIN_TOOLS: ConnectorTool[] = [
       guarded(async () => {
         const res = await fetch(`${controlPlaneUrl()}/api/tenants`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...controlPlaneAuth() },
           body: JSON.stringify({
             name: str(a.name),
             ownerEmail: str(a.ownerEmail) || undefined,
@@ -611,6 +622,13 @@ export const ADMIN_TOOLS: ConnectorTool[] = [
           }),
         })
         const body = (await res.json().catch(() => ({}))) as Record<string, unknown>
+        if (res.status === 401) {
+          return fail(
+            `The control plane refused the connector: ${CONTROL_PLANE_TOKEN_ENV} is unset here or ` +
+              'does not match the one the control plane holds.',
+            body,
+          )
+        }
         if (!res.ok) {
           return fail(
             typeof body.error === 'string' ? body.error : `Site creation failed (HTTP ${res.status})`,

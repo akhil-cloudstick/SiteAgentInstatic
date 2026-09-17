@@ -24,21 +24,22 @@
         {
           "id": "R14",
           "title": "Admin authentication",
-          "status": "todo",
+          "status": "built",
           "dependsOn": [],
-          "note": "Password hashing, signed sessions and invites already exist elsewhere in the system; reuse rather than rewrite.",
+          "note": "Built 2026-09-17: every admin route on the control plane and every console page requires a signed-in administrator — scrypt password, a signed 12-hour session scoped to the console, per-email lockout after repeated failures. One check sits ahead of every route, and a self-test fails if an admin route is ever left outside it. The connector keeps site creation only, on its own token. The board is no longer served on the public address. Live since 2026-09-17: on the public address every admin route answers 401 without a session, the console redirects to sign-in, and the public board path is gone.",
           "subtasks": [
-            { "id": "AC-D14.1", "text": "Unauthenticated admin request refused; the console requires sign-in", "status": "todo", "verified": "pending" }
+            { "id": "AC-D14.1", "text": "Unauthenticated admin request refused; the console requires sign-in", "status": "built", "verified": "pending" }
           ]
         },
         {
           "id": "NEW-1",
           "title": "The admin surface reveals no secret it does not have to",
-          "status": "todo",
+          "status": "built",
           "dependsOn": ["R14"],
+          "note": "Built 2026-09-17: machine keys are stored as a hash only, the read-back route is gone, and stored copies are wiped at startup. The project listing carries no invite link, no AI gateway token and no secret-bearing field; a new invite link is shown once, when issued. Links already shared keep working until used or replaced. Live since 2026-09-17: a signed-in project listing carries no invite link, token or secret-bearing field, and a key read-back answers 404.",
           "subtasks": [
-            { "id": "NEW-1a", "text": "A minted machine key cannot be read back in plaintext", "status": "todo", "verified": "pending" },
-            { "id": "NEW-1b", "text": "A project listing leaks no usable invite link or capacity token", "status": "todo", "verified": "pending" }
+            { "id": "NEW-1a", "text": "A minted machine key cannot be read back in plaintext", "status": "built", "verified": "pending" },
+            { "id": "NEW-1b", "text": "A project listing leaks no usable invite link or capacity token", "status": "built", "verified": "pending" }
           ]
         }
       ]
@@ -301,7 +302,7 @@
       "title": "Security acceptance — the locked ten",
       "summary": "Run by someone other than the builder, on a throwaway or staging project, never on a live site. Five have no control at all today.",
       "tasks": [
-        { "id": "E1", "title": "Secret access blocked", "status": "todo", "dependsOn": ["NEW-1"], "note": "Covered by NEW-1.", "subtasks": [ { "id": "E1", "text": "Covered by NEW-1a / NEW-1b", "status": "todo", "verified": "pending" } ] },
+        { "id": "E1", "title": "Secret access blocked", "status": "built", "dependsOn": ["NEW-1"], "note": "Covered by NEW-1, built 2026-09-17.", "subtasks": [ { "id": "E1", "text": "Covered by NEW-1a / NEW-1b", "status": "built", "verified": "pending" } ] },
         { "id": "E2", "title": "Network and tool allowlists enforced", "status": "todo", "dependsOn": [], "note": "No test and no control today — net-new.", "subtasks": [ { "id": "E2", "text": "New test needed", "status": "todo", "verified": "pending" } ] },
         { "id": "E3", "title": "Prompt-injection attempts rejected", "status": "todo", "dependsOn": [], "note": "No test and no control today — net-new.", "subtasks": [ { "id": "E3", "text": "New test needed", "status": "todo", "verified": "pending" } ] },
         { "id": "E4", "title": "Spending limits enforced", "status": "todo", "dependsOn": [], "note": "No spend cap exists. An accepted omission until now; to become a real control.", "subtasks": [ { "id": "E4", "text": "New test and a real spend cap needed", "status": "todo", "verified": "pending" } ] },

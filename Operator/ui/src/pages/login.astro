@@ -1,0 +1,58 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { ADMIN_COOKIE, CP, cpFetch, safeNext, sessionCookieOptions } from '../lib/cp';
+
+// Operator console sign-in (R14). The control plane checks the password and
+// signs the session; this page only stores it on the console's own path.
+let next = safeNext(Astro.url.searchParams.get('next'));
+let email = '';
+let error = '';
+
+if (Astro.request.method === 'POST') {
+  const f = await Astro.request.formData();
+  email = String(f.get('email') || '').trim();
+  next = safeNext(String(f.get('next') || ''));
+  try {
+    const r = await fetch(`${CP}/api/admin/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password: String(f.get('password') || '') }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (r.ok && j.session) {
+      Astro.cookies.set(ADMIN_COOKIE, j.session, sessionCookieOptions(Astro.request, j.maxAgeSec));
+      return Astro.redirect(next, 303);
+    }
+    error = j.error || `Sign-in failed (${r.status})`;
+  } catch (e) {
+    error = `Control plane not reachable on :4400 — is it running? (${(e as Error).message})`;
+  }
+} else {
+  // Already signed in: straight through.
+  try {
+    const r = await cpFetch(Astro.cookies, '/api/admin/session');
+    if (r.ok) return Astro.redirect(next, 303);
+  } catch { /* show the form */ }
+}
+---
+<Layout title="Sign in" bare>
+  <div class="login">
+    <div class="card">
+      <h1>Operator sign-in</h1>
+      <p class="sub">Every operator action requires a signed-in administrator.</p>
+      {error && <div class="banner err" role="alert">{error}</div>}
+      <form method="POST">
+        <input type="hidden" name="next" value={next} />
+        <label for="email">Email</label>
+        <input id="email" name="email" type="email" autocomplete="username" value={email} required autofocus />
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password" autocomplete="current-password" required />
+        <div style="margin-top:16px"><button type="submit" style="width:100%">Sign in</button></div>
+      </form>
+      <p class="hint" style="margin:14px 0 0">No account, or forgotten the password? On the server, from <code>Operator/</code>: <code>npm run admin:create -- --email you@example.com</code></p>
+    </div>
+  </div>
+  <style>
+    .login{max-width:380px;margin:48px auto 0}
+  </style>
+</Layout>

@@ -10,10 +10,13 @@
   "scripts": {
     "dev": "node dev.mjs",
     "migrate": "node control-plane/registry/migrate.mjs",
+    "admin:create": "node control-plane/registry/adminCreate.mjs",
     "test:deployer": "node control-plane/deployer/deploy.selftest.mjs",
     "test:allowlist": "node control-plane/lib/connectorAllowlist.selftest.mjs",
     "test:login": "node control-plane/registry/tenantUsers.selftest.mjs",
-    "test": "npm run test:deployer && npm run test:allowlist && npm run test:login",
+    "test:admin-auth": "node control-plane/lib/adminAuth.selftest.mjs",
+    "test:new1": "node control-plane/lib/new1.selftest.mjs",
+    "test": "npm run test:deployer && npm run test:allowlist && npm run test:login && npm run test:admin-auth && npm run test:new1",
     "start": "node control-plane/server.mjs",
     "console:dev": "npm --prefix ui run dev",
     "console:build": "npm --prefix ui run build"

@@ -8,7 +8,7 @@ export async function listTenants() {
             d.status     as last_deploy_status,
             d.started_at as last_deploy_at,
             tu.status          as hub_status,
-            tu.invite_token_enc,
+            tu.invite_token_hash is not null as has_invite,
             tu.invite_expires_at
        from siteagent_control.tenants t
        left join siteagent_control.tenant_users tu on tu.tenant_slug = t.slug

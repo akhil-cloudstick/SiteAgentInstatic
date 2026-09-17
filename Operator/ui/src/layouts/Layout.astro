@@ -1,7 +1,9 @@
 ---
 import { BRAND_NAME, BRAND_EMOJI } from '../brand.ts'
-interface Props { title?: string }
-const { title = BRAND_NAME } = Astro.props;
+// `bare` drops the nav and account controls (the sign-in page).
+interface Props { title?: string; bare?: boolean }
+const { title = BRAND_NAME, bare = false } = Astro.props;
+const admin = Astro.locals.admin;
 // The console is served under `base` (/operator/). Nav links MUST carry that
 // prefix — a base-less "/settings" escapes the operator and falls through the
 // gateway proxy to a tenant instance, which 404s ({"error":"Not found"}).
@@ -45,6 +47,8 @@ const isTenants = !isSettings && !isMcp;
     .brand{font-family:'Nunito','Nunito Sans',sans-serif;font-weight:800;font-size:16px;color:var(--ink)}
     nav{display:flex;gap:16px}
     nav a{color:var(--mut)} nav a.active,nav a:hover{color:var(--ink)}
+    header .account{margin-left:auto;display:flex;align-items:center;gap:10px}
+    header .account button{padding:6px 12px}
     main{max-width:1000px;margin:0 auto;padding:28px 24px 80px}
     h1{font-family:'Nunito','Nunito Sans',sans-serif;font-weight:800;font-size:20px;margin:0 0 4px} .sub{color:var(--mut);margin:0 0 22px}
     .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px;margin:0 0 18px;box-shadow:0 6px 24px rgba(8,42,56,.06)}
@@ -77,11 +81,19 @@ const isTenants = !isSettings && !isMcp;
 <body>
   <header>
     <span class="brand">{BRAND_EMOJI} {BRAND_NAME}</span>
-    <nav>
-      <a href={base} class={isTenants ? 'active' : ''}>Tenants</a>
-      <a href={`${base}mcp`} class={isMcp ? 'active' : ''}>MCP Agents</a>
-      <a href={`${base}settings`} class={isSettings ? 'active' : ''}>Settings</a>
-    </nav>
+    {!bare && (
+      <nav>
+        <a href={base} class={isTenants ? 'active' : ''}>Tenants</a>
+        <a href={`${base}mcp`} class={isMcp ? 'active' : ''}>MCP Agents</a>
+        <a href={`${base}settings`} class={isSettings ? 'active' : ''}>Settings</a>
+      </nav>
+    )}
+    {!bare && admin && (
+      <form method="POST" action={`${base}logout`} class="account">
+        <span class="hint">{admin.email}</span>
+        <button class="ghost" type="submit">Sign out</button>
+      </form>
+    )}
   </header>
   <main><slot /></main>
 </body>

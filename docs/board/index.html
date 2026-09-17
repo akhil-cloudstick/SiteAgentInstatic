@@ -49,59 +49,59 @@
   <h1>MMSBUILD delivery board</h1>
   <p class="meta">
     Modules are the phases of <code>docs/prd/mmsbuild-prd.md</code>, tasks are its requirements, subtasks its acceptance criteria — ids unchanged.<br>
-    Generated 2026-09-16 11:47 UTC from commit <code>c865d10</code>.
+    Generated 2026-09-17 12:03 UTC from commit <code>cafaf26</code>.
   </p>
   <div class="legend">
     <p><strong>Build</strong> is ours: <span class="chip todo">Not started</span> <span class="chip doing">In progress</span> <span class="chip built">Built</span> <span class="chip blocked">Blocked</span></p>
     <p><strong>Acceptance run</strong> is yours, and we never set it: <span class="chip v-pending">Not yet verified</span> <span class="chip v-pass">Verified</span> <span class="chip v-fail">Failed</span></p>
     <p>Modules are the PRD's phases, tasks are its requirements, subtasks are its acceptance criteria. Ids match the PRD exactly, so an acceptance run maps to this board line for line. `status` is ours — what is built. `verified` belongs to the acceptance run and is never set by us.</p>
-    <p>Totals — tasks: <span class="chip todo">19 not started</span> <span class="chip doing">9 in progress</span> <span class="chip built">3 built</span> &nbsp;·&nbsp; acceptance criteria: <span class="chip todo">36 not started</span> <span class="chip doing">4 in progress</span> <span class="chip built">16 built</span></p>
+    <p>Totals — tasks: <span class="chip todo">16 not started</span> <span class="chip doing">9 in progress</span> <span class="chip built">6 built</span> &nbsp;·&nbsp; acceptance criteria: <span class="chip todo">32 not started</span> <span class="chip doing">4 in progress</span> <span class="chip built">20 built</span></p>
   </div>
   <section class="module">
     <h2><span class="id">P0</span> Phase 0 — Close the surface</h2>
     <p class="summary">Every requirement after this one assumes an authenticated admin.</p>
-    <p class="counts"><span class="chip todo">2 not started</span></p>
-    <details class="task" >
+    <p class="counts"><span class="chip built">2 built</span></p>
+    <details class="task" open>
       <summary>
         <span class="id">R14</span>
         <span class="task-title">Admin authentication</span>
-        <span class="chip todo">Not started</span>
-        <span class="counts"><span class="chip todo">1 not started</span></span>
+        <span class="chip built">Built</span>
+        <span class="counts"><span class="chip built">1 built</span></span>
       </summary>
-      <p class="note">Password hashing, signed sessions and invites already exist elsewhere in the system; reuse rather than rewrite.</p>
+      <p class="note">Built 2026-09-17: every admin route on the control plane and every console page requires a signed-in administrator — scrypt password, a signed 12-hour session scoped to the console, per-email lockout after repeated failures. One check sits ahead of every route, and a self-test fails if an admin route is ever left outside it. The connector keeps site creation only, on its own token. The board is no longer served on the public address. Live since 2026-09-17: on the public address every admin route answers 401 without a session, the console redirects to sign-in, and the public board path is gone.</p>
       <table>
         <thead><tr><th>Acceptance</th><th>Pass means</th><th>Build</th><th>Acceptance run</th></tr></thead>
         <tbody>
         <tr>
           <td class="id">AC-D14.1</td>
           <td>Unauthenticated admin request refused; the console requires sign-in</td>
-          <td><span class="chip todo">Not started</span></td>
+          <td><span class="chip built">Built</span></td>
           <td><span class="chip v-pending">Not yet verified</span></td>
         </tr>
         </tbody>
       </table>
     </details>
-    <details class="task" >
+    <details class="task" open>
       <summary>
         <span class="id">NEW-1</span>
         <span class="task-title">The admin surface reveals no secret it does not have to</span>
-        <span class="chip todo">Not started</span>
-        <span class="counts"><span class="chip todo">2 not started</span></span>
+        <span class="chip built">Built</span>
+        <span class="counts"><span class="chip built">2 built</span></span>
       </summary>
-      <p class="depends">Depends on R14</p>
+      <p class="depends">Depends on R14</p><p class="note">Built 2026-09-17: machine keys are stored as a hash only, the read-back route is gone, and stored copies are wiped at startup. The project listing carries no invite link, no AI gateway token and no secret-bearing field; a new invite link is shown once, when issued. Links already shared keep working until used or replaced. Live since 2026-09-17: a signed-in project listing carries no invite link, token or secret-bearing field, and a key read-back answers 404.</p>
       <table>
         <thead><tr><th>Acceptance</th><th>Pass means</th><th>Build</th><th>Acceptance run</th></tr></thead>
         <tbody>
         <tr>
           <td class="id">NEW-1a</td>
           <td>A minted machine key cannot be read back in plaintext</td>
-          <td><span class="chip todo">Not started</span></td>
+          <td><span class="chip built">Built</span></td>
           <td><span class="chip v-pending">Not yet verified</span></td>
         </tr>
         <tr>
           <td class="id">NEW-1b</td>
           <td>A project listing leaks no usable invite link or capacity token</td>
-          <td><span class="chip todo">Not started</span></td>
+          <td><span class="chip built">Built</span></td>
           <td><span class="chip v-pending">Not yet verified</span></td>
         </tr>
         </tbody>
@@ -665,22 +665,22 @@
   <section class="module">
     <h2><span class="id">E</span> Security acceptance — the locked ten</h2>
     <p class="summary">Run by someone other than the builder, on a throwaway or staging project, never on a live site. Five have no control at all today.</p>
-    <p class="counts"><span class="chip todo">8 not started</span> <span class="chip doing">1 in progress</span> <span class="chip built">1 built</span></p>
-    <details class="task" >
+    <p class="counts"><span class="chip todo">7 not started</span> <span class="chip doing">1 in progress</span> <span class="chip built">2 built</span></p>
+    <details class="task" open>
       <summary>
         <span class="id">E1</span>
         <span class="task-title">Secret access blocked</span>
-        <span class="chip todo">Not started</span>
-        <span class="counts"><span class="chip todo">1 not started</span></span>
+        <span class="chip built">Built</span>
+        <span class="counts"><span class="chip built">1 built</span></span>
       </summary>
-      <p class="depends">Depends on NEW-1</p><p class="note">Covered by NEW-1.</p>
+      <p class="depends">Depends on NEW-1</p><p class="note">Covered by NEW-1, built 2026-09-17.</p>
       <table>
         <thead><tr><th>Acceptance</th><th>Pass means</th><th>Build</th><th>Acceptance run</th></tr></thead>
         <tbody>
         <tr>
           <td class="id">E1</td>
           <td>Covered by NEW-1a / NEW-1b</td>
-          <td><span class="chip todo">Not started</span></td>
+          <td><span class="chip built">Built</span></td>
           <td><span class="chip v-pending">Not yet verified</span></td>
         </tr>
         </tbody>

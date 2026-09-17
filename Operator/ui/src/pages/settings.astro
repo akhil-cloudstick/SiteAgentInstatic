@@ -1,6 +1,6 @@
 ---
 import Layout from '../layouts/Layout.astro';
-const CP = 'http://127.0.0.1:4400';
+import { cpFetch } from '../lib/cp';
 let error = '';
 // Normalise BASE_URL to exactly one trailing slash so save-redirects land on
 // `/operator/settings`, not `/operatorsettings` (which escapes the operator and
@@ -39,7 +39,7 @@ if (Astro.request.method === 'POST') {
   // endpoint (not the settings row), so it posts separately from the other forms.
   if (section === 'guidance') {
     try {
-      const r = await fetch(`${CP}/api/ai-guidance-default`, {
+      const r = await cpFetch(Astro.cookies, `/api/ai-guidance-default`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ guidance: (f.get('aiGuidance') || '').toString() }),
       });
@@ -92,7 +92,7 @@ if (Astro.request.method === 'POST') {
       };
     }
     try {
-      const r = await fetch(`${CP}/api/settings`, {
+      const r = await cpFetch(Astro.cookies, `/api/settings`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
       });
       if (!r.ok) {
@@ -107,16 +107,16 @@ if (Astro.request.method === 'POST') {
 }
 
 let s = {};
-try { s = await (await fetch(`${CP}/api/settings`)).json(); }
+try { s = await (await cpFetch(Astro.cookies, `/api/settings`)).json(); }
 catch (e) { error = `Control plane not reachable: ${e.message}`; }
 
 // Live OpenRouter catalogue with tool-calling capability flags for the pickers.
 let models = [];
-try { models = ((await (await fetch(`${CP}/api/models`)).json()).models) || []; } catch {}
+try { models = ((await (await cpFetch(Astro.cookies, `/api/models`)).json()).models) || []; } catch {}
 
 // The global AI guidance file (rules/globalAiGuidanceRule.md), editable below.
 let guidance = '';
-try { guidance = ((await (await fetch(`${CP}/api/ai-guidance-default`)).json()).guidance) || ''; } catch {}
+try { guidance = ((await (await cpFetch(Astro.cookies, `/api/ai-guidance-default`)).json()).guidance) || ''; } catch {}
 const GUIDANCE_MAX = 16000;
 
 // Seed the category table: stored config, or Design/Content builtins (seeded from

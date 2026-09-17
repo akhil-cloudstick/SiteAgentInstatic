@@ -1,7 +1,6 @@
 // SiteAgent control-plane HTTP API. Node built-ins + pg only.
 // Wires Registry + Provisioner + Deployer + AI Gateway. The Astro console calls this.
 import http from 'node:http';
-import { timingSafeEqual } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { networkInterfaces } from 'node:os';
 import { dirname, resolve as resolvePath } from 'node:path';
@@ -13,7 +12,13 @@ import * as tenantsRepo from './registry/tenants.mjs';
 import { provisionTenant, deprovisionTenant, startTenant, resumeAll, editTenant, repairTenantCf, pointTestFunnel, createTenantInvite } from './provisioner/provision.mjs';
 import { deployTenant, hasBakedOutput } from './deployer/deploy.mjs';
 import { handleGateway } from './ai-gateway/gateway.mjs';
-import { signTenantToken, verifyTenantToken, decrypt } from './lib/crypto.mjs';
+import { verifyTenantToken, decrypt } from './lib/crypto.mjs';
+import {
+  currentAdmin, isAdminApiPath, connectorMayCall, tokenMatches, signAdminSession,
+  loginLockedFor, recordLoginFailure, clearLoginFailures, ADMIN_SESSION_TTL_SEC,
+} from './lib/adminAuth.mjs';
+import { validateAdminLogin } from './registry/adminUsers.mjs';
+import { decorate } from './lib/tenantView.mjs';
 import * as rt from './runtime/tenantRuntime.mjs';
 import * as odrt from './runtime/odRuntime.mjs';
 import { handleHub } from './hub/hub.mjs';
@@ -32,13 +37,6 @@ const CORS = {
   'Access-Control-Allow-Headers': 'Content-Type',
 };
 
-// Constant-time, and length-guarded because timingSafeEqual throws on a length
-// mismatch — which would otherwise be a 500 that leaks the expected length.
-function tokenMatches(presented, expected) {
-  if (!presented || presented.length !== expected.length) return false;
-  return timingSafeEqual(Buffer.from(presented), Buffer.from(expected));
-}
-
 function send(res, code, obj) {
   res.writeHead(code, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', ...CORS });
   res.end(JSON.stringify(obj));
@@ -49,14 +47,17 @@ const BOARD_FILE = resolvePath(dirname(fileURLToPath(import.meta.url)), '../../d
 
 /**
  * The board is read by the other party over the tailnet, so it is served with
- * no session — but only to a request that arrived on a private interface. The
+ * no session — but only to a request that arrived on the tailnet interface. The
  * board names which security controls do not exist yet, which is precisely the
- * list that must not be reachable from the public address this control plane
- * also answers on.
+ * list that must not be reachable from the public address.
+ *
+ * Loopback does NOT count: the Tailscale funnel delivers public traffic to the
+ * main server over 127.0.0.1, which is how the board used to be public at
+ * <gateway>/board. It is now served only by the tailnet listener at the bottom
+ * of this file.
  */
 function onPrivateInterface(req) {
   const ip = (req.socket?.localAddress ?? '').replace(/^::ffff:/, '');
-  if (ip === '127.0.0.1' || ip === '::1') return true;
   const [a, b] = ip.split('.').map(Number);
   return a === 100 && b >= 64 && b <= 127; // Tailscale's CGNAT range
 }
@@ -94,32 +95,36 @@ function readJson(req) {
   });
 }
 
-// Add the live runtime status + gateway token to a tenant row for the UI.
-function decorate(row) {
-  // Hub identity: `hub_activated` once the tenant has set a password. Until then the
-  // console shows the pending invite link — decrypted from the stored token so the
-  // SAME link stays valid across page views (no re-mint that would burn a shared copy).
-  const hubActivated = row.hub_status === 'active';
-  const inviteExpired = row.invite_expires_at && new Date(row.invite_expires_at) <= new Date();
-  let inviteToken = null;
-  if (!hubActivated && !inviteExpired && row.invite_token_enc) {
-    try { inviteToken = decrypt(row.invite_token_enc); } catch { inviteToken = null; }
+// A tenant row plus its live runtime status, for the console (lib/tenantView.mjs).
+const tenantView = (row) => decorate(row, {
+  running: rt.isRunning(row.slug),
+  odRunning: odrt.isRunning(row.slug),
+  published: hasBakedOutput(row.slug),
+});
+
+// The session is returned in the body, not as a Set-Cookie: the Astro console
+// calls this server-side and sets `sa_admin` on its own /operator path.
+async function adminLogin(req, res) {
+  const b = await readJson(req);
+  const email = String(b.email || '').trim().toLowerCase();
+  const lockedMs = loginLockedFor(email);
+  if (lockedMs) {
+    return send(res, 429, {
+      error: `Too many failed sign-ins. Try again in ${Math.ceil(lockedMs / 60_000)} minute(s).`,
+      locked: true,
+    });
   }
-  return {
-    ...row,
-    invite_token_enc: undefined, // never expose the at-rest blob to the client
-    hub_activated: hubActivated,
-    invite_url: inviteToken ? `${config.gatewayOrigin}/invite/${inviteToken}` : null,
-    running: rt.isRunning(row.slug),
-    od_running: odrt.isRunning(row.slug),
-    published: hasBakedOutput(row.slug),
-    admin_url: row.port ? `http://127.0.0.1:${row.port}/cms` : null,
-    // One shared OD web serves every tenant; the tenant is resolved from the hub
-    // session, so the reachable URL is the gateway's /od mount, not a per-tenant
-    // localhost port. (The od_web_port column is legacy and no longer used.)
-    od_url: row.od_port ? `${config.gatewayOrigin}/design` : null,
-    ai_base_url: `${config.publicBaseUrl}/ai/${signTenantToken(row.slug)}`,
-  };
+  const admin = await validateAdminLogin(email, String(b.password || ''));
+  if (!admin) {
+    recordLoginFailure(email);
+    return send(res, 401, { error: 'Wrong email or password.' });
+  }
+  clearLoginFailures(email);
+  return send(res, 200, {
+    session: signAdminSession(admin),
+    maxAgeSec: ADMIN_SESSION_TTL_SEC,
+    email: admin.email,
+  });
 }
 
 // Live OpenRouter model catalogue for the console picker, fetched with the
@@ -210,9 +215,26 @@ const server = http.createServer(async (req, res) => {
     // Tenant Hub (login / invite / two-card home) — the HTML surface tenants use.
     if (await handleHub(req, res, method, path)) return;
 
-    if (path === '/board' || path === '/board/') return serveBoard(req, res, method);
+    // No /board here: this server is the funnel's upstream, so it is public.
+    // The board is served by the tailnet-only listener at the bottom.
+
+    // R14: every admin/operator route requires a signed-in administrator. One
+    // gate for all of them, ahead of every handler, so a route cannot forget
+    // it (lib/adminAuth.selftest.mjs checks each /api/ route is covered).
+    if (isAdminApiPath(path)) {
+      if (!(await currentAdmin(req)) && !connectorMayCall(method, path, req)) {
+        return send(res, 401, { error: 'admin sign-in required' });
+      }
+    }
+
+    if (path === '/api/admin/login' && method === 'POST') return adminLogin(req, res);
+    if (path === '/api/admin/session' && method === 'GET') {
+      return send(res, 200, { admin: await currentAdmin(req) });
+    }
 
     if (path === '/api/health') {
+      // Liveness is public; which tenants are running is not.
+      if (!(await currentAdmin(req))) return send(res, 200, { ok: true });
       return send(res, 200, { ok: true, running: rt.listRunning() });
     }
     if (path === '/api/settings') {
@@ -241,7 +263,7 @@ const server = http.createServer(async (req, res) => {
     if (path === '/api/tenants') {
       if (method === 'GET') {
         const rows = await tenantsRepo.listTenants();
-        return send(res, 200, { tenants: rows.map(decorate) });
+        return send(res, 200, { tenants: rows.map(tenantView) });
       }
       if (method === 'POST') {
         const body = await readJson(req);
@@ -347,19 +369,13 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, await installBridge(mcpInstall[1]));
     }
 
-    const mcpKey = path.match(/^\/api\/mcp\/agents\/([A-Za-z0-9_-]+)(?:\/(revoke|reveal))?$/);
-    if (mcpKey) {
-      const keyId = mcpKey[1];
-      if (mcpKey[2] === 'revoke' && method === 'POST') {
-        const agent = await mcpAgents.revokeAgentKey(keyId);
-        if (!agent) return send(res, 404, { error: 'key not found or already revoked' });
-        return send(res, 200, { agent });
-      }
-      if (mcpKey[2] === 'reveal' && method === 'GET') {
-        const token = await mcpAgents.revealAgentKey(keyId);
-        if (!token) return send(res, 404, { error: 'key not found or revoked' });
-        return send(res, 200, { token });
-      }
+    // Revoke only. A minted key is shown once, in the mint response, and can
+    // never be read back (NEW-1): only its keyed hash is stored.
+    const mcpKey = path.match(/^\/api\/mcp\/agents\/([A-Za-z0-9_-]+)\/revoke$/);
+    if (mcpKey && method === 'POST') {
+      const agent = await mcpAgents.revokeAgentKey(mcpKey[1]);
+      if (!agent) return send(res, 404, { error: 'key not found or already revoked' });
+      return send(res, 200, { agent });
     }
 
     const m = path.match(/^\/api\/tenants\/([a-z0-9-]+)(?:\/(start|deploy|update|repair|expose|invite))?$/);
@@ -429,17 +445,16 @@ server.listen(config.controlPlanePort, '127.0.0.1', async () => {
   console.log(`[control-plane] resumed instances: ${resumed.length ? resumed.join(', ') : '(none)'}`);
   console.log(`[gateway] public entry  : ${config.gatewayOrigin}  (funnel :${config.gatewayPort} -> 127.0.0.1:${config.controlPlanePort})`);
   console.log(`[gateway] tenant sign-in: ${config.gatewayOrigin}/login`);
-  console.log(`[gateway] operator      : ${config.gatewayOrigin}/operator   (open — no login)`);
+  console.log(`[gateway] operator      : ${config.gatewayOrigin}/operator   (admin sign-in required)`);
   // Open the funnel only now the gated server is up (never point it at ungated code).
   await openFunnel();
 });
 
 // The delivery board on the tailnet, and nothing else.
 //
-// The control plane itself stays on loopback: its admin surface needs no
-// session yet, so widening it to give the other party a read-only board would
-// hand them everything else with it. This is a separate listener bound to the
-// tailnet address alone, serving one file.
+// The control plane itself stays on loopback and is the funnel's public
+// upstream, so it does not serve the board at all. This is a separate listener
+// bound to the tailnet address alone, serving one file.
 const boardHost = tailnetAddress();
 if (boardHost) {
   const boardPort = Number(process.env.BOARD_PORT || 4460);

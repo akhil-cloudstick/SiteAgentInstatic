@@ -2,10 +2,12 @@
 // One row per tenant (the owner's hub account). Only the invite token's keyed hash
 // and the scrypt password hash are ever stored.
 import { query } from './db.mjs';
-import { genInviteToken, hashToken, hashPassword, verifyPassword, encrypt } from '../lib/crypto.mjs';
+import { genInviteToken, hashToken, hashPassword, verifyPassword } from '../lib/crypto.mjs';
 
 // Create/replace the tenant's hub user and mint a fresh one-time invite token.
-// Returns the RAW token (share it once); only its hash + an encrypted copy persist.
+// Returns the RAW token (share it once); only its hash persists — no reversible
+// copy (NEW-1), so no admin listing can hand the link out again. A new invite
+// replaces the hash, which is what cancels the previous link.
 // Invite links do NOT expire — they stay valid until accepted (or regenerated),
 // so a link the operator shared can't go stale on its own.
 export async function createInvite(tenantSlug, email) {
@@ -13,15 +15,15 @@ export async function createInvite(tenantSlug, email) {
   await query(
     `insert into siteagent_control.tenant_users
        (tenant_slug, email, invite_token_hash, invite_token_enc, invite_expires_at, status)
-     values ($1,$2,$3,$4, null, 'invited')
+     values ($1,$2,$3, null, null, 'invited')
      on conflict (tenant_slug) do update set
        email = coalesce(excluded.email, siteagent_control.tenant_users.email),
        invite_token_hash = excluded.invite_token_hash,
-       invite_token_enc = excluded.invite_token_enc,
+       invite_token_enc = null,
        invite_expires_at = null,
        status = 'invited',
        updated_at = now()`,
-    [tenantSlug, email || null, hashToken(token), encrypt(token)],
+    [tenantSlug, email || null, hashToken(token)],
   );
   return token;
 }

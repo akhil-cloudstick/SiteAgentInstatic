@@ -239,10 +239,15 @@ if (existsSync(publishedDir)) {
 let tenantRecycled = tenantStopped && !tenantWasRunning
 if (tenantStopped && tenantWasRunning) {
   try {
-    const started = (await fetch(`${cpUrl}/api/tenants/${slug}/start`, { method: 'POST' })
-      .then((r) => r.json())) as { healthy?: boolean; port?: number }
+    const res = await fetch(`${cpUrl}/api/tenants/${slug}/start`, { method: 'POST' })
+    const started = (await res.json().catch(() => ({}))) as { healthy?: boolean; port?: number }
     tenantRecycled = Boolean(started?.healthy)
-    if (!tenantRecycled) {
+    if (res.status === 401) {
+      // The control plane's admin routes need a signed-in administrator (R14),
+      // which a CLI does not have.
+      console.error(`\n⚠️  The control plane requires admin sign-in, so "${slug}" was not restarted.`)
+      console.error('   Start it from the Operator console (Tenants → Start).')
+    } else if (!tenantRecycled) {
       console.error(`\n⚠️  Tenant "${slug}" was bounced but did not report healthy on restart.`)
       console.error(`   Check ${tenantPaths(slug).log} and start it from the Operator console.`)
     }

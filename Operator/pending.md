@@ -61,10 +61,12 @@ the Host-header fallback). The reliable workaround is `VITE_ALLOWED_ORIGIN` (a s
 (`testFunnelOrigin`) and in the funnel setup. In production these become the real
 domain(s).
 
-### 1e. ⚠️ SECURITY: the console + control-plane have NO login
-Nothing gates the operator console or the `:4400` API. It is currently public with
-no password. **Do not ship this.** Before production either add auth or keep it
-private (tailnet-only / VPN). Tracked here so it isn't forgotten.
+### 1e. Console + control-plane login: closed by R14 (2026-09-17)
+The operator console and every admin route on the `:4400` API now require a
+signed-in administrator (`sa_admin` session; `control-plane/lib/adminAuth.mjs`).
+Create or reset an admin from `Operator/`: `npm run admin:create -- --email <email>`.
+Still open for production: CSRF is covered only by the SameSite=Strict cookie
+(see 1c and security item E7).
 
 ---
 

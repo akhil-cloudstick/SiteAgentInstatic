@@ -6,7 +6,6 @@
 // is stored inside a tenant at all.
 import { randomBytes, createHmac } from 'node:crypto';
 import { query } from './db.mjs';
-import { encrypt, decrypt } from '../lib/crypto.mjs';
 import config from '../lib/env.mjs';
 
 // Keyed hash for an inbound bearer. Namespaced separately from invite tokens
@@ -33,7 +32,8 @@ function toView(row) {
 }
 
 // Mint a key. Returns the view PLUS the raw token — the only moment the
-// plaintext exists outside the caller's clipboard.
+// plaintext exists outside the caller's clipboard. Only the keyed hash is
+// stored (NEW-1): there is no way to read a key back after this.
 export async function createAgentKey({ tenantSlug, label, permissions, tables, expiresInDays }) {
   const token = genAgentToken();
   const keyId = genKeyId();
@@ -43,14 +43,13 @@ export async function createAgentKey({ tenantSlug, label, permissions, tables, e
   const { rows } = await query(
     `insert into siteagent_control.mcp_agents
        (tenant_slug, key_id, label, token_hash, token_enc, permissions, tables, expires_at)
-     values ($1,$2,$3,$4,$5,$6,$7,$8)
+     values ($1,$2,$3,$4, null, $5,$6,$7)
      returning *`,
     [
       tenantSlug,
       keyId,
       label || 'agent',
       hashAgentToken(token),
-      encrypt(token),
       permissions || [],
       tables && tables.length ? tables : ['*'],
       expiresAt,
@@ -68,18 +67,6 @@ export async function listAgentKeys(tenantSlug) {
       )
     : await query('select * from siteagent_control.mcp_agents order by created_at desc');
   return rows.map(toView);
-}
-
-// The console re-shows a key the operator already minted (same rationale as the
-// tenant invite link). Revoked keys never reveal their token.
-export async function revealAgentKey(keyId) {
-  const { rows } = await query(
-    'select token_enc, revoked_at from siteagent_control.mcp_agents where key_id = $1',
-    [keyId],
-  );
-  const row = rows[0];
-  if (!row || row.revoked_at) return null;
-  return decrypt(row.token_enc);
 }
 
 export async function revokeAgentKey(keyId) {
