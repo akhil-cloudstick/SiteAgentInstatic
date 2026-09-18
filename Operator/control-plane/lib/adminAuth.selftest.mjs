@@ -6,7 +6,7 @@
  * refused". The last group reads server.mjs itself, so a route added later
  * without being covered by the gate fails here rather than shipping open.
  */
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { signValue } from './crypto.mjs';
@@ -140,6 +140,51 @@ check('orgApi.mjs never looks a project up without a scope',
   /[^A-Za-z]getTenant\(/.test(orgSrc), false);
 check('every project listing in server.mjs names the scope',
   (serverSrc.match(/listTenants\(([^)]*)\)/g) || []).every((c) => c === 'listTenants(scope)'), true);
+
+// --- AC-A5.1: the platform owner sees counts, and opens nothing -------------------
+//
+// Three ways into a customer's work, all of which have to pass canOpenWork, and
+// a fourth that was deleted outright. These are source checks because the
+// alternative is a live project, an owner session and a real agent key — and
+// the thing most likely to break here is somebody adding a fifth way, which a
+// source check catches and a behaviour test does not.
+const actAsSrc = readFileSync(resolve(here, '../api/actAsApi.mjs'), 'utf8');
+
+const gatedBlock = (name, from, to) => {
+  const start = serverSrc.indexOf(from);
+  const end = start >= 0 ? serverSrc.indexOf(to, start) : -1;
+  const block = start >= 0 && end > start ? serverSrc.slice(start, end) : '';
+  check(name, /requireOpenWork\(/.test(block), true);
+};
+gatedBlock('minting an agent key passes the open-work gate', "if (path === '/api/mcp/agents')", "if (path === '/api/mcp/presets'");
+gatedBlock('installing the bridge passes the open-work gate', 'install-bridge$/', 'return send(res, 200, out);');
+gatedBlock('exposing a project passes the open-work gate', "if (action === 'expose'", 'return send(res, 200, out);');
+
+check('the console no longer carries the ungated expose link',
+  existsSync(resolve(here, '../../ui/src/pages/open.ts')), false);
+
+check('listing the MCP directory no longer opens a session in every project',
+  /bridgeInstalled: reachable \? await pluginInstalled/.test(serverSrc), false);
+
+// The grant is recorded before it is handed out. A grant that was given after a
+// failed write is access nobody can see afterwards, which is the one failure
+// this whole mode exists to prevent.
+check('the act-as grant is recorded before the session is minted',
+  actAsSrc.indexOf('recordAndWait(') > 0
+    && actAsSrc.indexOf('recordAndWait(') < actAsSrc.indexOf('sessionCookie(person)'), true);
+check('the act-as grant waits for its audit row rather than firing and forgetting',
+  /await recordAndWait\(/.test(actAsSrc), true);
+check('ending a grant removes the person, which is what revokes it everywhere',
+  /closeGrants\(/.test(actAsSrc), true);
+check('ending a grant tells the project, so the CMS drops the account too',
+  /syncPeopleSoon\(/.test(actAsSrc), true);
+check('only a platform administrator can act as a business',
+  /scope\?\.level !== 'platform'/.test(actAsSrc), true);
+check('a reason is required before the work is opened',
+  /Say why you are opening this project/.test(actAsSrc), true);
+
+// The audit must be readable, or it is a table nobody looks at.
+check('the record can be read back', /path === '\/api\/audit'/.test(serverSrc), true);
 
 if (failures) {
   console.error(`\n${failures} check(s) failed`);

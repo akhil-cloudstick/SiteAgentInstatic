@@ -17,8 +17,28 @@
  * `BRAND_NAME` / the shared favicon by hand.
  */
 
-/** The product name shown in the admin UI (tab title, login, dialogs, help). */
-export const BRAND_NAME = 'MMS-CMS'
+/** What this product is called when no Operator has rebranded it. */
+export const PLATFORM_BRAND_NAME = 'MMS-CMS'
+
+/**
+ * The product name shown in the admin UI (tab title, login, dialogs, help).
+ *
+ * An Operator reselling the platform renames it for its own customers — "MMS-CMS"
+ * becomes "BrightLeaf CMS" (R5). The name arrives with the Hub hand-off and is
+ * published on `window.__mmsBrandName` before any module runs, so this stays a
+ * plain constant and the ~13 places that render it are untouched.
+ *
+ * It is read once, at module load, exactly as a constant would be: the brand of
+ * a project cannot change while its page is open.
+ */
+export const BRAND_NAME: string = (() => {
+  try {
+    const supplied = (globalThis as { __mmsBrandName?: unknown }).__mmsBrandName
+    return typeof supplied === 'string' && supplied.trim() ? supplied.trim() : PLATFORM_BRAND_NAME
+  } catch {
+    return PLATFORM_BRAND_NAME
+  }
+})()
 
 // External project links (docs / repo / issues) were removed with the MMS-CMS
 // rebrand: no branded destinations exist yet, and pointing them at the upstream

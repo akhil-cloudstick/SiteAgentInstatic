@@ -41,10 +41,42 @@ export interface HubUser {
   initials: string
 }
 
+/**
+ * An Operator's own branding, when one is reselling this platform (R5).
+ *
+ * An agency cannot sell a product that shows its customers somebody else's
+ * name, so the Hub hands down the mark, the name and the accent its projects
+ * wear. `null` means this project sits directly under the platform and wears
+ * MMSBUILD's — which is also what every field falling back to undefined means,
+ * so a hand-off that predates this keeps working unchanged.
+ */
+export interface ShellBrand {
+  /** Shown in place of MMSBUILD, and as the accessible name of the lockup. */
+  name: string
+  /** Absolute or Hub-relative URL of the artwork; null keeps the bundled mark. */
+  logoLight?: string | null
+  logoDark?: string | null
+  /** `#rrggbb`, already validated by the Hub. */
+  accent?: string | null
+  /** The product names under this brand: "BrightLeaf CMS", "BrightLeaf Design". */
+  cms?: string | null
+  design?: string | null
+}
+
+/** Platform staff working inside a customer's project, named as such (R5). */
+export interface ShellActingAs {
+  email?: string | null
+  actingAs?: string | null
+}
+
 export interface HubContext {
   /** Origin the Product Hub is served from. Every Hub link resolves against it. */
   hubBaseUrl: string
   role: HubRole
+  /** The Operator's branding, or null for the platform's own. */
+  brand?: ShellBrand | null
+  /** Set when the signed-in identity is platform staff acting as this business. */
+  staff?: ShellActingAs | null
   /**
    * Signed-in user, when the Hub identified one.
    *

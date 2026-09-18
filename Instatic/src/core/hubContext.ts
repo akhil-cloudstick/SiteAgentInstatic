@@ -67,6 +67,20 @@ export const HubContextSchema = Type.Object({
    */
   designActive: Type.Optional(Type.Boolean()),
   cmsActive: Type.Optional(Type.Boolean()),
+  /**
+   * The Operator's own branding, when an agency resells this platform (R5).
+   *
+   * An agency cannot sell a product that shows its customers somebody else's
+   * name, so the Hub hands down the mark, the name and the accent its projects
+   * wear. Absent means this project sits directly under the platform and keeps
+   * MMSBUILD's, which is also what every hand-off minted before this field
+   * means — so nothing needs migrating.
+   */
+  brandName: Type.Optional(OptionalScope),
+  brandLogoLight: Type.Optional(OptionalScope),
+  brandLogoDark: Type.Optional(OptionalScope),
+  brandAccent: Type.Optional(OptionalScope),
+  brandProduct: Type.Optional(OptionalScope),
 })
 
 export type HubContext = Static<typeof HubContextSchema>
@@ -90,4 +104,9 @@ export const HUB_CONTEXT_PARAMS = {
   returnUrl: 'hubReturnUrl',
   designActive: 'hubDesignActive',
   cmsActive: 'hubCmsActive',
+  brandName: 'hubBrandName',
+  brandLogoLight: 'hubBrandLogo',
+  brandLogoDark: 'hubBrandLogoDark',
+  brandAccent: 'hubBrandAccent',
+  brandProduct: 'hubBrandProduct',
 } as const

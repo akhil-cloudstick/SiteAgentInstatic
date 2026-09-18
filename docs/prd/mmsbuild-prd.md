@@ -165,7 +165,55 @@ Promoted from the brief's last group to first, because every requirement after i
 | **Why** | An agency cannot resell a product that shows the platform's name to its own customers, and the platform owner should not be able to read a customer's work by default. Opening the work must be a distinct, logged "acting as" mode. |
 | **Acceptance** | **AC-A5.1** — as the platform-owner role, list project and business counts and status, then attempt to open a business's design or content: counts visible, opening denied. **AC-A5.2** — an Operator's project surfaces render the Operator's branding on the branded surfaces this PRD names. |
 | **Depends on** | R1, R3 |
-| **Status** | ❌ Not started. Branding is a single global value today. |
+| **Status** | ✅ Built 2026-09-18. Branding was a single global value; it is now per-Operator, and opening a business's work goes through a logged act-as mode. |
+
+##### The branded surfaces (authored here)
+
+> ⚠️ **AC-A5.2 referred to a list this PRD never contained.** As with the locked
+> ten in §4, the list below is **authored as part of this PRD** rather than
+> cited from an earlier decision. Until it existed, AC-A5.2 could not be tested:
+> "the surfaces this PRD names" named none.
+
+The rule it follows is the target architecture's: **branding flows down exactly
+one level.** An Operator's branding replaces the platform's across everything
+that Operator owns; a Business directly under the Platform Owner keeps
+MMSBUILD's. Anything an Operator leaves unset falls back to the platform's.
+
+| # | Surface | What carries the Operator's brand | Seen by |
+|---|---|---|---|
+| S1 | Hub invite, project chooser, product chooser, "no products" | logo, page title, favicon, accent | the customer |
+| S2 | The "Starting…" interstitial | logo, product name, accent | the customer |
+| S3 | MMS-CMS shared header, rows 1 and 2 | logo, product name, accent | the customer |
+| S4 | MMS-CMS browser tab title and icon | title, favicon | the customer |
+| S5 | MMS-Design shared header | logo, product name, accent | the customer |
+| S6 | MMS-Design browser tab title and icon | title, favicon | the customer |
+| S7 | Operator Console header, title, favicon | logo, product name, accent | the agency's staff |
+| S8 | Operator Console invite-accept card | logo, product name | the agency's staff |
+
+**Branding covers** the logo, the product name shown in the header, and the
+accent colour — the three the platform vision names. The product name takes the
+Operator's: *MMS-CMS* reads *BrightLeaf CMS*, *MMS Design* reads *BrightLeaf
+Design*.
+
+**Deliberately not branded.** The published website: that is the customer's own
+design, and rewriting it was never asked for. Internal identifiers, route
+prefixes, cookie and storage names: contracts, not brand text. A project's own
+name and favicon: they belong to the customer, not to the agency.
+
+**One named limit.** The cold hub sign-in page carries no session and no token,
+and one funnel origin serves every Operator, so there is no way to know whose
+brand to show before someone identifies themselves. It stays platform-branded.
+Branding it from the typed email is deliberately refused — that would reveal
+which agency an address belongs to. Every surface after sign-in is branded, and
+an invite link is branded because its token names the project.
+
+##### How far "cannot open the work" reaches
+
+The Outcome and the target architecture both say "**a business's** design or
+content" without qualification, so the restriction covers **every** Business,
+agency-owned or direct, and act-as is the one way in. (`mmsbuild-platform-vision.md`
+predates this PRD and lets platform staff open direct clients freely; where they
+differ, this PRD governs.)
 
 ---
 

@@ -1,0 +1,158 @@
+---
+// Activity — who did what, and on whose behalf (R5).
+//
+// The platform owner may see counts and status across the estate but not open
+// a customer's work; opening it is "Act as this business", and that mode is
+// only worth having if the record it writes can be read afterwards. This is
+// where it is read. Without this page the audit would be a table nobody ever
+// looks at, which is hard to tell apart from not keeping one.
+//
+// Scope-filtered by the control plane, so an Operator's administrators see
+// their own estate's trail and no further.
+import ConsoleLayout from '../components/ConsoleLayout.astro';
+import PageHeader from '../components/PageHeader.astro';
+import EmptyState from '../components/EmptyState.astro';
+import Select from '../components/Select.astro';
+import { basePath } from '../lib/cp';
+import { cpGet } from '../lib/org';
+
+const base = basePath();
+let error = '';
+
+let events: any[] = [];
+let projects: any[] = [];
+try {
+  const [audit, tenants] = await Promise.all([
+    cpGet(Astro.cookies, '/api/audit?limit=200', 'Could not read the activity'),
+    cpGet(Astro.cookies, '/api/tenants', 'Could not list projects'),
+  ]);
+  events = audit.events || [];
+  projects = tenants.tenants || [];
+} catch (e) {
+  error = (e as Error).message;
+}
+
+const nameOf = new Map(projects.map((t: any) => [t.slug, t.display_name || t.slug]));
+
+// One line per action, in the words a person would use. An action with no entry
+// here still shows — under its own name — rather than silently not appearing.
+const WORDS: Record<string, string> = {
+  'act_as.enter': 'Opened a project as platform staff',
+  'act_as.exit': 'Ended a platform-staff session',
+  'act_as.expired': 'A platform-staff session expired',
+  'agent.key.mint': 'Created an agent key',
+  'agent.key.revoke': 'Revoked an agent key',
+  'bridge.install': 'Installed the MCP bridge',
+  'bridge.probe': 'Checked the MCP bridge',
+  'tenant.create': 'Created a project',
+  'tenant.move': 'Moved a project to another business',
+  'tenant.expose': 'Exposed a project on the test address',
+  'person.invite': 'Invited someone to a project',
+  'person.invite.reissue': 'Issued a new invite link',
+  'person.role': "Changed someone's role",
+  'person.remove': 'Removed someone from a project',
+  'admin.invite': 'Invited an administrator',
+  'admin.disable': 'Disabled an administrator',
+  'admin.login': 'Signed in',
+  'admin.login.failed': 'Failed sign-in',
+  'operator.brand.update': "Changed an operator's branding",
+  'operator.rename': 'Renamed an operator',
+};
+
+// The entries worth spotting from across the room: someone inside a customer's
+// work, a key that can read it, or a project put on a public address.
+const WATCH = new Set(['act_as.enter', 'act_as.exit', 'act_as.expired', 'agent.key.mint', 'tenant.expose', 'admin.login.failed']);
+
+const when = (at: string) => {
+  const d = new Date(at);
+  return Number.isNaN(d.getTime()) ? String(at) : d.toLocaleString();
+};
+
+const kindOptions = [
+  { value: '', label: 'Everything' },
+  { value: 'watch', label: 'Opening the work' },
+  { value: 'people', label: 'People and access' },
+  { value: 'project', label: 'Projects' },
+];
+const kindOf = (action: string) => {
+  if (WATCH.has(action)) return 'watch';
+  if (action.startsWith('person.') || action.startsWith('admin.')) return 'people';
+  if (action.startsWith('tenant.') || action.startsWith('operator.') || action.startsWith('bridge.') || action.startsWith('agent.')) return 'project';
+  return 'other';
+};
+---
+
+<ConsoleLayout title="Activity" active="activity">
+  <PageHeader
+    eyebrow="Governance"
+    title="Activity"
+    description="Every administrator action, and every time platform staff opened a customer's work."
+  />
+
+  {error && <div class="mms-alert mms-alert--err">{error}</div>}
+
+  <div class="mms-toolbar" data-filter-for="activity-table">
+    <label class="mms-search">
+      <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+      <span class="mms-sr-only">Search activity</span>
+      <input type="search" placeholder="Search by person, action or project" data-filter="search" />
+    </label>
+    <Select name="kindFilter" ariaLabel="Filter by kind" placeholder="Everything"
+      options={kindOptions} attrs={{ 'data-filter': 'kind' }} />
+    <span class="mms-toolbar__count" data-filter-count></span>
+  </div>
+
+  <div class="mms-table-card">
+    {events.length === 0 ? (
+      <EmptyState
+        icon="clipboard-list"
+        title="Nothing recorded yet"
+        body="Administrator actions appear here as they happen — including every act-as session."
+      />
+    ) : (
+      <table class="mms-table" id="activity-table">
+        <thead>
+          <tr>
+            <th scope="col">When</th>
+            <th scope="col">Who</th>
+            <th scope="col">Did what</th>
+            <th scope="col">Project</th>
+          </tr>
+        </thead>
+        <tbody>
+          {events.map((e: any) => (
+            <tr
+              data-row
+              data-search={`${e.admin_email ?? ''} ${WORDS[e.action] ?? e.action} ${e.tenant_slug ?? ''} ${e.reason ?? ''}`}
+              data-kind={kindOf(e.action)}
+            >
+              <td style="white-space:nowrap">{when(e.at)}</td>
+              <td>
+                <strong style="font-size:13px">{e.admin_email}</strong>
+                <div class="mms-hint">{e.admin_level}</div>
+              </td>
+              <td>
+                {WATCH.has(e.action)
+                  ? <span class="mms-chip mms-chip--warning mms-chip--sm">{WORDS[e.action] || e.action}</span>
+                  : <span>{WORDS[e.action] || e.action}</span>}
+                {e.acting_grant_id && (
+                  <div class="mms-hint">as platform staff, acting as that business — not as the business itself</div>
+                )}
+                {e.reason && <div class="mms-hint">“{e.reason}”</div>}
+                {e.ok === false && <div class="mms-hint">failed{e.error ? `: ${e.error}` : ''}</div>}
+              </td>
+              <td>
+                {e.tenant_slug ? (
+                  <a class="mms-link" href={`${base}people?project=${e.tenant_slug}`}>{nameOf.get(e.tenant_slug) || e.tenant_slug}</a>
+                ) : <span class="mms-muted">—</span>}
+              </td>
+            </tr>
+          ))}
+          <tr class="mms-no-results" hidden>
+            <td colspan="4"><span class="mms-muted">Nothing matches that.</span></td>
+          </tr>
+        </tbody>
+      </table>
+    )}
+  </div>
+</ConsoleLayout>

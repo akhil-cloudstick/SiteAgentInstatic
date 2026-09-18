@@ -10,13 +10,16 @@ import { isPlatform } from '../lib/scope.mjs';
 import { getTenantInScope, moveTenant } from '../registry/tenants.mjs';
 import {
   orgTree, listOperators, getOperatorInScope, createOperator, updateOperator,
-  listBusinesses, getBusinessInScope, createBusiness, updateBusiness,
+  listBusinesses, getBusinessInScope, createBusiness, updateBusiness, saveOperatorBrand,
 } from '../registry/org.mjs';
 import {
   listPeople, invitePerson, setRole, removePerson, reissueInvite, INVITABLE_ROLES,
 } from '../registry/tenantUsers.mjs';
 import { listAdmins, inviteAdmin, acceptAdminInvite, disableAdmin } from '../registry/adminUsers.mjs';
 import { syncPeopleSoon } from '../provisioner/peopleSync.mjs';
+import { recordAdminAction } from '../registry/adminAudit.mjs';
+import { cleanAccent, cleanBrandName, forgetBrand, resolveBrand } from '../lib/brand.mjs';
+import { readArtwork } from '../lib/brandArtwork.mjs';
 
 const notFound = () => Object.assign(new Error('not found'), { status: 404 });
 const forbidden = (msg) => Object.assign(new Error(msg), { status: 403 });
@@ -71,8 +74,25 @@ export async function handleOrgApi({ req, res, method, path, admin, send, readJs
   const scope = admin.scope;
 
   // ---- The chain (AC-A1.1) ------------------------------------------------------
+  // Counts and status across everything this administrator reaches (AC-A5.1,
+  // first half). Counted from the same tree the caller already receives, so
+  // the totals can never disagree with the rows beneath them — and they carry
+  // no content, which is the whole point of the requirement.
   if (path === '/api/org' && method === 'GET') {
-    return reply(200, await orgTree(scope));
+    const tree = await orgTree(scope);
+    const businesses = [...tree.direct, ...tree.other, ...tree.operators.flatMap((o) => o.businesses)];
+    const projects = businesses.flatMap((b) => b.projects ?? []);
+    const byStatus = {};
+    for (const p of projects) byStatus[p.status || 'unknown'] = (byStatus[p.status || 'unknown'] || 0) + 1;
+    return reply(200, {
+      ...tree,
+      counts: {
+        operators: tree.operators.length,
+        businesses: businesses.length,
+        projects: projects.length,
+        projectsByStatus: byStatus,
+      },
+    });
   }
 
   // ---- Operators ------------------------------------------------------------------
@@ -83,10 +103,36 @@ export async function handleOrgApi({ req, res, method, path, admin, send, readJs
       return reply(200, { operator: await createOperator(scope, { name: b.name, slug: b.slug }) });
     }
   }
-  const op = path.match(/^\/api\/operators\/(\d+)(?:\/(update))?$/);
+  const op = path.match(/^\/api\/operators\/(\d+)(?:\/(update|brand))?$/);
   if (op && op[2] === 'update' && method === 'POST') {
     const b = await readJson(req);
-    return reply(200, { operator: await updateOperator(scope, op[1], { name: b.name }) });
+    const operator = await updateOperator(scope, op[1], { name: b.name });
+    recordAdminAction({ admin, action: 'operator.rename', targetType: 'operator', targetId: op[1], detail: { name: operator.name } });
+    return reply(200, { operator });
+  }
+  // ---- An Operator's own branding (R5, AC-A5.2) ---------------------------------
+  // What its customers see instead of the platform's name and mark. Each piece
+  // of artwork is three-valued on the wire: absent leaves it, null clears it
+  // back to MMSBUILD's, and a value replaces it.
+  if (op && op[2] === 'brand' && method === 'POST') {
+    const b = await readJson(req);
+    const patch = {};
+    if (b.brandName !== undefined) patch.brandName = cleanBrandName(b.brandName);
+    if (b.accent !== undefined) patch.accent = cleanAccent(b.accent);
+    for (const key of ['logo', 'logoDark', 'icon']) {
+      const art = await readArtwork(b[key]);
+      if (art !== undefined) patch[key] = art;
+    }
+    const operator = await saveOperatorBrand(scope, op[1], patch);
+    forgetBrand(op[1]);
+    recordAdminAction({
+      admin,
+      action: 'operator.brand.update',
+      targetType: 'operator',
+      targetId: op[1],
+      detail: { changed: Object.keys(patch), version: operator.brand_version },
+    });
+    return reply(200, { operator, brand: resolveBrand(operator) });
   }
   if (op && !op[2] && method === 'GET') {
     const operator = await getOperatorInScope(scope, op[1]);
@@ -135,13 +181,21 @@ export async function handleOrgApi({ req, res, method, path, admin, send, readJs
         businessId: level === 'business' ? idParam(b.businessId) : null,
       };
       const { admin: created, token } = await inviteAdmin(scope, b.email, target);
+      recordAdminAction({
+        admin, action: 'admin.invite', targetType: 'admin', targetId: String(created.id),
+        detail: { email: created.email, level: created.scope_level },
+      });
       // The link is in this response only; only its hash is stored.
       return reply(200, { admin: adminView(created), inviteUrl: adminInviteUrl(token) });
     }
   }
   const adm = path.match(/^\/api\/admins\/(\d+)\/disable$/);
   if (adm && method === 'POST') {
-    return reply(200, { admin: adminView(await disableAdmin(scope, admin.id, adm[1])) });
+    const disabled = await disableAdmin(scope, admin.id, adm[1]);
+    recordAdminAction({
+      admin, action: 'admin.disable', targetType: 'admin', targetId: adm[1], detail: { email: disabled.email },
+    });
+    return reply(200, { admin: adminView(disabled) });
   }
 
   // ---- A project's Business, and its people -------------------------------------------
@@ -157,6 +211,10 @@ export async function handleOrgApi({ req, res, method, path, admin, send, readJs
       const target = await getBusinessInScope(scope, b.businessId);
       if (!target) throw notFound();
       const moved = await moveTenant(slug, target.id);
+      recordAdminAction({
+        admin, action: 'tenant.move', tenantSlug: slug, targetType: 'business', targetId: String(target.id),
+        detail: { from: String(tenant.business_id ?? ''), to: String(moved.business_id), business: target.name },
+      });
       return reply(200, { slug, businessId: String(moved.business_id) });
     }
 
@@ -169,8 +227,22 @@ export async function handleOrgApi({ req, res, method, path, admin, send, readJs
         if (!INVITABLE_ROLES.includes(b.role)) {
           throw Object.assign(new Error(`Choose one of: ${INVITABLE_ROLES.join(', ')}`), { status: 400 });
         }
+        // A platform administrator inviting ITSELF is the same act as opening
+        // the work, wearing a customer's clothes. Refused — the way in is
+        // "Act as this business", which says so on the record (R5).
+        //
+        // A second mailbox defeats this check and we know it: the control that
+        // actually holds is the audit row written below, which names the
+        // administrator behind every invite whoever it was addressed to.
+        if (isPlatform(scope) && String(b.email || '').trim().toLowerCase() === String(admin.email || '').toLowerCase()) {
+          throw forbidden('Use “Act as this business” instead of inviting yourself to a project');
+        }
         const { person, token } = await invitePerson(slug, {
           email: b.email, role: b.role, displayName: b.displayName,
+        });
+        recordAdminAction({
+          admin, action: 'person.invite', tenantSlug: slug, targetType: 'person', targetId: String(person.id),
+          detail: { email: person.email, role: person.role },
         });
         // A second person is ADDED (NEW-2). The link is in this response only.
         return reply(200, { person: personView(person), inviteUrl: inviteUrl(token) });
@@ -183,15 +255,27 @@ export async function handleOrgApi({ req, res, method, path, admin, send, readJs
         const b = await readJson(req);
         const person = await setRole(slug, personId, b.role);
         syncPeopleSoon(slug, 0);
+        recordAdminAction({
+          admin, action: 'person.role', tenantSlug: slug, targetType: 'person', targetId: personId,
+          detail: { email: person.email, role: person.role },
+        });
         return reply(200, { person: personView(person) });
       }
       if (tp[4] === 'remove') {
         const person = await removePerson(slug, personId);
         syncPeopleSoon(slug, 0);
+        recordAdminAction({
+          admin, action: 'person.remove', tenantSlug: slug, targetType: 'person', targetId: personId,
+          detail: { email: person.email },
+        });
         return reply(200, { person: personView(person) });
       }
       if (tp[4] === 'invite') {
         const { person, token } = await reissueInvite(slug, personId);
+        recordAdminAction({
+          admin, action: 'person.invite.reissue', tenantSlug: slug, targetType: 'person', targetId: personId,
+          detail: { email: person.email },
+        });
         return reply(200, { person: personView(person), inviteUrl: inviteUrl(token) });
       }
     }

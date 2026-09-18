@@ -118,6 +118,16 @@ export async function moveTenant(slug, businessId) {
   return rows[0] || null;
 }
 
+/**
+ * Remember that this project has the MCP bridge. The console used to answer
+ * that question by asking every project on every page load, which opened a
+ * session inside each one; what an install already knows is written down
+ * instead.
+ */
+export async function markBridgeInstalled(slug) {
+  await query('update siteagent_control.tenants set bridge_installed_at = now() where slug = $1', [slug]);
+}
+
 // True once a real (successful) publish exists — used to avoid a placeholder
 // re-deploy overwriting a tenant's live site during a CF repair.
 export async function hasLiveDeploy(tenantId) {

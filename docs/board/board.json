@@ -162,23 +162,23 @@
         {
           "id": "R5",
           "title": "Platform Owner sees counts, not work; Operators are branded",
-          "status": "todo",
+          "status": "built",
           "dependsOn": [
             "R1",
             "R3"
           ],
-          "note": "Branding is a single global value today.",
+          "note": "Built 2026-09-18: the Platform Owner sees counts and status across the estate and opens no project by default. Four ways in were closed — minting an agent key, installing the bridge, inviting yourself to a project, and the unlinked route that put a project on a public address — and listing MCP keys no longer opens an owner session inside every project on each page load. Opening a business’s work is now \"Act as this business\": it asks why, records the answer before anything is handed over, puts platform staff on that project’s People list under their own name so the customer can see them, and ends after an hour or on exit — which removes the person, and so revokes the session in MMS-CMS and MMS-Design as well as the hub. Every administrator action is now recorded with the actor and, where it applies, who they were acting as; the trail is read on a new Activity page, scoped like everything else. Branding is per-Operator: logo, name and accent colour, set by upload or by pasting an address (fetched once and stored, so an agency’s customers never call a third-party server). It reaches the hub pages, both products’ headers, their browser tab titles and icons, and the console — with no per-Operator build, because the gateway answers the icon addresses the built pages already ask for and rewrites the title in the document it is already touching. A Business directly under the platform keeps MMSBUILD’s. The PRD’s AC-A5.2 referred to a list of \"branded surfaces\" that did not exist; it is authored in the PRD now (S1–S8).",
           "subtasks": [
             {
               "id": "AC-A5.1",
               "text": "Counts visible to the platform-owner role; opening the work denied",
-              "status": "todo",
+              "status": "built",
               "verified": "pending"
             },
             {
               "id": "AC-A5.2",
               "text": "Operator branding renders on the named surfaces",
-              "status": "todo",
+              "status": "built",
               "verified": "pending"
             }
           ]

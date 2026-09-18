@@ -456,3 +456,90 @@ begin
     );
   end if;
 end $$;
+
+-- ---------------------------------------------------------------------------
+-- Phase 2 (R5) — an Operator's own branding.
+--
+-- Branding flows down exactly one level: an Operator's logo, name and accent
+-- replace the platform's across every project it owns, while a Business that
+-- sits directly under the platform keeps MMSBUILD's. That rule needs no code —
+-- a project's operator_id is stamped by trigger, and "no Operator" resolves to
+-- the platform brand by construction.
+--
+-- The artwork is stored here rather than on disk: the control plane has no
+-- asset store, and a row survives a redeploy. brand_version is the ETag every
+-- branded icon is served with. Without it a browser that cached one Operator's
+-- favicon at a shared URL would keep showing it for the next one, for good.
+alter table siteagent_control.operators add column if not exists brand_name     text;
+alter table siteagent_control.operators add column if not exists brand_accent   text;
+alter table siteagent_control.operators add column if not exists logo_blob      bytea;
+alter table siteagent_control.operators add column if not exists logo_mime      text;
+alter table siteagent_control.operators add column if not exists logo_dark_blob bytea;
+alter table siteagent_control.operators add column if not exists logo_dark_mime text;
+alter table siteagent_control.operators add column if not exists icon_blob      bytea;
+alter table siteagent_control.operators add column if not exists icon_mime      text;
+alter table siteagent_control.operators add column if not exists brand_version  int not null default 0;
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'operators_brand_accent_check') then
+    alter table siteagent_control.operators add constraint operators_brand_accent_check
+      check (brand_accent is null or brand_accent ~ '^#[0-9a-fA-F]{6}$');
+  end if;
+end $$;
+
+-- ---------------------------------------------------------------------------
+-- Phase 2 (R5) — the Platform Owner sees counts, not work.
+--
+-- Opening a business's work is a distinct, logged "acting as" mode, recorded as
+-- platform staff acting as that business — never as the business itself. Both
+-- identities are stored: admin_* is who really did it, acting_* is who they
+-- were acting as. admin_email and admin_level are denormalised on purpose — an
+-- audit trail that resolves the actor's authority at read time records today's
+-- authority, not the authority the action was taken with.
+create table if not exists siteagent_control.admin_audit (
+  id                 bigserial primary key,
+  at                 timestamptz not null default now(),
+  admin_id           bigint,          -- null for the connector and other machine actors
+  admin_email        text not null,
+  admin_level        text not null,   -- platform | operator | business | machine
+  admin_operator_id  bigint,
+  admin_business_id  bigint,
+  acting_grant_id    bigint,          -- the act_as.enter row this action belongs to
+  acting_business_id bigint,
+  action             text not null,
+  tenant_slug        text,
+  target_type        text,
+  target_id          text,
+  reason             text,
+  detail             jsonb not null default '{}'::jsonb,
+  ok                 boolean not null default true,
+  error              text,
+  ip                 text,
+  business_id        bigint,
+  operator_id        bigint
+);
+create index if not exists admin_audit_at        on siteagent_control.admin_audit (at desc);
+create index if not exists admin_audit_tenant_at on siteagent_control.admin_audit (tenant_slug, at desc);
+create index if not exists admin_audit_admin_at  on siteagent_control.admin_audit (admin_id, at desc);
+create index if not exists admin_audit_grant     on siteagent_control.admin_audit (acting_grant_id);
+-- Addressed like every other project-keyed record, so a scoped read filters the
+-- audit with no new logic. A row with no project (a branding change, say) keeps
+-- a null address and is therefore platform-only, which is correct.
+drop trigger if exists admin_audit_stamp_address on siteagent_control.admin_audit;
+create trigger admin_audit_stamp_address
+  before insert on siteagent_control.admin_audit
+  for each row execute function siteagent_control.stamp_slug_address();
+
+-- The act-as grant lives on the person row it creates, so ending it — by exit,
+-- by expiry, or by the customer removing that person — always travels the one
+-- path Phase 1 already proved: remove the person, and the session dies
+-- everywhere, in the products as well as the hub.
+alter table siteagent_control.tenant_users add column if not exists staff_admin_id bigint references siteagent_control.admin_users(id) on delete cascade;
+alter table siteagent_control.tenant_users add column if not exists staff_grant_id bigint;
+alter table siteagent_control.tenant_users add column if not exists staff_expires_at timestamptz;
+create index if not exists tenant_users_staff on siteagent_control.tenant_users (staff_admin_id) where staff_admin_id is not null;
+
+-- The bridge state the console shows, recorded when an install runs rather
+-- than probed per project on every page load: probing opened an owner session
+-- inside every tenant, which is exactly what R5 forbids.
+alter table siteagent_control.tenants add column if not exists bridge_installed_at timestamptz;

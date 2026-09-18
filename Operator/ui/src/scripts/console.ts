@@ -445,3 +445,204 @@ document.querySelectorAll<HTMLElement>('[data-filter-for]').forEach((bar) => {
   });
   apply();
 });
+
+// ---------------------------------------------------------------------------
+// An Operator's branding pictures (R5).
+//
+// Upload and "paste an address" are one control, because they are one choice:
+// where this picture comes from. The <input type="file"> is still what opens
+// the dialog — nothing else can — but it is hidden and clicked by a themed
+// button, so no operating-system widget is left in the form.
+//
+// The chosen file travels as a data URL in a hidden field rather than as a
+// multipart upload: one code path for both ways in, and no new body parser on
+// the control plane. The size is checked here as a courtesy only. The control
+// plane checks it again, and checks the actual first bytes, because nothing a
+// browser sends about a file is evidence.
+const MAX_ARTWORK_BYTES = 512 * 1024;
+const shortName = (name: string) => (name.length > 32 ? `${name.slice(0, 29)}…` : name);
+
+document.querySelectorAll<HTMLElement>('[data-imagefield]').forEach((box) => {
+  const q = <T extends HTMLElement>(sel: string) => box.querySelector<T>(sel);
+  const file = q<HTMLInputElement>('[data-imagefield-file]');
+  const data = q<HTMLInputElement>('[data-imagefield-data]');
+  const clear = q<HTMLInputElement>('[data-imagefield-clear]');
+  const current = q<HTMLInputElement>('[data-imagefield-current]');
+  const url = q<HTMLInputElement>('[data-imagefield-url]');
+  const img = q<HTMLImageElement>('[data-imagefield-img]');
+  const placeholder = q<HTMLElement>('[data-imagefield-placeholder]');
+  const state = q<HTMLElement>('[data-imagefield-state]');
+  const chooseBtn = q<HTMLButtonElement>('[data-imagefield-choose]');
+  const removeBtn = q<HTMLButtonElement>('[data-imagefield-remove]');
+  if (!file || !data || !clear || !current || !url || !img || !state || !removeBtn || !chooseBtn) return;
+
+  let chosenName = '';
+
+  // What the control shows is decided in one place, from the fields alone, so
+  // "what will be saved" and "what you are looking at" cannot drift apart.
+  const paint = () => {
+    const removing = clear.value === '1';
+    const src = removing ? '' : data.value || url.value.trim() || current.value;
+    img.hidden = !src;
+    if (src) img.src = src;
+    else img.removeAttribute('src');
+    if (placeholder) placeholder.hidden = !!src;
+
+    if (removing) {
+      state.textContent = 'Will go back to MMSBUILD’s when you save';
+      state.setAttribute('data-pending', '');
+    } else {
+      state.removeAttribute('data-pending');
+      if (data.value) state.textContent = chosenName || 'New image chosen';
+      else if (url.value.trim()) state.textContent = 'From the address below';
+      else if (current.value) state.textContent = 'Current image';
+      else state.textContent = 'Using MMSBUILD’s';
+    }
+    // There is nothing to remove until there is something to remove.
+    removeBtn.hidden = removing || !(data.value || url.value.trim() || current.value);
+    removeBtn.textContent = 'Remove';
+  };
+
+  chooseBtn.addEventListener('click', () => file.click());
+
+  file.addEventListener('change', () => {
+    const chosen = file.files?.[0];
+    data.value = '';
+    chosenName = '';
+    if (!chosen) { paint(); return; }
+    if (chosen.size > MAX_ARTWORK_BYTES) {
+      state.textContent = `That image is ${Math.round(chosen.size / 1024)} KB — the limit is 512 KB`;
+      state.setAttribute('data-pending', '');
+      file.value = '';
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      data.value = typeof reader.result === 'string' ? reader.result : '';
+      chosenName = shortName(chosen.name);
+      // Choosing a picture is the answer to "remove it?" being no.
+      clear.value = '';
+      url.value = '';
+      paint();
+      box.dispatchEvent(new Event('change', { bubbles: true }));
+    };
+    reader.onerror = () => {
+      state.textContent = 'That file could not be read';
+      state.setAttribute('data-pending', '');
+    };
+    reader.readAsDataURL(chosen);
+  });
+
+  url.addEventListener('input', () => {
+    if (url.value.trim()) {
+      data.value = '';
+      file.value = '';
+      chosenName = '';
+      clear.value = '';
+    }
+    paint();
+  });
+
+  removeBtn.addEventListener('click', () => {
+    clear.value = '1';
+    data.value = '';
+    url.value = '';
+    file.value = '';
+    chosenName = '';
+    paint();
+    box.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+
+  // Opening the dialog for another Operator fills the hidden fields; repaint on
+  // the change event the prefill already dispatches.
+  current.addEventListener('change', paint);
+  paint();
+});
+
+// ---------------------------------------------------------------------------
+// The branding preview.
+//
+// Says what an Operator's customers will see before it is saved — the mark,
+// the name, the product name derived from it, and the accent — because the
+// surfaces it actually lands on are somebody else's screens, which whoever is
+// filling this in cannot check afterwards.
+document.querySelectorAll<HTMLElement>('[data-brand-preview]').forEach((preview) => {
+  const form = preview.closest('form');
+  if (!form) return;
+  const nameInput = form.querySelector<HTMLInputElement>('[data-brand-name]');
+  const accentInput = form.querySelector<HTMLInputElement>('[data-brand-accent]');
+  const logoData = form.querySelector<HTMLInputElement>('input[name="logoData"]');
+  const logoUrl = form.querySelector<HTMLInputElement>('input[name="logoUrl"]');
+  const logoCurrent = form.querySelector<HTMLInputElement>('input[name="logoCurrent"]');
+  const logoClear = form.querySelector<HTMLInputElement>('input[name="logoClear"]');
+  const img = preview.querySelector<HTMLImageElement>('[data-brand-preview-logo]');
+  const nameOut = preview.querySelector<HTMLElement>('[data-brand-preview-name]');
+  const productOut = preview.querySelector<HTMLElement>('[data-brand-preview-product]');
+  const swatch = preview.querySelector<HTMLElement>('[data-brand-preview-swatch]');
+
+  const paint = () => {
+    const name = (nameInput?.value || '').trim();
+    if (nameOut) nameOut.textContent = name || 'MMSBUILD';
+    // The same rule the control plane applies, so the preview cannot promise a
+    // name the server would not produce.
+    if (productOut) productOut.textContent = name ? `${name} CMS` : 'MMS-CMS';
+    const accent = (accentInput?.value || '').trim();
+    if (swatch) swatch.style.background = /^#[0-9a-fA-F]{6}$/.test(accent) ? accent : 'var(--mms-action)';
+    const src = logoClear?.value === '1'
+      ? ''
+      : logoData?.value || (logoUrl?.value || '').trim() || (logoCurrent?.value || '');
+    if (img) {
+      // A pasted address is shown as typed; it is fetched and stored server-side
+      // on save, so a broken preview here is a broken address there.
+      if (src) {
+        img.src = src;
+        img.hidden = false;
+      } else {
+        img.removeAttribute('src');
+        img.hidden = true;
+      }
+    }
+  };
+
+  for (const el of [nameInput, accentInput, logoUrl, logoData]) {
+    el?.addEventListener('input', paint);
+    el?.addEventListener('change', paint);
+  }
+  // The image controls announce themselves once the file has been read.
+  form.querySelectorAll<HTMLElement>('[data-imagefield]').forEach((imageBox) => {
+    imageBox.addEventListener('change', paint);
+  });
+  paint();
+});
+
+// ---------------------------------------------------------------------------
+// Colour picker beside a colour code.
+//
+// Both edit the same value and neither owns it: a brand colour usually arrives
+// as a hex code from a style guide, which you type, but choosing one by eye is
+// easier with a picker. Only the text field carries the form's `name`, so the
+// picker never submits a second value — and an untouched picker never writes
+// anything, because its default (black, or the platform green) is not a choice
+// anybody made.
+document.querySelectorAll<HTMLInputElement>('input[type="color"][data-colour-for]').forEach((picker) => {
+  const field = document.getElementById(picker.dataset.colourFor ?? '');
+  if (!(field instanceof HTMLInputElement)) return;
+  const HEX = /^#[0-9a-fA-F]{6}$/;
+
+  // Typing a valid code moves the swatch; a half-typed one leaves it alone
+  // rather than jumping about on every keystroke.
+  const fromField = () => {
+    const value = field.value.trim();
+    if (HEX.test(value)) picker.value = value.toLowerCase();
+  };
+  field.addEventListener('input', fromField);
+  field.addEventListener('change', fromField);
+  fromField();
+
+  // Picking writes the code, and tells the field so the preview repaints.
+  picker.addEventListener('input', () => {
+    field.value = picker.value.toLowerCase();
+    field.dispatchEvent(new Event('input', { bubbles: true }));
+    field.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+});

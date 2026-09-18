@@ -1509,3 +1509,300 @@ mms-select[data-ready] > select {
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
+
+/* ---------------------------------------------------------------------------
+   Acting as a business (R5)
+
+   Platform staff inside somebody else's project. Deliberately loud and not
+   dismissible: a mode you can hide is a mode you forget you are in, and this
+   one is holding a customer's data. The same words and the same way out as the
+   banner the gateway puts inside MMS-CMS and MMS-Design, so it reads as one
+   thing wherever you meet it. */
+.mms-acting {
+  position: sticky;
+  top: 0;
+  z-index: 60;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  padding: 8px 16px;
+  background: #8a2a1a;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+}
+.mms-acting strong { font-weight: 800; }
+.mms-acting-exit {
+  font: inherit;
+  padding: 4px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  background: transparent;
+  color: #fff;
+  cursor: pointer;
+}
+.mms-acting-exit:hover { background: rgba(255, 255, 255, 0.14); }
+
+/* The branding editor's preview: a strip showing the logo on the surface
+   colour, so an Operator sees what its customers will see before saving. */
+.mms-brand-preview {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--border-subtle, #e8ddbd);
+  border-radius: 10px;
+  background: var(--bg-surface-2, #fdfbf6);
+  min-height: 62px;
+}
+.mms-brand-preview img { max-height: 30px; max-width: 160px; width: auto; }
+.mms-brand-preview .mms-brand-name { font-weight: 700; }
+.mms-brand-swatch {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  margin-left: auto;
+}
+
+/* ---------------------------------------------------------------------------
+   Scrollbars
+
+   The browser's default scrollbar is drawn in the OS's colours, so a dialog
+   that scrolls — the branding editor, a long project list — showed a grey
+   Windows bar down the side of a cream panel, and a light bar in dark mode.
+   Painted from the same tokens as everything else instead, in both engines:
+   `scrollbar-*` for Firefox, the `::-webkit-` pseudo-elements for the rest.
+
+   The thumb is drawn with a transparent border and `background-clip`, which is
+   what gives it breathing room inside the track without a second element. */
+html,
+.mms-console {
+  scrollbar-width: thin;
+  scrollbar-color: var(--mms-border-strong) transparent;
+}
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--mms-border-strong);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--mms-text-muted);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* ---------------------------------------------------------------------------
+   File pickers
+
+   A file input renders its own button, and the browser draws it in the OS's
+   style — a grey "Choose File" sitting inside an MMS field. `::file-selector-
+   button` is that button, so it takes the same shape as `.mms-btn--secondary`
+   and the field around it stops looking borrowed.
+
+   The text beside it ("No file chosen") is the browser's and cannot be
+   restyled or replaced, which is why the button carries the weight. */
+.mms-input[type='file'] {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 10px;
+  font-size: 12px;
+  color: var(--mms-text-muted);
+  cursor: pointer;
+}
+.mms-input[type='file']::file-selector-button {
+  height: 30px;
+  margin: 0;
+  padding: 0 12px;
+  border: 1px solid var(--mms-border-strong);
+  border-radius: var(--c-radius);
+  background: var(--mms-surface-raised);
+  color: var(--mms-text);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+  transition:
+    border-color 120ms ease,
+    background 120ms ease;
+}
+.mms-input[type='file']:hover::file-selector-button {
+  border-color: var(--mms-action);
+  background: var(--mms-surface-tint);
+}
+.mms-input[type='file']:focus-visible {
+  outline: none;
+  border-color: var(--mms-action);
+  box-shadow: 0 0 0 3px var(--mms-surface-green);
+}
+
+/* ---------------------------------------------------------------------------
+   Colour field: a swatch you can pick from, beside the code you can type.
+
+   The native colour input is a button the browser draws, so like the file
+   picker it needs its inner parts restyled — `::-webkit-color-swatch` and
+   `::-moz-color-swatch` are the filled square inside it, and both carry a
+   default border and inset that read as somebody else's control. */
+.mms-colour {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.mms-colour .mms-input {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-mono), ui-monospace, monospace;
+  text-transform: lowercase;
+}
+
+.mms-colour__swatch {
+  flex: 0 0 auto;
+  width: var(--c-tap);
+  height: var(--c-tap);
+  padding: 4px;
+  border: 1px solid var(--mms-border-strong);
+  border-radius: var(--c-radius);
+  background: var(--mms-surface-raised);
+  cursor: pointer;
+  transition:
+    border-color 120ms ease,
+    box-shadow 120ms ease;
+}
+.mms-colour__swatch:hover {
+  border-color: var(--mms-action);
+}
+.mms-colour__swatch:focus-visible {
+  outline: none;
+  border-color: var(--mms-action);
+  box-shadow: 0 0 0 3px var(--mms-surface-green);
+}
+.mms-colour__swatch::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+.mms-colour__swatch::-webkit-color-swatch {
+  border: none;
+  border-radius: 4px;
+}
+.mms-colour__swatch::-moz-color-swatch {
+  border: none;
+  border-radius: 4px;
+}
+
+/* ---------------------------------------------------------------------------
+   Image field — upload or address, as one control.
+
+   The browser's own file button is hidden and driven by a themed one, so the
+   only OS-drawn widget left in this form is gone. The thumbnail is the answer
+   to "did that work", which is why it sits first. */
+.mms-imagefield {
+  display: grid;
+  gap: 8px;
+}
+
+.mms-imagefield__box {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 12px;
+  border: 1px solid var(--mms-border);
+  border-radius: var(--c-radius-card);
+  background: var(--mms-surface);
+}
+
+.mms-imagefield__thumb {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 76px;
+  height: 56px;
+  padding: 6px;
+  border: 1px solid var(--mms-border);
+  border-radius: var(--c-radius);
+  /* A chequerboard, so a transparent logo is visibly transparent rather than
+     looking like it failed to load against a flat panel. */
+  background-color: var(--mms-surface-raised);
+  background-image:
+    linear-gradient(45deg, var(--mms-surface-tint) 25%, transparent 25%),
+    linear-gradient(-45deg, var(--mms-surface-tint) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, var(--mms-surface-tint) 75%),
+    linear-gradient(-45deg, transparent 75%, var(--mms-surface-tint) 75%);
+  background-size: 10px 10px;
+  background-position: 0 0, 0 5px, 5px -5px, -5px 0;
+  overflow: hidden;
+}
+.mms-imagefield__thumb img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+.mms-imagefield__thumb i {
+  color: var(--mms-text-muted);
+  font-size: 18px;
+  opacity: 0.55;
+}
+
+.mms-imagefield__controls {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.mms-imagefield__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.mms-imagefield__state {
+  min-width: 0;
+  flex: 1;
+  color: var(--mms-text-muted);
+  font-size: 12px;
+  font-weight: 560;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mms-imagefield__state[data-pending] {
+  color: var(--mms-danger);
+}
+
+.mms-imagefield__remove {
+  flex: 0 0 auto;
+  color: var(--mms-danger);
+}
+
+.mms-input--sm {
+  min-height: 34px;
+  font-size: 12px;
+}
+
+/* A section heading following a control needs air above it; without this the
+   next title sits on the previous field. */
+.mms-modal__body .mms-section-title + .mms-form,
+.mms-modal__body .mms-section-title + .mms-imagefield {
+  margin-top: 0;
+}
+.mms-modal__body .mms-section-title {
+  margin-top: 22px;
+}
+.mms-modal__body > .mms-section-title:first-child {
+  margin-top: 0;
+}

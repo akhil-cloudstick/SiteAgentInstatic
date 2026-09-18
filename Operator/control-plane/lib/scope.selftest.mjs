@@ -8,7 +8,7 @@
  * acceptance logic itself.
  */
 import {
-  scopeOf, canReachOperator, canReachBusiness, canReachRecord, scopeFilter, canGrant, isPlatform,
+  scopeOf, canReachOperator, canReachBusiness, canReachRecord, canOpenWork, scopeFilter, canGrant, isPlatform,
 } from './scope.mjs';
 
 let failures = 0;
@@ -63,6 +63,29 @@ check('a record without an address is reachable only by the platform',
     canReachRecord(biz10, { business_id: null, operator_id: null })], [true, false, false]);
 check('ids compare as strings (pg returns bigint as text)',
   canReachRecord(biz10, { business_id: '10', operator_id: '1' }), true);
+
+// --- opening the work, as opposed to reaching it (R5, AC-A5.1) -----------------
+//
+// The two halves of the requirement sit side by side here on purpose: the
+// platform owner still REACHES every project, because counts and status across
+// the estate are its job, and now OPENS none of them. Opening is the act-as
+// grant, and a grant names exactly one project.
+const openable = (scope, actAs = null) => Object.keys(P).filter((k) => canOpenWork(scope, P[k], actAs));
+
+check('the platform owner still reaches every project', reachable(platform), Object.keys(P));
+check('the platform owner opens no project by default', openable(platform), []);
+check('a grant opens the project it names, and only that one',
+  openable(platform, { slug: 'a1' }), ['a1']);
+check('a grant for another project opens nothing here',
+  canOpenWork(platform, P.a1, { slug: 'a2' }), false);
+check('a grant cannot reach outside the platform owner\'s own reach either',
+  canOpenWork(biz10, P.d1, { slug: 'd1' }), false);
+check('an operator opens its own businesses\' projects, with no grant',
+  openable(op1), ['a1', 'a2', 'c1', 'c2']);
+check('a business opens its own projects, with no grant', openable(biz10), ['a1', 'a2']);
+check('a project outside a business admin\'s scope stays shut', canOpenWork(biz10, P.c1), false);
+check('a grant with no slug opens nothing', canOpenWork(platform, P.a1, {}), false);
+check('grant slugs compare as strings', canOpenWork(platform, P.a1, { slug: 'a1' }), true);
 
 // --- businesses and operators --------------------------------------------------
 check('an operator reaches its own businesses', [B.b10, B.b11, B.b20, B.b30].map((b) => canReachBusiness(op1, b)), [true, true, false, false]);

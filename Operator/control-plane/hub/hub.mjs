@@ -16,6 +16,10 @@ import {
 } from '../registry/tenantUsers.mjs';
 import { readActiveProducts } from '../registry/settings.mjs';
 import { signForTenant } from '../lib/crypto.mjs';
+import { PLATFORM_BRAND, brandForTenant, productName } from '../lib/brand.mjs';
+import { closeGrants } from '../registry/actAs.mjs';
+import { recordAdminAction } from '../registry/adminAudit.mjs';
+import { syncPeopleSoon } from '../provisioner/peopleSync.mjs';
 import {
   SESSION_COOKIE, SESSION_TTL_SEC, signHubSession, currentPerson, signChooser, readChooser,
 } from './hubSession.mjs';
@@ -77,7 +81,7 @@ function readForm(req) {
 // Requires Secure, which we have (the funnel is HTTPS). CSRF is still covered:
 // the OD daemon validates Origin against OD_ALLOWED_ORIGINS, and state-changing
 // hub routes are POST-only.
-function sessionCookie(person) {
+export function sessionCookie(person) {
   const val = signHubSession(person);
   return `${SESSION_COOKIE}=${val}; HttpOnly; Path=/; SameSite=None; Secure; Max-Age=${SESSION_TTL_SEC}`;
 }
@@ -91,7 +95,7 @@ function sessionCookie(person) {
 // Deletion matches on name + domain + PATH, so each Path must mirror the one
 // the cookie was set with — `instatic_admin_session` is scoped to /cms and a
 // Path=/ clear would silently miss it.
-function clearCookie() {
+export function clearCookie() {
   return [
     `${SESSION_COOKIE}=; HttpOnly; Path=/; SameSite=None; Secure; Max-Age=0`,
     // OpenDesign daemon session (apps/daemon/src/server.ts).
@@ -124,9 +128,19 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => (
 // for it) is what keeps the header honest: the flags are written by the very
 // redirect that applied them, so the nav can never disagree with the routing
 // decision that produced this session.
-function hubContextParams(tenant, origin, products, business) {
+function hubContextParams(tenant, origin, products, business, brand = PLATFORM_BRAND) {
   const params = new URLSearchParams();
   params.set('hubRole', 'client');
+  // The Operator's own branding travels with the hand-off, so the CMS renders
+  // the agency's mark and name rather than the platform's (R5). Nothing is sent
+  // for a project directly under the platform: absent means MMSBUILD's.
+  if (!brand.isPlatform) {
+    params.set('hubBrandName', brand.name);
+    params.set('hubBrandProduct', productName(brand, 'cms'));
+    if (brand.logoLight) params.set('hubBrandLogo', brand.logoLight);
+    if (brand.logoDark) params.set('hubBrandLogoDark', brand.logoDark);
+    if (brand.accent) params.set('hubBrandAccent', brand.accent);
+  }
   if (business?.name) params.set('hubClient', business.name);
   params.set('hubProject', tenant.display_name || tenant.slug);
   params.set('hubSite', tenant.slug);
@@ -142,7 +156,7 @@ function hubContextParams(tenant, origin, products, business) {
 // Short-lived signed SSO hand-off URL for a tool. The tool validates the token
 // (server-side, with its project's key) and signs the named person in with
 // their own role — never as the owner by default (NEW-3).
-export function ssoUrl(tenant, target, products, person, business) {
+export function ssoUrl(tenant, target, products, person, business, brand = PLATFORM_BRAND) {
   if (!person || person.tenant_slug !== tenant.slug) throw new Error('A hand-off needs a person of this project');
   const token = signForTenant(tenant.slug, {
     target,
@@ -160,7 +174,7 @@ export function ssoUrl(tenant, target, products, person, business) {
     // Root path -> the gateway's session-routed catch-all forwards it to THIS
     // tenant's Instatic (the request carries the sa_hub cookie set at login).
     return `${config.gatewayOrigin}/cms/api/cms/sso?token=${encodeURIComponent(token)}`
-      + `&${hubContextParams(tenant, 'hub', products, business)}`;
+      + `&${hubContextParams(tenant, 'hub', products, business, brand)}`;
   }
   // OpenDesign: the tenant-agnostic /od mount. The gateway splits /od/sso off to
   // THIS tenant's daemon using the sa_hub cookie set at login — exactly like the
@@ -170,11 +184,25 @@ export function ssoUrl(tenant, target, products, person, business) {
 }
 
 // ---- page templates ------------------------------------------------------
-function shell(title, inner) {
+// Every page here is one an Operator's customer sees, so each takes the brand
+// that project wears: the agency's mark, name and colour, or the platform's
+// when the Business sits directly under it (R5, AC-A5.2).
+//
+// The accent is a validated #rrggbb before it ever reaches this stylesheet
+// (lib/brand.mjs) — a colour is a string an Operator supplies, and a string
+// pasted into CSS is a way into the page if it is not checked first.
+function shell(title, inner, brand = PLATFORM_BRAND) {
+  const suite = brand.isPlatform ? 'MMS Design' : brand.name;
+  const accent = brand.accent
+    ? `<style>:root{--accent:${brand.accent};--accent-strong:${brand.accent}}</style>`
+    : '';
+  const lockup = brand.logoLight
+    ? `<div class="lockup"><img src="${esc(brand.logoLight)}" alt="${esc(brand.name)}" /></div>`
+    : '';
   return `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>${esc(title)} · MMS Design</title>
-${FAVICON_TAG}
+<title>${esc(title)} · ${esc(suite)}</title>
+${brand.icon ? `<link rel="icon" href="${esc(brand.icon)}">` : FAVICON_TAG}
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&family=Nunito+Sans:wght@400;500;600;700;800&display=swap">
@@ -202,7 +230,8 @@ ${FAVICON_TAG}
   .card .ico{font-size:30px} .card h3{font-family:'Nunito','Nunito Sans',sans-serif;margin:10px 0 4px;font-size:17px;font-weight:800}
   .topbar{display:flex;justify-content:space-between;align-items:center}
   .logout{font-size:13px;color:var(--muted);text-decoration:none}
-</style></head><body><div class="wrap">${inner}</div></body></html>`;
+  .lockup{margin:0 0 18px} .lockup img{max-height:34px;max-width:200px;width:auto;height:auto}
+</style>${accent}</head><body><div class="wrap">${lockup}${inner}</div></body></html>`;
 }
 
 function loginPage(err, next, identifier = '') {
@@ -221,7 +250,7 @@ function loginPage(err, next, identifier = '') {
     </form>`);
 }
 
-function invitePage(token, err) {
+function invitePage(token, err, brand = PLATFORM_BRAND) {
   return shell('Set your password', `
     <h1>Welcome — set your password</h1>
     <p class="muted">This becomes your single login for both tools.</p>
@@ -232,12 +261,12 @@ function invitePage(token, err) {
       <label>Confirm password</label>
       <input name="confirm" type="password" autocomplete="new-password" required minlength="8" />
       <button type="submit">Set password &amp; continue</button>
-    </form>`);
+    </form>`, brand);
 }
 
 // One email, several projects: the password was right for each, so ask which
 // rather than pick (target architecture, "project chooser").
-function choosePage(token, options, next) {
+function choosePage(token, options, next, brand = PLATFORM_BRAND) {
   const items = options.map((o) => `
       <form method="POST" action="/login/choose" style="margin:10px 0 0">
         <input type="hidden" name="token" value="${esc(token)}" />
@@ -250,23 +279,23 @@ function choosePage(token, options, next) {
   return shell('Choose a project', `
     <h1>Choose a project</h1>
     <p class="muted">Your email opens more than one project. Pick where to work.</p>
-    ${items}`);
+    ${items}`, brand);
 }
 
 // Shown when the operator has turned every product off. A tenant can still sign
 // in (their account is valid), so say plainly why there is nothing here rather
 // than 404ing them into thinking the platform is broken.
-function noProductsPage(tenant) {
+function noProductsPage(tenant, brand = PLATFORM_BRAND) {
   const name = esc(tenant.display_name || tenant.slug);
   return shell(`${name} — Home`, `
     <div class="topbar">
       <div><h1>Welcome, ${name}</h1><p class="muted">No products are enabled on this account.</p></div>
       <form method="POST" action="/logout" style="margin:0"><button class="logout" style="background:none;border:0;padding:0;width:auto;margin:0" type="submit">Sign out</button></form>
     </div>
-    <p class="muted">Your operator has turned off both MMS Design and MMS CMS. Contact them to have one enabled.</p>`);
+    <p class="muted">Your operator has turned off both ${esc(productName(brand, 'design'))} and ${esc(productName(brand, 'cms'))}. Contact them to have one enabled.</p>`, brand);
 }
 
-function hubPage(tenant, products, person) {
+function hubPage(tenant, products, person, brand = PLATFORM_BRAND) {
   const name = esc(tenant.display_name || tenant.slug);
   const who = esc(person.display_name || person.email || '');
   const role = esc(ROLE_LABELS[person.role] || person.role);
@@ -274,12 +303,12 @@ function hubPage(tenant, products, person) {
   // gateway would refuse the click otherwise, which reads as a broken link.
   const designCard = `
       <a class="card" href="/sso/design">
-        <div class="ico">&#127912;</div><h3>MMS Design</h3>
+        <div class="ico">&#127912;</div><h3>${esc(productName(brand, 'design'))}</h3>
         <div class="muted">Design your website visually. Push it to your CMS when ready.</div>
       </a>`;
   const cmsCard = `
       <a class="card" href="/sso/cms">
-        <div class="ico">&#128441;&#65039;</div><h3>MMS CMS</h3>
+        <div class="ico">&#128441;&#65039;</div><h3>${esc(productName(brand, 'cms'))}</h3>
         <div class="muted">Edit content, publish, and manage your live site.</div>
       </a>`;
   const cards = `${products.design ? designCard : ''}${products.cms ? cmsCard : ''}`;
@@ -295,7 +324,7 @@ function hubPage(tenant, products, person) {
          401 rather than bouncing back here. /sso/<tool> mints on click, so the
          token is always seconds old however long the page has been sitting. -->
     <div class="cards">${cards}
-    </div>`);
+    </div>`, brand);
 }
 
 // Start a hub session for `person` and send them on. A deep link into a
@@ -350,7 +379,7 @@ export async function handleHub(req, res, method, path) {
       return true;
     }
     const target = tool === 'cms' ? 'instatic' : 'od';
-    let url = ssoUrl(tenant, target, products, person, await getBusiness(tenant.business_id));
+    let url = ssoUrl(tenant, target, products, person, await getBusiness(tenant.business_id), await brandForTenant(tenant.slug));
     if (next) url += `&redirect=${encodeURIComponent(next)}`;
     redirect(res, url);
     return true;
@@ -411,18 +440,23 @@ export async function handleHub(req, res, method, path) {
   const inv = path.match(/^\/invite\/([^/]+)$/);
   if (inv) {
     const token = decodeURIComponent(inv[1]);
+    // The token names the person, the person names the project, and the project
+    // names the Operator — so an invited customer sees their agency's mark on
+    // the very first screen, which is the one place before sign-in where that
+    // is possible at all.
+    const invited = await findByInviteToken(token);
+    const brand = invited ? await brandForTenant(invited.tenant_slug) : PLATFORM_BRAND;
     if (method === 'GET') {
-      const user = await findByInviteToken(token);
-      if (!user) { html(res, 410, shell('Invite', '<h1>Invite invalid or expired</h1><p class="muted">Ask your operator for a new link.</p>')); return true; }
-      html(res, 200, invitePage(token));
+      if (!invited) { html(res, 410, shell('Invite', '<h1>Invite invalid or expired</h1><p class="muted">Ask your operator for a new link.</p>')); return true; }
+      html(res, 200, invitePage(token, null, brand));
       return true;
     }
     if (method === 'POST') {
       const f = await readForm(req);
-      if (!f.password || f.password.length < 8) { html(res, 400, invitePage(token, 'Password must be at least 8 characters.')); return true; }
-      if (f.password !== f.confirm) { html(res, 400, invitePage(token, 'Passwords do not match.')); return true; }
+      if (!f.password || f.password.length < 8) { html(res, 400, invitePage(token, 'Password must be at least 8 characters.', brand)); return true; }
+      if (f.password !== f.confirm) { html(res, 400, invitePage(token, 'Passwords do not match.', brand)); return true; }
       const person = await acceptInvite(token, f.password);
-      if (!person) { html(res, 410, invitePage(token, 'This invite is no longer valid.')); return true; }
+      if (!person) { html(res, 410, invitePage(token, 'This invite is no longer valid.', brand)); return true; }
       redirect(res, '/hub', sessionCookie(person));
       return true;
     }
@@ -443,6 +477,36 @@ export async function handleHub(req, res, method, path) {
     return true;
   }
 
+  // POST /act-as/exit — ending a grant from INSIDE the work.
+  //
+  // This cannot live under /api/: the console's administrator cookie is scoped
+  // to /operator and is simply not sent from a page served at /cms or /design.
+  // What authorises it is the staff session it is ending — you can only end the
+  // grant you are holding — and removing that person is what actually revokes
+  // the access, in the products as well as here (Phase 1: a removed person is
+  // signed out). Clearing the browser's cookies alone would leave the tools'
+  // own sessions alive, and those are the real credential.
+  if (path === '/act-as/exit' && (method === 'POST' || method === 'GET')) {
+    const person = await currentPerson(req);
+    if (person?.staff_admin_id) {
+      const closed = await closeGrants(person.staff_admin_id, person.tenant_slug);
+      for (const row of closed) {
+        syncPeopleSoon(row.tenant_slug, 0);
+        recordAdminAction({
+          admin: { id: row.staff_admin_id, email: row.email, scope_level: 'platform' },
+          actAs: { grantId: row.staff_grant_id ?? null, businessId: row.business_id ?? null },
+          action: 'act_as.exit',
+          tenantSlug: row.tenant_slug,
+          targetType: 'tenant',
+          targetId: row.tenant_slug,
+          ip: req.socket?.remoteAddress ?? null,
+        });
+      }
+    }
+    redirect(res, '/operator/projects', clearCookie());
+    return true;
+  }
+
   // GET /hub  (requires session)
   if (path === '/hub' && method === 'GET') {
     const person = await currentPerson(req);
@@ -452,13 +516,14 @@ export async function handleHub(req, res, method, path) {
     const business = await getBusiness(tenant.business_id);
     // Lite = OpenDesign only → straight in. Advanced = two cards.
     const products = await readActiveProducts();
-    if ((tenant.tier || 'advanced') === 'lite') { redirect(res, ssoUrl(tenant, 'od', products, person, business)); return true; }
+    const brand = await brandForTenant(tenant.slug);
+    if ((tenant.tier || 'advanced') === 'lite') { redirect(res, ssoUrl(tenant, 'od', products, person, business, brand)); return true; }
     // With only one product available there is nothing to choose, so skip the
     // chooser entirely rather than showing a one-card page.
-    if (!products.design && !products.cms) { html(res, 200, noProductsPage(tenant)); return true; }
-    if (!products.cms) { redirect(res, ssoUrl(tenant, 'od', products, person, business)); return true; }
-    if (!products.design) { redirect(res, ssoUrl(tenant, 'instatic', products, person, business)); return true; }
-    html(res, 200, hubPage(tenant, products, person));
+    if (!products.design && !products.cms) { html(res, 200, noProductsPage(tenant, brand)); return true; }
+    if (!products.cms) { redirect(res, ssoUrl(tenant, 'od', products, person, business, brand)); return true; }
+    if (!products.design) { redirect(res, ssoUrl(tenant, 'instatic', products, person, business, brand)); return true; }
+    html(res, 200, hubPage(tenant, products, person, brand));
     return true;
   }
 

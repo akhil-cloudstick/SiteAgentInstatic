@@ -5,6 +5,7 @@
 import ConsoleLayout from '../components/ConsoleLayout.astro';
 import PageHeader from '../components/PageHeader.astro';
 import Modal from '../components/Modal.astro';
+import ImageField from '../components/ImageField.astro';
 import RowMenu from '../components/RowMenu.astro';
 import Select from '../components/Select.astro';
 import EmptyState from '../components/EmptyState.astro';
@@ -12,6 +13,8 @@ import { basePath, cpFetch } from '../lib/cp';
 import { cpGet, okJson } from '../lib/org';
 
 const base = basePath();
+const artwork = (operator: any, kind: string, present: boolean) =>
+  present ? `/brand/${operator.id}/${kind}?v=${operator.brand_version ?? 0}` : '';
 const scope = Astro.locals.admin?.scope ?? { level: 'platform', operatorId: null, businessId: null };
 const isPlatform = scope.level === 'platform';
 let error = '';
@@ -38,6 +41,26 @@ if (Astro.request.method === 'POST') {
       await okJson(await cpFetch(Astro.cookies, `/api/businesses/${id('businessId')}/update`, json({ operatorId: opOrNull() })), 'Could not move the business');
     } else if (intent === 'rename-operator' && id('operatorId')) {
       await okJson(await cpFetch(Astro.cookies, `/api/operators/${id('operatorId')}/update`, json({ name: f.get('name') })), 'Could not rename the operator');
+    } else if (intent === 'brand-operator' && id('operatorId')) {
+      // Each artwork is three-valued: a data URL or an https address replaces
+      // it, the "clear" box removes it back to MMSBUILD's, and sending nothing
+      // leaves whatever is already there.
+      const art = (field: string) => {
+        if (String(f.get(`${field}Clear`) || '') === '1') return null;
+        const upload = String(f.get(`${field}Data`) || '');
+        if (upload.startsWith('data:')) return { upload };
+        const url = String(f.get(`${field}Url`) || '').trim();
+        return url ? { url } : undefined;
+      };
+      const payload: Record<string, unknown> = {
+        brandName: String(f.get('brandName') ?? ''),
+        accent: String(f.get('accent') ?? ''),
+      };
+      for (const field of ['logo', 'logoDark', 'icon']) {
+        const value = art(field);
+        if (value !== undefined) payload[field] = value;
+      }
+      await okJson(await cpFetch(Astro.cookies, `/api/operators/${id('operatorId')}/brand`, json(payload)), 'Could not save the branding');
     }
     return Astro.redirect(`${base}org`, 303);
   } catch (e) {
@@ -157,6 +180,15 @@ const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one :
                     <i class="fa-solid fa-pen" aria-hidden="true"></i> Rename operator
                   </button>
                 )}
+                <button type="button" class="mms-menu__item" role="menuitem" data-open-modal="brand-operator"
+                  data-prefill-operatorId={String(g.operator.id)}
+                  data-prefill-brandName={g.operator.brand_name || ''}
+                  data-prefill-accent={g.operator.brand_accent || '#15964e'}
+                  data-prefill-logoCurrent={artwork(g.operator, 'logo', g.operator.has_logo)}
+                  data-prefill-logoDarkCurrent={artwork(g.operator, 'logo-dark', g.operator.has_logo_dark)}
+                  data-prefill-iconCurrent={artwork(g.operator, 'icon', g.operator.has_icon)}>
+                  <i class="fa-solid fa-palette" aria-hidden="true"></i> Branding
+                </button>
                 <a class="mms-menu__item" role="menuitem" href={`${base}access?invite=operator:${g.operator.id}`}>
                   <i class="fa-solid fa-user-shield" aria-hidden="true"></i> Invite operator admin
                 </a>
@@ -293,6 +325,68 @@ const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one :
         <Fragment slot="footer">
           <button type="button" class="mms-btn mms-btn--secondary" data-close-modal>Cancel</button>
           <button type="submit" class="mms-btn mms-btn--primary">Save</button>
+        </Fragment>
+      </Modal>
+
+      <Modal id="brand-operator" title="Branding" eyebrow="Organisation" size="md" intent="brand-operator" busy="Saving branding">
+        <input type="hidden" name="operatorId" />
+        <p class="mms-muted" style="margin:0 0 14px">
+          What this agency's customers see instead of MMSBUILD — on their sign-in page, in
+          MMS-CMS and MMS-Design, and in the browser tab. Anything left empty keeps the
+          platform's own.
+        </p>
+        <div class="mms-form">
+          <div class="mms-field">
+            <label class="mms-label" for="bo-name">Brand name</label>
+            <input id="bo-name" class="mms-input" name="brandName" maxlength="40" placeholder="MMSBUILD" data-brand-name />
+            <p class="mms-hint">Their products are then named for it — “BrightLeaf CMS”, “BrightLeaf Design”.</p>
+          </div>
+          <div class="mms-field">
+            <label class="mms-label" for="bo-accent">Accent colour</label>
+            <div class="mms-colour">
+              {/* The picker is the quick way, the code is the exact way — a brand
+                  colour usually arrives as a hex code from a style guide, and
+                  picking it out of a gradient by eye would not match it. Whichever
+                  you touch, the other follows. */}
+              <input type="color" class="mms-colour__swatch" value="#15964e"
+                aria-label="Pick the accent colour" data-colour-for="bo-accent" />
+              <input id="bo-accent" class="mms-input" name="accent" maxlength="7"
+                placeholder="#15964e" pattern="^#[0-9a-fA-F]{6}$" spellcheck="false" data-brand-accent />
+            </div>
+            <p class="mms-hint">Buttons and highlights across their projects. Leave it empty to keep MMSBUILD's green.</p>
+          </div>
+        </div>
+
+        <p class="mms-section-title">What their customers will see</p>
+        <div class="mms-brand-preview" data-brand-preview>
+          <img data-brand-preview-logo alt="" hidden />
+          <span class="mms-brand-name" data-brand-preview-name>MMSBUILD</span>
+          <span class="mms-muted" data-brand-preview-product>MMS-CMS</span>
+          <span class="mms-brand-swatch" data-brand-preview-swatch></span>
+        </div>
+
+        <p class="mms-section-title">Pictures</p>
+        <div class="mms-form">
+          <ImageField
+            name="logo"
+            label="Logo"
+            hint="Shown in the header their customers see. A pasted address is copied here once when you save, so their customers never call that server."
+          />
+          <ImageField
+            name="logoDark"
+            label="Logo for dark mode (optional)"
+            hint="Only needed when the logo above disappears on a dark background. Left empty, that one is used for both."
+          />
+          <ImageField
+            name="icon"
+            label="Browser tab icon"
+            hint="A square image. It replaces the MMSBUILD mark in the browser tab."
+          />
+        </div>
+
+        <Fragment slot="footer">
+          <button type="button" class="mms-btn mms-btn--secondary" data-close-modal>Cancel</button>
+          <button type="submit" class="mms-btn mms-btn--primary">Save branding</button>
         </Fragment>
       </Modal>
 

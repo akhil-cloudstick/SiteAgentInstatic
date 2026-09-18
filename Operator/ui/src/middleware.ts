@@ -4,7 +4,7 @@
 // down) sends the browser to sign in. The control plane checks the session
 // again on every call, so this is the front door, not the only lock.
 import { defineMiddleware } from 'astro:middleware';
-import { basePath, cpFetch, safeNext } from './lib/cp';
+import { basePath, cpLoad, safeNext } from './lib/cp';
 
 export const onRequest = defineMiddleware(async (ctx, next) => {
   const base = basePath();
@@ -15,8 +15,10 @@ export const onRequest = defineMiddleware(async (ctx, next) => {
 
   let admin = null;
   try {
-    const r = await cpFetch(ctx.cookies, '/api/admin/session');
-    if (r.ok) admin = (await r.json()).admin ?? null;
+    // cpLoad, not cpFetch: the layout needs this same answer for the brand and
+    // for any open act-as grant, and one request should not ask twice.
+    const r = await cpLoad(ctx.cookies, '/api/admin/session');
+    if (r.ok) admin = r.body.admin ?? null;
   } catch {
     admin = null; // cannot verify: fail closed
   }

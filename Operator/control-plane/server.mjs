@@ -21,6 +21,11 @@ import { validateAdminLogin } from './registry/adminUsers.mjs';
 import { verifyPersonPassword } from './registry/tenantUsers.mjs';
 import { getBusinessInScope, getOperatorInScope, connectorBusiness } from './registry/org.mjs';
 import { handleOrgApi, requirePlatform } from './api/orgApi.mjs';
+import { handleActAsApi, requireOpenWork, actorPair } from './api/actAsApi.mjs';
+import { recordAdminAction, listAdminAudit } from './registry/adminAudit.mjs';
+import { sweepExpiredGrants, activeGrants } from './registry/actAs.mjs';
+import { brandForScope, productName } from './lib/brand.mjs';
+import { syncPeopleSoon } from './provisioner/peopleSync.mjs';
 import { isPlatform } from './lib/scope.mjs';
 import { decorate } from './lib/tenantView.mjs';
 import * as rt from './runtime/tenantRuntime.mjs';
@@ -128,9 +133,16 @@ async function adminLogin(req, res) {
   const admin = await validateAdminLogin(email, String(b.password || ''));
   if (!admin) {
     recordLoginFailure(email);
+    // Recorded with the address that was tried, so a run of failures against
+    // one account is visible rather than only rate-limited.
+    recordAdminAction({
+      admin: { id: null, email: email || 'unknown', scope_level: 'unknown' },
+      action: 'admin.login.failed', ok: false, ip: req.socket?.remoteAddress ?? null,
+    });
     return send(res, 401, { error: 'Wrong email or password.' });
   }
   clearLoginFailures(email);
+  recordAdminAction({ admin, action: 'admin.login', ip: req.socket?.remoteAddress ?? null });
   return send(res, 200, {
     session: signAdminSession(admin),
     maxAgeSec: ADMIN_SESSION_TTL_SEC,
@@ -247,7 +259,27 @@ const server = http.createServer(async (req, res) => {
 
     if (path === '/api/admin/login' && method === 'POST') return adminLogin(req, res);
     if (path === '/api/admin/session' && method === 'GET') {
-      return send(res, 200, { admin: { ...admin, scopeName: await scopeName(scope) } });
+      // The console asks this on every page, so it carries what every page
+      // needs: who you are, the brand this administrator's console wears (R5),
+      // and whether you are currently inside somebody's work.
+      const brand = await brandForScope(scope);
+      // Only a platform administrator can hold a grant, so nobody else pays for
+      // the lookup — this route answers every page the console renders.
+      const grants = isPlatform(scope) ? await activeGrants(admin?.id) : [];
+      const grant = grants[0] || null;
+      return send(res, 200, {
+        admin: { ...admin, scopeName: await scopeName(scope) },
+        brand: brand.isPlatform ? null : {
+          name: brand.name,
+          logoLight: brand.logoLight,
+          logoDark: brand.logoDark,
+          accent: brand.accent,
+          console: productName(brand, 'console'),
+        },
+        acting: grant
+          ? { slug: grant.tenant_slug, project: grant.project_name || grant.tenant_slug, business: grant.business_name || null }
+          : null,
+      });
     }
 
     // Step-up for portal people (NEW-3b). A project's CMS asks whether this is
@@ -269,6 +301,21 @@ const server = http.createServer(async (req, res) => {
 
     // Levels, a project's people, console administrators (api/orgApi.mjs).
     if (await handleOrgApi({ req, res, method, path, admin, send, readJson })) return;
+
+    // Acting as a business — the one way the platform owner opens the work (R5).
+    if (await handleActAsApi({ req, res, method, path, admin, send, readJson })) return;
+
+    // The record of who did what, and on whose behalf. Scope-filtered, so an
+    // Operator's administrators read their own estate's trail and no further.
+    if (path === '/api/audit' && method === 'GET') {
+      const url = new URL(req.url, 'http://x');
+      return send(res, 200, {
+        events: await listAdminAudit(scope, {
+          tenantSlug: url.searchParams.get('tenant'),
+          limit: url.searchParams.get('limit'),
+        }),
+      });
+    }
 
     if (path === '/api/health') {
       // Liveness is public; which projects are running is platform detail.
@@ -316,6 +363,16 @@ const server = http.createServer(async (req, res) => {
           ? await connectorBusiness()
           : await getBusinessInScope(scope, body.businessId);
         if (!business) return send(res, 404, { error: 'Choose a business you manage.' });
+        // Recorded with the owner address that was chosen: naming yourself the
+        // owner of a new project is a way in, and one nobody could see before.
+        recordAdminAction({
+          admin,
+          action: 'tenant.create',
+          targetType: 'business',
+          targetId: String(business.id),
+          detail: { name: body.name ?? null, ownerEmail: body.ownerEmail ?? null, tier: body.tier ?? null, viaConnector },
+          ip: req.socket?.remoteAddress ?? null,
+        });
         return send(res, 200, await provisionTenant({
           name: body.name,
           ownerEmail: body.ownerEmail,
@@ -373,9 +430,13 @@ const server = http.createServer(async (req, res) => {
       if (method === 'POST') {
         const b = await readJson(req);
         if (!b.tenantSlug) throw new Error('tenantSlug is required');
-        if (!(await tenantsRepo.getTenantInScope(scope, String(b.tenantSlug)))) {
+        const forKey = await tenantsRepo.getTenantInScope(scope, String(b.tenantSlug));
+        if (!forKey) {
           return send(res, 404, { error: 'not found' });
         }
+        // Minting a key IS opening the work: the key it returns reads and
+        // writes this project's content and design (R5, AC-A5.1).
+        const keyGrant = await requireOpenWork(admin, forKey);
         const permissions = b.preset
           ? normalizePermissions(PERMISSION_PRESETS[b.preset])
           : normalizePermissions(b.permissions);
@@ -386,6 +447,16 @@ const server = http.createServer(async (req, res) => {
           permissions,
           tables: normalizeTables(b.tables),
           expiresInDays: b.expiresInDays,
+        });
+        recordAdminAction({
+          admin,
+          actAs: actorPair(keyGrant, forKey.business_id),
+          action: 'agent.key.mint',
+          tenantSlug: forKey.slug,
+          targetType: 'agent_key',
+          targetId: agent.key_id ?? agent.keyId ?? null,
+          detail: { label: agent.label ?? b.label ?? null, permissions, preset: b.preset ?? null },
+          ip: req.socket?.remoteAddress ?? null,
         });
         // `token` is present exactly once, here.
         return send(res, 200, { agent, endpoint: `${config.gatewayOrigin}/mcp/${b.tenantSlug}` });
@@ -400,24 +471,25 @@ const server = http.createServer(async (req, res) => {
         mcpAgents.agentKeyCounts(scope),
       ]);
       const byTenant = new Map(counts.map((c) => [c.tenant_slug, c]));
-      const rows = await Promise.all(
-        tenants.map(async (t) => {
-          const c = byTenant.get(t.slug);
-          // Probing costs an SSO round-trip per tenant, so only ask a tenant
-          // that could actually answer. A stopped or unprovisioned one reports
-          // `null` (unknown) rather than a misleading "not installed".
-          const reachable = t.status === 'active' && !!t.port;
-          return {
-            slug: t.slug,
-            status: t.status,
-            endpoint: `${config.gatewayOrigin}/mcp/${t.slug}`,
-            activeKeys: c ? Number(c.active) : 0,
-            totalKeys: c ? Number(c.total) : 0,
-            lastUsed: c ? c.last_used : null,
-            bridgeInstalled: reachable ? await pluginInstalled(t.slug).catch(() => false) : null,
-          };
-        }),
-      );
+      // Listing keys no longer probes each project. The probe opened an OWNER
+      // session inside every reachable tenant on every load of this page —
+      // the platform owner reading the work by accident, which R5 forbids, and
+      // an SSO round-trip per project besides. Whether the bridge is installed
+      // is now what the last install recorded; the probe is a deliberate,
+      // gated act (`?probe=<slug>` below).
+      const rows = tenants.map((t) => {
+        const c = byTenant.get(t.slug);
+        return {
+          slug: t.slug,
+          status: t.status,
+          endpoint: `${config.gatewayOrigin}/mcp/${t.slug}`,
+          activeKeys: c ? Number(c.active) : 0,
+          totalKeys: c ? Number(c.total) : 0,
+          lastUsed: c ? c.last_used : null,
+          bridgeInstalled: t.bridge_installed_at ? true : null,
+          bridgeInstalledAt: t.bridge_installed_at ?? null,
+        };
+      });
       return send(res, 200, { tenants: rows });
     }
     if (path === '/api/mcp/audit' && method === 'GET') {
@@ -434,7 +506,42 @@ const server = http.createServer(async (req, res) => {
     if (mcpInstall && method === 'POST') {
       const t = await tenantsRepo.getTenantInScope(scope, mcpInstall[1]);
       if (!t) return send(res, 404, { error: 'not found' });
-      return send(res, 200, await installBridge(t.slug));
+      // Installing writes into the project's CMS over an owner session, so it
+      // is opening the work by any honest reading of it (R5).
+      const grant = await requireOpenWork(admin, t);
+      const out = await installBridge(t.slug);
+      await tenantsRepo.markBridgeInstalled(t.slug);
+      recordAdminAction({
+        admin,
+        actAs: actorPair(grant, t.business_id),
+        action: 'bridge.install',
+        tenantSlug: t.slug,
+        targetType: 'tenant',
+        targetId: t.slug,
+        ip: req.socket?.remoteAddress ?? null,
+      });
+      return send(res, 200, out);
+    }
+    // Ask ONE project whether its bridge is there. Deliberate, gated and
+    // recorded, because the answer costs a session inside that project.
+    const mcpProbe = path.match(/^\/api\/mcp\/tenants\/([a-z0-9-]+)\/probe-bridge$/);
+    if (mcpProbe && method === 'POST') {
+      const t = await tenantsRepo.getTenantInScope(scope, mcpProbe[1]);
+      if (!t) return send(res, 404, { error: 'not found' });
+      const grant = await requireOpenWork(admin, t);
+      const installed = t.status === 'active' && t.port ? await pluginInstalled(t.slug).catch(() => false) : null;
+      if (installed) await tenantsRepo.markBridgeInstalled(t.slug);
+      recordAdminAction({
+        admin,
+        actAs: actorPair(grant, t.business_id),
+        action: 'bridge.probe',
+        tenantSlug: t.slug,
+        targetType: 'tenant',
+        targetId: t.slug,
+        detail: { installed },
+        ip: req.socket?.remoteAddress ?? null,
+      });
+      return send(res, 200, { slug: t.slug, bridgeInstalled: installed });
     }
 
     // Revoke only. A minted key is shown once, in the mint response, and can
@@ -462,7 +569,23 @@ const server = http.createServer(async (req, res) => {
       if (action === 'deploy' && method === 'POST') return send(res, 200, await deployTenant(slug));
       if (action === 'update' && method === 'POST') return send(res, 200, await editTenant(slug, await readJson(req)));
       if (action === 'repair' && method === 'POST') return send(res, 200, await repairTenantCf(slug));
-      if (action === 'expose' && method === 'POST') return send(res, 200, await pointTestFunnel(slug));
+      if (action === 'expose' && method === 'POST') {
+        // This points the PUBLIC funnel at a project's CMS with no session in
+        // front of it — the widest way there is to open a business's work, and
+        // it was one unlinked URL away. Gated and recorded like the rest.
+        const grant = await requireOpenWork(admin, tenant);
+        const out = await pointTestFunnel(slug);
+        recordAdminAction({
+          admin,
+          actAs: actorPair(grant, tenant.business_id),
+          action: 'tenant.expose',
+          tenantSlug: slug,
+          targetType: 'tenant',
+          targetId: slug,
+          ip: req.socket?.remoteAddress ?? null,
+        });
+        return send(res, 200, out);
+      }
     }
     // An admin route no handler above claimed ends here. It must never fall
     // through to the tenant proxy below with an administrator's request.
@@ -515,6 +638,32 @@ process.on('unhandledRejection', (err) => {
 // --- boot ---
 await migrate();
 const resumed = await resumeAll();
+
+// An act-as grant lasts an hour, and expiry has to be swept rather than merely
+// checked when someone signs in: the products hold their own sessions, so a
+// grant whose person row still exists is still an account they honour. Every
+// five minutes, and once at startup, so a grant cannot outlive a restart.
+const sweepGrants = async () => {
+  try {
+    const ended = await sweepExpiredGrants();
+    for (const person of ended) {
+      syncPeopleSoon(person.tenant_slug, 0);
+      recordAdminAction({
+        admin: { id: person.staff_admin_id, email: 'expired-grant', scope_level: 'platform' },
+        actAs: { grantId: person.staff_grant_id, businessId: null },
+        action: 'act_as.expired',
+        tenantSlug: person.tenant_slug,
+        targetType: 'tenant',
+        targetId: person.tenant_slug,
+      });
+    }
+    if (ended.length) console.log(`[act-as] ended ${ended.length} expired grant(s)`);
+  } catch (e) {
+    console.error('[act-as] expiry sweep failed:', e.message);
+  }
+};
+await sweepGrants();
+setInterval(sweepGrants, 5 * 60_000).unref();
 server.listen(config.controlPlanePort, '127.0.0.1', async () => {
   console.log(`[control-plane] listening on ${config.publicBaseUrl}`);
   console.log(`[control-plane] resumed instances: ${resumed.length ? resumed.join(', ') : '(none)'}`);

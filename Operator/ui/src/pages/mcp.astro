@@ -76,6 +76,9 @@ if (Astro.request.method === 'POST') {
     } else if (intent === 'revoke') {
       await okJson(await cpFetch(Astro.cookies, `/api/mcp/agents/${encodeURIComponent(String(f.get('keyId') || ''))}/revoke`, { method: 'POST' }), 'Could not revoke the key');
       return Astro.redirect(`${base}mcp?revoked=1`, 303);
+    } else if (intent === 'probe-bridge') {
+      const slug = String(f.get('tenantSlug') || '');
+      await okJson(await cpFetch(Astro.cookies, `/api/mcp/tenants/${encodeURIComponent(slug)}/probe-bridge`, { method: 'POST' }), 'Could not check the bridge');
     } else if (intent === 'install-bridge') {
       const slug = String(f.get('tenantSlug') || '');
       const out = await okJson(await cpFetch(Astro.cookies, `/api/mcp/tenants/${encodeURIComponent(slug)}/install-bridge`, { method: 'POST' }), 'Could not install the bridge');
@@ -115,7 +118,7 @@ const activeProjects = directory.filter((t) => t.status !== 'removed');
 const projectOptions = activeProjects.map((t) => ({
   value: t.slug,
   label: t.slug,
-  hint: t.bridgeInstalled ? 'Bridge installed' : t.bridgeInstalled === null ? 'Project not running' : 'Bridge not installed — content tools won’t work yet',
+  hint: t.bridgeInstalled ? 'Bridge installed' : 'Bridge not confirmed — use Check on the project below',
 }));
 const fmt = (v: string | null) => (v ? new Date(v).toLocaleString() : 'Never');
 const keyState = (a: any) => (a.revokedAt ? 'revoked' : a.expiresAt && new Date(a.expiresAt) < new Date() ? 'expired' : 'active');
@@ -236,17 +239,25 @@ const keyState = (a: any) => (a.revokedAt ? 'revoked' : a.expiresAt && new Date(
                     </span>
                   </td>
                   <td>
-                    {t.bridgeInstalled === null
-                      ? <StatusChip>Project not running</StatusChip>
-                      : t.bridgeInstalled
-                        ? <StatusChip tone="success" dot>Installed</StatusChip>
-                        : <StatusChip tone="warning" dot>Not installed</StatusChip>}
+                    {t.bridgeInstalled
+                      ? <StatusChip tone="success" dot>Installed</StatusChip>
+                      : <StatusChip>Not checked</StatusChip>}
+                    {t.bridgeInstalledAt && <div class="mms-hint">since {fmt(t.bridgeInstalledAt)}</div>}
                   </td>
                   <td>{t.activeKeys}</td>
                   <td class="mms-muted">{fmt(t.lastUsed)}</td>
                   <td>
                     <div class="mms-cell-actions">
-                      {t.bridgeInstalled !== null && (
+                      {t.status === 'active' && (
+                        <form method="POST" style="margin:0">
+                          <input type="hidden" name="intent" value="probe-bridge" />
+                          <input type="hidden" name="tenantSlug" value={t.slug} />
+                          <button type="submit" class="mms-btn mms-btn--ghost mms-btn--sm" data-busy="Checking the project">
+                            <i class="fa-solid fa-stethoscope" aria-hidden="true"></i> Check
+                          </button>
+                        </form>
+                      )}
+                      {t.status === 'active' && (
                         <button type="button" class="mms-btn mms-btn--secondary mms-btn--sm" data-open-modal="install-bridge"
                           data-prefill-tenantSlug={t.slug}
                           data-fill-message={`${t.bridgeInstalled ? 'Reinstall' : 'Install'} the bridge on ${t.slug}? It is built from source and installed into that project.`}>

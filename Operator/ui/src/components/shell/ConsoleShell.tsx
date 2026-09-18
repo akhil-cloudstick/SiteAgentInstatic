@@ -17,13 +17,14 @@ import {
   FaIcon,
   MmsShellHeader,
   MmsSpecialistRow,
+  type ShellBrand,
   type ShellDestination,
   type ShellNotificationItem,
   type ShellTheme,
 } from '@mms/shell'
 import styles from './ConsoleShell.module.css'
 
-export type ConsoleSection = 'org' | 'projects' | 'access' | 'mcp' | 'settings'
+export type ConsoleSection = 'org' | 'projects' | 'access' | 'mcp' | 'activity' | 'settings'
 export type ScopeLevel = 'platform' | 'operator' | 'business'
 
 export interface ConsoleShellProps {
@@ -34,6 +35,14 @@ export interface ConsoleShellProps {
   admin: { email: string; level: ScopeLevel; scopeName: string | null }
   initialTheme: ShellTheme
   notifications: ShellNotificationItem[]
+  /**
+   * The Operator's own branding, resolved per request by the server (R5).
+   * null for the platform's own administrators, and for an Operator that has
+   * set nothing — both of which wear MMSBUILD's mark.
+   */
+  brand?: ShellBrand | null
+  /** Set while this administrator is acting as a business, so the console says so. */
+  acting?: { project: string; business: string | null; slug: string } | null
 }
 
 const READ_KEY = 'mms-operator:notifications-read'
@@ -73,7 +82,7 @@ function applyTheme(theme: ShellTheme): void {
   }
 }
 
-export function ConsoleShell({ productName, base, active, admin, initialTheme, notifications }: ConsoleShellProps) {
+export function ConsoleShell({ productName, base, active, admin, initialTheme, notifications, brand, acting }: ConsoleShellProps) {
   const [theme, setTheme] = useState<ShellTheme>(initialTheme)
   const [helpOpen, setHelpOpen] = useState(false)
   const [read, setRead] = useState<string[]>([])
@@ -92,6 +101,7 @@ export function ConsoleShell({ productName, base, active, admin, initialTheme, n
     { id: 'projects', label: 'Projects', icon: 'globe', href: `${base}projects`, active: active === 'projects' },
     { id: 'access', label: 'Access', icon: 'user-shield', href: `${base}access`, active: active === 'access' },
     { id: 'mcp', label: 'MCP Agents', icon: 'robot', href: `${base}mcp`, active: active === 'mcp' },
+    { id: 'activity', label: 'Activity', icon: 'clipboard-list', href: `${base}activity`, active: active === 'activity' },
     ...(isPlatform
       ? [{ id: 'settings', label: 'Settings', icon: 'gear', href: `${base}settings`, active: active === 'settings' }]
       : []),
@@ -99,6 +109,21 @@ export function ConsoleShell({ productName, base, active, admin, initialTheme, n
 
   return (
     <>
+      {acting && (
+        // The console is where an open grant is most likely to be forgotten —
+        // you leave the project's tab and come back here. Same words as the
+        // banner inside the products, and the same one-click way out.
+        <div className="mms-acting" role="status">
+          <span>
+            You are acting as <strong>{acting.business || acting.project}</strong>. Everything you do is recorded.
+          </span>
+          <form method="POST" action={`${base}projects`} style={{ margin: 0 }}>
+            <input type="hidden" name="intent" value="act-as-exit" />
+            <input type="hidden" name="slug" value={acting.slug} />
+            <button type="submit" className="mms-acting-exit">End session</button>
+          </form>
+        </div>
+      )}
       <MmsShellHeader
         productLabel={productName}
         hubContext={null}
@@ -130,6 +155,7 @@ export function ConsoleShell({ productName, base, active, admin, initialTheme, n
         }}
         accountSlot={<AccountMenu base={base} email={admin.email} scope={scopeLabel(admin.level, admin.scopeName)} />}
         brandTarget={{ href: base }}
+        brand={brand ?? null}
       />
       <MmsSpecialistRow
         productName={productName}

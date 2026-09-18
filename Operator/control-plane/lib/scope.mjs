@@ -68,6 +68,26 @@ export function canReachRecord(scope, record) {
 }
 
 /**
+ * May this scope OPEN a project's work — its design or its content (R5)?
+ *
+ * Reaching a project and opening it are different questions. The Platform
+ * Owner reaches everything, because counts and status across the estate are
+ * its job; it opens nothing, because a customer's work is not. Opening is a
+ * distinct, logged "acting as" mode, and `actAs` is that grant: the one
+ * project it names, for as long as it lasts.
+ *
+ * Operator and Business administrators are unchanged — R5 constrains the
+ * Platform Owner only. Widening act-as to them later (an Operator entering one
+ * of its own Businesses, per the platform vision) is a change to this one
+ * predicate and to nothing else.
+ */
+export function canOpenWork(scope, record, actAs = null) {
+  if (!canReachRecord(scope, record)) return false;
+  if (scope.level !== 'platform') return true;
+  return !!actAs && !!record.slug && String(actAs.slug) === String(record.slug);
+}
+
+/**
  * A WHERE fragment naming the scope's address, with its parameters appended
  * after `params`. `alias` is the table alias carrying operator_id/business_id.
  */

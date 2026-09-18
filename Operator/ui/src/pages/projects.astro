@@ -18,6 +18,10 @@ const base = basePath();
 const scope = Astro.locals.admin?.scope ?? { level: 'platform' };
 // A Business administrator works inside one Business: nothing to move between.
 const canMove = scope.level !== 'business';
+// Opening a project's work is the platform owner's one gated action (R5): it
+// goes through “Act as”, which records why. Everyone else already reaches
+// only their own projects, so they open them as they always did.
+const isPlatform = scope.level === 'platform';
 let error = '';
 
 const json = (body: unknown) => ({
@@ -62,6 +66,17 @@ if (Astro.request.method === 'POST') {
       await okJson(await cpFetch(Astro.cookies, `/api/tenants/${slug}/repair`, { method: 'POST' }), 'Cloudflare setup failed');
     } else if (valid && intent === 'start') {
       await okJson(await cpFetch(Astro.cookies, `/api/tenants/${slug}/start`, { method: 'POST' }), 'Could not start the project');
+    } else if (valid && intent === 'act-as') {
+      const r = await cpFetch(Astro.cookies, '/api/act-as', json({ slug, reason: f.get('reason') }));
+      const j = await okJson(r, 'Could not start acting as that business');
+      for (const cookie of r.headers.getSetCookie?.() ?? []) Astro.response.headers.append('set-cookie', cookie);
+      // Straight into the project's own hub, as the person the grant created.
+      return Astro.redirect(j.redirect || '/hub', 303);
+    } else if (intent === 'act-as-exit') {
+      const r = await cpFetch(Astro.cookies, '/api/act-as/exit', json({ slug: slug || null }));
+      await okJson(r, 'Could not end the session');
+      for (const cookie of r.headers.getSetCookie?.() ?? []) Astro.response.headers.append('set-cookie', cookie);
+      return Astro.redirect(`${base}projects`, 303);
     } else if (valid && intent === 'remove') {
       const cf = f.get('deleteCf') ? '?cf=1' : '';
       await okJson(await cpFetch(Astro.cookies, `/api/tenants/${slug}${cf}`, { method: 'DELETE' }), 'Could not remove the project');
@@ -218,9 +233,14 @@ const presetBusiness = Astro.url.searchParams.get('business') || (businesses.len
                 </td>
                 <td>
                   <div class="mms-cell-actions">
-                    {state === 'running' && (
+                    {state === 'running' && (isPlatform ? (
+                      <button type="button" class="mms-btn mms-btn--secondary mms-btn--sm" data-open-modal="act-as"
+                        data-fill-project={name} data-prefill-slug={t.slug} data-fill-business={t.business_name || ''}>
+                        Act as
+                      </button>
+                    ) : (
                       <a class="mms-btn mms-btn--secondary mms-btn--sm" href="/login" target="_blank" rel="noreferrer">Open</a>
-                    )}
+                    ))}
                     <RowMenu label={`Actions for ${name}`}>
                       <button type="button" class="mms-menu__item" role="menuitem" data-open-modal={`details-${t.slug}`}>
                         <i class="fa-solid fa-circle-info" aria-hidden="true"></i> Details
@@ -285,7 +305,28 @@ const presetBusiness = Astro.url.searchParams.get('business') || (businesses.len
                     </RowMenu>
                   </div>
 
-                  <Modal id={`details-${t.slug}`} title={name} eyebrow="Project details" size="lg">
+                  <Modal id="act-as" title="Act as this business" eyebrow="Projects" size="md" intent="act-as" busy="Opening the project">
+    <input type="hidden" name="slug" />
+    <p class="mms-muted" style="margin:0 0 14px">
+      You are about to open <strong data-fill="project">this project</strong>'s design and content as
+      platform staff. You will appear on its People list as “Platform staff”, every action is recorded
+      against your name, and the session ends after an hour or when you end it.
+    </p>
+    <div class="mms-form">
+      <div class="mms-field">
+        <label class="mms-label" for="aa-reason">Why are you opening it?</label>
+        <input id="aa-reason" class="mms-input" name="reason" required maxlength="200"
+          placeholder="e.g. fixing the broken contact form they reported" />
+        <p class="mms-hint">This goes on the record beside your name, and the customer can see that staff were in.</p>
+      </div>
+    </div>
+    <Fragment slot="footer">
+      <button type="button" class="mms-btn mms-btn--secondary" data-close-modal>Cancel</button>
+      <button type="submit" class="mms-btn mms-btn--primary">Open as platform staff</button>
+    </Fragment>
+  </Modal>
+
+  <Modal id={`details-${t.slug}`} title={name} eyebrow="Project details" size="lg">
                     <dl class="mms-kv">
                       <dt>Address (fixed)</dt><dd class="mms-mono">{t.slug}</dd>
                       <dt>Business</dt><dd>{t.business_name || '—'}{t.operator_name ? ` · ${t.operator_name}` : ' · direct'}</dd>

@@ -27,6 +27,8 @@ import { getTenant } from '../registry/tenants.mjs';
 import { getBusiness } from '../registry/org.mjs';
 import { readActiveProducts } from '../registry/settings.mjs';
 import { currentPersonCached } from '../hub/hubSession.mjs';
+import { PLATFORM_BRAND, brandForTenant, brandForWire, productName } from '../lib/brand.mjs';
+import { readOperatorArtwork } from '../registry/org.mjs';
 import * as odRuntime from '../runtime/odRuntime.mjs';
 import * as tenantRuntime from '../runtime/tenantRuntime.mjs';
 import { ensureOdUp, ensureTenantUp } from '../provisioner/provision.mjs';
@@ -91,7 +93,17 @@ function userFromPerson(person, tenant) {
 async function hubContextFor(tenant, person) {
   const business = tenant?.business_id ? await getBusiness(tenant.business_id) : null;
   const products = await readActiveProducts();
+  const brand = tenant ? await brandForTenant(tenant.slug) : PLATFORM_BRAND;
   return {
+    // The Operator's mark and name, or null when this project sits directly
+    // under the platform and wears MMSBUILD's (R5). The shared header reads
+    // this; no product needs its own copy of the rule.
+    brand: brandForWire(brand),
+    // Platform staff working on this project are named as what they are, so
+    // the products' own logs say "acting as", never the business itself.
+    staff: person?.staff_admin_id
+      ? { email: person.email || null, actingAs: business?.name || tenant?.display_name || tenant?.slug || null }
+      : null,
     // The ORIGIN, not the origin + '/hub'. The shared header appends hub-relative
     // paths to this (hubLinkHref), so including '/hub' here produced '/hub/hub'.
     // Instatic's own producer (server/auth/hubContext.ts) has always sent the
@@ -145,6 +157,140 @@ function isConsoleDevAsset(req, path) {
   if (VITE_ONLY_PREFIXES.some((p) => path.startsWith(p))) return true;
   if (!SHARED_SHAPE_PREFIXES.some((p) => path.startsWith(p))) return false;
   return fromConsole(req.headers.referer);
+}
+
+const escAttr = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+// The icon addresses baked into the two products' built HTML. They are asked
+// for by name, one build for every project, so answering them per-Operator is
+// how a branded favicon happens at all (R5).
+const BAKED_ICON_PATHS = new Set([
+  '/favicon.ico', '/favicon-32x32.png', '/favicon-16x16.png', '/apple-touch-icon.png',
+  '/design/favicon.ico', '/design/favicon-32x32.png', '/design/favicon-16x16.png', '/design/apple-touch-icon.png',
+]);
+
+/** The acting-as banner's contents, or null when this is an ordinary person. */
+function actingFor(person, tenant) {
+  if (!person?.staff_admin_id) return null;
+  return {
+    email: person.email || null,
+    project: tenant?.display_name || tenant?.slug || null,
+    business: null, // filled by the business name when the caller has it
+  };
+}
+
+/** The brand this request's session means — the platform's when there is none. */
+async function brandForRequest(req) {
+  const slug = await sessionSlug(req);
+  return slug ? brandForTenant(slug) : PLATFORM_BRAND;
+}
+
+/**
+ * Answer one piece of an Operator's artwork.
+ *
+ * The version is in the ETag, not just in the URL, because the addresses the
+ * products ask for are FIXED: without a version a browser that cached one
+ * Operator's favicon at `/favicon-32x32.png` would go on showing it after a
+ * rebrand, and — on a shared machine — for the next Operator too.
+ */
+async function serveBrandArtwork(req, res, { operatorId, artwork }) {
+  const art = await readOperatorArtwork(operatorId, artwork).catch(() => null);
+  if (!art) {
+    res.writeHead(404, { 'content-type': 'text/plain' });
+    res.end('not found');
+    return;
+  }
+  const etag = `"op${operatorId}-${artwork}-v${art.version}"`;
+  if (req.headers['if-none-match'] === etag) {
+    res.writeHead(304, { etag, 'cache-control': 'private, max-age=0, must-revalidate', vary: 'Cookie' });
+    res.end();
+    return;
+  }
+  res.writeHead(200, {
+    'content-type': art.mime || 'image/png',
+    'content-length': String(art.bytes.length),
+    etag,
+    // Private: these addresses are shared between Operators, and only the
+    // session says which one is looking.
+    'cache-control': 'private, max-age=0, must-revalidate',
+    vary: 'Cookie',
+    'x-content-type-options': 'nosniff',
+  });
+  res.end(art.bytes);
+}
+
+/**
+ * Rewrite one built document so it wears an Operator's brand (R5, S3–S6).
+ *
+ * Both products bake their <title> and icon at build time, and ONE build
+ * serves every project, so this is the only place a per-Operator title or
+ * favicon can be applied without a build per agency.
+ *
+ * The title is REPLACED, never appended: a browser honours the first <title>
+ * in a document, so an added one is invisible and would have looked like the
+ * feature working for anyone who only checked the HTML.
+ *
+ * The accent is defined on `html:root` rather than `:root` so it outranks BOTH
+ * the light and the dark token block in the shared stylesheet without this
+ * code having to know which theme is showing.
+ */
+function brandDocRewriter(brand, product, acting = null) {
+  if ((!brand || brand.isPlatform) && !acting) return null;
+  const name = productName(brand, product);
+  const parts = [];
+  if (brand && !brand.isPlatform) {
+    if (brand.accent) {
+      parts.push(`<style>html:root{--mms-action:${brand.accent};--mms-action-strong:${brand.accent}}</style>`);
+    }
+    if (brand.icon) {
+      parts.push(`<link rel="icon" href="${escAttr(brand.icon)}">`);
+    }
+  }
+  const head = parts.join('');
+  // The product's own name is a module-level constant in its bundle, read the
+  // first time any module loads. Publishing it on the document BEFORE the
+  // bundle runs is what lets "MMS-CMS" read "BrightLeaf CMS" without a build
+  // per Operator — and why this goes at the START of <head>, not the end.
+  const earlyHead = brand && !brand.isPlatform
+    ? `<script>window.__mmsBrandName=${JSON.stringify(name).replace(/</g, '\\u003c')}</script>`
+    : '';
+  return (html) => {
+    let out = html;
+    if (brand && !brand.isPlatform) {
+      out = /<title[^>]*>[\s\S]*?<\/title>/i.test(out)
+        ? out.replace(/<title[^>]*>[\s\S]*?<\/title>/i, `<title>${escAttr(name)}</title>`)
+        : out;
+      if (earlyHead) {
+        const open = out.indexOf('<head>');
+        out = open >= 0 ? out.slice(0, open + 6) + earlyHead + out.slice(open + 6) : earlyHead + out;
+      }
+      if (head) {
+        // At the END of <head>, so it beats the document's own <link rel=icon>
+        // and the stylesheet whose token it is overriding.
+        const close = out.toLowerCase().lastIndexOf('</head>');
+        out = close >= 0 ? out.slice(0, close) + head + out.slice(close) : head + out;
+      }
+    }
+    if (acting) out = out.replace(/<body([^>]*)>/i, (m) => m + actingBanner(acting));
+    return out;
+  };
+}
+
+/**
+ * The banner platform staff see while they are inside somebody's work.
+ *
+ * Rendered by the gateway rather than by each product, so it is byte-identical
+ * in MMS-CMS and MMS-Design and cannot be forgotten by one of them. It is not
+ * dismissible: a mode you can hide is a mode you forget you are in, and this
+ * one carries somebody else's customer's data.
+ */
+function actingBanner({ business, project, email }) {
+  const who = escAttr(business || project || 'this business');
+  return `<div id="mms-acting-as" role="status" style="position:sticky;top:0;z-index:2147483000;display:flex;gap:12px;align-items:center;justify-content:center;flex-wrap:wrap;padding:8px 16px;background:#8a2a1a;color:#fff;font:600 13px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif">`
+    + `<span>Platform staff — you are acting as <strong>${who}</strong>. Everything you do is recorded.</span>`
+    + `<form method="POST" action="/act-as/exit" style="margin:0">`
+    + `<button type="submit" style="font:inherit;padding:4px 12px;border-radius:999px;border:1px solid rgba(255,255,255,.6);background:transparent;color:#fff;cursor:pointer">End session</button>`
+    + `</form></div>`;
 }
 
 // Serialized into a <script> block. Only `<` needs escaping: an unescaped
@@ -250,7 +396,7 @@ function isDaemonPath(p) {
 // scheme/host so it can build correct absolute URLs and set Secure cookies.
 // `rewritePath` overrides the upstream path (used to restore the OD basePath).
 function forward(req, res, target) {
-  const { port, prefix, rewritePath, injectHead, kind } = target;
+  const { port, prefix, rewritePath, injectHead, kind, rewriteDoc } = target;
   const headers = { ...req.headers };
   headers.host = `127.0.0.1:${port}`;
   headers['x-forwarded-proto'] = 'https';
@@ -295,14 +441,14 @@ function forward(req, res, target) {
   // Rewriting the body means reading it, so ask the upstream for identity
   // encoding rather than teaching this proxy to gunzip. Only the (small,
   // single) SPA document takes this path; every asset still streams compressed.
-  if (injectHead) delete headers['accept-encoding'];
+  if (injectHead || rewriteDoc) delete headers['accept-encoding'];
 
   const upstream = http.request(
     { host: '127.0.0.1', port, method: req.method, path: rewritePath || req.url, headers },
     (up) => {
       const outHeaders = rewriteLocation(up.headers, prefix);
       const isHtml = (up.headers['content-type'] || '').includes('text/html');
-      if (!injectHead || !isHtml) {
+      if ((!injectHead && !rewriteDoc) || !isHtml) {
         res.writeHead(up.statusCode || 502, outHeaders);
         up.pipe(res);
         return;
@@ -314,13 +460,26 @@ function forward(req, res, target) {
       up.on('data', (chunk) => chunks.push(chunk));
       up.on('end', () => {
         let html = Buffer.concat(chunks).toString('utf8');
-        const at = html.indexOf('<head>');
-        html = at >= 0
-          ? html.slice(0, at + 6) + injectHead + html.slice(at + 6)
-          : injectHead + html;
+        if (injectHead) {
+          const at = html.indexOf('<head>');
+          html = at >= 0
+            ? html.slice(0, at + 6) + injectHead + html.slice(at + 6)
+            : injectHead + html;
+        }
+        // The Operator's own name, mark and colour, written into a document
+        // that was built once for everybody (R5). Both products bake their
+        // title and icon at build time, and there is one build serving every
+        // project, so the only place this can happen is here.
+        if (rewriteDoc) html = rewriteDoc(html);
         const body = Buffer.from(html, 'utf8');
         const finalHeaders = { ...outHeaders, 'content-length': String(body.length) };
         delete finalHeaders['transfer-encoding'];
+        if (rewriteDoc) {
+          // A document that now carries ONE Operator's branding must never be
+          // held by anything shared: the next request may belong to another.
+          finalHeaders['cache-control'] = 'private, no-store';
+          finalHeaders.vary = outHeaders.vary ? `${outHeaders.vary}, Cookie` : 'Cookie';
+        }
         res.writeHead(up.statusCode || 502, finalHeaders);
         res.end(body);
       });
@@ -372,6 +531,23 @@ async function resolveBackend(req, path) {
       rewritePath: rest === '/' ? '/mcp' : rest.startsWith('?') ? '/mcp' + rest : rest,
     };
   }
+  // An Operator's own artwork, by the address the brand resolver hands out.
+  // Public on purpose: a logo has to load on a sign-in page, before anybody has
+  // signed in. It carries no other information — the id is already in every
+  // link the same page renders.
+  const art = path.match(/^\/brand\/(\d+)\/(logo|logo-dark|icon)$/);
+  if (art) return { kind: 'brand-art', operatorId: art[1], artwork: { logo: 'logo', 'logo-dark': 'logoDark', icon: 'icon' }[art[2]] };
+
+  // The icon a baked page asks for. Both products bake their favicon links at
+  // build time, and one build serves every project, so the branded answer is
+  // given at the address they already ask for rather than by rewriting their
+  // markup (R5, S4/S6). An Operator with no icon set falls straight through to
+  // the product's own.
+  if (BAKED_ICON_PATHS.has(path)) {
+    const brand = await brandForRequest(req);
+    if (brand.icon) return { kind: 'brand-art', operatorId: brand.operatorId, artwork: 'icon' };
+  }
+
   // Operator console (Astro, served with base=/operator). The console itself
   // requires an admin sign-in (ui/src/middleware.ts), and so does every API it calls.
   if (path === '/operator' || path.startsWith('/operator/') || isConsoleDevAsset(req, path)) {
@@ -434,7 +610,12 @@ async function resolveBackend(req, path) {
       const tenant = person ? await getTenant(person.tenant_slug) : null;
       // No session, or a session whose tenant is gone: inject nothing. The app
       // then renders its no-Hub shape rather than a stale or borrowed scope.
-      if (tenant) target.injectHead = hubContextScript(await hubContextFor(tenant, person));
+      if (tenant) {
+        target.injectHead = hubContextScript(await hubContextFor(tenant, person));
+        // The tab title, the icon, the accent — and the acting-as banner when
+        // platform staff are inside somebody's work (R5, S5/S6).
+        target.rewriteDoc = brandDocRewriter(await brandForTenant(tenant.slug), 'design', actingFor(person, tenant));
+      }
     }
     return target;
   }
@@ -480,7 +661,16 @@ async function resolveBackend(req, path) {
       // which is luck, not a design, and it hid this whole class of failure.
       const state = await ensureTenantUp(t);
       if (!state.ready) return startingTarget({ tool: 'cms', continueUrl: req.url || path, state });
-      return { port: t.port, kind: 'instatic', readySlug: t.slug, continueUrl: req.url || path };
+      const target = { port: t.port, kind: 'instatic', readySlug: t.slug, continueUrl: req.url || path };
+      // Brand the CMS's own pages — and ONLY those. This same backend serves
+      // the customer's published website at root slugs, and that site is the
+      // customer's own design: putting an agency's title or colour on it would
+      // be rewriting somebody's published pages, which R5 never asked for.
+      if (isDocumentRequest(req) && (path === '/cms' || path.startsWith('/cms/'))) {
+        const person = await currentPersonCached(req);
+        target.rewriteDoc = brandDocRewriter(await brandForTenant(t.slug), 'cms', actingFor(person, t));
+      }
+      return target;
     }
   }
   return null;
@@ -575,6 +765,10 @@ export async function handleGatewayProxy(req, res, method, path) {
   }
   if (target.starting) {
     serveStarting(req, res, target.starting);
+    return true;
+  }
+  if (target.kind === 'brand-art') {
+    await serveBrandArtwork(req, res, target);
     return true;
   }
   forward(req, res, target);

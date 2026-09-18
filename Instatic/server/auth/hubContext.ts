@@ -109,6 +109,13 @@ export function parseHubContextFromSso(url: URL): HubContext | null {
     project: scopeParam(url.searchParams, HUB_CONTEXT_PARAMS.project),
     site: scopeParam(url.searchParams, HUB_CONTEXT_PARAMS.site),
     origin: scopeParam(url.searchParams, HUB_CONTEXT_PARAMS.origin),
+    // The Operator's branding, as handed over. Absent is normal and means the
+    // platform's own (R5).
+    brandName: scopeParam(url.searchParams, HUB_CONTEXT_PARAMS.brandName),
+    brandLogoLight: scopeParam(url.searchParams, HUB_CONTEXT_PARAMS.brandLogoLight),
+    brandLogoDark: scopeParam(url.searchParams, HUB_CONTEXT_PARAMS.brandLogoDark),
+    brandAccent: scopeParam(url.searchParams, HUB_CONTEXT_PARAMS.brandAccent),
+    brandProduct: scopeParam(url.searchParams, HUB_CONTEXT_PARAMS.brandProduct),
     returnUrl: resolveReturnUrl(scopeParam(url.searchParams, HUB_CONTEXT_PARAMS.returnUrl), base),
     // Absent stays absent rather than defaulting to `true`: the schema treats
     // "unknown" as enabled already, and writing a guessed `true` into the

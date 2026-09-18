@@ -78,8 +78,10 @@ const ADMIN_EXACT = new Set([
   '/api/operators',
   '/api/businesses',
   '/api/admins',
+  '/api/act-as',
+  '/api/audit',
 ]);
-const ADMIN_PREFIXES = ['/api/tenants/', '/api/mcp/', '/api/operators/', '/api/businesses/', '/api/admins/'];
+const ADMIN_PREFIXES = ['/api/tenants/', '/api/mcp/', '/api/operators/', '/api/businesses/', '/api/admins/', '/api/act-as/'];
 
 /** Routes under /api/ this server answers without an admin session. */
 export const OPEN_API_PATHS = Object.freeze([

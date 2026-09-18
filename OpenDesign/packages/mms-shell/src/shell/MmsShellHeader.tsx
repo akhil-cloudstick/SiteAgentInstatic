@@ -44,6 +44,7 @@ import { NotificationsButton } from './NotificationsButton'
 import { hubLinkHref, hubNavigationLinks } from './hubNavigation'
 import type {
   HubContext,
+  ShellBrand,
   ShellBrandTarget,
   ShellNotifications,
   ShellTheme,
@@ -96,6 +97,13 @@ export interface MmsShellHeaderProps {
   accountSlot?: ReactNode
   /** Where the logo goes when there is no Hub. */
   brandTarget: ShellBrandTarget
+  /**
+   * An Operator's own branding, for a surface that resolves it itself rather
+   * than receiving a Hub hand-off (the Operator Console). When absent, the
+   * Hub context's brand is used; when that is absent too, the bundled MMSBUILD
+   * mark — so an Operator that has set nothing looks exactly as it did.
+   */
+  brand?: ShellBrand | null
 }
 
 export function MmsShellHeader({
@@ -108,6 +116,7 @@ export function MmsShellHeader({
   notifications,
   accountSlot,
   brandTarget,
+  brand,
   showHubNavWithoutContext = false,
 }: MmsShellHeaderProps) {
   const links = hubContext
@@ -128,6 +137,7 @@ export function MmsShellHeader({
         hubBaseUrl={hubContext?.hubBaseUrl ?? null}
         brandTarget={brandTarget}
         isDark={isDark}
+        brand={brand ?? hubContext?.brand ?? null}
       />
       <HubContextControl hubBaseUrl={hubContext?.hubBaseUrl ?? null} productLabel={productLabel} />
 
@@ -202,11 +212,18 @@ function HubBrandLockup({
   hubBaseUrl,
   brandTarget,
   isDark,
+  brand,
 }: {
   hubBaseUrl: string | null
   brandTarget: ShellBrandTarget
   isDark: boolean
+  brand?: ShellBrand | null
 }) {
+  // An Operator's own artwork when it has uploaded any, otherwise the bundled
+  // MMSBUILD mark. One artwork is enough: an Operator that supplied only a
+  // light logo gets it on both themes rather than a hole on one of them.
+  const operatorMark = (isDark ? brand?.logoDark : brand?.logoLight) ?? brand?.logoLight ?? null
+  const markName = brand?.name || 'MMSBUILD'
   const image = (
     <img
       className={styles.brandMark}
@@ -214,7 +231,7 @@ function HubBrandLockup({
       // returns a URL string, so read `.src` when it is present. Importing the
       // asset (rather than pointing at `/mmsbuild-logo-*.png`) is what makes it
       // resolve under MMS Design's `/design` base path.
-      src={assetUrl(isDark ? logoDark : logoLight)}
+      src={operatorMark ?? assetUrl(isDark ? logoDark : logoLight)}
       // One box in both themes — the artwork swaps, the frame does not, so a
       // theme toggle cannot shift everything to the right of the lockup.
       width={145}
@@ -230,7 +247,7 @@ function HubBrandLockup({
       <a
         className={styles.brand}
         href={hubLinkHref(hubBaseUrl, '/hub')}
-        aria-label="MMSBUILD — Product Hub"
+        aria-label={`${markName} — Product Hub`}
         data-testid="hub-header-brand"
       >
         {image}
@@ -242,7 +259,7 @@ function HubBrandLockup({
     <a
       className={styles.brand}
       href={brandTarget.href}
-      aria-label="MMSBUILD"
+      aria-label={markName}
       data-testid="hub-header-brand"
       onClick={(event) => {
         if (!brandTarget.onSelect || !isPlainClick(event)) return

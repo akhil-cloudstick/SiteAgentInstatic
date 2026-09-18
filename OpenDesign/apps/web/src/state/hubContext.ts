@@ -16,7 +16,7 @@
  * nothing to load before the header can paint.
  */
 import { useSyncExternalStore } from 'react';
-import type { HubContext, HubRole, HubUser } from '@mms/shell';
+import type { HubContext, HubRole, HubUser, ShellBrand } from '@mms/shell';
 
 const HUB_ROLES: readonly HubRole[] = ['operator', 'agency', 'client', 'super-admin'];
 
@@ -44,6 +44,21 @@ function parseHubUser(raw: unknown): HubUser | null {
   return { name, initials: initials.slice(0, 2).toUpperCase() };
 }
 
+/** The Operator's brand, or null. A brand with no name is not a brand. */
+function parseShellBrand(raw: unknown): ShellBrand | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const value = raw as Record<string, unknown>;
+  const name = asScope(value.name);
+  if (!name) return null;
+  return {
+    name,
+    logoLight: asScope(value.logoLight),
+    logoDark: asScope(value.logoDark),
+    accent: asScope(value.accent),
+    design: asScope(value.design),
+  };
+}
+
 /**
  * Validates at the boundary. A partially-filled hand-off is not a reason to
  * invent the missing halves — anything short of an origin and a return URL
@@ -69,6 +84,10 @@ function parseHubContext(raw: unknown): HubContext | null {
     // enabled", so coercing it to a boolean here would erase that distinction.
     ...(typeof value.designActive === 'boolean' ? { designActive: value.designActive } : {}),
     ...(typeof value.cmsActive === 'boolean' ? { cmsActive: value.cmsActive } : {}),
+    // An Operator's own branding, when an agency resells this platform (R5).
+    // Absent means the project sits directly under the platform and keeps
+    // MMSBUILD's — which is also what every hand-off predating this means.
+    brand: parseShellBrand(value.brand),
   };
 }
 

@@ -56,6 +56,22 @@ export function ProductHubHeader() {
       // the whole admin, including this row.
       productLabel={BRAND_NAME}
       hubContext={hubContext}
+      // An Operator reselling this platform shows its own mark and name to its
+      // customers (R5). The Hub hands the pieces over as flat fields on the
+      // context; the shell wants them as one object, so the mapping happens
+      // here rather than in the shared component — the shell stays the same for
+      // every product, and this adapter stays the place CMS-side wiring lives.
+      brand={
+        hubContext?.brandName
+          ? {
+              name: hubContext.brandName,
+              logoLight: hubContext.brandLogoLight ?? null,
+              logoDark: hubContext.brandLogoDark ?? null,
+              accent: hubContext.brandAccent ?? null,
+              cms: hubContext.brandProduct ?? null,
+            }
+          : null
+      }
       theme={theme === 'dark' ? 'dark' : 'light'}
       onToggleTheme={() =>
         setEditorSelectPreference('theme', theme === 'dark' ? 'light' : 'dark')

@@ -1,0 +1,57 @@
+---
+// One picture, supplied either way (R5).
+//
+// Upload and "paste an address" were two separate fields, which asked the
+// reader to work out that they are the same choice — and the browser's own file
+// button came in the operating system's colours, so the form looked half
+// borrowed. They are one control now: a themed button that opens the file
+// dialog, an address box beneath it, and one preview showing whichever is
+// current.
+//
+// The native <input type="file"> is still the thing that opens the dialog —
+// nothing else can — but it is hidden and clicked by our own button, which is
+// how the control gets to look like the rest of the console.
+//
+// `Remove` appears only when there IS a picture. It is the way back to the
+// platform's own mark, and as a checkbox that was always visible it read as a
+// setting rather than an action.
+interface Props {
+  /** Field prefix: `logo` posts logoData / logoUrl / logoClear / logoCurrent. */
+  name: string;
+  label: string;
+  hint?: string;
+  accept?: string;
+}
+const { name, label, hint, accept = 'image/png,image/jpeg,image/webp,image/gif' } = Astro.props;
+const id = `img-${name}`;
+---
+<div class="mms-imagefield" data-imagefield={name}>
+  <span class="mms-label" id={`${id}-label`}>{label}</span>
+  <div class="mms-imagefield__box">
+    <div class="mms-imagefield__thumb" data-imagefield-thumb>
+      <img alt="" data-imagefield-img hidden />
+      <i class="fa-solid fa-image" aria-hidden="true" data-imagefield-placeholder></i>
+    </div>
+    <div class="mms-imagefield__controls">
+      <div class="mms-imagefield__row">
+        <button type="button" class="mms-btn mms-btn--secondary mms-btn--sm" data-imagefield-choose
+          aria-describedby={`${id}-label`}>
+          <i class="fa-solid fa-arrow-up-from-bracket" aria-hidden="true"></i> Choose image
+        </button>
+        <span class="mms-imagefield__state" data-imagefield-state>Using MMSBUILD's</span>
+        <button type="button" class="mms-btn mms-btn--ghost mms-btn--sm mms-imagefield__remove"
+          data-imagefield-remove hidden>Remove</button>
+      </div>
+      <input type="url" class="mms-input mms-input--sm" name={`${name}Url`}
+        placeholder="…or paste an image address (https://…)" spellcheck="false" data-imagefield-url />
+    </div>
+  </div>
+  {hint && <p class="mms-hint">{hint}</p>}
+
+  {/* The file dialog opener, the chosen bytes, the remove flag, and whatever is
+      already stored — all hidden, all posted with the form. */}
+  <input type="file" accept={accept} hidden data-imagefield-file />
+  <input type="hidden" name={`${name}Data`} data-imagefield-data />
+  <input type="hidden" name={`${name}Clear`} data-imagefield-clear />
+  <input type="hidden" name={`${name}Current`} data-imagefield-current />
+</div>

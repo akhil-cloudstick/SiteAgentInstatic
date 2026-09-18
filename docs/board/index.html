@@ -49,13 +49,13 @@
   <h1>MMSBUILD delivery board</h1>
   <p class="meta">
     Modules are the phases of <code>docs/prd/mmsbuild-prd.md</code>, tasks are its requirements, subtasks its acceptance criteria — ids unchanged.<br>
-    Generated 2026-09-18 05:29 UTC from commit <code>43ea0e6</code>.
+    Generated 2026-09-18 08:47 UTC from commit <code>f265290</code>.
   </p>
   <div class="legend">
     <p><strong>Build</strong> is ours: <span class="chip todo">Not started</span> <span class="chip doing">In progress</span> <span class="chip built">Built</span> <span class="chip blocked">Blocked</span></p>
     <p><strong>Acceptance run</strong> is yours, and we never set it: <span class="chip v-pending">Not yet verified</span> <span class="chip v-pass">Verified</span> <span class="chip v-fail">Failed</span></p>
     <p>Modules are the PRD's phases, tasks are its requirements, subtasks are its acceptance criteria. Ids match the PRD exactly, so an acceptance run maps to this board line for line. `status` is ours — what is built. `verified` belongs to the acceptance run and is never set by us.</p>
-    <p>Totals — tasks: <span class="chip todo">11 not started</span> <span class="chip doing">9 in progress</span> <span class="chip built">11 built</span> &nbsp;·&nbsp; acceptance criteria: <span class="chip todo">24 not started</span> <span class="chip doing">4 in progress</span> <span class="chip built">28 built</span></p>
+    <p>Totals — tasks: <span class="chip todo">10 not started</span> <span class="chip doing">9 in progress</span> <span class="chip built">12 built</span> &nbsp;·&nbsp; acceptance criteria: <span class="chip todo">22 not started</span> <span class="chip doing">4 in progress</span> <span class="chip built">30 built</span></p>
   </div>
   <section class="module">
     <h2><span class="id">P0</span> Phase 0 — Close the surface</h2>
@@ -214,28 +214,28 @@
   <section class="module">
     <h2><span class="id">P2</span> Phase 2 — Scoped visibility and branding</h2>
     <p class="summary">Counts without the work, and an Operator's own branding.</p>
-    <p class="counts"><span class="chip todo">1 not started</span></p>
-    <details class="task" >
+    <p class="counts"><span class="chip built">1 built</span></p>
+    <details class="task" open>
       <summary>
         <span class="id">R5</span>
         <span class="task-title">Platform Owner sees counts, not work; Operators are branded</span>
-        <span class="chip todo">Not started</span>
-        <span class="counts"><span class="chip todo">2 not started</span></span>
+        <span class="chip built">Built</span>
+        <span class="counts"><span class="chip built">2 built</span></span>
       </summary>
-      <p class="depends">Depends on R1, R3</p><p class="note">Branding is a single global value today.</p>
+      <p class="depends">Depends on R1, R3</p><p class="note">Built 2026-09-18: the Platform Owner sees counts and status across the estate and opens no project by default. Four ways in were closed — minting an agent key, installing the bridge, inviting yourself to a project, and the unlinked route that put a project on a public address — and listing MCP keys no longer opens an owner session inside every project on each page load. Opening a business’s work is now &quot;Act as this business&quot;: it asks why, records the answer before anything is handed over, puts platform staff on that project’s People list under their own name so the customer can see them, and ends after an hour or on exit — which removes the person, and so revokes the session in MMS-CMS and MMS-Design as well as the hub. Every administrator action is now recorded with the actor and, where it applies, who they were acting as; the trail is read on a new Activity page, scoped like everything else. Branding is per-Operator: logo, name and accent colour, set by upload or by pasting an address (fetched once and stored, so an agency’s customers never call a third-party server). It reaches the hub pages, both products’ headers, their browser tab titles and icons, and the console — with no per-Operator build, because the gateway answers the icon addresses the built pages already ask for and rewrites the title in the document it is already touching. A Business directly under the platform keeps MMSBUILD’s. The PRD’s AC-A5.2 referred to a list of &quot;branded surfaces&quot; that did not exist; it is authored in the PRD now (S1–S8).</p>
       <table>
         <thead><tr><th>Acceptance</th><th>Pass means</th><th>Build</th><th>Acceptance run</th></tr></thead>
         <tbody>
         <tr>
           <td class="id">AC-A5.1</td>
           <td>Counts visible to the platform-owner role; opening the work denied</td>
-          <td><span class="chip todo">Not started</span></td>
+          <td><span class="chip built">Built</span></td>
           <td><span class="chip v-pending">Not yet verified</span></td>
         </tr>
         <tr>
           <td class="id">AC-A5.2</td>
           <td>Operator branding renders on the named surfaces</td>
-          <td><span class="chip todo">Not started</span></td>
+          <td><span class="chip built">Built</span></td>
           <td><span class="chip v-pending">Not yet verified</span></td>
         </tr>
         </tbody>

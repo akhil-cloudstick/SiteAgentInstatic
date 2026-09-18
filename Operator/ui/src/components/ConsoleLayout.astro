@@ -7,6 +7,13 @@ import { ConsoleShell, type ConsoleSection } from './shell/ConsoleShell';
 import { BRAND_NAME } from '../brand';
 import { basePath, cpLoad } from '../lib/cp';
 
+// An Operator's administrators see their own agency's name and mark here, not
+// the platform's (R5). The control plane resolves it from the signed-in
+// administrator's scope; a platform administrator, and an Operator that has
+// set nothing, both get MMSBUILD's.
+type Brand = { name: string; logoLight: string | null; logoDark: string | null; accent: string | null; console: string | null } | null;
+type Acting = { project: string; business: string | null; slug: string } | null;
+
 interface Props {
   title: string;
   active?: ConsoleSection;
@@ -21,6 +28,21 @@ const theme = Astro.cookies.get('sa_theme')?.value === 'dark' ? 'dark' : 'light'
 // still being set up, and invites nobody has accepted yet — all within this
 // administrator's scope (the API filters them).
 type Note = { id: string; title: string; body: string; at: string; kind?: 'error' | 'warning' | 'info' };
+let brand: Brand = null;
+let acting: Acting = null;
+if (!bare && admin) {
+  try {
+    const me = await cpLoad(Astro.cookies, '/api/admin/session');
+    if (me.ok) {
+      brand = me.body.brand ?? null;
+      acting = me.body.acting ?? null;
+    }
+  } catch {
+    /* the page itself reports an unreachable control plane */
+  }
+}
+const productName = brand?.console || BRAND_NAME;
+
 const notifications: Note[] = [];
 if (!bare && admin) {
   try {
@@ -65,7 +87,8 @@ if (!bare && admin) {
   <link rel="icon" type="image/png" sizes="16x16" href={`${base}favicon-16x16.png`} />
   <link rel="apple-touch-icon" href={`${base}apple-touch-icon.png`} />
   <meta name="theme-color" content={theme === 'dark' ? '#001e2d' : '#fdfbf6'} />
-  <title>{title} · {BRAND_NAME}</title>
+  <title>{title} · {productName}</title>
+  {brand?.accent && <style set:html={`html:root{--mms-action:${brand.accent};--mms-action-strong:${brand.accent}}`} />}
 </head>
 <body class="mms-console">
   {bare ? (
@@ -75,8 +98,10 @@ if (!bare && admin) {
       <div class="mms-chrome">
         <ConsoleShell
           client:load
-          productName={BRAND_NAME}
+          productName={productName}
           base={base}
+          brand={brand}
+          acting={acting}
           active={active}
           admin={{
             email: admin?.email ?? '',

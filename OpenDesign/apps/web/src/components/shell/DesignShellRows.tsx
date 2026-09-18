@@ -111,10 +111,15 @@ export function DesignShellRows({
   }));
 
 
+  // An Operator reselling the platform names this product for itself —
+  // "MMS Design" reads "BrightLeaf Design" to its customers (R5). The name
+  // arrives with the Hub hand-off; without one, the platform's own.
+  const productLabel = hubContext?.brand?.design || 'MMS Design';
+
   return (
     <>
       <MmsShellHeader
-        productLabel="MMS Design"
+        productLabel={productLabel}
         hubContext={hubContext}
         // The approved reference shows the Operator Hub links, so they render
         // even before Operator carries hub context into /design. They are inert
@@ -129,15 +134,15 @@ export function DesignShellRows({
         brandTarget={{ href: withBasePath('/'), onSelect: () => onSelectView('home') }}
       />
       <MmsSpecialistRow
-        productName="MMS Design"
+        productName={productLabel}
         // Broadest to narrowest, as the contract orders it. Omitted rather than
         // guessed when the Hub hand-off did not supply them.
         scope={[hubContext?.client, hubContext?.project ?? projectName, hubContext?.site]}
         identityHref={withBasePath('/')}
         onSelectIdentity={() => onSelectView('home')}
         destinations={destinations}
-        navLabel="MMS Design navigation"
-        rowLabel="MMS Design specialist workspace"
+        navLabel={`${productLabel} navigation`}
+        rowLabel={`${productLabel} specialist workspace`}
         // Leftmost in MMS Design per DECISIONS 2026-08-10 (the CMS keeps it
         // right). Rendered without a destination until the Hub hand-off exists,
         // so the row matches the approved chrome.
