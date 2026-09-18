@@ -1,0 +1,33 @@
+---
+// A link (or key) shown exactly once, right after it was created: the registry
+// keeps only its hash (NEW-1), so this is the only time anyone can copy it.
+import Modal from './Modal.astro';
+
+interface Props {
+  link: { kind: string; label: string; url: string } | null;
+}
+const { link } = Astro.props;
+const title = link?.kind === 'admin' ? 'Console invite link' : link?.kind === 'owner' ? 'Owner invite link' : 'Invite link';
+---
+{link && (
+  <Modal id="once-link" title={title} eyebrow="Shown once" size="lg" openOnLoad>
+    <div class="mms-form">
+      <p style="margin:0">
+        Send this link to <strong>{link.label}</strong>. It works until they set a password or you issue a new one.
+      </p>
+      <div class="mms-copyrow">
+        <code class="mms-code" id="once-link-value">{link.url}</code>
+        <button type="button" class="mms-btn mms-btn--secondary" data-copy-target="once-link-value">
+          <i class="fa-solid fa-copy" aria-hidden="true"></i> Copy
+        </button>
+      </div>
+      <div class="mms-alert mms-alert--warn">
+        <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+        <span>Copy it now — it will not be shown again. Only a fingerprint of it is stored.</span>
+      </div>
+    </div>
+    <Fragment slot="footer">
+      <button type="button" class="mms-btn mms-btn--primary" data-close-modal>Done</button>
+    </Fragment>
+  </Modal>
+)}

@@ -18,7 +18,16 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "skipLibCheck": true,
-    "types": ["node", "vitest"]
+    "types": ["node", "vitest"],
+    // Type-check against the zod the workspace packages are built with (3.25.x).
+    // On this install the hoisted copies under node_modules/@open-design/* have
+    // no nested node_modules, so their declaration files would otherwise pick up
+    // the root zod 4 and every zod-inferred contract type collapses to
+    // unknown/any (71 errors). Types only: the emitted JS keeps the bare `zod`
+    // specifier, so the runtime is unchanged.
+    "paths": {
+      "zod": ["../../packages/contracts/node_modules/zod/index.d.ts"]
+    }
   },
   "include": [
     "src/**/*.ts",

@@ -1,0 +1,79 @@
+---
+import ConsoleLayout from '../components/ConsoleLayout.astro';
+import { CP, basePath } from '../lib/cp';
+import logoLight from '@mms/shell/assets/mmsbuild-logo-light.png';
+import logoDark from '@mms/shell/assets/mmsbuild-logo-dark.png';
+
+// An invited console administrator sets their password (reachable without a
+// session; see middleware.ts). The token is checked by the control plane.
+const base = basePath();
+let token = String(Astro.url.searchParams.get('token') || '');
+let error = '';
+let done = '';
+
+if (Astro.request.method === 'POST') {
+  const f = await Astro.request.formData();
+  token = String(f.get('token') || '');
+  const password = String(f.get('password') || '');
+  if (password.length < 12) {
+    error = 'Use at least 12 characters.';
+  } else if (password !== String(f.get('confirm') || '')) {
+    error = 'The passwords do not match.';
+  } else {
+    try {
+      const r = await fetch(`${CP}/api/admin/accept`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, password }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (r.ok) done = j.email || 'Your account';
+      else error = j.error || `Could not set the password (${r.status})`;
+    } catch (e) {
+      error = `The control plane is not reachable. Is it running? (${(e as Error).message})`;
+    }
+  }
+}
+const theme = Astro.cookies.get('sa_theme')?.value === 'dark' ? 'dark' : 'light';
+const logo = theme === 'dark' ? logoDark : logoLight;
+---
+<ConsoleLayout title="Set your password" bare>
+  <div class="mms-auth">
+    <div class="mms-auth__card">
+      <img class="mms-auth__logo" src={logo.src} alt="MMSBUILD" width="145" height="30" />
+      {done ? (
+        <>
+          <div>
+            <h1>You're all set</h1>
+            <p class="mms-lede">{done} can now sign in to the operator console.</p>
+          </div>
+          <a class="mms-btn mms-btn--primary mms-btn--block" href={`${base}login`}>Go to sign-in</a>
+        </>
+      ) : (
+        <>
+          <div>
+            <h1>Set your password</h1>
+            <p class="mms-lede">This becomes your sign-in for the operator console.</p>
+          </div>
+          {error && <div class="mms-alert mms-alert--err" role="alert"><i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i><span>{error}</span></div>}
+          {!token ? (
+            <p class="mms-hint">This link is missing its invite. Ask whoever invited you for a new one.</p>
+          ) : (
+            <form method="POST" class="mms-form">
+              <input type="hidden" name="token" value={token} />
+              <div class="mms-field">
+                <label class="mms-label" for="password">New password <small>(at least 12 characters)</small></label>
+                <input id="password" class="mms-input" name="password" type="password" autocomplete="new-password" minlength="12" required autofocus />
+              </div>
+              <div class="mms-field">
+                <label class="mms-label" for="confirm">Confirm password</label>
+                <input id="confirm" class="mms-input" name="confirm" type="password" autocomplete="new-password" minlength="12" required />
+              </div>
+              <button type="submit" class="mms-btn mms-btn--primary mms-btn--block">Set password</button>
+            </form>
+          )}
+        </>
+      )}
+    </div>
+  </div>
+</ConsoleLayout>

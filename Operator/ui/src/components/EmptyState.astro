@@ -1,0 +1,13 @@
+---
+interface Props {
+  icon: string;
+  title: string;
+}
+const { icon, title } = Astro.props;
+---
+<div class="mms-empty">
+  <i class={`fa-solid fa-${icon}`} aria-hidden="true"></i>
+  <h3>{title}</h3>
+  <p><slot /></p>
+  <div class="mms-row" style="justify-content:center;margin-top:8px"><slot name="actions" /></div>
+</div>

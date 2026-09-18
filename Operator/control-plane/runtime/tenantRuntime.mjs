@@ -4,7 +4,8 @@ import { spawn, execSync } from 'node:child_process';
 import { mkdirSync, createWriteStream, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import config from '../lib/env.mjs';
-import { signTenantToken } from '../lib/crypto.mjs';
+import { signTenantToken, tenantKey } from '../lib/crypto.mjs';
+import { childEnv } from '../lib/childEnv.mjs';
 import { isPortOpen, waitPortOpen } from '../lib/ports.mjs';
 
 const isWin = process.platform === 'win32';
@@ -128,16 +129,20 @@ export function start(tenant) {
   const p = tenantPaths(slug);
   mkdirSync(p.uploads, { recursive: true });
 
-  const env = {
-    ...process.env,
+  const env = childEnv({
     PORT: String(port),
     DATABASE_URL: buildDatabaseUrl(tenant.dbRole, tenant.dbPassword),
     UPLOADS_DIR: p.uploads,
     STATIC_DIR: distDir(),
     INSTATIC_SECRET_KEY: tenant.secretKey,
-    // Tenant SSO: the hub redirects the tenant to /cms/sso?token=<signed>; the
-    // instance verifies it with this shared secret and mints an Owner session.
-    INSTATIC_SSO_SECRET: config.tokenSecret,
+    // Tenant SSO: the hub redirects a person to /cms/sso?token=<signed>; the
+    // instance verifies it with this key and signs the person in with their own
+    // role. The key is this project's alone (derived from the master), so the
+    // instance can neither forge hub/admin sessions nor tokens for another project.
+    INSTATIC_SSO_SECRET: tenantKey(slug),
+    // Step-up for portal people: the CMS checks the person's hub password here
+    // (tenant-key signed request) instead of a local password they never had.
+    INSTATIC_HUB_VERIFY_URL: `${config.publicBaseUrl}/internal/hub/verify-password`,
     INSTATIC_TENANT_SLUG: slug,
     // ONE LOGIN: where to bounce an unauthenticated page load. The hub silently
     // re-mints an SSO token when the hub session is alive, so an expired admin
@@ -166,9 +171,7 @@ export function start(tenant) {
     // explicit Publish, so the tenant's Publish also ships the baked site to
     // Cloudflare — the control-plane runs the deploy with the operator's CF token.
     INSTATIC_DEPLOY_WEBHOOK: `${config.publicBaseUrl}/deploy/${signTenantToken(slug)}`,
-  };
-  // Remove inherited vars that would confuse the child.
-  delete env.SETTINGS_ENC_KEY;
+  });
 
   const out = createWriteStream(p.log, { flags: 'a' });
   out.write(`\n[runtime] starting ${slug} on :${port} @ ${new Date().toISOString()}\n`);

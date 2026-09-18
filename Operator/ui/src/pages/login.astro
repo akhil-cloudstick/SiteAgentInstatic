@@ -1,6 +1,9 @@
 ---
-import Layout from '../layouts/Layout.astro';
+import ConsoleLayout from '../components/ConsoleLayout.astro';
 import { ADMIN_COOKIE, CP, cpFetch, safeNext, sessionCookieOptions } from '../lib/cp';
+import logoLight from '@mms/shell/assets/mmsbuild-logo-light.png';
+import logoDark from '@mms/shell/assets/mmsbuild-logo-dark.png';
+import { BRAND_NAME } from '../brand';
 
 // Operator console sign-in (R14). The control plane checks the password and
 // signs the session; this page only stores it on the console's own path.
@@ -25,7 +28,7 @@ if (Astro.request.method === 'POST') {
     }
     error = j.error || `Sign-in failed (${r.status})`;
   } catch (e) {
-    error = `Control plane not reachable on :4400 — is it running? (${(e as Error).message})`;
+    error = `The control plane is not reachable. Is it running? (${(e as Error).message})`;
   }
 } else {
   // Already signed in: straight through.
@@ -34,25 +37,35 @@ if (Astro.request.method === 'POST') {
     if (r.ok) return Astro.redirect(next, 303);
   } catch { /* show the form */ }
 }
+const theme = Astro.cookies.get('sa_theme')?.value === 'dark' ? 'dark' : 'light';
+const logo = theme === 'dark' ? logoDark : logoLight;
 ---
-<Layout title="Sign in" bare>
-  <div class="login">
-    <div class="card">
-      <h1>Operator sign-in</h1>
-      <p class="sub">Every operator action requires a signed-in administrator.</p>
-      {error && <div class="banner err" role="alert">{error}</div>}
-      <form method="POST">
+<ConsoleLayout title="Sign in" bare>
+  <div class="mms-auth">
+    <div class="mms-auth__card">
+      <img class="mms-auth__logo" src={logo.src} alt="MMSBUILD" width="145" height="30" />
+      <div>
+        <p class="mms-eyebrow" style="margin-bottom:6px">{BRAND_NAME}</p>
+        <h1>Sign in</h1>
+        <p class="mms-lede">Every operator action needs a signed-in administrator.</p>
+      </div>
+      {error && <div class="mms-alert mms-alert--err" role="alert"><i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i><span>{error}</span></div>}
+      <form method="POST" class="mms-form">
         <input type="hidden" name="next" value={next} />
-        <label for="email">Email</label>
-        <input id="email" name="email" type="email" autocomplete="username" value={email} required autofocus />
-        <label for="password">Password</label>
-        <input id="password" name="password" type="password" autocomplete="current-password" required />
-        <div style="margin-top:16px"><button type="submit" style="width:100%">Sign in</button></div>
+        <div class="mms-field">
+          <label class="mms-label" for="email">Email</label>
+          <input id="email" class="mms-input" name="email" type="email" autocomplete="username" value={email} required autofocus />
+        </div>
+        <div class="mms-field">
+          <label class="mms-label" for="password">Password</label>
+          <input id="password" class="mms-input" name="password" type="password" autocomplete="current-password" required />
+        </div>
+        <button type="submit" class="mms-btn mms-btn--primary mms-btn--block">Sign in</button>
       </form>
-      <p class="hint" style="margin:14px 0 0">No account, or forgotten the password? On the server, from <code>Operator/</code>: <code>npm run admin:create -- --email you@example.com</code></p>
+      <p class="mms-hint">
+        No account, or forgotten your password? On the server, from <span class="mms-mono">Operator/</span>:
+        <span class="mms-mono">npm run admin:create -- --email you@example.com</span>
+      </p>
     </div>
   </div>
-  <style>
-    .login{max-width:380px;margin:48px auto 0}
-  </style>
-</Layout>
+</ConsoleLayout>

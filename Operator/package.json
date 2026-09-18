@@ -16,7 +16,9 @@
     "test:login": "node control-plane/registry/tenantUsers.selftest.mjs",
     "test:admin-auth": "node control-plane/lib/adminAuth.selftest.mjs",
     "test:new1": "node control-plane/lib/new1.selftest.mjs",
-    "test": "npm run test:deployer && npm run test:allowlist && npm run test:login && npm run test:admin-auth && npm run test:new1",
+    "test:scope": "node control-plane/lib/scope.selftest.mjs",
+    "test:hub-session": "node control-plane/hub/hubSession.selftest.mjs",
+    "test": "npm run test:deployer && npm run test:allowlist && npm run test:login && npm run test:admin-auth && npm run test:new1 && npm run test:scope && npm run test:hub-session",
     "start": "node control-plane/server.mjs",
     "console:dev": "npm --prefix ui run dev",
     "console:build": "npm --prefix ui run build"

@@ -1,0 +1,107 @@
+---
+// The console page frame: the shared MMS header rows (row 1 + row 2 from
+// @mms/shell, through ConsoleShell), then the page. `bare` is for the
+// sign-in screens, which show only the MMS logo card.
+import '../styles/console.css';
+import { ConsoleShell, type ConsoleSection } from './shell/ConsoleShell';
+import { BRAND_NAME } from '../brand';
+import { basePath, cpLoad } from '../lib/cp';
+
+interface Props {
+  title: string;
+  active?: ConsoleSection;
+  bare?: boolean;
+}
+const { title, active = 'projects', bare = false } = Astro.props;
+const base = basePath();
+const admin = Astro.locals.admin;
+const theme = Astro.cookies.get('sa_theme')?.value === 'dark' ? 'dark' : 'light';
+
+// Notifications are real state, not decoration: projects that failed, projects
+// still being set up, and invites nobody has accepted yet — all within this
+// administrator's scope (the API filters them).
+type Note = { id: string; title: string; body: string; at: string; kind?: 'error' | 'warning' | 'info' };
+const notifications: Note[] = [];
+if (!bare && admin) {
+  try {
+    // The page has usually asked for this listing already; cpLoad hands back
+    // that same answer instead of making a second round trip.
+    const res = await cpLoad(Astro.cookies, '/api/tenants');
+    if (res.ok) {
+      const { tenants = [] } = res.body;
+      for (const t of tenants) {
+        const name = t.display_name || t.slug;
+        const at = t.updated_at || t.created_at || new Date().toISOString();
+        if (t.status === 'failed') {
+          notifications.push({ id: `failed:${t.slug}:${at}`, kind: 'error', at, title: `${name} failed to set up`, body: t.last_error || 'Open the project to retry.' });
+        } else if (t.status === 'provisioning') {
+          notifications.push({ id: `prov:${t.slug}`, kind: 'info', at, title: `${name} is being set up`, body: 'This usually takes under a minute.' });
+        } else if (t.last_error) {
+          notifications.push({ id: `err:${t.slug}:${at}`, kind: 'warning', at, title: `${name} needs attention`, body: t.last_error });
+        }
+        if (Number(t.people_pending) > 0) {
+          notifications.push({
+            id: `pending:${t.slug}:${t.people_pending}`,
+            kind: 'info',
+            at,
+            title: `${name}: ${t.people_pending} invite${Number(t.people_pending) === 1 ? '' : 's'} not accepted`,
+            body: 'Open People to send a new link if it was lost.',
+          });
+        }
+      }
+    }
+  } catch {
+    /* the page itself reports an unreachable control plane */
+  }
+}
+---
+<!doctype html>
+<html lang="en" data-theme={theme}>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="icon" href={`${base}favicon.ico`} sizes="any" />
+  <link rel="icon" type="image/png" sizes="32x32" href={`${base}favicon-32x32.png`} />
+  <link rel="icon" type="image/png" sizes="16x16" href={`${base}favicon-16x16.png`} />
+  <link rel="apple-touch-icon" href={`${base}apple-touch-icon.png`} />
+  <meta name="theme-color" content={theme === 'dark' ? '#001e2d' : '#fdfbf6'} />
+  <title>{title} · {BRAND_NAME}</title>
+</head>
+<body class="mms-console">
+  {bare ? (
+    <slot />
+  ) : (
+    <>
+      <div class="mms-chrome">
+        <ConsoleShell
+          client:load
+          productName={BRAND_NAME}
+          base={base}
+          active={active}
+          admin={{
+            email: admin?.email ?? '',
+            level: admin?.scope?.level ?? 'platform',
+            scopeName: admin?.scopeName ?? null,
+          }}
+          initialTheme={theme}
+          notifications={notifications}
+        />
+      </div>
+      <main class="mms-main">
+        <slot />
+      </main>
+    </>
+  )}
+
+  <div class="mms-busy" id="mms-busy" hidden>
+    <div class="mms-busy__panel" role="status" aria-live="polite">
+      <strong><span class="mms-spinner" aria-hidden="true"></span><span data-busy-label>Working…</span></strong>
+      <div class="mms-bar mms-bar--indeterminate"><span></span></div>
+      <p class="mms-hint">This can take a few seconds. Please keep this tab open.</p>
+    </div>
+  </div>
+  <script>
+    import '../scripts/console';
+  </script>
+</body>
+</html>

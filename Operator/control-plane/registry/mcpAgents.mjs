@@ -7,6 +7,7 @@
 import { randomBytes, createHmac } from 'node:crypto';
 import { query } from './db.mjs';
 import config from '../lib/env.mjs';
+import { scopeFilter, canReachRecord } from '../lib/scope.mjs';
 
 // Keyed hash for an inbound bearer. Namespaced separately from invite tokens
 // (`invite:`) so the two token families can never be cross-matched.
@@ -58,18 +59,26 @@ export async function createAgentKey({ tenantSlug, label, permissions, tables, e
   return { ...toView(rows[0]), token };
 }
 
-export async function listAgentKeys(tenantSlug) {
-  const { rows } = tenantSlug
-    ? await query(
-        `select * from siteagent_control.mcp_agents
-          where tenant_slug = $1 order by created_at desc`,
-        [tenantSlug],
-      )
-    : await query('select * from siteagent_control.mcp_agents order by created_at desc');
+// Every read names the administrator's scope (R1): keys are stamped with
+// their project's address, so the filter is on the key row itself.
+export async function listAgentKeys(scope, tenantSlug) {
+  const f = scopeFilter(scope, 'a', tenantSlug ? [tenantSlug] : []);
+  const { rows } = await query(
+    `select a.* from siteagent_control.mcp_agents a
+      where ${tenantSlug ? 'a.tenant_slug = $1 and ' : ''}${f.sql}
+      order by a.created_at desc`,
+    f.params,
+  );
   return rows.map(toView);
 }
 
-export async function revokeAgentKey(keyId) {
+export async function revokeAgentKey(scope, keyId) {
+  const { rows: found } = await query(
+    'select business_id, operator_id from siteagent_control.mcp_agents where key_id = $1',
+    [keyId],
+  );
+  // A key in another Business is indistinguishable from no key.
+  if (!found[0] || !canReachRecord(scope, found[0])) return null;
   const { rows } = await query(
     `update siteagent_control.mcp_agents
         set revoked_at = now(), token_enc = null
@@ -107,24 +116,29 @@ export function recordAgentCall({ tenantSlug, keyId, tool, target, ok, error }) 
   ).catch((e) => console.error('[mcp] audit write failed:', e.message));
 }
 
-export async function listAgentAudit(tenantSlug, limit = 50) {
+export async function listAgentAudit(scope, tenantSlug, limit = 50) {
+  const f = scopeFilter(scope, 'e', [tenantSlug, Math.min(Number(limit) || 50, 200)]);
   const { rows } = await query(
-    `select * from siteagent_control.mcp_agent_audit
-      where tenant_slug = $1 order by created_at desc limit $2`,
-    [tenantSlug, Math.min(Number(limit) || 50, 200)],
+    `select e.* from siteagent_control.mcp_agent_audit e
+      where e.tenant_slug = $1 and ${f.sql}
+      order by e.created_at desc limit $2`,
+    f.params,
   );
   return rows;
 }
 
 // Directory row per tenant for the console overview.
-export async function agentKeyCounts() {
+export async function agentKeyCounts(scope) {
+  const f = scopeFilter(scope, 'a');
   const { rows } = await query(
-    `select tenant_slug,
-            count(*) filter (where revoked_at is null) as active,
+    `select a.tenant_slug,
+            count(*) filter (where a.revoked_at is null) as active,
             count(*) as total,
-            max(last_used_at) as last_used
-       from siteagent_control.mcp_agents
-      group by tenant_slug`,
+            max(a.last_used_at) as last_used
+       from siteagent_control.mcp_agents a
+      where ${f.sql}
+      group by a.tenant_slug`,
+    f.params,
   );
   return rows;
 }

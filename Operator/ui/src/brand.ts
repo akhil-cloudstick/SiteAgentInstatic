@@ -2,4 +2,3 @@
 // Edit here to rebrand the console. (Internal ids like the DB schema and the
 // Cloudflare "siteagent-" deploy prefix are NOT brand text and stay as-is.)
 export const BRAND_NAME = 'MMS Operator'
-export const BRAND_EMOJI = '🛰️'

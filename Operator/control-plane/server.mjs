@@ -9,15 +9,19 @@ import config from './lib/env.mjs';
 import { migrate } from './registry/db.mjs';
 import { getSettings, saveSettings, getSecrets, getDefaultGuidance, saveDefaultGuidance } from './registry/settings.mjs';
 import * as tenantsRepo from './registry/tenants.mjs';
-import { provisionTenant, deprovisionTenant, startTenant, resumeAll, editTenant, repairTenantCf, pointTestFunnel, createTenantInvite } from './provisioner/provision.mjs';
+import { provisionTenant, deprovisionTenant, startTenant, resumeAll, editTenant, repairTenantCf, pointTestFunnel } from './provisioner/provision.mjs';
 import { deployTenant, hasBakedOutput } from './deployer/deploy.mjs';
 import { handleGateway } from './ai-gateway/gateway.mjs';
-import { verifyTenantToken, decrypt } from './lib/crypto.mjs';
+import { verifyTenantToken, verifyForTenant, decrypt } from './lib/crypto.mjs';
 import {
   currentAdmin, isAdminApiPath, connectorMayCall, tokenMatches, signAdminSession,
   loginLockedFor, recordLoginFailure, clearLoginFailures, ADMIN_SESSION_TTL_SEC,
 } from './lib/adminAuth.mjs';
 import { validateAdminLogin } from './registry/adminUsers.mjs';
+import { verifyPersonPassword } from './registry/tenantUsers.mjs';
+import { getBusinessInScope, getOperatorInScope, connectorBusiness } from './registry/org.mjs';
+import { handleOrgApi, requirePlatform } from './api/orgApi.mjs';
+import { isPlatform } from './lib/scope.mjs';
 import { decorate } from './lib/tenantView.mjs';
 import * as rt from './runtime/tenantRuntime.mjs';
 import * as odrt from './runtime/odRuntime.mjs';
@@ -101,6 +105,13 @@ const tenantView = (row) => decorate(row, {
   odRunning: odrt.isRunning(row.slug),
   published: hasBakedOutput(row.slug),
 });
+
+// The Operator or Business an administrator is scoped to, by name (console header).
+async function scopeName(scope) {
+  if (scope?.level === 'operator') return (await getOperatorInScope(scope, scope.operatorId))?.name ?? null;
+  if (scope?.level === 'business') return (await getBusinessInScope(scope, scope.businessId))?.name ?? null;
+  return null;
+}
 
 // The session is returned in the body, not as a Set-Cookie: the Astro console
 // calls this server-side and sets `sa_admin` on its own /operator path.
@@ -221,21 +232,53 @@ const server = http.createServer(async (req, res) => {
     // R14: every admin/operator route requires a signed-in administrator. One
     // gate for all of them, ahead of every handler, so a route cannot forget
     // it (lib/adminAuth.selftest.mjs checks each /api/ route is covered).
+    // Phase 1: the administrator (and so their scope — platform, one Operator
+    // or one Business) is carried into every handler below.
+    let admin = null;
+    let viaConnector = false;
     if (isAdminApiPath(path)) {
-      if (!(await currentAdmin(req)) && !connectorMayCall(method, path, req)) {
+      admin = await currentAdmin(req);
+      viaConnector = !admin && connectorMayCall(method, path, req);
+      if (!admin && !viaConnector) {
         return send(res, 401, { error: 'admin sign-in required' });
       }
     }
+    const scope = admin?.scope ?? null;
 
     if (path === '/api/admin/login' && method === 'POST') return adminLogin(req, res);
     if (path === '/api/admin/session' && method === 'GET') {
-      return send(res, 200, { admin: await currentAdmin(req) });
+      return send(res, 200, { admin: { ...admin, scopeName: await scopeName(scope) } });
     }
 
+    // Step-up for portal people (NEW-3b). A project's CMS asks whether this is
+    // the person's hub password; the request is signed with that project's key,
+    // so a project can only ask about its own people.
+    if (path === '/internal/hub/verify-password' && method === 'POST') {
+      const b = await readJson(req);
+      const project = String(b.project || '');
+      const claim = /^[a-z0-9-]+$/.test(project) ? verifyForTenant(project, String(b.token || '')) : null;
+      if (!claim || claim.kind !== 'hub-verify' || !/^\d+$/.test(String(claim.personId ?? ''))) {
+        return send(res, 401, { error: 'unauthorized' });
+      }
+      const key = `hub:${project}:${claim.personId}`;
+      if (loginLockedFor(key)) return send(res, 429, { ok: false, locked: true });
+      const ok = await verifyPersonPassword(project, claim.personId, String(b.password || ''));
+      if (ok) clearLoginFailures(key); else recordLoginFailure(key);
+      return send(res, 200, { ok });
+    }
+
+    // Levels, a project's people, console administrators (api/orgApi.mjs).
+    if (await handleOrgApi({ req, res, method, path, admin, send, readJson })) return;
+
     if (path === '/api/health') {
-      // Liveness is public; which tenants are running is not.
-      if (!(await currentAdmin(req))) return send(res, 200, { ok: true });
+      // Liveness is public; which projects are running is platform detail.
+      const viewer = await currentAdmin(req);
+      if (!viewer || !isPlatform(viewer.scope)) return send(res, 200, { ok: true });
       return send(res, 200, { ok: true, running: rt.listRunning() });
+    }
+    // Platform-wide configuration: platform administrators only.
+    if (path === '/api/settings' || path === '/api/ai-guidance-default' || path === '/api/models') {
+      requirePlatform(admin);
     }
     if (path === '/api/settings') {
       if (method === 'GET') return send(res, 200, await getSettings());
@@ -262,12 +305,27 @@ const server = http.createServer(async (req, res) => {
     }
     if (path === '/api/tenants') {
       if (method === 'GET') {
-        const rows = await tenantsRepo.listTenants();
+        const rows = await tenantsRepo.listTenants(scope);
         return send(res, 200, { tenants: rows.map(tenantView) });
       }
       if (method === 'POST') {
         const body = await readJson(req);
-        return send(res, 200, await provisionTenant(body));
+        // The Business a new project belongs to: one the administrator can
+        // reach, or — for the Connector's token — its own "Connector sites".
+        const business = viaConnector
+          ? await connectorBusiness()
+          : await getBusinessInScope(scope, body.businessId);
+        if (!business) return send(res, 404, { error: 'Choose a business you manage.' });
+        return send(res, 200, await provisionTenant({
+          name: body.name,
+          ownerEmail: body.ownerEmail,
+          cfProject: body.cfProject,
+          customDomain: body.customDomain,
+          tier: body.tier,
+          // Only the Connector's own token marks a project as the Connector's.
+          connectorManaged: viaConnector,
+          businessId: business.id,
+        }));
       }
     }
     // ---- Connector-managed targets ----------------------------------------
@@ -286,7 +344,8 @@ const server = http.createServer(async (req, res) => {
       if (!expected || !tokenMatches(presented, expected)) {
         return send(res, 401, { error: 'unauthorized' });
       }
-      const rows = await tenantsRepo.listTenants();
+      // The Connector's machine view: every Connector-created project, by design.
+      const rows = await tenantsRepo.listAllTenants();
       const targets = {};
       for (const t of rows) {
         if (!t.connector_managed || t.status !== 'active' || !t.port) continue;
@@ -306,11 +365,17 @@ const server = http.createServer(async (req, res) => {
     if (path === '/api/mcp/agents') {
       if (method === 'GET') {
         const tenant = new URL(req.url, 'http://x').searchParams.get('tenant');
-        return send(res, 200, { agents: await mcpAgents.listAgentKeys(tenant || null) });
+        if (tenant && !(await tenantsRepo.getTenantInScope(scope, tenant))) {
+          return send(res, 404, { error: 'not found' });
+        }
+        return send(res, 200, { agents: await mcpAgents.listAgentKeys(scope, tenant || null) });
       }
       if (method === 'POST') {
         const b = await readJson(req);
         if (!b.tenantSlug) throw new Error('tenantSlug is required');
+        if (!(await tenantsRepo.getTenantInScope(scope, String(b.tenantSlug)))) {
+          return send(res, 404, { error: 'not found' });
+        }
         const permissions = b.preset
           ? normalizePermissions(PERMISSION_PRESETS[b.preset])
           : normalizePermissions(b.permissions);
@@ -331,8 +396,8 @@ const server = http.createServer(async (req, res) => {
     }
     if (path === '/api/mcp/directory' && method === 'GET') {
       const [tenants, counts] = await Promise.all([
-        tenantsRepo.listTenants(),
-        mcpAgents.agentKeyCounts(),
+        tenantsRepo.listTenants(scope),
+        mcpAgents.agentKeyCounts(scope),
       ]);
       const byTenant = new Map(counts.map((c) => [c.tenant_slug, c]));
       const rows = await Promise.all(
@@ -359,28 +424,35 @@ const server = http.createServer(async (req, res) => {
       const url = new URL(req.url, 'http://x');
       const tenant = url.searchParams.get('tenant');
       if (!tenant) throw new Error('tenant is required');
-      return send(res, 200, { events: await mcpAgents.listAgentAudit(tenant, url.searchParams.get('limit')) });
+      if (!(await tenantsRepo.getTenantInScope(scope, tenant))) return send(res, 404, { error: 'not found' });
+      return send(res, 200, { events: await mcpAgents.listAgentAudit(scope, tenant, url.searchParams.get('limit')) });
     }
     // Build the bridge package from source and install it into one tenant.
     // Zipping by hand and uploading through each tenant's admin UI does not
     // scale, so rollout is one call per site — and re-callable to upgrade.
     const mcpInstall = path.match(/^\/api\/mcp\/tenants\/([a-z0-9-]+)\/install-bridge$/);
     if (mcpInstall && method === 'POST') {
-      return send(res, 200, await installBridge(mcpInstall[1]));
+      const t = await tenantsRepo.getTenantInScope(scope, mcpInstall[1]);
+      if (!t) return send(res, 404, { error: 'not found' });
+      return send(res, 200, await installBridge(t.slug));
     }
 
     // Revoke only. A minted key is shown once, in the mint response, and can
     // never be read back (NEW-1): only its keyed hash is stored.
     const mcpKey = path.match(/^\/api\/mcp\/agents\/([A-Za-z0-9_-]+)\/revoke$/);
     if (mcpKey && method === 'POST') {
-      const agent = await mcpAgents.revokeAgentKey(mcpKey[1]);
+      const agent = await mcpAgents.revokeAgentKey(scope, mcpKey[1]);
       if (!agent) return send(res, 404, { error: 'key not found or already revoked' });
       return send(res, 200, { agent });
     }
 
-    const m = path.match(/^\/api\/tenants\/([a-z0-9-]+)(?:\/(start|deploy|update|repair|expose|invite))?$/);
+    const m = path.match(/^\/api\/tenants\/([a-z0-9-]+)(?:\/(start|deploy|update|repair|expose))?$/);
     if (m) {
-      const slug = m[1];
+      // A project outside the administrator's scope does not exist, for reads
+      // and changes alike (AC-A1.2).
+      const tenant = await tenantsRepo.getTenantInScope(scope, m[1]);
+      if (!tenant) return send(res, 404, { error: 'not found' });
+      const slug = tenant.slug;
       const action = m[2];
       if (!action && method === 'DELETE') {
         const deleteCf = new URL(req.url, 'http://x').searchParams.get('cf') === '1';
@@ -389,10 +461,13 @@ const server = http.createServer(async (req, res) => {
       if (action === 'start' && method === 'POST') return send(res, 200, await startTenant(slug));
       if (action === 'deploy' && method === 'POST') return send(res, 200, await deployTenant(slug));
       if (action === 'update' && method === 'POST') return send(res, 200, await editTenant(slug, await readJson(req)));
-      if (action === 'invite' && method === 'POST') return send(res, 200, await createTenantInvite(slug));
       if (action === 'repair' && method === 'POST') return send(res, 200, await repairTenantCf(slug));
       if (action === 'expose' && method === 'POST') return send(res, 200, await pointTestFunnel(slug));
     }
+    // An admin route no handler above claimed ends here. It must never fall
+    // through to the tenant proxy below with an administrator's request.
+    if (isAdminApiPath(path)) return send(res, 404, { error: 'not found' });
+
     // Tenant-triggered deploy: a tenant's Instatic instance calls this (with its
     // signed token) right after an explicit Publish. The control-plane runs the
     // Cloudflare deploy with the operator's token — the token never leaves here.
@@ -416,7 +491,7 @@ const server = http.createServer(async (req, res) => {
     send(res, 404, { error: 'not found' });
   } catch (e) {
     console.error('[control-plane]', e.message);
-    send(res, 400, { error: e.message });
+    send(res, Number.isInteger(e.status) ? e.status : 400, { error: e.message });
   }
 });
 

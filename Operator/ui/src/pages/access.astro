@@ -1,0 +1,191 @@
+---
+// Access — who can sign in to this console, and what each account reaches
+// ("own people" per level, R1). An administrator invites others only at or
+// below its own scope.
+import ConsoleLayout from '../components/ConsoleLayout.astro';
+import PageHeader from '../components/PageHeader.astro';
+import Modal from '../components/Modal.astro';
+import ConfirmModal from '../components/ConfirmModal.astro';
+import OnceLinkModal from '../components/OnceLinkModal.astro';
+import RowMenu from '../components/RowMenu.astro';
+import Select from '../components/Select.astro';
+import StatusChip from '../components/StatusChip.astro';
+import EmptyState from '../components/EmptyState.astro';
+import { basePath, cpFetch } from '../lib/cp';
+import { flashLink, takeLink, okJson, cpGet } from '../lib/org';
+
+const base = basePath();
+const me = Astro.locals.admin;
+const level = me?.scope?.level ?? 'platform';
+let error = '';
+
+if (Astro.request.method === 'POST') {
+  const f = await Astro.request.formData();
+  const intent = String(f.get('intent') || '');
+  try {
+    if (intent === 'invite') {
+      const email = String(f.get('email') || '').trim();
+      const target = String(f.get('level') || '');
+      const j = await okJson(await cpFetch(Astro.cookies, '/api/admins', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email,
+          level: target,
+          operatorId: target === 'operator' ? f.get('operatorId') : null,
+          businessId: target === 'business' ? f.get('businessId') : null,
+        }),
+      }), 'Could not invite');
+      flashLink(Astro.cookies, Astro.request, { kind: 'admin', label: email, url: j.inviteUrl });
+    } else if (intent === 'disable' && /^\d+$/.test(String(f.get('adminId') ?? ''))) {
+      await okJson(await cpFetch(Astro.cookies, `/api/admins/${f.get('adminId')}/disable`, { method: 'POST' }), 'Could not disable');
+    }
+    return Astro.redirect(`${base}access`, 303);
+  } catch (e) {
+    error = (e as Error).message;
+  }
+}
+
+let admins: any[] = [];
+let operators: any[] = [];
+let businesses: any[] = [];
+try {
+  // Fetched together, not one after another (an Operator administrator sees
+  // the Operator list too; a Business one has nothing to choose from).
+  const [adminJson, opJson, bizJson] = await Promise.all([
+    cpGet(Astro.cookies, '/api/admins', 'Could not list accounts'),
+    level === 'business' ? Promise.resolve({ operators: [] }) : cpGet(Astro.cookies, '/api/operators', 'Could not list operators'),
+    cpGet(Astro.cookies, '/api/businesses', 'Could not list businesses'),
+  ]);
+  admins = adminJson.admins || [];
+  operators = opJson.operators || [];
+  businesses = bizJson.businesses || [];
+} catch (e) {
+  error = error || (e as Error).message;
+}
+const link = takeLink(Astro.cookies);
+
+// What this administrator may grant: its own level and below, within reach.
+const levels = [
+  ...(level === 'platform' ? [{ value: 'platform', title: 'Platform', hint: 'Everything, including settings and every operator.' }] : []),
+  ...(level !== 'business' && operators.length ? [{ value: 'operator', title: 'An operator', hint: 'That agency and all of its businesses and projects.' }] : []),
+  ...(businesses.length ? [{ value: 'business', title: 'A business', hint: 'One business and its projects only.' }] : []),
+];
+const operatorOptions = operators.map((o) => ({ value: String(o.id), label: o.name }));
+const businessOptions = businesses.map((b) => ({ value: String(b.id), label: b.name, hint: b.operator_name ? `Operator · ${b.operator_name}` : 'Direct' }));
+
+// Deep link from Organisation: /access?invite=business:<id> | operator:<id>
+const [inviteLevel, inviteId] = String(Astro.url.searchParams.get('invite') ?? '').split(':');
+const deepLink = (inviteLevel === 'operator' || inviteLevel === 'business') && /^\d+$/.test(inviteId ?? '') && levels.some((l) => l.value === inviteLevel);
+const presetLevel = deepLink ? inviteLevel : (levels[levels.length - 1]?.value ?? 'business');
+
+const scopeTone = (l: string) => (l === 'platform' ? 'violet' : l === 'operator' ? 'blue' : 'success');
+const scopeText = (a: any) =>
+  a.level === 'platform' ? 'Platform'
+    : a.level === 'operator' ? `Operator · ${a.operatorName ?? a.operatorId}`
+      : `Business · ${a.businessName ?? a.businessId}`;
+const fmtDate = (s: string | null) => (s ? new Date(s).toLocaleString() : 'Never');
+---
+<ConsoleLayout title="Access" active="access">
+  <PageHeader title="Access" eyebrow="Console accounts">
+    Who can sign in to this console, and what each account can reach. You can grant access at your own level or below.
+    <Fragment slot="actions">
+      <button type="button" class="mms-btn mms-btn--primary" data-open-modal="invite-admin" disabled={levels.length === 0}>
+        <i class="fa-solid fa-user-plus" aria-hidden="true"></i> Invite admin
+      </button>
+    </Fragment>
+  </PageHeader>
+
+  {error && <div class="mms-alert mms-alert--err" role="alert" style="margin-bottom:16px"><i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i><span>{error}</span></div>}
+
+  <div class="mms-table-card mms-table-card--solo">
+    {admins.length === 0 ? (
+      <EmptyState icon="user-shield" title="No accounts in your reach">Invite an administrator to get started.</EmptyState>
+    ) : (
+      <table class="mms-table">
+        <thead>
+          <tr><th>Account</th><th>Can manage</th><th>Status</th><th>Last sign-in</th><th class="mms-right">Actions</th></tr>
+        </thead>
+        <tbody>
+          {admins.map((a) => (
+            <tr>
+              <td>
+                <div class="mms-cell-main">
+                  <strong>{a.email}</strong>
+                  {a.id === me?.id && <small>You</small>}
+                </div>
+              </td>
+              <td><StatusChip tone={scopeTone(a.level)}>{scopeText(a)}</StatusChip></td>
+              <td>
+                {a.status === 'active'
+                  ? <StatusChip tone="success" dot>Active</StatusChip>
+                  : <StatusChip tone="warning" dot>Invited</StatusChip>}
+              </td>
+              <td class="mms-muted">{a.status === 'active' ? fmtDate(a.lastLoginAt) : '—'}</td>
+              <td>
+                <div class="mms-cell-actions">
+                  {a.id === me?.id ? <span class="mms-hint">Your account</span> : (
+                    <RowMenu label={`Actions for ${a.email}`}>
+                      <button type="button" class="mms-menu__item mms-menu__item--danger" role="menuitem" data-open-modal="disable-admin"
+                        data-prefill-adminId={a.id}
+                        data-fill-message={`Disable ${a.email}? They are signed out everywhere and can no longer sign in.`}>
+                        <i class="fa-solid fa-user-slash" aria-hidden="true"></i> Disable account
+                      </button>
+                    </RowMenu>
+                  )}
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    )}
+  </div>
+
+  {levels.length > 0 && (
+    <Modal id="invite-admin" title="Invite an administrator" eyebrow="Access" size="lg" intent="invite" busy="Creating invite" openOnLoad={deepLink}>
+      <div class="mms-form">
+        <div class="mms-field">
+          <label class="mms-label" for="ia-email">Email</label>
+          <input id="ia-email" class="mms-input" name="email" type="email" required placeholder="name@agency.com" autocomplete="off" />
+        </div>
+        <fieldset class="mms-field" style="border:0;margin:0;padding:0">
+          <legend class="mms-label" style="margin-bottom:6px">Can manage</legend>
+          <div class="mms-choices">
+            {levels.map((l) => (
+              <label class="mms-choice">
+                <input type="radio" name="level" value={l.value} checked={l.value === presetLevel} required />
+                <span><strong>{l.title}</strong><span>{l.hint}</span></span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+        {operatorOptions.length > 0 && (
+          <div class="mms-field" data-show-when="level:operator">
+            <label class="mms-label" for="ia-operator">Operator</label>
+            <Select id="ia-operator" name="operatorId" required placeholder="Choose an operator" options={operatorOptions}
+              value={deepLink && inviteLevel === 'operator' ? inviteId : null} />
+          </div>
+        )}
+        {businessOptions.length > 0 && (
+          <div class="mms-field" data-show-when="level:business">
+            <label class="mms-label" for="ia-business">Business</label>
+            <Select id="ia-business" name="businessId" required placeholder="Choose a business" options={businessOptions}
+              value={deepLink && inviteLevel === 'business' ? inviteId : (businessOptions.length === 1 ? businessOptions[0]!.value : null)} />
+          </div>
+        )}
+        <p class="mms-hint">They get a one-time link to set their own password.</p>
+      </div>
+      <Fragment slot="footer">
+        <button type="button" class="mms-btn mms-btn--secondary" data-close-modal>Cancel</button>
+        <button type="submit" class="mms-btn mms-btn--primary">Create invite</button>
+      </Fragment>
+    </Modal>
+  )}
+
+  <ConfirmModal id="disable-admin" title="Disable account" intent="disable" confirmLabel="Disable account" fields={['adminId']} busy="Disabling">
+    <Fragment slot="message">Disable this account? It is signed out everywhere and can no longer sign in.</Fragment>
+  </ConfirmModal>
+
+  <OnceLinkModal link={link && link.kind === 'admin' ? link : null} />
+</ConsoleLayout>

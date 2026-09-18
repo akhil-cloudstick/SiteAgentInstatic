@@ -38,6 +38,8 @@ interface SessionRotationRow {
   device_label: string
   mfa_passed_at: Date | string | null
   step_up_expires_at: Date | string | null
+  hub_context_json: unknown
+  hub_person_id: string | null
 }
 
 interface RotatedSession {
@@ -80,13 +82,35 @@ export async function createSession(
      * what makes the Product Hub header inert on a self-hosted install.
      */
     hubContext?: HubContext | null
+    /**
+     * The Product Hub person this session belongs to (MMS Phase 1). Set only by
+     * the SSO route for a person hand-off; step-up on such a session checks the
+     * person's hub password instead of a local one.
+     */
+    hubPersonId?: string | null
   },
 ): Promise<void> {
   const deviceLabel = input.deviceLabel ?? deriveDeviceLabel(input.userAgent)
   await db`
-    insert into sessions (id_hash, user_id, expires_at, ip_address, user_agent, device_label, mfa_passed_at, step_up_expires_at, hub_context_json)
-    values (${input.idHash}, ${input.userId}, ${input.expiresAt}, ${input.ipAddress}, ${input.userAgent}, ${deviceLabel}, ${input.mfaPassedAt ?? null}, ${input.stepUpExpiresAt ?? null}, ${input.hubContext ?? null})
+    insert into sessions (id_hash, user_id, expires_at, ip_address, user_agent, device_label, mfa_passed_at, step_up_expires_at, hub_context_json, hub_person_id)
+    values (${input.idHash}, ${input.userId}, ${input.expiresAt}, ${input.ipAddress}, ${input.userAgent}, ${deviceLabel}, ${input.mfaPassedAt ?? null}, ${input.stepUpExpiresAt ?? null}, ${input.hubContext ?? null}, ${input.hubPersonId ?? null})
   `
+}
+
+/** The Product Hub person a live session belongs to, or null for a local session. */
+export async function findSessionHubPersonId(
+  db: DbClient,
+  idHash: string,
+): Promise<string | null> {
+  const { rows } = await db.unsafe<{ hub_person_id: string | null }>(
+    `select hub_person_id
+     from sessions
+     where id_hash = ${placeholder(db.dialect, 1)}
+       and revoked_at is null
+     limit 1`,
+    [idHash],
+  )
+  return rows[0]?.hub_person_id ?? null
 }
 
 /**
@@ -243,7 +267,9 @@ export async function rotateSessionToken(
              user_agent,
              device_label,
              mfa_passed_at,
-             step_up_expires_at
+             step_up_expires_at,
+             hub_context_json,
+             hub_person_id
       from sessions
       where id_hash = ${currentIdHash}
         and revoked_at is null
@@ -275,7 +301,9 @@ export async function rotateSessionToken(
         user_agent,
         device_label,
         mfa_passed_at,
-        step_up_expires_at
+        step_up_expires_at,
+        hub_context_json,
+        hub_person_id
       )
       values (
         ${input.nextIdHash},
@@ -285,7 +313,9 @@ export async function rotateSessionToken(
         ${current.user_agent},
         ${current.device_label},
         ${mfaPassedAt},
-        ${stepUpExpiresAt}
+        ${stepUpExpiresAt},
+        ${current.hub_context_json ?? null},
+        ${current.hub_person_id ?? null}
       )
     `
 

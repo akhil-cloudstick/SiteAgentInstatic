@@ -1,19 +1,19 @@
 ---
-import Layout from '../layouts/Layout.astro';
-import { cpFetch } from '../lib/cp';
-let error = '';
-// Normalise BASE_URL to exactly one trailing slash so save-redirects land on
-// `/operator/settings`, not `/operatorsettings` (which escapes the operator and
-// 404s through the gateway).
-const rawBase = import.meta.env.BASE_URL;
-const baseUrl = rawBase.endsWith('/') ? rawBase : `${rawBase}/`;
+// Settings — platform-wide configuration (platform administrators only; the
+// middleware and the API both enforce it). One card per concern, each its own
+// form, with a section index on the left.
+import ConsoleLayout from '../components/ConsoleLayout.astro';
+import PageHeader from '../components/PageHeader.astro';
+import { basePath, cpFetch } from '../lib/cp';
 
-// Media providers the operator can hold a key for. These are the slots MMS
-// Design resolves from its environment, so a key saved here reaches every
-// tenant daemon at spawn and tenants never configure media generation at all.
+let error = '';
+const baseUrl = basePath();
+
+// Media providers the platform can hold a key for. These are the slots
+// MMS-Design resolves from its environment, so a key saved here reaches every
+// project's design daemon at spawn and projects never configure it themselves.
 // Must stay in sync with MEDIA_PROVIDER_IDS (control-plane/registry/settings.mjs)
 // and MEDIA_KEY_ENV (control-plane/runtime/odRuntime.mjs).
-// Declared above the POST handler because the handler reads it.
 const MEDIA_PROVIDERS = [
   { id: 'openrouter', label: 'OpenRouter', note: 'Images via OpenRouter' },
   { id: 'replicate', label: 'Replicate', note: 'Image + video' },
@@ -29,98 +29,78 @@ const MEDIA_PROVIDERS = [
 
 if (Astro.request.method === 'POST') {
   const f = await Astro.request.formData();
-  const str = (k) => (f.get(k) || '').toString().trim() || undefined;
-  // The page has three independent forms (AI agent, Global AI guidance,
-  // Cloudflare). Each posts only its own section; unmentioned fields are left
-  // undefined so the backend coalesces them to their existing values.
-  const section = (f.get('section') || '').toString();
-
-  // Global AI guidance edits the file rules/globalAiGuidanceRule.md via its own
-  // endpoint (not the settings row), so it posts separately from the other forms.
-  if (section === 'guidance') {
-    try {
-      const r = await cpFetch(Astro.cookies, `/api/ai-guidance-default`, {
+  const str = (k: string) => String(f.get(k) || '').trim() || undefined;
+  // Independent forms; each posts only its own section. Unmentioned fields are
+  // left undefined so the backend keeps their existing values.
+  const section = String(f.get('section') || '');
+  const fail = async (r: Response) => {
+    let msg = 'Save failed';
+    try { msg = (await r.json()).error || msg; } catch { /* keep the generic message */ }
+    throw new Error(msg);
+  };
+  try {
+    if (section === 'guidance') {
+      // The global guidance is a file (rules/globalAiGuidanceRule.md) with its own endpoint.
+      const r = await cpFetch(Astro.cookies, '/api/ai-guidance-default', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ guidance: (f.get('aiGuidance') || '').toString() }),
+        body: JSON.stringify({ guidance: String(f.get('aiGuidance') || '') }),
       });
-      if (!r.ok) {
-        let msg = 'save failed';
-        try { msg = (await r.json()).error || msg; } catch {}
-        throw new Error(msg);
-      }
-      return Astro.redirect(`${baseUrl}settings?saved=guidance`);
-    } catch (e) { error = e.message; }
-  } else {
-    let payload = {};
+      if (!r.ok) await fail(r);
+      return Astro.redirect(`${baseUrl}settings?saved=guidance#guidance`, 303);
+    }
+    let payload: Record<string, unknown> = {};
     if (section === 'cloudflare') {
-      payload = {
-        cloudflareToken: str('cloudflareToken'),
-        cloudflareAccountId: str('cloudflareAccountId'),
-      };
+      payload = { cloudflareToken: str('cloudflareToken'), cloudflareAccountId: str('cloudflareAccountId') };
     } else if (section === 'products') {
-      // Unticked checkboxes post nothing, so both flags are derived from
-      // presence and always sent explicitly — otherwise turning a product OFF
-      // would be indistinguishable from "this form didn't mention it" and the
-      // backend would coalesce it back to its old value.
-      payload = {
-        designActive: !!f.get('designActive'),
-        cmsActive: !!f.get('cmsActive'),
-      };
+      // Unticked switches post nothing, so both flags are sent explicitly —
+      // otherwise turning a product OFF would read as "not mentioned".
+      payload = { designActive: !!f.get('designActive'), cmsActive: !!f.get('cmsActive') };
     } else if (section === 'media') {
-      // Media provider keys. A blank field means "keep the stored key" (the same
-      // convention as every other secret here), so only non-empty values are
-      // sent; clearing is the explicit Remove checkbox.
-      const mediaKeys = {};
-      const mediaKeysClear = [];
-      for (const id of MEDIA_PROVIDERS.map((p) => p.id)) {
-        const v = (f.get(`media_${id}`) || '').toString().trim();
+      // A blank field keeps the stored key; clearing is the explicit Remove box.
+      const mediaKeys: Record<string, string> = {};
+      const mediaKeysClear: string[] = [];
+      for (const { id } of MEDIA_PROVIDERS) {
+        const v = String(f.get(`media_${id}`) || '').trim();
         if (v) mediaKeys[id] = v;
         if (f.get(`mediaClear_${id}`)) mediaKeysClear.push(id);
       }
       payload = { mediaKeys, mediaKeysClear };
     } else {
-      // AI agent: OpenRouter key + per-task-type models + classifier + the one
-      // MMS Design model. The global guidance is edited in its own section
-      // below, not sent here.
+      // AI agent: OpenRouter key + per-task models + classifier + the MMS-Design model.
       let aiCategories = [];
-      try { aiCategories = JSON.parse((f.get('aiCategories') || '[]').toString()); } catch {}
+      try { aiCategories = JSON.parse(String(f.get('aiCategories') || '[]')); } catch { /* validated by the API */ }
       payload = {
         openrouterKey: str('openrouterKey'),
         aiCategories,
-        classifierModel: (f.get('classifierModel') || '').toString().trim(),
-        designModel: (f.get('designModel') || '').toString().trim(),
+        classifierModel: String(f.get('classifierModel') || '').trim(),
+        designModel: String(f.get('designModel') || '').trim(),
       };
     }
-    try {
-      const r = await cpFetch(Astro.cookies, `/api/settings`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
-      });
-      if (!r.ok) {
-        let msg = 'save failed';
-        try { msg = (await r.json()).error || msg; } catch {}
-        throw new Error(msg);
-      }
-      const savedTag = ['cloudflare', 'media', 'products'].includes(section) ? section : 'ai';
-      return Astro.redirect(`${baseUrl}settings?saved=${savedTag}`);
-    } catch (e) { error = e.message; }
+    const r = await cpFetch(Astro.cookies, '/api/settings', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+    });
+    if (!r.ok) await fail(r);
+    const tag = ['cloudflare', 'media', 'products'].includes(section) ? section : 'ai';
+    const anchor = tag === 'ai' ? 'ai' : tag;
+    return Astro.redirect(`${baseUrl}settings?saved=${tag}#${anchor}`, 303);
+  } catch (e) {
+    error = (e as Error).message;
   }
 }
 
-let s = {};
-try { s = await (await cpFetch(Astro.cookies, `/api/settings`)).json(); }
-catch (e) { error = `Control plane not reachable: ${e.message}`; }
+let s: any = {};
+try { s = await (await cpFetch(Astro.cookies, '/api/settings')).json(); }
+catch (e) { error = `The control plane is not reachable: ${(e as Error).message}`; }
 
-// Live OpenRouter catalogue with tool-calling capability flags for the pickers.
-let models = [];
-try { models = ((await (await cpFetch(Astro.cookies, `/api/models`)).json()).models) || []; } catch {}
+// Live OpenRouter catalogue, with tool-calling / vision flags for the pickers.
+let models: any[] = [];
+try { models = ((await (await cpFetch(Astro.cookies, '/api/models')).json()).models) || []; } catch { /* no key yet */ }
 
-// The global AI guidance file (rules/globalAiGuidanceRule.md), editable below.
 let guidance = '';
-try { guidance = ((await (await cpFetch(Astro.cookies, `/api/ai-guidance-default`)).json()).guidance) || ''; } catch {}
+try { guidance = ((await (await cpFetch(Astro.cookies, '/api/ai-guidance-default')).json()).guidance) || ''; } catch { /* shown empty */ }
 const GUIDANCE_MAX = 16000;
 
-// Seed the category table: stored config, or Design/Content builtins (seeded from
-// the legacy single model) on first use so live installs migrate cleanly.
+// Stored categories, or the Design/Content builtins on first use.
 const seededCategories = (Array.isArray(s.aiCategories) && s.aiCategories.length)
   ? s.aiCategories
   : [
@@ -130,245 +110,267 @@ const seededCategories = (Array.isArray(s.aiCategories) && s.aiCategories.length
         description: 'Writing or editing text: headlines, paragraphs, blog posts, product descriptions, and other wording on the page.' },
     ];
 
-const savedSection = Astro.url.searchParams.get('saved');
-const savedLabel = savedSection === 'cloudflare' ? 'Cloudflare settings saved.'
-  : savedSection === 'ai' ? 'AI agent settings saved.'
-  : savedSection === 'guidance' ? 'Global AI guidance saved — all tenants use it on their next message.'
-  : savedSection === 'media' ? 'Media provider keys saved — restart tenants to apply.'
-  : savedSection === 'products' ? 'Product availability saved — applies to every tenant on their next request.'
-  : savedSection ? 'Saved.' : '';
+const saved = Astro.url.searchParams.get('saved');
+const savedLabel = saved === 'cloudflare' ? 'Cloudflare settings saved.'
+  : saved === 'ai' ? 'AI agent settings saved.'
+  : saved === 'guidance' ? 'Global AI guidance saved — every project uses it on its next message.'
+  : saved === 'media' ? 'Media provider keys saved — they apply when each project restarts.'
+  : saved === 'products' ? 'Product availability saved — it applies to every project on its next request.'
+  : saved ? 'Saved.' : '';
 
-// Both default true so a deployment that predates these columns is unchanged.
 const designActive = s.designActive !== false;
 const cmsActive = s.cmsActive !== false;
-
 const mediaKeys = s.mediaKeys || {};
+const noModels = models.length === 0;
+const pickerPlaceholder = noModels ? 'Save an API key to load models' : 'Select a model…';
+
+const SECTIONS = [
+  ['ai', 'robot', 'AI agent'],
+  ['media', 'photo-film', 'Media keys'],
+  ['guidance', 'scroll', 'Global guidance'],
+  ['products', 'cubes', 'Products'],
+  ['cloudflare', 'cloud', 'Cloudflare'],
+];
 ---
-<Layout title="Settings">
-  <h1>Settings</h1>
-  <p class="sub">AI agent and Cloudflare credentials, saved separately. Secrets are <strong>encrypted at rest</strong> and masked — leave a secret field blank to keep its current value.</p>
-  {savedLabel && <div class="banner ok">{savedLabel}</div>}
-  {error && <div class="banner err">{error}</div>}
+<ConsoleLayout title="Settings" active="settings">
+  <PageHeader title="Settings" eyebrow="Platform">
+    Platform-wide credentials and behaviour. Secrets are encrypted at rest and never shown — leave a secret field blank to keep its value.
+  </PageHeader>
 
-  <div class="card">
-    <h2 class="card-title">AI agent</h2>
-    <p class="hint card-sub">The OpenRouter key is injected only by the <strong>AI Gateway</strong> — it is never stored in any tenant instance, and tenants never see which model runs.</p>
-    <form method="POST" id="settings-form">
-      <input type="hidden" name="section" value="ai" />
-      <label>OpenRouter API key {s.hasOpenrouterKey && (<span class="hint">(set — blank keeps it)</span>)}</label>
-      <input name="openrouterKey" type="password" autocomplete="off" placeholder={s.hasOpenrouterKey ? '••••••••••••' : 'sk-or-...'} />
+  {savedLabel && <div class="mms-alert mms-alert--ok" style="margin-bottom:16px"><i class="fa-solid fa-circle-check" aria-hidden="true"></i><span>{savedLabel}</span></div>}
+  {error && <div class="mms-alert mms-alert--err" role="alert" style="margin-bottom:16px"><i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i><span>{error}</span></div>}
 
-      <h2 class="sec">AI models by task type</h2>
-      <p class="hint">Each tenant message is auto-routed to one of these models based on what the tenant asks. Exactly one category is the <strong>Default</strong> (used when the request is unclear or classification fails). Category models must support tool-calling; the picker hides models that can't.</p>
-
-      <div id="cat-rows"></div>
-      <div style="margin-top:8px"><button type="button" class="ghost" id="add-cat">+ Add category</button></div>
-      <input type="hidden" name="aiCategories" id="cat-value" />
-
-      <label class="mt">Classifier model <span class="hint">(a cheap model that reads each prompt and picks the category — no tool-calling needed)</span></label>
-      <div class="combo" id="classifier-combo" data-full="1">
-        <input type="hidden" name="classifierModel" class="combo-value" value={s.classifierModel || ''} />
-        <button type="button" class="combo-trigger" disabled={models.length === 0}>
-          <span class:list={['combo-trigger-label', !s.classifierModel && 'placeholder']} data-placeholder={models.length ? 'Select a model…' : 'Save an API key to load models'}>{s.classifierModel || (models.length ? 'Select a model…' : 'Save an API key to load models')}</span>
-          <span class="combo-clear" title="Clear selection" hidden>✕</span>
-          <span class="combo-caret">▾</span>
-        </button>
-        <div class="combo-panel" hidden>
-          <input type="text" class="combo-search" placeholder="Type to search…" autocomplete="off" />
-          <div class="combo-list"></div>
-        </div>
-      </div>
-
-      <h2 class="sec">MMS Design model</h2>
-      <p class="hint">The one model every tenant's <strong>MMS Design</strong> session runs on. MMS Design has no classifier — one build is a single long tool loop — so it needs a model that supports <strong>tool calling</strong> and <strong>image input</strong> (tenants attach reference screenshots). The picker lists only models that do both. Leave blank to reuse the Default category's model.</p>
-      <div class="combo" id="design-combo" data-full="1">
-        <input type="hidden" name="designModel" class="combo-value" value={s.designModel || ''} />
-        <button type="button" class="combo-trigger" disabled={models.length === 0}>
-          <span class:list={['combo-trigger-label', !s.designModel && 'placeholder']} data-placeholder={models.length ? 'Select a model…' : 'Save an API key to load models'}>{s.designModel || (models.length ? 'Select a model…' : 'Save an API key to load models')}</span>
-          <span class="combo-clear" title="Clear selection" hidden>✕</span>
-          <span class="combo-caret">▾</span>
-        </button>
-        <div class="combo-panel" hidden>
-          <input type="text" class="combo-search" placeholder="Type to search…" autocomplete="off" />
-          <div class="combo-list"></div>
-        </div>
-      </div>
-
-      <div style="margin-top:18px"><button type="submit">Save AI settings</button></div>
-    </form>
-  </div>
-
-  <div class="card">
-    <h2 class="card-title">Media provider keys</h2>
-    <p class="hint card-sub">Keys for image, video and speech generation in <strong>MMS Design</strong>. They are injected into each tenant's daemon at start-up, so tenants never see or set them — a provider left blank simply means that kind of generation is unavailable. Saved keys apply to tenants on their <strong>next restart</strong>, not immediately.</p>
-    <form method="POST" id="media-form">
-      <input type="hidden" name="section" value="media" />
-      {MEDIA_PROVIDERS.map((p) => (
-        <div class="media-row">
-          <label class="media-label">
-            {p.label}
-            <span class="hint">{p.note}</span>
-          </label>
-          <input
-            name={`media_${p.id}`}
-            type="password"
-            autocomplete="off"
-            placeholder={mediaKeys[p.id] ? mediaKeys[p.id] : 'not set'}
-          />
-          {mediaKeys[p.id] && (
-            <label class="media-clear">
-              <input type="checkbox" name={`mediaClear_${p.id}`} value="1" /> Remove
-            </label>
-          )}
-        </div>
+  <div class="mms-split mms-settings">
+    <nav class="mms-sidenav" aria-label="Settings sections">
+      {SECTIONS.map(([id, icon, label]) => (
+        <a href={`#${id}`}><i class={`fa-solid fa-${icon}`} aria-hidden="true"></i>{label}</a>
       ))}
-      <div style="margin-top:18px"><button type="submit">Save media keys</button></div>
-    </form>
-  </div>
+    </nav>
 
-  <div class="card">
-    <h2 class="card-title">Global AI guidance</h2>
-    <p class="hint card-sub">The standing instructions injected into <strong>every tenant's AI chat</strong>. This is the file <code>rules/globalAiGuidanceRule.md</code> — edit it and save to change how the assistant behaves for all tenants. Changes take effect on each tenant's next message; no restart needed.</p>
-    <form method="POST" id="guidance-form">
-      <input type="hidden" name="section" value="guidance" />
-      <textarea name="aiGuidance" class="guidance-area" spellcheck="false" maxlength={GUIDANCE_MAX} aria-label="Global AI guidance">{guidance}</textarea>
-      <div class="guidance-actions">
-        <span class="hint" id="guidance-count"></span>
-        <button type="submit">Save guidance</button>
-      </div>
-    </form>
-  </div>
-
-  <div class="card">
-    <h2 class="card-title">Products</h2>
-    <p class="hint card-sub">
-      Which products this deployment offers, for <strong>every</strong> tenant. Turn one off and
-      tenants land straight in the other after signing in — no Product Hub in between. This is
-      separate from a tenant's Lite/Advanced plan, which controls what gets provisioned.
-    </p>
-    <form method="POST" id="products-form">
-      <input type="hidden" name="section" value="products" />
-
-      <label class="product-row">
-        <input type="checkbox" name="designActive" value="1" checked={designActive} />
-        <span><strong>MMS Design</strong><br /><span class="hint">Visual website design studio (/design)</span></span>
-      </label>
-
-      <label class="product-row">
-        <input type="checkbox" name="cmsActive" value="1" checked={cmsActive} />
-        <span><strong>MMS CMS</strong><br /><span class="hint">Content editing and publishing (/cms)</span></span>
-      </label>
-
-      {!designActive && !cmsActive && (
-        <div class="banner err" style="margin-top:14px">
-          Both products are off — tenants can sign in but have nowhere to go.
+    <div class="mms-stack">
+      <section class="mms-card" id="ai" aria-labelledby="ai-title">
+        <div class="mms-card__head">
+          <div class="mms-card__title">
+            <span class="mms-card__icon"><i class="fa-solid fa-robot" aria-hidden="true"></i></span>
+            <div>
+              <h2 id="ai-title">AI agent</h2>
+              <p>The OpenRouter key is used only by the AI gateway — no project ever holds it or sees which model runs.</p>
+            </div>
+          </div>
         </div>
-      )}
+        <form method="POST" id="settings-form">
+          <input type="hidden" name="section" value="ai" />
+          <div class="mms-card__body mms-form">
+            <div class="mms-field">
+              <label class="mms-label" for="or-key">OpenRouter API key {s.hasOpenrouterKey && <small>· set, blank keeps it</small>}</label>
+              <input id="or-key" class="mms-input" name="openrouterKey" type="password" autocomplete="off" placeholder={s.hasOpenrouterKey ? '••••••••••••' : 'sk-or-…'} />
+            </div>
 
-      <div style="margin-top:18px"><button type="submit">Save product availability</button></div>
-    </form>
+            <div class="mms-field">
+              <span class="mms-label">Models by task</span>
+              <p class="mms-hint">Each project message is routed to one of these by what it asks. Exactly one is the Default, used when a request is unclear. Category models must support tool calling; the picker hides models that don't.</p>
+              <div id="cat-rows" class="mms-stack" style="gap:10px"></div>
+              <div><button type="button" class="mms-btn mms-btn--secondary mms-btn--sm" id="add-cat"><i class="fa-solid fa-plus" aria-hidden="true"></i> Add category</button></div>
+              <p class="mms-error-text" id="cat-error" role="alert" hidden></p>
+              <input type="hidden" name="aiCategories" id="cat-value" />
+            </div>
+
+            <div class="mms-grid2">
+              <div class="mms-field">
+                <span class="mms-label">Classifier model</span>
+                <div class="combo" id="classifier-combo">
+                  <input type="hidden" name="classifierModel" class="combo-value" value={s.classifierModel || ''} />
+                  <button type="button" class="mms-select__button combo-trigger" disabled={noModels}>
+                    <span class:list={['mms-select__value', 'combo-trigger-label']} data-placeholder={pickerPlaceholder} data-empty={!s.classifierModel ? '' : undefined}>{s.classifierModel || pickerPlaceholder}</span>
+                    <span class="combo-clear" role="button" aria-label="Clear selection" hidden><i class="fa-solid fa-xmark" aria-hidden="true"></i></span>
+                    <i class="fa-solid fa-chevron-down mms-select__chevron" aria-hidden="true"></i>
+                  </button>
+                  <div class="combo-panel" hidden>
+                    <input type="text" class="combo-search" placeholder="Type to search…" autocomplete="off" />
+                    <div class="combo-list"></div>
+                  </div>
+                </div>
+                <p class="mms-hint">A cheap model that reads each prompt and picks the category. No tool calling needed.</p>
+              </div>
+              <div class="mms-field">
+                <span class="mms-label">MMS-Design model</span>
+                <div class="combo" id="design-combo">
+                  <input type="hidden" name="designModel" class="combo-value" value={s.designModel || ''} />
+                  <button type="button" class="mms-select__button combo-trigger" disabled={noModels}>
+                    <span class:list={['mms-select__value', 'combo-trigger-label']} data-placeholder={pickerPlaceholder} data-empty={!s.designModel ? '' : undefined}>{s.designModel || pickerPlaceholder}</span>
+                    <span class="combo-clear" role="button" aria-label="Clear selection" hidden><i class="fa-solid fa-xmark" aria-hidden="true"></i></span>
+                    <i class="fa-solid fa-chevron-down mms-select__chevron" aria-hidden="true"></i>
+                  </button>
+                  <div class="combo-panel" hidden>
+                    <input type="text" class="combo-search" placeholder="Type to search…" autocomplete="off" />
+                    <div class="combo-list"></div>
+                  </div>
+                </div>
+                <p class="mms-hint">The one model every design session runs on. It must support tool calling and image input; only such models are listed. Blank reuses the Default category's model.</p>
+              </div>
+            </div>
+          </div>
+          <div class="mms-card__foot">
+            <button type="submit" class="mms-btn mms-btn--primary">Save AI settings</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="mms-card" id="media" aria-labelledby="media-title">
+        <div class="mms-card__head">
+          <div class="mms-card__title">
+            <span class="mms-card__icon"><i class="fa-solid fa-photo-film" aria-hidden="true"></i></span>
+            <div>
+              <h2 id="media-title">Media provider keys</h2>
+              <p>Image, video and speech generation in MMS-Design. A blank provider means that kind of generation is off. Keys apply when each project restarts.</p>
+            </div>
+          </div>
+        </div>
+        <form method="POST" data-busy="Saving media keys">
+          <input type="hidden" name="section" value="media" />
+          <div class="mms-table-card" style="border-radius:0">
+            <table class="mms-table">
+              <thead><tr><th>Provider</th><th>Key</th><th class="mms-right">Remove</th></tr></thead>
+              <tbody>
+                {MEDIA_PROVIDERS.map((p) => (
+                  <tr>
+                    <td><div class="mms-cell-main"><strong style="font-size:13px">{p.label}</strong><small>{p.note}</small></div></td>
+                    <td style="width:55%">
+                      <input class="mms-input" name={`media_${p.id}`} type="password" autocomplete="off"
+                        aria-label={`${p.label} key`} placeholder={mediaKeys[p.id] ? mediaKeys[p.id] : 'Not set'} />
+                    </td>
+                    <td class="mms-right">
+                      {mediaKeys[p.id] ? (
+                        <label class="mms-check" style="justify-content:flex-end">
+                          <input type="checkbox" name={`mediaClear_${p.id}`} value="1" aria-label={`Remove the ${p.label} key`} />
+                        </label>
+                      ) : <span class="mms-muted">—</span>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div class="mms-card__foot">
+            <button type="submit" class="mms-btn mms-btn--primary">Save media keys</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="mms-card" id="guidance" aria-labelledby="guidance-title">
+        <div class="mms-card__head">
+          <div class="mms-card__title">
+            <span class="mms-card__icon"><i class="fa-solid fa-scroll" aria-hidden="true"></i></span>
+            <div>
+              <h2 id="guidance-title">Global AI guidance</h2>
+              <p>Standing instructions added to every project's AI chat. Changes apply on each project's next message.</p>
+            </div>
+          </div>
+        </div>
+        <form method="POST" id="guidance-form">
+          <input type="hidden" name="section" value="guidance" />
+          <div class="mms-card__body">
+            <textarea name="aiGuidance" class="mms-textarea mms-mono" style="min-height:360px;max-height:70vh" spellcheck="false" maxlength={GUIDANCE_MAX} aria-label="Global AI guidance">{guidance}</textarea>
+          </div>
+          <div class="mms-card__foot">
+            <span class="mms-hint" id="guidance-count" style="margin-right:auto"></span>
+            <button type="submit" class="mms-btn mms-btn--primary">Save guidance</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="mms-card" id="products" aria-labelledby="products-title">
+        <div class="mms-card__head">
+          <div class="mms-card__title">
+            <span class="mms-card__icon"><i class="fa-solid fa-cubes" aria-hidden="true"></i></span>
+            <div>
+              <h2 id="products-title">Products</h2>
+              <p>Which products every project can open. With one off, people land straight in the other after signing in. Separate from a project's Lite/Advanced plan.</p>
+            </div>
+          </div>
+        </div>
+        <form method="POST">
+          <input type="hidden" name="section" value="products" />
+          <div class="mms-card__body mms-form">
+            <label class="mms-switch">
+              <input type="checkbox" name="designActive" value="1" checked={designActive} />
+              <span><strong>MMS-Design</strong><br /><span class="mms-hint">Visual website design studio</span></span>
+            </label>
+            <label class="mms-switch">
+              <input type="checkbox" name="cmsActive" value="1" checked={cmsActive} />
+              <span><strong>MMS-CMS</strong><br /><span class="mms-hint">Content editing and publishing</span></span>
+            </label>
+            {!designActive && !cmsActive && (
+              <div class="mms-alert mms-alert--err"><i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i><span>Both products are off — people can sign in but have nowhere to go.</span></div>
+            )}
+          </div>
+          <div class="mms-card__foot">
+            <button type="submit" class="mms-btn mms-btn--primary">Save product availability</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="mms-card" id="cloudflare" aria-labelledby="cf-title">
+        <div class="mms-card__head">
+          <div class="mms-card__title">
+            <span class="mms-card__icon"><i class="fa-solid fa-cloud" aria-hidden="true"></i></span>
+            <div>
+              <h2 id="cf-title">Cloudflare</h2>
+              <p>Used to publish project sites to Cloudflare Pages.</p>
+            </div>
+          </div>
+        </div>
+        <form method="POST">
+          <input type="hidden" name="section" value="cloudflare" />
+          <div class="mms-card__body mms-grid2">
+            <div class="mms-field">
+              <label class="mms-label" for="cf-token">API token {s.hasCloudflareToken && <small>· set, blank keeps it</small>}</label>
+              <input id="cf-token" class="mms-input" name="cloudflareToken" type="password" autocomplete="off" placeholder={s.hasCloudflareToken ? '••••••••••••' : 'Cloudflare Pages token'} />
+            </div>
+            <div class="mms-field">
+              <label class="mms-label" for="cf-account">Account id</label>
+              <input id="cf-account" class="mms-input mms-mono" name="cloudflareAccountId" value={s.cloudflareAccountId || ''} placeholder="32-character account id" />
+            </div>
+          </div>
+          <div class="mms-card__foot">
+            <button type="submit" class="mms-btn mms-btn--primary">Save Cloudflare settings</button>
+          </div>
+        </form>
+      </section>
+    </div>
   </div>
-
-  <div class="card">
-    <h2 class="card-title">Cloudflare</h2>
-    <p class="hint card-sub">Used by the Publish Deployer to ship tenant sites to Cloudflare Pages.</p>
-    <form method="POST" id="cf-form">
-      <input type="hidden" name="section" value="cloudflare" />
-      <label>Cloudflare API token {s.hasCloudflareToken && (<span class="hint">(set — blank keeps it)</span>)}</label>
-      <input name="cloudflareToken" type="password" autocomplete="off" placeholder={s.hasCloudflareToken ? '••••••••••••' : 'Cloudflare Pages token'} />
-
-      <label>Cloudflare account id</label>
-      <input name="cloudflareAccountId" value={s.cloudflareAccountId || ''} placeholder="32-char account id" />
-
-      <div style="margin-top:18px"><button type="submit">Save Cloudflare settings</button></div>
-    </form>
-  </div>
-</Layout>
+</ConsoleLayout>
 
 <!--
-  NOTE: this block is `is:global` on purpose. The category rows (and their model
-  combos) are built with innerHTML in the client script below, so they never
-  receive Astro's scoped-style attribute. Scoping these rules would leave the
-  generated combos unstyled — they'd fall back to the global blue `button` style
-  and the card grid would collapse. Generic selectors (textarea, button.ghost)
-  are namespaced under #settings-form so they don't leak to other pages.
+  Global on purpose: the category cards and their model pickers are built by the
+  script below, so they never receive Astro's scoped-style attribute. Every rule
+  is namespaced under .mms-settings and uses the shell tokens (dark mode works).
 -->
 <style is:global>
-  .card-title { margin: 0 0 4px; font-size: 16px; }
-  .card-sub { margin: 0 0 16px; }
-  #settings-form .sec { margin: 26px 0 4px; font-size: 15px; border-top: 1px solid var(--line); padding-top: 18px; }
-  #settings-form .mt { margin-top: 18px; }
-  #settings-form textarea { width: 100%; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; color: var(--ink); padding: 10px 11px; font: inherit; resize: vertical; }
-  #settings-form button.ghost { background: transparent; border: 1px solid var(--line); color: var(--ink); border-radius: 8px; padding: 7px 12px; cursor: pointer; font: inherit; font-weight: 500; }
-  #settings-form button.ghost:hover { border-color: var(--accent); }
+  .mms-settings .combo { position: relative; }
+  .mms-settings .combo-trigger-label[data-empty] { color: var(--mms-text-muted); }
+  .mms-settings .combo-clear { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 6px; color: var(--mms-text-muted); cursor: pointer; }
+  .mms-settings .combo-clear:hover { background: var(--c-danger-bg); color: var(--mms-danger); }
+  .mms-settings .combo-clear[hidden] { display: none; }
+  .mms-settings .combo-panel { position: absolute; z-index: 40; left: 0; right: 0; margin-top: 6px; overflow: hidden; border: 1px solid var(--mms-border); border-radius: 10px; background: var(--mms-surface-raised); box-shadow: var(--mms-shadow-menu); }
+  .mms-settings .combo-panel[hidden] { display: none; }
+  .mms-settings .combo-search { width: 100%; height: 42px; padding: 0 14px; border: 0; border-bottom: 1px solid var(--mms-border); background: transparent; color: var(--mms-text); font: inherit; outline: none; }
+  .mms-settings .combo-list { max-height: 300px; overflow-y: auto; padding: 6px; }
+  .mms-settings .combo-item { padding: 8px 12px; border-radius: 7px; cursor: pointer; }
+  .mms-settings .combo-item:hover, .mms-settings .combo-item.active { background: var(--mms-surface-tint); }
+  .mms-settings .combo-item.selected .combo-item-id { color: var(--mms-action-strong); }
+  .mms-settings .combo-item-id { font-weight: 680; font-size: 13px; color: var(--mms-text); }
+  .mms-settings .combo-item-name { margin-top: 1px; font-size: 12px; color: var(--mms-text-muted); }
+  .mms-settings .combo-item-warn { margin-top: 1px; font-size: 11px; color: var(--mms-warning); }
+  .mms-settings .combo-empty { padding: 16px; color: var(--mms-text-muted); text-align: center; }
 
-  /* Global AI guidance editor — a large, monospace, theme-matched textarea. */
-  #guidance-form .guidance-area { width: 100%; min-height: 360px; max-height: 70vh; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; color: var(--ink); padding: 12px 14px; font: 13px/1.65 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; resize: vertical; white-space: pre-wrap; overflow-wrap: anywhere; tab-size: 2; scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
-  #guidance-form .guidance-area:focus { outline: none; border-color: var(--accent); }
-  #guidance-form .guidance-area::-webkit-scrollbar { width: 10px; }
-  #guidance-form .guidance-area::-webkit-scrollbar-thumb { background: var(--line); border-radius: 8px; border: 2px solid var(--bg); background-clip: padding-box; }
-  #guidance-form .guidance-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 14px; }
-  #guidance-form #guidance-count.near { color: var(--bad); }
-
-  /* Product availability — two toggle rows. The checkbox is sized up and pulled
-     out of the default full-width input styling, which is written for text
-     fields and would otherwise stretch the box across the card. */
-  #products-form .product-row { display: flex; align-items: flex-start; gap: 11px; padding: 11px 0; border-bottom: 1px solid var(--line); margin: 0; font-weight: 400; }
-  #products-form .product-row:last-of-type { border-bottom: 0; }
-  #products-form .product-row input[type="checkbox"] { width: auto; margin: 2px 0 0; flex: none; accent-color: var(--accent); }
-  #products-form .product-row .hint { font-weight: 400; }
-
-  /* Media provider keys — one compact row per provider so ten of them read as a
-     list rather than ten stacked forms. Collapses to stacked on narrow screens. */
-  #media-form .media-row { display: grid; grid-template-columns: minmax(150px, 220px) 1fr auto; align-items: center; gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--line); }
-  #media-form .media-row:last-of-type { border-bottom: 0; }
-  #media-form .media-label { display: flex; flex-direction: column; gap: 2px; margin: 0; font-weight: 500; }
-  #media-form .media-label .hint { font-weight: 400; }
-  #media-form .media-row input[type="password"] { margin: 0; }
-  #media-form .media-clear { display: flex; align-items: center; gap: 6px; margin: 0; white-space: nowrap; font-weight: 400; }
-  #media-form .media-clear input { width: auto; margin: 0; }
-  @media (max-width: 700px) {
-    #media-form .media-row { grid-template-columns: 1fr; gap: 6px; }
-  }
-
-  #settings-form .cat-card { background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; margin-bottom: 12px; }
-  #settings-form .cat-card-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 14px; }
-  #settings-form .cat-name[readonly] { opacity: .85; cursor: default; }
-  #settings-form .cat-card-body { display: flex; flex-direction: column; gap: 14px; }
-  #settings-form .cat-row1 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
-  #settings-form .cat-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
-  #settings-form .cat-field-label { font-size: 11px; color: var(--mut); text-transform: uppercase; letter-spacing: .04em; }
-  #settings-form .cat-desc { width: 100%; min-height: 62px; font-size: 12px; }
-  #settings-form .cat-default { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--mut); white-space: nowrap; }
-  #settings-form .cat-default input { width: auto; }
-  #settings-form .cat-remove { background: transparent; border: 0; color: var(--mut); cursor: pointer; font-size: 16px; line-height: 1; padding: 0 2px; }
-  #settings-form .cat-remove:hover { color: var(--bad); }
-  @media (max-width: 640px) { #settings-form .cat-row1 { grid-template-columns: 1fr; } }
-
-  #settings-form .combo { position: relative; }
-  #settings-form .combo-trigger { width: 100%; display: flex; align-items: center; justify-content: space-between; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; color: var(--ink); padding: 9px 11px; font: inherit; font-weight: 400; cursor: pointer; text-align: left; }
-  #settings-form .combo-trigger:hover:not(:disabled) { border-color: var(--accent); }
-  #settings-form .combo-trigger:disabled { cursor: not-allowed; opacity: .6; }
-  #settings-form .combo-trigger-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  #settings-form .combo-trigger-label.placeholder { color: var(--mut); }
-  #settings-form .combo-clear { color: var(--mut); margin-left: 8px; font-size: 12px; line-height: 1; cursor: pointer; padding: 2px 4px; border-radius: 4px; }
-  #settings-form .combo-clear:hover { color: var(--bad); background: rgba(229,83,75,.12); }
-  #settings-form .combo-clear[hidden] { display: none; }
-  #settings-form .combo-caret { color: var(--mut); margin-left: 6px; font-size: 12px; }
-  #settings-form .combo-panel { position: absolute; z-index: 30; left: 0; right: 0; margin-top: 6px; background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,.5); overflow: hidden; }
-  #settings-form .combo-search { width: 100%; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: var(--panel); padding: 10px 16px; color: var(--ink); font: inherit; }
-  #settings-form .combo-search:focus { outline: none; }
-  #settings-form .combo-list { max-height: 300px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
-  #settings-form .combo-list::-webkit-scrollbar { width: 10px; }
-  #settings-form .combo-list::-webkit-scrollbar-thumb { background: var(--line); border-radius: 8px; border: 2px solid var(--panel2); background-clip: padding-box; }
-  #settings-form .combo-item { padding: 8px 16px; cursor: pointer; border-bottom: 1px solid rgba(42,49,58,.5); }
-  #settings-form .combo-item:last-child { border-bottom: 0; }
-  #settings-form .combo-item:hover, #settings-form .combo-item.active { background: var(--panel); }
-  #settings-form .combo-item.selected { background: rgba(27,169,87,.12); }
-  #settings-form .combo-item-id { font-weight: 600; color: var(--ink); font-size: 13px; }
-  #settings-form .combo-item-name { color: var(--mut); font-size: 12px; margin-top: 1px; }
-  #settings-form .combo-item-warn { color: #c24a0e; font-size: 11px; margin-top: 1px; }
-  #settings-form .combo-empty { padding: 16px; color: var(--mut); text-align: center; }
+  .mms-settings .cat-card { padding: 14px 16px; border: 1px solid var(--mms-border); border-radius: 10px; background: var(--mms-surface-raised); }
+  .mms-settings .cat-card-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+  .mms-settings .cat-card-body { display: grid; gap: 12px; }
+  .mms-settings .cat-name[readonly] { background: var(--mms-surface-tint); cursor: default; }
+  .mms-settings .cat-desc { min-height: 64px; font-size: 12px; }
+  #guidance-count[data-near] { color: var(--mms-danger); }
+  .mms-settings .mms-card > form .mms-card__foot { border-radius: 0 0 var(--c-radius-card) var(--c-radius-card); }
 </style>
 
 <script define:vars={{ models, seededCategories }}>
@@ -376,8 +378,17 @@ const mediaKeys = s.mediaKeys || {};
     const esc = (s) => String(s).replace(/[&<>"']/g, (c) =>
       ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-    // Reusable searchable model combo, scoped to a root .combo element.
-    // opts.list = model array to show; opts.onChange(id) fires on selection.
+    // Every open picker, so one opening closes the others and scroll/Escape
+    // close whichever is open.
+    const closers = new Set();
+    const closeAll = (except) => closers.forEach((c) => { if (c !== except) c(); });
+    window.addEventListener('scroll', (e) => {
+      if (e.target instanceof Element && e.target.closest('.combo-panel')) return;
+      closeAll();
+    }, true);
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeAll(); });
+
+    // Searchable model picker scoped to a root .combo element.
     function makeCombo(root, opts) {
       const list = opts.list;
       const trigger = root.querySelector('.combo-trigger');
@@ -387,50 +398,57 @@ const mediaKeys = s.mediaKeys || {};
       const listBox = root.querySelector('.combo-list');
       const valueInput = root.querySelector('.combo-value');
       const clearBtn = root.querySelector('.combo-clear');
-      if (!trigger || !list.length) return { get: () => valueInput ? valueInput.value : '' };
+      if (!trigger || !list.length) return { get: () => (valueInput ? valueInput.value : '') };
       trigger.disabled = false;
-      let filtered = list, active = -1;
+      let filtered = list;
+      let active = -1;
 
-      // The ✕ only appears once something is picked. Operators can clear a
-      // selection back to "unset" (they can't otherwise — the list only lets
-      // them switch to another model).
       function syncClear() { if (clearBtn) clearBtn.hidden = !valueInput.value; }
       syncClear();
 
       function render() {
         listBox.innerHTML = filtered.length
           ? filtered.map((m, i) =>
-              `<div class="combo-item${i === active ? ' active' : ''}${m.id === valueInput.value ? ' selected' : ''}" data-id="${esc(m.id)}">` +
+              `<div class="combo-item${i === active ? ' active' : ''}${m.id === valueInput.value ? ' selected' : ''}" data-id="${esc(m.id)}" role="option">` +
               `<div class="combo-item-id">${esc(m.id)}</div><div class="combo-item-name">${esc(m.name)}</div>` +
-              (m.toolCalling === null ? `<div class="combo-item-warn">⚠ tool support unknown</div>` : ``) +
+              (m.toolCalling === null ? `<div class="combo-item-warn">Tool support unknown</div>` : ``) +
               `</div>`).join('')
           : '<div class="combo-empty">No models match</div>';
       }
-      function open() { panel.hidden = false; search.value = ''; filtered = list; active = -1; render(); search.focus(); }
-      function close() { panel.hidden = true; }
+      function close() { panel.hidden = true; trigger.setAttribute('aria-expanded', 'false'); }
+      function open() {
+        closeAll(close);
+        panel.hidden = false;
+        trigger.setAttribute('aria-expanded', 'true');
+        search.value = '';
+        filtered = list;
+        active = -1;
+        render();
+        search.focus();
+      }
+      closers.add(close);
       function select(id) {
         valueInput.value = id;
         label.textContent = id;
-        label.classList.remove('placeholder');
+        label.removeAttribute('data-empty');
         syncClear();
         close();
-        if (opts.onChange) opts.onChange(id);
+        trigger.focus();
       }
       function clearSelection() {
         valueInput.value = '';
         label.textContent = label.dataset.placeholder || 'Select a model…';
-        label.classList.add('placeholder');
+        label.setAttribute('data-empty', '');
         syncClear();
         close();
-        if (opts.onChange) opts.onChange('');
       }
       trigger.addEventListener('click', () => (panel.hidden ? open() : close()));
-      // Sits inside the trigger button, so swallow the click to avoid re-opening.
       if (clearBtn) clearBtn.addEventListener('click', (e) => { e.stopPropagation(); clearSelection(); });
       search.addEventListener('input', () => {
         const q = search.value.toLowerCase().trim();
         filtered = q ? list.filter((m) => m.id.toLowerCase().includes(q) || (m.name || '').toLowerCase().includes(q)) : list;
-        active = -1; render();
+        active = -1;
+        render();
       });
       listBox.addEventListener('click', (e) => {
         const item = e.target.closest('.combo-item');
@@ -442,58 +460,53 @@ const mediaKeys = s.mediaKeys || {};
         else if (e.key === 'Enter') { e.preventDefault(); if (active >= 0 && filtered[active]) select(filtered[active].id); }
         else if (e.key === 'Escape') { close(); trigger.focus(); }
       });
-      document.addEventListener('click', (e) => { if (!root.contains(e.target)) close(); });
+      document.addEventListener('pointerdown', (e) => { if (!root.contains(e.target)) close(); });
       return { get: () => valueInput.value };
     }
 
-    // Category models must support tools: hide KNOWN-false, keep unknown (warned).
+    // Category models must support tools: hide known-false, keep unknown (warned).
     const toolModels = models.filter((m) => m.toolCalling !== false);
-
-    // MMS Design additionally needs image input. Unlike the CMS — which routes a
-    // request with an attachment to the Design category — MMS Design has ONE
-    // model, so a text-only pick means every reference screenshot a tenant
-    // attaches is refused. Unknown capability is kept (the item warns).
+    // The design model also needs image input (people attach reference screenshots).
     const designModels = models.filter((m) => m.toolCalling !== false && m.vision !== false);
 
     const rowsBox = document.getElementById('cat-rows');
-    const rowCombos = []; // { getSlug, getName, getDesc, getModel, isDefault, builtin }
+    const rows = [];
 
     function slugify(name, taken) {
       let base = String(name).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'category';
       if (base.length > 60) base = base.slice(0, 60).replace(/-+$/g, '');
-      let slug = base, n = 2;
+      let slug = base;
+      let n = 2;
       while (taken.has(slug)) slug = `${base}-${n++}`;
       return slug;
     }
 
     function addRow(cat) {
-      const idx = rowCombos.length;
       const row = document.createElement('div');
       row.className = 'cat-card';
+      const picker = models.length ? 'Select a model…' : 'Save an API key to load models';
       row.innerHTML =
         `<div class="cat-card-top">` +
-          `<label class="cat-default"><input type="radio" name="__cat_default" ${cat.isDefault ? 'checked' : ''} /> Default</label>` +
-          (cat.builtin ? `` : `<button type="button" class="cat-remove" title="Remove category">✕</button>`) +
+          `<label class="mms-check"><input type="radio" name="__cat_default" ${cat.isDefault ? 'checked' : ''} /> <span>Default category</span></label>` +
+          (cat.builtin ? `<span class="mms-chip mms-chip--sm">Built-in</span>` : `<button type="button" class="mms-iconbtn cat-remove" aria-label="Remove category"><i class="fa-solid fa-trash-can" aria-hidden="true"></i></button>`) +
         `</div>` +
         `<div class="cat-card-body">` +
-          `<div class="cat-row1">` +
-            `<div class="cat-field">` +
-              `<span class="cat-field-label">Category name</span>` +
-              `<input class="cat-name" value="${esc(cat.name || '')}" ${cat.builtin ? 'readonly' : 'placeholder="Category name (e.g. Products)"'} />` +
-            `</div>` +
-            `<div class="cat-field">` +
-              `<span class="cat-field-label">Model</span>` +
+          `<div class="mms-grid2">` +
+            `<div class="mms-field"><span class="mms-label">Category name</span>` +
+              `<input class="mms-input cat-name" value="${esc(cat.name || '')}" ${cat.builtin ? 'readonly' : 'placeholder="e.g. Products"'} /></div>` +
+            `<div class="mms-field"><span class="mms-label">Model</span>` +
               `<div class="combo cat-model-combo">` +
                 `<input type="hidden" class="combo-value" value="${esc(cat.modelId || '')}" />` +
-                `<button type="button" class="combo-trigger"><span class="combo-trigger-label${cat.modelId ? '' : ' placeholder'}" data-placeholder="Select a model…">${esc(cat.modelId || 'Select a model…')}</span><span class="combo-clear" title="Clear selection" hidden>✕</span><span class="combo-caret">▾</span></button>` +
+                `<button type="button" class="mms-select__button combo-trigger" ${models.length ? '' : 'disabled'}>` +
+                  `<span class="mms-select__value combo-trigger-label" data-placeholder="${picker}" ${cat.modelId ? '' : 'data-empty'}>${esc(cat.modelId || picker)}</span>` +
+                  `<span class="combo-clear" role="button" aria-label="Clear selection" hidden><i class="fa-solid fa-xmark" aria-hidden="true"></i></span>` +
+                  `<i class="fa-solid fa-chevron-down mms-select__chevron" aria-hidden="true"></i>` +
+                `</button>` +
                 `<div class="combo-panel" hidden><input type="text" class="combo-search" placeholder="Type to search…" autocomplete="off" /><div class="combo-list"></div></div>` +
-              `</div>` +
-            `</div>` +
+              `</div></div>` +
           `</div>` +
-          `<div class="cat-field">` +
-            `<span class="cat-field-label">When to use (helps routing)</span>` +
-            `<textarea class="cat-desc" placeholder="e.g. Writing or editing text on the page">${esc(cat.description || '')}</textarea>` +
-          `</div>` +
+          `<div class="mms-field"><span class="mms-label">When to use <small>(helps routing)</small></span>` +
+            `<textarea class="mms-textarea cat-desc" placeholder="e.g. Writing or editing text on the page">${esc(cat.description || '')}</textarea></div>` +
         `</div>`;
       rowsBox.appendChild(row);
 
@@ -504,67 +517,66 @@ const mediaKeys = s.mediaKeys || {};
       const entry = {
         builtin: !!cat.builtin,
         fixedSlug: cat.builtin ? cat.slug : null,
+        nameEl,
         getName: () => nameEl.value.trim(),
         getDesc: () => descEl.value,
         getModel: () => combo.get(),
         isDefault: () => radioEl.checked,
       };
-      rowCombos.push(entry);
-
+      rows.push(entry);
       const rm = row.querySelector('.cat-remove');
       if (rm) rm.addEventListener('click', () => {
-        const i = rowCombos.indexOf(entry);
-        if (i >= 0) rowCombos.splice(i, 1);
+        const i = rows.indexOf(entry);
+        if (i >= 0) rows.splice(i, 1);
         row.remove();
       });
     }
 
     seededCategories.forEach(addRow);
-
     document.getElementById('add-cat').addEventListener('click', () =>
       addRow({ name: '', description: '', modelId: '', isDefault: false, builtin: false }));
-
-    // Classifier combo (full, unrestricted list).
     makeCombo(document.getElementById('classifier-combo'), { list: models });
-
-    // MMS Design combo (tool-calling + vision capable only).
     makeCombo(document.getElementById('design-combo'), { list: designModels });
 
-    // Serialize categories to the hidden field + validate on submit.
+    // Serialise categories into the hidden field; problems show inline.
+    const errorEl = document.getElementById('cat-error');
+    const showError = (msg, focusEl) => {
+      errorEl.textContent = msg;
+      errorEl.hidden = false;
+      if (focusEl) focusEl.focus();
+    };
     document.getElementById('settings-form').addEventListener('submit', (e) => {
+      errorEl.hidden = true;
       const taken = new Set();
       const out = [];
       let defaults = 0;
-      for (const r of rowCombos) {
+      for (const r of rows) {
         const name = r.getName();
-        if (!name) { e.preventDefault(); alert('Every category needs a name.'); return; }
+        if (!name) { e.preventDefault(); showError('Every category needs a name.', r.nameEl); return; }
         const model = r.getModel();
-        if (!model) { e.preventDefault(); alert(`Category "${name}" needs a model.`); return; }
+        if (!model) { e.preventDefault(); showError(`Category “${name}” needs a model.`); return; }
         const slug = r.fixedSlug || slugify(name, taken);
         taken.add(slug);
         const isDefault = r.isDefault();
         if (isDefault) defaults++;
         out.push({ slug, name, description: r.getDesc(), modelId: model, isDefault, builtin: r.builtin });
       }
-      if (defaults !== 1) { e.preventDefault(); alert('Pick exactly one Default category.'); return; }
+      if (defaults !== 1) { e.preventDefault(); showError('Pick exactly one Default category.'); return; }
       document.getElementById('cat-value').value = JSON.stringify(out);
     });
-  })();
-</script>
 
-<script is:inline>
-  // Global AI guidance: live character counter (warns as it nears the limit).
-  (function () {
-    const area = document.querySelector('#guidance-form .guidance-area');
+    // Guidance: live character counter, warning near the limit.
+    const area = document.querySelector('#guidance-form textarea');
     const count = document.getElementById('guidance-count');
-    if (!area || !count) return;
-    const max = Number(area.getAttribute('maxlength')) || 16000;
-    const sync = () => {
-      const n = area.value.length;
-      count.textContent = n.toLocaleString() + ' / ' + max.toLocaleString() + ' characters';
-      count.classList.toggle('near', n > max * 0.9);
-    };
-    area.addEventListener('input', sync);
-    sync();
+    if (area && count) {
+      const max = Number(area.getAttribute('maxlength')) || 16000;
+      const sync = () => {
+        const n = area.value.length;
+        count.textContent = `${n.toLocaleString()} / ${max.toLocaleString()} characters`;
+        count.toggleAttribute('data-near', n > max * 0.9);
+      };
+      area.addEventListener('input', sync);
+      sync();
+    }
   })();
 </script>

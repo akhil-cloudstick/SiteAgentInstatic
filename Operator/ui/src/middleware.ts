@@ -9,7 +9,9 @@ import { basePath, cpFetch, safeNext } from './lib/cp';
 export const onRequest = defineMiddleware(async (ctx, next) => {
   const base = basePath();
   const path = ctx.url.pathname;
-  if (path === `${base}login` || path === `${base}logout`) return next();
+  // Signing in, signing out, and an invited administrator setting a password
+  // are the only pages reachable without a session.
+  if (path === `${base}login` || path === `${base}logout` || path === `${base}accept`) return next();
 
   let admin = null;
   try {
@@ -23,5 +25,18 @@ export const onRequest = defineMiddleware(async (ctx, next) => {
     return ctx.redirect(`${base}login?next=${encodeURIComponent(back)}`, 303);
   }
   ctx.locals.admin = admin;
+  const level = admin.scope?.level;
+  const is = (page: string) => path === `${base}${page}` || path === `${base}${page}/`;
+  // The landing page follows the setup order: administrators above a single
+  // Business start at Organisation; a Business administrator starts at its
+  // Projects.
+  if (path === base || path === base.replace(/\/$/, '')) {
+    return ctx.redirect(`${base}${level === 'business' ? 'projects' : 'org'}`, 302);
+  }
+  // Organisation is for administrators above a single Business.
+  if (is('org') && level === 'business') return ctx.redirect(`${base}projects`, 303);
+  // Platform-wide configuration is for platform administrators; the API
+  // refuses the rest anyway, so send them somewhere useful instead.
+  if (is('settings') && level !== 'platform') return ctx.redirect(`${base}projects`, 303);
   return next();
 });

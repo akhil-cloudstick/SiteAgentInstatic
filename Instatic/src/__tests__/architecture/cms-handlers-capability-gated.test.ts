@@ -40,6 +40,11 @@ const ALLOWLIST: ReadonlyMap<string, string> = new Map([
   // only the two fields already rendered on every published page (site
   // name + favicon URL).
   ['setup.ts', 'Public bootstrap + site identity — gates aren\'t applicable.'],
+  // MMS managed mode: the hub hand-off (GET /sso) and the control plane's
+  // people list (POST /sso/people). Both are authenticated by a token signed
+  // with the project's key (auth/tenantSso.ts), not by a session — there is
+  // no session yet — and both are inert unless INSTATIC_SSO_SECRET is set.
+  ['sso.ts', 'Managed-mode SSO + people sync; authenticated by a project-key signed token, inert without INSTATIC_SSO_SECRET.'],
   // Dispatcher / index — composes the per-resource handlers and runs
   // the CSRF Origin check. Per-handler files apply the actual auth gates.
   ['index.ts', 'Top-level dispatcher; per-handler files own the auth gates.'],

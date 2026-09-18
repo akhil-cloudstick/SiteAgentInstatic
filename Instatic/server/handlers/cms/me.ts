@@ -22,7 +22,7 @@ import type { DbClient } from '../../db/client'
 import { BRAND_NAME } from '@core/brand'
 import { getSessionHash, requireAuthenticatedUser, requireStepUp } from '../../auth/authz'
 import { hashPassword, verifyPassword } from '../../auth/tokens'
-import { markSessionMfaPassed } from '../../auth/sessions'
+import { findSessionHubPersonId, markSessionMfaPassed } from '../../auth/sessions'
 import {
   generateRecoveryCodes,
   generateTotpSecret,
@@ -101,6 +101,17 @@ function newRecoveryCodeSet(): { codes: string[]; hashes: string[] } {
   }
 }
 
+/**
+ * A session opened from the Product Hub (MMS Phase 1) belongs to a hub person:
+ * their password and email are managed at the hub. Changing them here would
+ * detach the account from its hub identity — and for the owner account, which
+ * the Connector also signs in to, would silently break that login.
+ */
+async function hubManagedIdentity(req: Request, db: DbClient): Promise<boolean> {
+  const idHash = await getSessionHash(req)
+  return idHash ? (await findSessionHubPersonId(db, idHash)) !== null : false
+}
+
 export async function handleMeRoutes(
   req: Request,
   db: DbClient,
@@ -119,6 +130,9 @@ export async function handleMeRoutes(
 
     const email = body.email.trim()
     if (!email.toLowerCase().includes('@')) return badRequest('Invalid email')
+    if (email.toLowerCase() !== user.email.toLowerCase() && (await hubManagedIdentity(req, db))) {
+      return jsonResponse({ error: 'Your email is managed at your hub.' }, { status: 403 })
+    }
     const existing = await findUserByEmail(db, email)
     if (existing && existing.id !== user.id) {
       return badRequest('Email is already in use')
@@ -153,6 +167,9 @@ export async function handleMeRoutes(
     if (req.method !== 'PATCH') return methodNotAllowed()
     const user = await requireAuthenticatedUser(req, db)
     if (user instanceof Response) return user
+    if (await hubManagedIdentity(req, db)) {
+      return jsonResponse({ error: 'Your password is managed at your hub.' }, { status: 403 })
+    }
     const stepUp = await requireStepUp(req, db, user)
     if (stepUp) return stepUp
     const body = await readValidatedBody(req, ChangePasswordBodySchema)

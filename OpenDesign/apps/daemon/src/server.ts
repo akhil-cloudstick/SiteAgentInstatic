@@ -1024,7 +1024,7 @@ import {
   signSession,
   parseCookie,
   SESSION_MAX_AGE_SEC,
-  signInstaticSsoToken,
+  signInstaticMachineToken,
 } from './tenant-sso.js';
 import { collectSiteFiles } from './od-share-to-cms.js';
 import { materializeProjectImages } from './cms-image-materialize.js';
@@ -3176,7 +3176,7 @@ export async function startServer({
     }
     res.setHeader(
       'Set-Cookie',
-      `od_session=${signSession(payload.sub)}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${SESSION_MAX_AGE_SEC}`,
+      `od_session=${signSession(payload.sub, payload.person)}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${SESSION_MAX_AGE_SEC}`,
     );
     res.redirect('/');
   });
@@ -7874,8 +7874,9 @@ export async function startServer({
           `[share-to-cms] ${slug} normalize failed, pushing raw: ${normErr instanceof Error ? normErr.message : normErr}`,
         );
       }
-      // 1) open an Owner session on the tenant's Instatic
-      const token = signInstaticSsoToken(slug, 120);
+      // 1) open a MACHINE session on the tenant's Instatic, for this staging
+      // call only (MMS Phase 1). It never reaches the browser.
+      const token = signInstaticMachineToken(slug, 120);
       const ssoRes = await fetch(`${instaticUrl}/cms/api/cms/sso?token=${encodeURIComponent(token)}`, {
         redirect: 'manual',
       });
@@ -7894,17 +7895,18 @@ export async function startServer({
       if (!stageRes.ok || !staged.token) {
         return sendApiError(res, 502, 'CMS_IMPORT_FAILED', staged?.error || 'CMS import failed');
       }
-      // Send the BROWSER to the CMS through a fresh SSO hand-off so it lands already
-      // logged in, with the Import Site wizard open on Review import (pre-loaded from
-      // the staged FileMap via `importToken`). Use the PUBLIC gateway origin (the
-      // tenant's Instatic is session-routed at <gatewayOrigin>/admin) when set — a
-      // remote client cannot reach the daemon's localhost OD_INSTATIC_URL. Falls back
-      // to the local URL for plain dev.
+      // Send the BROWSER to the CMS through the HUB's hand-off, so the person
+      // arrives as themselves, with their own role — the CMS then decides what
+      // their import may change (MMS Phase 1, NEW-3). The hub signs them in and
+      // lands them on the Import Site wizard, pre-loaded from the staged FileMap
+      // via `importToken`. There is no fallback to an owner hand-off: without
+      // the hub's public origin the share cannot be handed to a person safely.
       const gatewayOrigin = (process.env.OD_GATEWAY_ORIGIN ?? '').trim().replace(/\/$/, '');
-      const cmsBase = gatewayOrigin || instaticUrl;
-      const browserToken = signInstaticSsoToken(slug, 120);
+      if (!gatewayOrigin) {
+        return sendApiError(res, 503, 'CMS_HANDOFF_UNAVAILABLE', 'The hub address is not configured, so the CMS cannot be opened.');
+      }
       const siteImportPath = `/cms/site?importToken=${encodeURIComponent(staged.token)}`;
-      const redirectUrl = `${cmsBase}/cms/api/cms/sso?token=${encodeURIComponent(browserToken)}&redirect=${encodeURIComponent(siteImportPath)}`;
+      const redirectUrl = `${gatewayOrigin}/sso/cms?next=${encodeURIComponent(siteImportPath)}`;
       return res.json({ ok: true, redirectUrl });
     } catch (caught) {
       return sendApiError(res, 500, 'PUSH_FAILED', caught instanceof Error ? caught.message : String(caught));

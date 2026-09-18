@@ -10,6 +10,7 @@
 import { timingSafeEqual } from 'node:crypto';
 import { signValue, verifyValue } from './crypto.mjs';
 import { findActiveAdmin } from '../registry/adminUsers.mjs';
+import { scopeOf } from './scope.mjs';
 
 export const ADMIN_COOKIE = 'sa_admin';
 export const ADMIN_SESSION_TTL_SEC = 12 * 3600;
@@ -59,7 +60,9 @@ export async function currentAdmin(req, find = findActiveAdmin) {
   if (!s) return null;
   const admin = await find(s.id);
   if (!admin || versionOf(admin) !== s.v) return null;
-  return { id: String(admin.id), email: admin.email };
+  // The scope is read from the row on every request, never from the cookie,
+  // so narrowing an administrator applies at once.
+  return { id: String(admin.id), email: admin.email, scope: scopeOf(admin) };
 }
 
 // Routes this server owns that act as, or read for, the operator. Anything
@@ -71,14 +74,19 @@ const ADMIN_EXACT = new Set([
   '/api/models',
   '/api/tenants',
   '/api/admin/session',
+  '/api/org',
+  '/api/operators',
+  '/api/businesses',
+  '/api/admins',
 ]);
-const ADMIN_PREFIXES = ['/api/tenants/', '/api/mcp/'];
+const ADMIN_PREFIXES = ['/api/tenants/', '/api/mcp/', '/api/operators/', '/api/businesses/', '/api/admins/'];
 
 /** Routes under /api/ this server answers without an admin session. */
 export const OPEN_API_PATHS = Object.freeze([
   '/api/health', // liveness only; the detail is admin-only
   '/api/connector/targets', // its own bearer (MMS_CONNECTOR_MCP_TOKEN)
   '/api/admin/login', // the way in
+  '/api/admin/accept', // an invited administrator sets a password (token-authenticated)
 ]);
 
 export function isAdminApiPath(path) {

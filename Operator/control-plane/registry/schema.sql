@@ -122,18 +122,19 @@ alter table siteagent_control.settings add column if not exists ai_categories   
 alter table siteagent_control.settings add column if not exists classifier_model text;
 alter table siteagent_control.settings add column if not exists ai_guidance      text;
 
--- Tenant hub identity: the ONE login a tenant uses for BOTH tools (via SSO). One
--- row per tenant (the owner's hub account). `password_hash` is null until the
+-- Tenant hub identity: the people of a project, each with ONE login for both
+-- tools (via SSO). Several rows per project since Phase 1 (R3/NEW-2) — see the
+-- role/index changes at the end of this file. `password_hash` is null until the
 -- one-time invite is accepted; only the invite token's keyed hash is stored, so a
 -- registry leak can't be replayed as a working invite.
 create table if not exists siteagent_control.tenant_users (
   id                bigserial primary key,
-  tenant_slug       text not null unique references siteagent_control.tenants(slug) on delete cascade,
+  tenant_slug       text not null references siteagent_control.tenants(slug) on delete cascade,
   email             text,
   password_hash     text,
   invite_token_hash text,
   invite_expires_at timestamptz,
-  status            text not null default 'invited',  -- invited|active|disabled
+  status            text not null default 'invited',  -- invited|active|disabled|removed
   created_at        timestamptz not null default now(),
   updated_at        timestamptz not null default now()
 );
@@ -226,14 +227,232 @@ alter table siteagent_control.settings add column if not exists cms_active    bo
 -- Operator console administrators (R14). Every admin/operator action requires
 -- one signed in. Only the scrypt hash is stored. `updated_at` doubles as the
 -- session version: resetting a password bumps it, which ends every session
--- signed before the reset. Created and reset from the CLI only:
+-- signed before the reset. Created from the CLI or invited from the console:
 --   npm run admin:create -- --email <email>      (from Operator/)
 create table if not exists siteagent_control.admin_users (
   id            bigserial primary key,
   email         text not null unique,
   password_hash text not null,
-  status        text not null default 'active',  -- active|disabled
+  status        text not null default 'active',  -- invited|active|disabled
   created_at    timestamptz not null default now(),
   updated_at    timestamptz not null default now(),
   last_login_at timestamptz
 );
+
+-- ===========================================================================
+-- Phase 1 (R1) — Operator → Business → Project.
+--
+-- Today's tenant IS the project. An Operator (an agency) owns Businesses; a
+-- Business owns projects; a Business with no Operator sits directly under the
+-- platform.
+--
+-- The addressing rule: every stored record carries its full address (which
+-- Operator, which Business). The columns are stamped by triggers from the
+-- project's Business, so the address is a property of the data rather than of
+-- code remembering to write it, and a query scoped to a Business can filter on
+-- the record itself.
+-- ===========================================================================
+create table if not exists siteagent_control.operators (
+  id         bigserial primary key,
+  slug       text not null unique,
+  name       text not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists siteagent_control.businesses (
+  id          bigserial primary key,
+  slug        text not null unique,
+  name        text not null,
+  operator_id bigint references siteagent_control.operators(id) on delete restrict,  -- null = direct
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now()
+);
+create index if not exists businesses_operator on siteagent_control.businesses (operator_id);
+
+alter table siteagent_control.tenants add column if not exists business_id bigint references siteagent_control.businesses(id) on delete restrict;
+alter table siteagent_control.tenants add column if not exists operator_id bigint references siteagent_control.operators(id) on delete restrict;
+alter table siteagent_control.tenant_users    add column if not exists business_id bigint;
+alter table siteagent_control.tenant_users    add column if not exists operator_id bigint;
+alter table siteagent_control.mcp_agents      add column if not exists business_id bigint;
+alter table siteagent_control.mcp_agents      add column if not exists operator_id bigint;
+alter table siteagent_control.mcp_agent_audit add column if not exists business_id bigint;
+alter table siteagent_control.mcp_agent_audit add column if not exists operator_id bigint;
+alter table siteagent_control.deploys         add column if not exists business_id bigint;
+alter table siteagent_control.deploys         add column if not exists operator_id bigint;
+create index if not exists tenants_business on siteagent_control.tenants (business_id);
+create index if not exists tenants_operator on siteagent_control.tenants (operator_id);
+
+-- A project's Operator is always its Business's Operator.
+create or replace function siteagent_control.stamp_tenant_address() returns trigger
+language plpgsql as $$
+begin
+  if new.business_id is null then
+    new.operator_id := null;
+  else
+    select b.operator_id into new.operator_id
+      from siteagent_control.businesses b where b.id = new.business_id;
+  end if;
+  return new;
+end $$;
+drop trigger if exists tenants_stamp_address on siteagent_control.tenants;
+create trigger tenants_stamp_address
+  before insert or update of business_id, operator_id on siteagent_control.tenants
+  for each row execute function siteagent_control.stamp_tenant_address();
+
+-- Records addressed by project slug take the project's address.
+create or replace function siteagent_control.stamp_slug_address() returns trigger
+language plpgsql as $$
+begin
+  select t.business_id, t.operator_id into new.business_id, new.operator_id
+    from siteagent_control.tenants t where t.slug = new.tenant_slug;
+  return new;
+end $$;
+-- Records addressed by project id (deploys) likewise.
+create or replace function siteagent_control.stamp_id_address() returns trigger
+language plpgsql as $$
+begin
+  select t.business_id, t.operator_id into new.business_id, new.operator_id
+    from siteagent_control.tenants t where t.id = new.tenant_id;
+  return new;
+end $$;
+drop trigger if exists tenant_users_stamp_address on siteagent_control.tenant_users;
+create trigger tenant_users_stamp_address
+  before insert or update of tenant_slug, business_id, operator_id on siteagent_control.tenant_users
+  for each row execute function siteagent_control.stamp_slug_address();
+drop trigger if exists mcp_agents_stamp_address on siteagent_control.mcp_agents;
+create trigger mcp_agents_stamp_address
+  before insert or update of tenant_slug, business_id, operator_id on siteagent_control.mcp_agents
+  for each row execute function siteagent_control.stamp_slug_address();
+drop trigger if exists mcp_agent_audit_stamp_address on siteagent_control.mcp_agent_audit;
+create trigger mcp_agent_audit_stamp_address
+  before insert or update of tenant_slug, business_id, operator_id on siteagent_control.mcp_agent_audit
+  for each row execute function siteagent_control.stamp_slug_address();
+drop trigger if exists deploys_stamp_address on siteagent_control.deploys;
+create trigger deploys_stamp_address
+  before insert or update of tenant_id, business_id, operator_id on siteagent_control.deploys
+  for each row execute function siteagent_control.stamp_id_address();
+
+-- Moving a project re-addresses everything that belongs to it.
+create or replace function siteagent_control.propagate_tenant_address() returns trigger
+language plpgsql as $$
+begin
+  if new.business_id is distinct from old.business_id
+     or new.operator_id is distinct from old.operator_id then
+    update siteagent_control.tenant_users    set business_id = new.business_id where tenant_slug = new.slug;
+    update siteagent_control.mcp_agents      set business_id = new.business_id where tenant_slug = new.slug;
+    update siteagent_control.mcp_agent_audit set business_id = new.business_id where tenant_slug = new.slug;
+    update siteagent_control.deploys         set business_id = new.business_id where tenant_id = new.id;
+  end if;
+  return null;
+end $$;
+drop trigger if exists tenants_propagate_address on siteagent_control.tenants;
+create trigger tenants_propagate_address
+  after update of business_id, operator_id on siteagent_control.tenants
+  for each row execute function siteagent_control.propagate_tenant_address();
+
+-- Moving a Business under another Operator re-addresses its projects.
+create or replace function siteagent_control.propagate_business_address() returns trigger
+language plpgsql as $$
+begin
+  if new.operator_id is distinct from old.operator_id then
+    update siteagent_control.tenants set operator_id = new.operator_id where business_id = new.id;
+  end if;
+  return null;
+end $$;
+drop trigger if exists businesses_propagate_address on siteagent_control.businesses;
+create trigger businesses_propagate_address
+  after update of operator_id on siteagent_control.businesses
+  for each row execute function siteagent_control.propagate_business_address();
+
+-- Backfill: every project that predates the levels gets its own Business,
+-- directly under the platform. A `-staging` copy shares its site's Business.
+-- Projects already removed share one "Removed projects" Business, so they do
+-- not each leave an empty Business behind.
+do $$
+declare
+  t    record;
+  base text;
+  bid  bigint;
+begin
+  for t in select id, slug, status from siteagent_control.tenants where business_id is null order by id loop
+    base := case when t.status = 'removed' then 'removed-projects'
+                 else regexp_replace(t.slug, '-staging$', '') end;
+    insert into siteagent_control.businesses (slug, name)
+    values (
+      base,
+      case when base = 'removed-projects' then 'Removed projects'
+           else coalesce(
+             (select nullif(trim(x.display_name), '') from siteagent_control.tenants x where x.slug = base),
+             initcap(replace(base, '-', ' '))
+           ) end
+    )
+    on conflict (slug) do nothing;
+    select b.id into bid from siteagent_control.businesses b where b.slug = base;
+    update siteagent_control.tenants set business_id = bid where id = t.id;
+  end loop;
+end $$;
+alter table siteagent_control.tenants alter column business_id set not null;
+
+update siteagent_control.tenant_users u set business_id = t.business_id
+  from siteagent_control.tenants t
+ where t.slug = u.tenant_slug and u.business_id is distinct from t.business_id;
+update siteagent_control.mcp_agents a set business_id = t.business_id
+  from siteagent_control.tenants t
+ where t.slug = a.tenant_slug and a.business_id is distinct from t.business_id;
+update siteagent_control.mcp_agent_audit a set business_id = t.business_id
+  from siteagent_control.tenants t
+ where t.slug = a.tenant_slug and a.business_id is distinct from t.business_id;
+update siteagent_control.deploys d set business_id = t.business_id
+  from siteagent_control.tenants t
+ where t.id = d.tenant_id and d.business_id is distinct from t.business_id;
+
+-- ---------------------------------------------------------------------------
+-- Phase 1 (R3 / NEW-2) — several people per project, each with a role.
+--
+-- The roles are the CMS's own four (owner, admin, client, member); the CMS
+-- enforces them on every request once the person arrives through SSO. In the
+-- console they read Owner / Publisher / Author / Viewer. One owner per project:
+-- the account holder, who maps to the CMS owner account.
+--
+-- The old UNIQUE(tenant_slug) is what made a second invite overwrite the first
+-- person (NEW-2). A person is now unique per (project, email) among rows that
+-- are not removed, so a removed person stays as history.
+alter table siteagent_control.tenant_users add column if not exists role text not null default 'owner';
+alter table siteagent_control.tenant_users add column if not exists display_name text;
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'tenant_users_role_check') then
+    alter table siteagent_control.tenant_users
+      add constraint tenant_users_role_check check (role in ('owner', 'admin', 'client', 'member'));
+  end if;
+end $$;
+alter table siteagent_control.tenant_users drop constraint if exists tenant_users_tenant_slug_key;
+create index if not exists tenant_users_slug on siteagent_control.tenant_users (tenant_slug);
+create unique index if not exists tenant_users_slug_email
+  on siteagent_control.tenant_users (tenant_slug, lower(email))
+  where status <> 'removed';
+create unique index if not exists tenant_users_one_owner
+  on siteagent_control.tenant_users (tenant_slug)
+  where role = 'owner' and status <> 'removed';
+
+-- ---------------------------------------------------------------------------
+-- Phase 1 (R1) — console administrators are scoped: the platform, one Operator
+-- ("own people", its Businesses only) or one Business (its projects only). An
+-- invited administrator has no password until they accept.
+alter table siteagent_control.admin_users add column if not exists scope_level text not null default 'platform';
+alter table siteagent_control.admin_users add column if not exists operator_id bigint references siteagent_control.operators(id) on delete cascade;
+alter table siteagent_control.admin_users add column if not exists business_id bigint references siteagent_control.businesses(id) on delete cascade;
+alter table siteagent_control.admin_users add column if not exists invite_token_hash text;
+alter table siteagent_control.admin_users add column if not exists invite_expires_at timestamptz;
+alter table siteagent_control.admin_users alter column password_hash drop not null;
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'admin_users_scope_check') then
+    alter table siteagent_control.admin_users add constraint admin_users_scope_check check (
+      (scope_level = 'platform' and operator_id is null and business_id is null)
+      or (scope_level = 'operator' and operator_id is not null and business_id is null)
+      or (scope_level = 'business' and business_id is not null and operator_id is null)
+    );
+  end if;
+end $$;

@@ -1,0 +1,254 @@
+---
+// A project's People (R3, NEW-2): several per project, each with one of the
+// CMS's roles. Inviting ADDS an account. The owner is set when the project is
+// created and is never re-roled or removed here.
+import ConsoleLayout from '../components/ConsoleLayout.astro';
+import PageHeader from '../components/PageHeader.astro';
+import Modal from '../components/Modal.astro';
+import ConfirmModal from '../components/ConfirmModal.astro';
+import OnceLinkModal from '../components/OnceLinkModal.astro';
+import RowMenu from '../components/RowMenu.astro';
+import StatusChip from '../components/StatusChip.astro';
+import EmptyState from '../components/EmptyState.astro';
+import { basePath, cpFetch, cpLoad } from '../lib/cp';
+import { ROLE_LABELS, ROLE_HINTS, INVITABLE_ROLES, flashLink, takeLink, okJson } from '../lib/org';
+
+const base = basePath();
+const slug = String(Astro.url.searchParams.get('project') || '');
+if (!/^[a-z0-9-]+$/.test(slug)) return Astro.redirect(`${base}projects`);
+const here = `${base}people?project=${encodeURIComponent(slug)}`;
+const api = `/api/tenants/${slug}/people`;
+let error = '';
+
+const json = (body: unknown) => ({
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(body),
+});
+
+if (Astro.request.method === 'POST') {
+  const f = await Astro.request.formData();
+  const intent = String(f.get('intent') || '');
+  const personId = String(f.get('personId') || '');
+  const validId = /^\d+$/.test(personId);
+  try {
+    if (intent === 'invite') {
+      const email = String(f.get('email') || '').trim();
+      const j = await okJson(await cpFetch(Astro.cookies, api, json({ email, role: f.get('role'), displayName: f.get('displayName') })), 'Could not invite');
+      flashLink(Astro.cookies, Astro.request, { kind: 'person', slug, label: email, url: j.inviteUrl });
+    } else if (validId && intent === 'role') {
+      await okJson(await cpFetch(Astro.cookies, `${api}/${personId}/role`, json({ role: f.get('role') })), 'Could not change the role');
+    } else if (validId && intent === 'remove') {
+      await okJson(await cpFetch(Astro.cookies, `${api}/${personId}/remove`, { method: 'POST' }), 'Could not remove');
+    } else if (validId && intent === 'reinvite') {
+      const j = await okJson(await cpFetch(Astro.cookies, `${api}/${personId}/invite`, { method: 'POST' }), 'Could not issue a new link');
+      flashLink(Astro.cookies, Astro.request, { kind: j.person?.role === 'owner' ? 'owner' : 'person', slug, label: j.person?.email || 'the owner', url: j.inviteUrl });
+    }
+    return Astro.redirect(here, 303);
+  } catch (e) {
+    error = (e as Error).message;
+  }
+}
+
+let people: any[] = [];
+let project: any = null;
+let notFound = false;
+try {
+  // The people and the project listing start together; the header needs the
+  // project listing anyway, so it costs nothing extra.
+  const [res, list] = await Promise.all([
+    cpLoad(Astro.cookies, api),
+    cpLoad(Astro.cookies, '/api/tenants'),
+  ]);
+  if (res.status === 404) {
+    notFound = true;
+  } else {
+    if (!res.ok || res.body.ok === false) throw new Error(res.body.error || `Could not list people (${res.status})`);
+    people = res.body.people || [];
+    project = (list.body.tenants || []).find((t: any) => t.slug === slug) || null;
+  }
+} catch (e) {
+  error = error || (e as Error).message;
+}
+const link = takeLink(Astro.cookies);
+const projectName = project?.display_name || slug;
+
+const roleTone: Record<string, 'blue' | 'violet' | 'success' | 'neutral'> = {
+  owner: 'blue',
+  admin: 'success',
+  client: 'violet',
+  member: 'neutral',
+};
+const initials = (p: any) => {
+  const src = (p.displayName || p.email || '?').trim();
+  const parts = src.split(/[\s@._-]+/).filter(Boolean);
+  return ((parts[0]?.[0] ?? '?') + (parts[1]?.[0] ?? '')).toUpperCase();
+};
+---
+<ConsoleLayout title={`People · ${projectName}`} active="projects">
+  <PageHeader
+    title="People"
+    eyebrow={projectName}
+    crumbs={[{ label: 'Projects', href: `${base}projects` }, { label: projectName }]}
+  >
+    {project
+      ? `${project.business_name ?? ''}${project.operator_name ? ` · ${project.operator_name}` : ''} — everyone here signs in once at the hub and works in the CMS and design studio with their own role.`
+      : 'Everyone here signs in once at the hub and works with their own role.'}
+    <Fragment slot="actions">
+      {!notFound && (
+        <button type="button" class="mms-btn mms-btn--primary" data-open-modal="invite-person">
+          <i class="fa-solid fa-user-plus" aria-hidden="true"></i> Invite person
+        </button>
+      )}
+    </Fragment>
+  </PageHeader>
+
+  {error && <div class="mms-alert mms-alert--err" role="alert" style="margin-bottom:16px"><i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i><span>{error}</span></div>}
+
+  {notFound ? (
+    <div class="mms-card">
+      <EmptyState icon="circle-question" title="Project not found">
+        This project does not exist, or it is outside your access.
+        <Fragment slot="actions"><a class="mms-btn mms-btn--secondary" href={`${base}projects`}>Back to projects</a></Fragment>
+      </EmptyState>
+    </div>
+  ) : (
+    <>
+      <div class="mms-table-card mms-table-card--solo">
+        {people.length === 0 ? (
+          <EmptyState icon="users" title="Nobody yet">Invite the first person to this project.</EmptyState>
+        ) : (
+          <table class="mms-table">
+            <thead>
+              <tr><th>Person</th><th>Role</th><th>Status</th><th class="mms-right">Actions</th></tr>
+            </thead>
+            <tbody>
+              {people.map((p) => {
+                const who = p.displayName || p.email || 'Owner';
+                return (
+                  <tr>
+                    <td>
+                      <div class="mms-row" style="flex-wrap:nowrap;gap:14px">
+                        <span class="mms-card__icon" style="border-radius:999px;font-weight:720" aria-hidden="true">{initials(p)}</span>
+                        <div class="mms-cell-main">
+                          <strong>{who}</strong>
+                          {p.displayName && p.email && <small>{p.email}</small>}
+                          {!p.email && <small>No email on record</small>}
+                        </div>
+                      </div>
+                    </td>
+                    <td>
+                      <StatusChip tone={roleTone[p.role] ?? 'neutral'}>{ROLE_LABELS[p.role] ?? p.role}</StatusChip>
+                      {p.role !== 'owner' && <div class="mms-hint" style="margin-top:4px">{ROLE_HINTS[p.role]}</div>}
+                    </td>
+                    <td>
+                      {p.status === 'active'
+                        ? <StatusChip tone="success" dot>Active</StatusChip>
+                        : <StatusChip tone="warning" dot>Invited</StatusChip>}
+                    </td>
+                    <td>
+                      <div class="mms-cell-actions">
+                        {(p.role !== 'owner' || p.status === 'invited') ? (
+                          <RowMenu label={`Actions for ${who}`}>
+                            {p.role !== 'owner' && (
+                              <button type="button" class="mms-menu__item" role="menuitem" data-open-modal="change-role"
+                                data-prefill-personId={p.id} data-prefill-role={p.role} data-fill-person={who}>
+                                <i class="fa-solid fa-user-tag" aria-hidden="true"></i> Change role
+                              </button>
+                            )}
+                            {p.status === 'invited' && (
+                              <button type="button" class="mms-menu__item" role="menuitem" data-open-modal="reinvite-person"
+                                data-prefill-personId={p.id}
+                                data-fill-message={`Issue a new invite link for ${who}? The previous link stops working.`}>
+                                <i class="fa-solid fa-link" aria-hidden="true"></i> New invite link
+                              </button>
+                            )}
+                            {p.role !== 'owner' && (
+                              <>
+                                <div class="mms-menu__sep"></div>
+                                <button type="button" class="mms-menu__item mms-menu__item--danger" role="menuitem" data-open-modal="remove-person"
+                                  data-prefill-personId={p.id}
+                                  data-fill-message={`Remove ${who} from ${projectName}? Their sign-in and any open CMS session stop working.`}>
+                                  <i class="fa-solid fa-user-minus" aria-hidden="true"></i> Remove
+                                </button>
+                              </>
+                            )}
+                          </RowMenu>
+                        ) : (
+                          <span class="mms-hint">Account holder</span>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+      </div>
+      <p class="mms-hint" style="margin-top:12px">
+        A role change applies straight away in the CMS; the person signs in again at the hub.
+      </p>
+
+      <Modal id="invite-person" title="Invite a person" eyebrow={projectName} size="lg" intent="invite" busy="Creating invite">
+        <div class="mms-form">
+          <div class="mms-grid2">
+            <div class="mms-field">
+              <label class="mms-label" for="ip-email">Email</label>
+              <input id="ip-email" class="mms-input" name="email" type="email" required placeholder="name@company.com" autocomplete="off" />
+            </div>
+            <div class="mms-field">
+              <label class="mms-label" for="ip-name">Name <small>(optional)</small></label>
+              <input id="ip-name" class="mms-input" name="displayName" placeholder="Jane Doe" autocomplete="off" />
+            </div>
+          </div>
+          <fieldset class="mms-field" style="border:0;margin:0;padding:0">
+            <legend class="mms-label" style="margin-bottom:6px">Role</legend>
+            <div class="mms-choices">
+              {INVITABLE_ROLES.map((r) => (
+                <label class="mms-choice">
+                  <input type="radio" name="role" value={r} checked={r === 'client'} required />
+                  <span><strong>{ROLE_LABELS[r]}</strong><span>{ROLE_HINTS[r]}</span></span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
+          <p class="mms-hint">Inviting adds an account — it never replaces anyone's. You get a one-time link to send them.</p>
+        </div>
+        <Fragment slot="footer">
+          <button type="button" class="mms-btn mms-btn--secondary" data-close-modal>Cancel</button>
+          <button type="submit" class="mms-btn mms-btn--primary">Create invite</button>
+        </Fragment>
+      </Modal>
+
+      <Modal id="change-role" title="Change role" eyebrow={projectName} size="md" intent="role" busy="Saving role">
+        <input type="hidden" name="personId" />
+        <div class="mms-form">
+          <p style="margin:0">Choose what <strong data-fill="person">this person</strong> can do.</p>
+          <div class="mms-choices">
+            {INVITABLE_ROLES.map((r) => (
+              <label class="mms-choice">
+                <input type="radio" name="role" value={r} required />
+                <span><strong>{ROLE_LABELS[r]}</strong><span>{ROLE_HINTS[r]}</span></span>
+              </label>
+            ))}
+          </div>
+        </div>
+        <Fragment slot="footer">
+          <button type="button" class="mms-btn mms-btn--secondary" data-close-modal>Cancel</button>
+          <button type="submit" class="mms-btn mms-btn--primary">Save role</button>
+        </Fragment>
+      </Modal>
+
+      <ConfirmModal id="reinvite-person" title="New invite link" intent="reinvite" confirmLabel="Issue new link" fields={['personId']} tone="primary" busy="Creating invite">
+        <Fragment slot="message">Issue a new invite link? The previous link stops working.</Fragment>
+      </ConfirmModal>
+
+      <ConfirmModal id="remove-person" title="Remove person" intent="remove" confirmLabel="Remove" fields={['personId']} busy="Removing">
+        <Fragment slot="message">Remove this person? Their sign-in and any open CMS session stop working.</Fragment>
+      </ConfirmModal>
+
+      <OnceLinkModal link={link && link.slug === slug ? link : null} />
+    </>
+  )}
+</ConsoleLayout>

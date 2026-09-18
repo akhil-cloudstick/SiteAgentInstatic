@@ -4,7 +4,8 @@ import { mkdirSync, rmSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import { query } from '../registry/db.mjs';
 import * as tenants from '../registry/tenants.mjs';
-import { createInvite } from '../registry/tenantUsers.mjs';
+import { invitePerson, resetPeople } from '../registry/tenantUsers.mjs';
+import { syncPeopleSoon } from './peopleSync.mjs';
 import * as rt from '../runtime/tenantRuntime.mjs';
 import * as odrt from '../runtime/odRuntime.mjs';
 import { initTenantSite, attachTenantDomain, deleteTenantSite } from '../deployer/deploy.mjs';
@@ -103,9 +104,12 @@ function runtimeParams(row) {
   };
 }
 
-export async function provisionTenant({ name, ownerEmail, cfProject, customDomain, tier, connectorManaged }) {
+export async function provisionTenant({ name, ownerEmail, cfProject, customDomain, tier, connectorManaged, businessId }) {
   const slug = slugify(name);
   if (!slug) throw new Error('A valid tenant name is required.');
+  // Every project belongs to a Business (R1). The caller has already checked
+  // that it may create projects in this one.
+  if (!businessId) throw new Error('Choose the business this project belongs to.');
   const existing = await tenants.getTenant(slug);
   if (existing && existing.status !== 'removed' && existing.status !== 'failed') {
     throw new Error(`Tenant "${slug}" already exists.`);
@@ -126,6 +130,7 @@ export async function provisionTenant({ name, ownerEmail, cfProject, customDomai
     slug, schemaName: schema, dbRole: role, ownerEmail,
     ownerPasswordEnc: null, secretRef: null, port,
     tier: tier === 'lite' ? 'lite' : 'advanced',
+    businessId,
   });
   await tenants.updateTenant(slug, {
     db_password_enc: encrypt(dbPassword),
@@ -139,9 +144,11 @@ export async function provisionTenant({ name, ownerEmail, cfProject, customDomai
     connector_managed: connectorManaged === true,
   });
 
-  // Mint the tenant's one-time invite link (the URL the operator shares). Only the
+  // The project's owner: its first person. A re-provisioned slug starts with
+  // nobody, so an earlier project's people never carry over. Only the invite
   // token's hash is stored; this raw URL is shown once in the console.
-  const inviteToken = await createInvite(slug, ownerEmail || null);
+  await resetPeople(slug);
+  const { token: inviteToken } = await invitePerson(slug, { email: ownerEmail || null, role: 'owner' });
   // gatewayOrigin, NOT publicBaseUrl. This link is opened by a PERSON in a
   // browser, and publicBaseUrl defaults to the control-plane's own loopback
   // address — so the returned link worked on this machine and nowhere else,
@@ -161,15 +168,9 @@ export async function provisionTenant({ name, ownerEmail, cfProject, customDomai
   };
 }
 
-// (Re)generate a one-time invite link for an existing tenant (new or pre-existing).
-export async function createTenantInvite(slug) {
-  const row = await tenants.getTenant(slug);
-  if (!row) throw new Error(`Unknown tenant: ${slug}`);
-  const token = await createInvite(slug, row.owner_email || null);
-  // Same reason as provisionTenant above: a person opens this, so it must be
-  // the public origin rather than the control-plane's loopback address.
-  return { ok: true, slug, url: `${config.gatewayOrigin}/invite/${token}` };
-}
+// The link a person opens to accept an invite. The public origin, not the
+// control plane's loopback address: a person opens it in a browser.
+export const inviteUrlFor = (token) => `${config.gatewayOrigin}/invite/${token}`;
 
 // Auto-create the Instatic Owner via the one-shot setup endpoint, so the hub can
 // SSO the tenant straight in (no self-serve wizard). The control-plane keeps the
@@ -409,7 +410,11 @@ export async function deprovisionTenant(slug, { force = false, deleteCf = false 
   try { rmSync(rt.tenantPaths(slug).dir, { recursive: true, force: true }); } catch { /* ignore */ }
   try { rmSync(odrt.odPaths(slug).dataDir, { recursive: true, force: true }); } catch { /* ignore */ }
 
-  if (row) await tenants.updateTenant(slug, { status: 'removed', provision_state: 'removed' });
+  if (row) {
+    await tenants.updateTenant(slug, { status: 'removed', provision_state: 'removed' });
+    // A removed project has no people: their hub sign-in ends with it.
+    await resetPeople(slug);
+  }
   return { slug, removed: true };
 }
 
@@ -420,6 +425,7 @@ export async function startTenant(slug) {
   if (rt.isRunning(slug)) return { slug, alreadyRunning: true, port: row.port };
   rt.start({ ...runtimeParams(row), aiModel: await operatorAiModel() });
   const healthy = await rt.waitHealthy(row.port, 45000);
+  syncPeopleSoon(slug);
   return { slug, port: row.port, healthy };
 }
 
@@ -485,14 +491,18 @@ export async function ensureTenantUp(row) {
 
 // On control-plane boot, bring active tenants back up.
 export async function resumeAll() {
-  const rows = await tenants.listTenants();
+  const rows = await tenants.listAllTenants();
   const active = rows.filter((r) => r.status === 'active');
   const aiModel = await operatorAiModel();
   const mediaKeys = await operatorMediaKeys();
   for (const r of active) {
     // Instatic only for advanced tenants (lite has no Instatic process).
     if (r.tier !== 'lite') {
-      try { rt.start({ ...runtimeParams(r), aiModel }); } catch (e) { console.error(`[provisioner] resume ${r.slug} failed:`, e.message); }
+      try {
+        rt.start({ ...runtimeParams(r), aiModel });
+        // Roles and removals made while it was down reach the CMS now.
+        syncPeopleSoon(r.slug, 300_000);
+      } catch (e) { console.error(`[provisioner] resume ${r.slug} failed:`, e.message); }
     }
     if (r.od_port) {
       try { odrt.start(odParams(r, mediaKeys)); } catch (e) { console.error(`[provisioner] OD resume ${r.slug} failed:`, e.message); }

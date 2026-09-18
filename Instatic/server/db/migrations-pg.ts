@@ -1239,4 +1239,30 @@ export const pgMigrations: Migration[] = [
        where trim(lower(display_name)) = trim(lower(email));
     `,
   },
+  {
+    // MMS Phase 1 (NEW-3): a person arriving from the Product Hub is signed in
+    // as THEMSELVES, with their own role — not as the owner.
+    //
+    // users.auth_source — 'hub' for an account the hub hand-off created. Such
+    //   an account has no usable local password (the hub is its identity
+    //   provider); its role is kept in step with the hub.
+    // sessions.hub_person_id — the hub person a session belongs to. Step-up on
+    //   such a session re-checks the person's HUB password.
+    //
+    // The old hand-off opened step-up for a session's whole 90-day life, which
+    // is the one shape where step_up_expires_at equals expires_at. Those
+    // sessions are revoked here: pre-satisfied step-up ends now, not in 90 days.
+    id: '029_hub_identity',
+    sql: `
+      alter table users
+        add column if not exists auth_source text not null default 'local';
+      alter table sessions
+        add column if not exists hub_person_id text;
+      update sessions
+         set revoked_at = current_timestamp
+       where revoked_at is null
+         and step_up_expires_at is not null
+         and step_up_expires_at = expires_at;
+    `,
+  },
 ]

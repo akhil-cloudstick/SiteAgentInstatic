@@ -1,17 +1,26 @@
 ---
-import Layout from '../layouts/Layout.astro';
-import { cpFetch } from '../lib/cp';
-const rawBase = import.meta.env.BASE_URL;
-const baseUrl = rawBase.endsWith('/') ? rawBase : `${rawBase}/`;
+// MCP Agents — scoped machine access for external AI agents, one key per
+// project. Keys are minted in a dialog and shown exactly once.
+import ConsoleLayout from '../components/ConsoleLayout.astro';
+import PageHeader from '../components/PageHeader.astro';
+import Modal from '../components/Modal.astro';
+import ConfirmModal from '../components/ConfirmModal.astro';
+import RowMenu from '../components/RowMenu.astro';
+import Select from '../components/Select.astro';
+import StatusChip from '../components/StatusChip.astro';
+import EmptyState from '../components/EmptyState.astro';
+import { basePath, cpFetch } from '../lib/cp';
+import { cpGet, okJson } from '../lib/org';
 
+const base = basePath();
 let error = '';
 let notice = '';
-// A freshly minted key is rendered inline instead of redirecting: the plaintext
-// exists exactly once and must never travel in a URL (browser history, logs,
-// referrers). Reload the page and it is gone.
-let minted = null;
+// A freshly minted key is rendered in this response instead of redirecting:
+// the plaintext exists exactly once and must never travel in a URL (history,
+// logs, referrers). Reload the page and it is gone.
+let minted: any = null;
 
-const PERMISSION_GROUPS = [
+const PERMISSION_GROUPS: Array<{ title: string; items: Array<[string, string]> }> = [
   {
     title: 'Content',
     items: [
@@ -36,48 +45,44 @@ const PERMISSION_GROUPS = [
     items: [['design.edit', 'Edit global design tokens and styles']],
   },
 ];
+const PRESET_LABELS: Record<string, string> = {
+  'read-only': 'Read only',
+  author: 'Author',
+  publisher: 'Publisher',
+  full: 'Everything',
+};
 
-async function cp(path, init) {
-  const res = await cpFetch(Astro.cookies, path, init);
-  const text = await res.text();
-  let parsed = {};
-  try { parsed = text ? JSON.parse(text) : {}; } catch {}
-  if (!res.ok) throw new Error(parsed.error || `request failed (${res.status})`);
-  return parsed;
-}
+const json = (body: unknown) => ({
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(body),
+});
 
 if (Astro.request.method === 'POST') {
   const f = await Astro.request.formData();
-  const action = (f.get('action') || '').toString();
+  const intent = String(f.get('intent') || '');
   try {
-    if (action === 'create') {
-      const permissions = f.getAll('permissions').map((p) => p.toString());
-      const tablesRaw = (f.get('tables') || '').toString().trim();
-      const expiresRaw = (f.get('expiresInDays') || '').toString().trim();
-      const body = {
-        tenantSlug: (f.get('tenantSlug') || '').toString(),
-        label: (f.get('label') || '').toString().trim() || 'agent',
-        permissions,
+    if (intent === 'create') {
+      const tablesRaw = String(f.get('tables') || '').trim();
+      const expiresRaw = String(f.get('expiresInDays') || '').trim();
+      const out = await okJson(await cpFetch(Astro.cookies, '/api/mcp/agents', json({
+        tenantSlug: String(f.get('tenantSlug') || ''),
+        label: String(f.get('label') || '').trim() || 'agent',
+        permissions: f.getAll('permissions').map(String),
         tables: tablesRaw ? tablesRaw.split(',').map((t) => t.trim()).filter(Boolean) : ['*'],
         expiresInDays: expiresRaw ? Number(expiresRaw) : undefined,
-      };
-      const out = await cp('/api/mcp/agents', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
+      })), 'Could not create the key');
       minted = { ...out.agent, endpoint: out.endpoint };
-      notice = 'Key created. Copy it now — it is shown only once.';
-    } else if (action === 'revoke') {
-      await cp(`/api/mcp/agents/${encodeURIComponent((f.get('keyId') || '').toString())}/revoke`, { method: 'POST' });
-      return Astro.redirect(`${baseUrl}mcp?revoked=1`);
-    } else if (action === 'install-bridge') {
-      const slug = (f.get('tenantSlug') || '').toString();
-      const out = await cp(`/api/mcp/tenants/${encodeURIComponent(slug)}/install-bridge`, { method: 'POST' });
-      return Astro.redirect(`${baseUrl}mcp?installed=${encodeURIComponent(slug)}&v=${encodeURIComponent(out.version || '')}`);
+    } else if (intent === 'revoke') {
+      await okJson(await cpFetch(Astro.cookies, `/api/mcp/agents/${encodeURIComponent(String(f.get('keyId') || ''))}/revoke`, { method: 'POST' }), 'Could not revoke the key');
+      return Astro.redirect(`${base}mcp?revoked=1`, 303);
+    } else if (intent === 'install-bridge') {
+      const slug = String(f.get('tenantSlug') || '');
+      const out = await okJson(await cpFetch(Astro.cookies, `/api/mcp/tenants/${encodeURIComponent(slug)}/install-bridge`, { method: 'POST' }), 'Could not install the bridge');
+      return Astro.redirect(`${base}mcp?installed=${encodeURIComponent(slug)}&v=${encodeURIComponent(out.version || '')}`, 303);
     }
   } catch (e) {
-    error = e.message;
+    error = (e as Error).message;
   }
 }
 
@@ -85,280 +90,273 @@ if (Astro.url.searchParams.get('revoked')) notice = 'Key revoked. It stops worki
 const installedSlug = Astro.url.searchParams.get('installed');
 if (installedSlug) {
   const v = Astro.url.searchParams.get('v');
-  notice = `Bridge plugin installed on ${installedSlug}${v ? ` (v${v})` : ''}. Content tools are live for that site.`;
+  notice = `Bridge installed on ${installedSlug}${v ? ` (v${v})` : ''}. Content tools are live for that project.`;
 }
 
-let directory = [];
-let agents = [];
+let directory: any[] = [];
+let agents: any[] = [];
+let presets: Record<string, string[]> = {};
 try {
-  const [d, a] = await Promise.all([cp('/api/mcp/directory'), cp('/api/mcp/agents')]);
+  const [d, a, p] = await Promise.all([
+    // No `await` inside the list: awaiting here would have started each call
+    // only after the one before it came back, which is what Promise.all avoids.
+    cpGet(Astro.cookies, '/api/mcp/directory', 'Could not list projects'),
+    cpGet(Astro.cookies, '/api/mcp/agents', 'Could not list keys'),
+    cpGet(Astro.cookies, '/api/mcp/presets', 'Could not load presets'),
+  ]);
   directory = d.tenants || [];
   agents = a.agents || [];
+  presets = p.presets || {};
 } catch (e) {
-  if (!error) error = e.message;
+  error = error || (e as Error).message;
 }
 
-const activeTenants = directory.filter((t) => t.status !== 'removed');
-const fmt = (v) => (v ? new Date(v).toLocaleString() : '—');
+const activeProjects = directory.filter((t) => t.status !== 'removed');
+const projectOptions = activeProjects.map((t) => ({
+  value: t.slug,
+  label: t.slug,
+  hint: t.bridgeInstalled ? 'Bridge installed' : t.bridgeInstalled === null ? 'Project not running' : 'Bridge not installed — content tools won’t work yet',
+}));
+const fmt = (v: string | null) => (v ? new Date(v).toLocaleString() : 'Never');
+const keyState = (a: any) => (a.revokedAt ? 'revoked' : a.expiresAt && new Date(a.expiresAt) < new Date() ? 'expired' : 'active');
 ---
+<ConsoleLayout title="MCP Agents" active="mcp">
+  <PageHeader title="MCP Agents" eyebrow="Machine access">
+    Give an external AI agent scoped access to one project's CMS. Each key belongs to one project and carries its own permissions.
+    <Fragment slot="actions">
+      <a class="mms-btn mms-btn--secondary" href={`${base}mcp/documentation`}>
+        <i class="fa-solid fa-book" aria-hidden="true"></i> How to connect
+      </a>
+      <button type="button" class="mms-btn mms-btn--primary" data-open-modal="new-key" disabled={activeProjects.length === 0}>
+        <i class="fa-solid fa-key" aria-hidden="true"></i> New agent key
+      </button>
+    </Fragment>
+  </PageHeader>
 
-<Layout title="MCP Agents">
-  <h1>MCP Agents</h1>
-  <p class="sub">
-    Give an external AI agent scoped access to one tenant's CMS. Each key is bound to a single site and
-    carries its own permissions — content, media and design arrive through one endpoint.
-  </p>
+  {error && <div class="mms-alert mms-alert--err" role="alert" style="margin-bottom:16px"><i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i><span>{error}</span></div>}
+  {notice && !error && <div class="mms-alert mms-alert--ok" style="margin-bottom:16px"><i class="fa-solid fa-circle-check" aria-hidden="true"></i><span>{notice}</span></div>}
 
-  <a class="docs-cta" href="/operator/mcp/documentation">
-    <span class="docs-icon" aria-hidden="true">?</span>
-    <span class="docs-text">
-      <strong>How to connect an AI agent</strong>
-      <span>Step-by-step setup for Claude, Cursor, VS Code, Windsurf, n8n and more — with examples.</span>
-    </span>
-    <span class="docs-go" aria-hidden="true">&rarr;</span>
-  </a>
-
-  {error && <div class="banner err">{error}</div>}
-  {notice && !error && <div class="banner ok">{notice}</div>}
-
-  {minted && (
-    <div class="card" style="border-color:var(--accent)">
-      <h2 style="margin:0 0 6px;font-size:15px">Your new agent key</h2>
-      <p class="hint" style="margin:0 0 10px">
-        This is the only time the key is shown. Store it in the agent's configuration now.
-      </p>
-      <div class="copyrow">
-        <pre class="tok" id="tok-key">{minted.token}</pre>
-        <button type="button" class="ghost copy" data-copy="tok-key">Copy key</button>
+  <div class="mms-stack">
+    <section aria-labelledby="keys-title">
+      <h2 id="keys-title" class="mms-section-title">Agent keys</h2>
+      <div class="mms-toolbar" data-filter-for="keys-table">
+        <label class="mms-search">
+          <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+          <span class="mms-sr-only">Search keys</span>
+          <input type="search" placeholder="Search by label" data-filter="search" />
+        </label>
+        {activeProjects.length > 1 && (
+          <Select name="projectFilter" ariaLabel="Filter by project" placeholder="All projects"
+            options={[{ value: '', label: 'All projects' }, ...activeProjects.map((t) => ({ value: t.slug, label: t.slug }))]}
+            attrs={{ 'data-filter': 'project' }} />
+        )}
+        <Select name="stateFilter" ariaLabel="Filter by status" placeholder="All statuses"
+          options={[{ value: '', label: 'All statuses' }, { value: 'active', label: 'Active' }, { value: 'expired', label: 'Expired' }, { value: 'revoked', label: 'Revoked' }]}
+          attrs={{ 'data-filter': 'state' }} />
+        <span class="mms-toolbar__count" data-filter-count></span>
       </div>
-
-      <p class="hint" style="margin:14px 0 4px"><strong>Endpoint</strong></p>
-      <div class="copyrow">
-        <pre class="tok" id="tok-endpoint">{minted.endpoint}</pre>
-        <button type="button" class="ghost copy" data-copy="tok-endpoint">Copy endpoint</button>
+      <div class="mms-table-card">
+        {agents.length === 0 ? (
+          <EmptyState icon="key" title="No keys yet">Create a key to connect an AI agent to a project.</EmptyState>
+        ) : (
+          <table class="mms-table" id="keys-table">
+            <thead>
+              <tr><th>Key</th><th>Project</th><th>Permissions</th><th>Tables</th><th>Last used</th><th>Status</th><th class="mms-right">Actions</th></tr>
+            </thead>
+            <tbody>
+              {agents.map((a) => {
+                const state = keyState(a);
+                return (
+                  <tr data-row data-search={`${a.label} ${a.keyId}`} data-project={a.tenantSlug} data-state={state}>
+                    <td><div class="mms-cell-main"><strong>{a.label}</strong><small class="mms-mono">{a.keyId}</small></div></td>
+                    <td class="mms-mono">{a.tenantSlug}</td>
+                    <td>
+                      <div class="mms-row" style="gap:4px">
+                        {(a.permissions || []).length === 0 ? <span class="mms-muted">None</span> : (a.permissions || []).map((p: string) => <StatusChip small>{p}</StatusChip>)}
+                      </div>
+                    </td>
+                    <td class="mms-muted">{(a.tables || ['*']).join(', ') === '*' ? 'All' : (a.tables || []).join(', ')}</td>
+                    <td class="mms-muted">{fmt(a.lastUsedAt)}</td>
+                    <td>
+                      {state === 'active' && <StatusChip tone="success" dot>Active</StatusChip>}
+                      {state === 'expired' && <StatusChip tone="warning" dot>Expired</StatusChip>}
+                      {state === 'revoked' && <StatusChip tone="danger" dot>Revoked</StatusChip>}
+                    </td>
+                    <td>
+                      <div class="mms-cell-actions">
+                        {state === 'revoked' ? <span class="mms-hint">—</span> : (
+                          <RowMenu label={`Actions for ${a.label}`}>
+                            <button type="button" class="mms-menu__item mms-menu__item--danger" role="menuitem" data-open-modal="revoke-key"
+                              data-prefill-keyId={a.keyId}
+                              data-fill-message={`Revoke “${a.label}” for ${a.tenantSlug}? The agent loses access immediately.`}>
+                              <i class="fa-solid fa-ban" aria-hidden="true"></i> Revoke key
+                            </button>
+                          </RowMenu>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+              <tr class="mms-no-results" hidden><td colspan="7">No keys match these filters.</td></tr>
+            </tbody>
+          </table>
+        )}
       </div>
+    </section>
 
-      <p class="hint" style="margin:14px 0 4px"><strong>Connect with Claude Code</strong></p>
-      <div class="copyrow">
-        <pre class="tok" id="tok-claude">{`claude mcp add mms-cms --transport http ${minted.endpoint} --header "Authorization: Bearer ${minted.token}"`}</pre>
-        <button type="button" class="ghost copy" data-copy="tok-claude">Copy command</button>
+    <section class="mms-card" aria-labelledby="endpoints-title">
+      <div class="mms-card__head">
+        <div class="mms-card__title">
+          <span class="mms-card__icon"><i class="fa-solid fa-plug" aria-hidden="true"></i></span>
+          <div>
+            <h2 id="endpoints-title">Connection endpoints</h2>
+            <p>One endpoint per project. Content tools need the bridge installed there; media and design tools work without it.</p>
+          </div>
+        </div>
       </div>
+      {directory.length === 0 ? (
+        <p class="mms-muted" style="margin:0;padding:18px">No projects yet.</p>
+      ) : (
+        <div class="mms-table-card">
+          <table class="mms-table">
+            <thead>
+              <tr><th>Project</th><th>Endpoint</th><th>Bridge</th><th>Active keys</th><th>Last used</th><th class="mms-right">Actions</th></tr>
+            </thead>
+            <tbody>
+              {directory.map((t) => (
+                <tr>
+                  <td class="mms-mono">{t.slug}</td>
+                  <td>
+                    <span class="mms-row" style="flex-wrap:nowrap;gap:6px">
+                      <span class="mms-mono" style="overflow-wrap:anywhere">{t.endpoint}</span>
+                      <button type="button" class="mms-iconbtn" data-copy={t.endpoint} aria-label={`Copy endpoint for ${t.slug}`}>
+                        <i class="fa-solid fa-copy" aria-hidden="true"></i>
+                      </button>
+                    </span>
+                  </td>
+                  <td>
+                    {t.bridgeInstalled === null
+                      ? <StatusChip>Project not running</StatusChip>
+                      : t.bridgeInstalled
+                        ? <StatusChip tone="success" dot>Installed</StatusChip>
+                        : <StatusChip tone="warning" dot>Not installed</StatusChip>}
+                  </td>
+                  <td>{t.activeKeys}</td>
+                  <td class="mms-muted">{fmt(t.lastUsed)}</td>
+                  <td>
+                    <div class="mms-cell-actions">
+                      {t.bridgeInstalled !== null && (
+                        <button type="button" class="mms-btn mms-btn--secondary mms-btn--sm" data-open-modal="install-bridge"
+                          data-prefill-tenantSlug={t.slug}
+                          data-fill-message={`${t.bridgeInstalled ? 'Reinstall' : 'Install'} the bridge on ${t.slug}? It is built from source and installed into that project.`}>
+                          <i class="fa-solid fa-plug-circle-plus" aria-hidden="true"></i> {t.bridgeInstalled ? 'Reinstall' : 'Install bridge'}
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  </div>
 
-      <p class="hint" style="margin:14px 0 4px"><strong>Any other MCP client</strong></p>
-      <div class="copyrow">
-        <pre class="tok" id="tok-manual">{`endpoint: ${minted.endpoint}\nheader:   Authorization: Bearer ${minted.token}`}</pre>
-        <button type="button" class="ghost copy" data-copy="tok-manual">Copy both</button>
+  {activeProjects.length > 0 && (
+    <Modal id="new-key" title="New agent key" eyebrow="MCP Agents" size="xl" intent="create" busy="Creating key">
+      <div class="mms-form">
+        <div class="mms-grid2">
+          <div class="mms-field">
+            <label class="mms-label" for="nk-project">Project</label>
+            <Select id="nk-project" name="tenantSlug" required placeholder="Choose a project" options={projectOptions}
+              value={activeProjects.length === 1 ? activeProjects[0].slug : null} />
+          </div>
+          <div class="mms-field">
+            <label class="mms-label" for="nk-label">Label</label>
+            <input id="nk-label" class="mms-input" name="label" placeholder="marketing-agent" autocomplete="off" />
+          </div>
+        </div>
+        <div class="mms-grid2">
+          <div class="mms-field">
+            <label class="mms-label" for="nk-tables">Tables <small>(comma-separated)</small></label>
+            <input id="nk-tables" class="mms-input" name="tables" placeholder="All tables" />
+          </div>
+          <div class="mms-field">
+            <label class="mms-label" for="nk-expiry">Expires in <small>(days)</small></label>
+            <input id="nk-expiry" class="mms-input" name="expiresInDays" type="number" min="1" placeholder="Never" />
+          </div>
+        </div>
+        <div class="mms-field">
+          <span class="mms-label">Permissions</span>
+          <div class="mms-row" style="gap:6px">
+            <span class="mms-hint">Quick pick:</span>
+            {Object.entries(presets).map(([key, perms]) => (
+              <button type="button" class="mms-btn mms-btn--secondary mms-btn--sm" data-check-set={(perms as string[]).join(',')} data-check-name="permissions">
+                {PRESET_LABELS[key] ?? key}
+              </button>
+            ))}
+          </div>
+          <div class="mms-perm-grid">
+            {PERMISSION_GROUPS.map((group) => (
+              <fieldset class="mms-perm-group">
+                <legend>{group.title}</legend>
+                {group.items.map(([value, description]) => (
+                  <label class="mms-check">
+                    <input type="checkbox" name="permissions" value={value} checked={value === 'read'} />
+                    <span><span class="mms-mono">{value}</span><small>{description}</small></span>
+                  </label>
+                ))}
+              </fieldset>
+            ))}
+          </div>
+          <p class="mms-hint">Grant the least the agent needs. Without <span class="mms-mono">publish</span>, every edit stays a draft a person can review.</p>
+        </div>
       </div>
-    </div>
+      <Fragment slot="footer">
+        <button type="button" class="mms-btn mms-btn--secondary" data-close-modal>Cancel</button>
+        <button type="submit" class="mms-btn mms-btn--primary">Create key</button>
+      </Fragment>
+    </Modal>
   )}
 
-  <div class="card">
-    <h2 style="margin:0 0 12px;font-size:15px">Create a key</h2>
-    {activeTenants.length === 0 ? (
-      <p class="hint">No tenants yet. Provision one first.</p>
-    ) : (
-      <form method="POST">
-        <input type="hidden" name="action" value="create" />
-        <div class="grid2">
-          <div>
-            <label for="tenantSlug">Site</label>
-            <select id="tenantSlug" name="tenantSlug" required>
-              {activeTenants.map((t) => (
-                <option value={t.slug}>{t.slug}{t.bridgeInstalled ? '' : '  (bridge plugin not installed)'}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label for="label">Label</label>
-            <input id="label" name="label" placeholder="marketing-agent" />
-          </div>
+  {minted && (
+    <Modal id="minted-key" title="Your new agent key" eyebrow="Shown once" size="xl" openOnLoad>
+      <div class="mms-form">
+        <div class="mms-alert mms-alert--warn">
+          <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+          <span>This is the only time the key is shown. Store it in the agent's configuration now.</span>
         </div>
-        <div class="grid2">
-          <div>
-            <label for="tables">Tables (comma-separated, blank = all)</label>
-            <input id="tables" name="tables" placeholder="posts, pages" />
+        {[
+          ['Key', 'mk-key', minted.token],
+          ['Endpoint', 'mk-endpoint', minted.endpoint],
+          ['Connect with Claude Code', 'mk-claude', `claude mcp add mms-cms --transport http ${minted.endpoint} --header "Authorization: Bearer ${minted.token}"`],
+          ['Any other MCP client', 'mk-manual', `endpoint: ${minted.endpoint}\nheader:   Authorization: Bearer ${minted.token}`],
+        ].map(([label, id, value]) => (
+          <div class="mms-field">
+            <span class="mms-label">{label}</span>
+            <div class="mms-copyrow">
+              <pre class="mms-code" id={id}>{value}</pre>
+              <button type="button" class="mms-btn mms-btn--secondary" data-copy-target={id}>
+                <i class="fa-solid fa-copy" aria-hidden="true"></i> <span class="mms-copy-label">Copy</span>
+              </button>
+            </div>
           </div>
-          <div>
-            <label for="expiresInDays">Expires in (days, blank = never)</label>
-            <input id="expiresInDays" name="expiresInDays" type="number" min="1" placeholder="90" />
-          </div>
-        </div>
-
-        <label style="margin-top:16px">Permissions</label>
-        <div class="perms">
-          {PERMISSION_GROUPS.map((group) => (
-            <fieldset>
-              <legend>{group.title}</legend>
-              {group.items.map(([value, description]) => (
-                <label class="check">
-                  <input type="checkbox" name="permissions" value={value} checked={value === 'read'} />
-                  <span><code>{value}</code> — {description}</span>
-                </label>
-              ))}
-            </fieldset>
-          ))}
-        </div>
-        <p class="hint" style="margin:12px 0 14px">
-          Grant the least the agent needs. <code>publish</code> is what makes work visible to visitors;
-          without it every edit stays a draft a human can review.
-        </p>
-        <button type="submit">Create key</button>
-      </form>
-    )}
-  </div>
-
-  <div class="card">
-    <h2 style="margin:0 0 12px;font-size:15px">Keys</h2>
-    {agents.length === 0 ? (
-      <p class="hint">No keys issued yet.</p>
-    ) : (
-      <table>
-        <thead>
-          <tr><th>Label</th><th>Site</th><th>Permissions</th><th>Tables</th><th>Last used</th><th>Status</th><th></th></tr>
-        </thead>
-        <tbody>
-          {agents.map((a) => (
-            <tr>
-              <td>{a.label}</td>
-              <td><code>{a.tenantSlug}</code></td>
-              <td class="hint">{(a.permissions || []).join(', ') || '—'}</td>
-              <td class="hint">{(a.tables || ['*']).join(', ')}</td>
-              <td class="hint">{fmt(a.lastUsedAt)}</td>
-              <td>
-                {a.revokedAt
-                  ? <span class="pill bad">revoked</span>
-                  : a.expiresAt && new Date(a.expiresAt) < new Date()
-                    ? <span class="pill warn">expired</span>
-                    : <span class="pill ok">active</span>}
-              </td>
-              <td class="row-actions">
-                {!a.revokedAt && (
-                  <form method="POST" onsubmit="return confirm('Revoke this key? The agent loses access immediately.')">
-                    <input type="hidden" name="action" value="revoke" />
-                    <input type="hidden" name="keyId" value={a.keyId} />
-                    <button class="danger" type="submit">Revoke</button>
-                  </form>
-                )}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    )}
-  </div>
-
-  <div class="card">
-    <h2 style="margin:0 0 12px;font-size:15px">Endpoint directory</h2>
-    <p class="hint" style="margin:0 0 12px">
-      One endpoint per site. The bridge plugin must be installed on a site before content tools work there;
-      media and design tools work without it.
-    </p>
-    <table>
-      <thead>
-        <tr><th>Site</th><th>Endpoint</th><th>Bridge</th><th>Keys</th><th>Last used</th><th></th></tr>
-      </thead>
-      <tbody>
-        {directory.map((t) => (
-          <tr>
-            <td><code>{t.slug}</code></td>
-            <td>
-              <div class="copyrow tight">
-                <code class="ep" id={`ep-${t.slug}`}>{t.endpoint}</code>
-                <button type="button" class="ghost copy small" data-copy={`ep-${t.slug}`}>Copy</button>
-              </div>
-            </td>
-            <td>
-              {t.bridgeInstalled === null
-                ? <span class="pill">site not running</span>
-                : t.bridgeInstalled
-                  ? <span class="pill ok">installed</span>
-                  : <span class="pill warn">not installed</span>}
-            </td>
-            <td>{t.activeKeys}</td>
-            <td class="hint">{fmt(t.lastUsed)}</td>
-            <td class="row-actions">
-              {t.bridgeInstalled !== null && (
-                <form method="POST">
-                  <input type="hidden" name="action" value="install-bridge" />
-                  <input type="hidden" name="tenantSlug" value={t.slug} />
-                  <button class="ghost small" type="submit">
-                    {t.bridgeInstalled ? 'Reinstall' : 'Install bridge'}
-                  </button>
-                </form>
-              )}
-            </td>
-          </tr>
         ))}
-      </tbody>
-    </table>
-    <p class="hint" style="margin:12px 0 0">
-      <strong>Install bridge</strong> builds the plugin from source and installs it into that site — no zip,
-      no upload. Run it once per site; run it again after the plugin is updated.
-    </p>
-  </div>
+      </div>
+      <Fragment slot="footer">
+        <a class="mms-btn mms-btn--secondary" href={`${base}mcp/documentation`}>How to connect</a>
+        <button type="button" class="mms-btn mms-btn--primary" data-close-modal>I've stored it</button>
+      </Fragment>
+    </Modal>
+  )}
 
-  <script is:inline>
-    // Clipboard with a visible confirmation — a copy button that gives no
-    // feedback leaves you unsure whether the key is actually on the clipboard,
-    // and this one is shown only once. execCommand is the fallback for
-    // non-secure origins, where navigator.clipboard is undefined.
-    document.addEventListener('click', function (e) {
-      var btn = e.target.closest('button.copy');
-      if (!btn) return;
-      var src = document.getElementById(btn.dataset.copy);
-      if (!src) return;
-      var text = src.textContent;
-      var done = function () {
-        var was = btn.textContent;
-        btn.textContent = 'Copied';
-        btn.classList.add('copied');
-        setTimeout(function () { btn.textContent = was; btn.classList.remove('copied'); }, 1400);
-      };
-      if (navigator.clipboard && window.isSecureContext) {
-        navigator.clipboard.writeText(text).then(done, function () { btn.textContent = 'Press Ctrl+C'; });
-      } else {
-        var ta = document.createElement('textarea');
-        ta.value = text;
-        ta.style.position = 'fixed';
-        ta.style.opacity = '0';
-        document.body.appendChild(ta);
-        ta.select();
-        try { document.execCommand('copy'); done(); } catch (err) { btn.textContent = 'Press Ctrl+C'; }
-        document.body.removeChild(ta);
-      }
-    });
-  </script>
+  <ConfirmModal id="revoke-key" title="Revoke key" intent="revoke" confirmLabel="Revoke key" fields={['keyId']} busy="Revoking">
+    <Fragment slot="message">Revoke this key? The agent loses access immediately.</Fragment>
+  </ConfirmModal>
 
-  <style>
-    .tok{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px 12px;
-         font:12px/1.6 'Roboto Mono',ui-monospace,monospace;white-space:pre-wrap;word-break:break-all;margin:0}
-    /* Documentation entry point. Sits directly under the page intro because a
-       first-time operator needs it before anything else on this page. */
-    .docs-cta{display:flex;align-items:center;gap:14px;margin:0 0 22px;padding:14px 16px;
-              background:var(--panel);border:1px solid var(--line);border-radius:12px;
-              box-shadow:0 6px 24px rgba(8,42,56,.06);color:var(--ink);text-decoration:none;
-              transition:border-color .12s ease,transform .12s ease}
-    .docs-cta:hover{border-color:var(--accent);transform:translateY(-1px)}
-    .docs-cta:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
-    .docs-icon{flex:0 0 auto;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;
-               background:var(--accent);color:#fff;font-weight:800;font-size:15px}
-    .docs-text{display:flex;flex-direction:column;gap:2px;min-width:0}
-    .docs-text strong{font-size:14px;font-weight:800}
-    .docs-text span{font-size:12px;color:var(--mut)}
-    .docs-go{margin-left:auto;color:var(--mut);font-size:18px;flex:0 0 auto}
-    .docs-cta:hover .docs-go{color:var(--accent)}
-    @media (prefers-reduced-motion:reduce){.docs-cta{transition:none}.docs-cta:hover{transform:none}}
-    .copyrow{display:flex;gap:8px;align-items:flex-start}
-    .copyrow .tok{flex:1;min-width:0}
-    .copyrow.tight{align-items:center;gap:6px}
-    .copyrow .ep{font:11px/1.5 'Roboto Mono',ui-monospace,monospace;word-break:break-all}
-    button.copy{white-space:nowrap;flex:0 0 auto}
-    button.copy.copied{background:var(--accent);color:#fff;border-color:var(--accent)}
-    button.small{padding:5px 10px;font-size:12px}
-    .perms{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
-    fieldset{border:1px solid var(--line);border-radius:10px;padding:10px 12px 12px;margin:0}
-    legend{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--mut);padding:0 4px}
-    label.check{display:flex;gap:8px;align-items:flex-start;margin:8px 0 0;font-size:12px;color:var(--ink);cursor:pointer}
-    label.check input{width:auto;margin-top:2px}
-  </style>
-</Layout>
+  <ConfirmModal id="install-bridge" title="Install bridge" intent="install-bridge" confirmLabel="Install" fields={['tenantSlug']} tone="primary" busy="Installing the bridge — this can take a minute">
+    <Fragment slot="message">Install the bridge on this project?</Fragment>
+  </ConfirmModal>
+</ConsoleLayout>

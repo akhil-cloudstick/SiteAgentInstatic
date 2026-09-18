@@ -1,0 +1,41 @@
+---
+// A themed dropdown. The native <select> stays in the form (it submits, it
+// validates, it works without script); `<mms-select>` draws the MMS-CMS
+// listbox over it (scripts/console.ts).
+interface Option {
+  value: string;
+  label: string;
+  hint?: string;
+  disabled?: boolean;
+}
+interface Props {
+  name: string;
+  options: Option[];
+  value?: string | null;
+  placeholder?: string;
+  id?: string;
+  required?: boolean;
+  disabled?: boolean;
+  ariaLabel?: string;
+  /** Extra attributes for the native select (e.g. data-filter). */
+  attrs?: Record<string, string>;
+}
+const { name, options, value = null, placeholder, id, required = false, disabled = false, ariaLabel, attrs = {} } = Astro.props;
+const selected = value === null || value === undefined ? null : String(value);
+---
+<mms-select>
+  <select
+    name={name}
+    id={id}
+    class="mms-native-select"
+    required={required}
+    disabled={disabled}
+    aria-label={ariaLabel}
+    {...attrs}
+  >
+    {placeholder && <option value="" disabled={required} selected={selected === null || selected === ''}>{placeholder}</option>}
+    {options.map((o) => (
+      <option value={o.value} selected={selected === String(o.value)} disabled={o.disabled} data-hint={o.hint}>{o.label}</option>
+    ))}
+  </select>
+</mms-select>

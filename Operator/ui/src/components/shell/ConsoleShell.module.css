@@ -1,0 +1,101 @@
+/* Console-local pieces the shared shell leaves to its product: the account
+ * trigger (the CMS AccountMenuButton's metrics) and the Help dialog's list. */
+
+/* A 44px round target with a 1px identity-green ring, like the CMS avatar. */
+.trigger {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border-radius: 999px;
+  border: 1px solid var(--toolbar-accent);
+  background: transparent;
+  color: var(--toolbar-accent-strong);
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  user-select: none;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease;
+}
+
+.trigger:hover,
+.trigger[data-active='true'] {
+  background: color-mix(in srgb, var(--toolbar-accent) 20%, transparent);
+}
+
+.trigger:focus-visible {
+  box-shadow: var(--focus-ring);
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px 6px;
+  pointer-events: none;
+}
+
+.headerEmail {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.scopeBadge {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: var(--bg-surface-2);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.steps {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.step {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.step strong {
+  display: block;
+  font-size: 14px;
+  font-weight: 720;
+}
+
+.step p {
+  margin: 2px 0 0;
+  color: var(--mms-text-muted);
+}
+
+.stepIcon {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 9px;
+  background: var(--mms-surface-green);
+  color: var(--mms-action-strong);
+}

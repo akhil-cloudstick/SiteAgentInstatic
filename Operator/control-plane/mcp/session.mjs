@@ -1,11 +1,17 @@
 // Headless sign-in to a tenant CMS, reusing the ONE hub login.
 //
 // There is no second login anywhere in the product, so the gateway does not
-// invent one: it mints the same short-lived signed SSO token the hub already
-// hands a browser (`signValue({ sub, target: 'instatic', kind: 'sso' })`,
-// verified by the CMS in `server/auth/tenantSso.ts`), follows the 302, and
-// keeps the session cookie the CMS sets. No CMS password is read or stored —
-// `owner_password_enc` is never touched by this module.
+// invent one: it mints a short-lived SSO token signed with the project's key
+// and marked `actor: 'machine'` (verified by the CMS in
+// `server/auth/tenantSso.ts`), follows the 302, and keeps the session cookie
+// the CMS sets. No CMS password is read or stored — `owner_password_enc` is
+// never touched by this module.
+//
+// The machine path is deliberate and separate from people (NEW-3): a person's
+// hand-off carries their own role and no step-up, while this one opens an
+// owner session with step-up, because an agent has no password to re-enter.
+// An agent's reach is bounded by its key's permissions (mcp/permissions.mjs),
+// and the hub never mints a machine token.
 //
 // Requests go straight to the tenant's loopback port rather than through the
 // public gateway, because the gateway proxy routes by hub session cookie and
@@ -14,7 +20,7 @@
 //
 // CSRF: `originAllowed` in the CMS trusts a request with NO Origin header
 // (server-to-server), so these calls deliberately send none.
-import { signValue } from '../lib/crypto.mjs';
+import { signForTenant } from '../lib/crypto.mjs';
 import { getTenant } from '../registry/tenants.mjs';
 
 const SSO_TTL_SEC = 120;
@@ -42,7 +48,7 @@ export function tenantOrigin(tenant) {
 // Exchange a fresh SSO token for a CMS session cookie.
 async function mintSession(slug) {
   const tenant = await resolveTenant(slug);
-  const token = signValue({ sub: slug, target: 'instatic', kind: 'sso' }, SSO_TTL_SEC);
+  const token = signForTenant(slug, { target: 'instatic', kind: 'sso', actor: 'machine' }, SSO_TTL_SEC);
   const url = `${tenantOrigin(tenant)}/cms/api/cms/sso?token=${encodeURIComponent(token)}`;
 
   const res = await fetch(url, { method: 'GET', redirect: 'manual' });

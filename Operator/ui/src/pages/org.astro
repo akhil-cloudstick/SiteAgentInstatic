@@ -1,0 +1,319 @@
+---
+// Organisation — Operator → Business → Project (R1), in setup order. Opens
+// with totals; each Operator is a card holding its Businesses; Businesses with
+// no Operator sit under "Direct". Create, rename and move happen in dialogs.
+import ConsoleLayout from '../components/ConsoleLayout.astro';
+import PageHeader from '../components/PageHeader.astro';
+import Modal from '../components/Modal.astro';
+import RowMenu from '../components/RowMenu.astro';
+import Select from '../components/Select.astro';
+import EmptyState from '../components/EmptyState.astro';
+import { basePath, cpFetch } from '../lib/cp';
+import { cpGet, okJson } from '../lib/org';
+
+const base = basePath();
+const scope = Astro.locals.admin?.scope ?? { level: 'platform', operatorId: null, businessId: null };
+const isPlatform = scope.level === 'platform';
+let error = '';
+
+const json = (body: unknown) => ({
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(body),
+});
+
+if (Astro.request.method === 'POST') {
+  const f = await Astro.request.formData();
+  const intent = String(f.get('intent') || '');
+  const id = (k: string) => (/^\d+$/.test(String(f.get(k) ?? '')) ? String(f.get(k)) : '');
+  const opOrNull = () => (String(f.get('operatorId') ?? '') === '' ? null : String(f.get('operatorId')));
+  try {
+    if (intent === 'operator') {
+      await okJson(await cpFetch(Astro.cookies, '/api/operators', json({ name: f.get('name') })), 'Could not create the operator');
+    } else if (intent === 'business') {
+      await okJson(await cpFetch(Astro.cookies, '/api/businesses', json({ name: f.get('name'), operatorId: opOrNull() })), 'Could not create the business');
+    } else if (intent === 'rename-business' && id('businessId')) {
+      await okJson(await cpFetch(Astro.cookies, `/api/businesses/${id('businessId')}/update`, json({ name: f.get('name') })), 'Could not rename the business');
+    } else if (intent === 'move-business' && id('businessId')) {
+      await okJson(await cpFetch(Astro.cookies, `/api/businesses/${id('businessId')}/update`, json({ operatorId: opOrNull() })), 'Could not move the business');
+    } else if (intent === 'rename-operator' && id('operatorId')) {
+      await okJson(await cpFetch(Astro.cookies, `/api/operators/${id('operatorId')}/update`, json({ name: f.get('name') })), 'Could not rename the operator');
+    }
+    return Astro.redirect(`${base}org`, 303);
+  } catch (e) {
+    error = (e as Error).message;
+  }
+}
+
+let tree: any = { operators: [], direct: [], other: [] };
+let operators: any[] = [];
+let tenants: any[] = [];
+try {
+  // All three listings at once: they don't depend on each other, so the page
+  // waits for the slowest call, not for their sum.
+  const [orgJson, opJson, tnJson] = await Promise.all([
+    cpGet(Astro.cookies, '/api/org', 'Could not load the organisation'),
+    cpGet(Astro.cookies, '/api/operators', 'Could not list operators'),
+    cpGet(Astro.cookies, '/api/tenants', 'Could not list projects'),
+  ]);
+  tree = orgJson;
+  operators = opJson.operators || [];
+  tenants = tnJson.tenants || [];
+} catch (e) {
+  error = error || (e as Error).message;
+}
+
+// People per Business, from the project listing (already limited to this scope).
+const peopleOf = new Map<string, { people: number; pending: number }>();
+for (const t of tenants) {
+  const k = String(t.business_id);
+  const cur = peopleOf.get(k) ?? { people: 0, pending: 0 };
+  cur.people += Number(t.people_count) || 0;
+  cur.pending += Number(t.people_pending) || 0;
+  peopleOf.set(k, cur);
+}
+const allBusinesses = [...tree.operators.flatMap((o: any) => o.businesses), ...tree.direct, ...tree.other];
+const totals = {
+  operators: tree.operators.length,
+  businesses: allBusinesses.length,
+  projects: allBusinesses.reduce((n: number, b: any) => n + b.projects.length, 0),
+  people: tenants.reduce((n, t) => n + (Number(t.people_count) || 0), 0),
+  pending: tenants.reduce((n, t) => n + (Number(t.people_pending) || 0), 0),
+};
+
+const groups = [
+  ...tree.operators.map((o: any) => ({ key: `op-${o.id}`, operator: o, title: o.name, icon: 'building', businesses: o.businesses })),
+  ...(isPlatform || tree.direct.length
+    ? [{ key: 'direct', operator: null, title: 'Direct businesses', icon: 'briefcase', businesses: tree.direct }]
+    : []),
+  ...(tree.other.length ? [{ key: 'other', operator: null, title: 'Your business', icon: 'briefcase', businesses: tree.other }] : []),
+];
+
+const operatorOptions = [
+  ...(isPlatform ? [{ value: '', label: 'None — directly under the platform' }] : []),
+  ...operators.map((o) => ({ value: String(o.id), label: o.name })),
+];
+const defaultOperator = isPlatform ? '' : (operators[0] ? String(operators[0].id) : '');
+const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+---
+<ConsoleLayout title="Organisation" active="org">
+  <PageHeader title="Organisation" eyebrow="Operators & businesses">
+    Operators are agencies; each serves businesses; each business owns its projects. A business with no operator sits directly under the platform.
+    <Fragment slot="actions">
+      {isPlatform && (
+        <button type="button" class="mms-btn mms-btn--secondary" data-open-modal="new-operator">
+          <i class="fa-solid fa-building" aria-hidden="true"></i> New operator
+        </button>
+      )}
+      <button type="button" class="mms-btn mms-btn--primary" data-open-modal="new-business" data-prefill-operatorId={defaultOperator}>
+        <i class="fa-solid fa-plus" aria-hidden="true"></i> New business
+      </button>
+    </Fragment>
+  </PageHeader>
+
+  {error && <div class="mms-alert mms-alert--err" role="alert" style="margin-bottom:16px"><i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i><span>{error}</span></div>}
+
+  <div class="mms-stack">
+    <div class="mms-stats">
+      {isPlatform && <div class="mms-stat"><strong>{totals.operators}</strong><span>Operators</span></div>}
+      <div class="mms-stat"><strong>{totals.businesses}</strong><span>Businesses</span></div>
+      <div class="mms-stat"><strong>{totals.projects}</strong><span>Projects</span></div>
+      <div class="mms-stat"><strong>{totals.people}</strong><span>People</span></div>
+      <div class="mms-stat"><strong>{totals.pending}</strong><span>Invites not accepted</span></div>
+    </div>
+
+    {groups.length === 0 && !error && (
+      <div class="mms-card">
+        <EmptyState icon="sitemap" title="Nothing set up yet">
+          Start with an operator for an agency, or a business directly under the platform.
+        </EmptyState>
+      </div>
+    )}
+
+    {groups.map((g) => (
+      <section class="mms-card" aria-label={g.title}>
+        <div class="mms-card__head">
+          <div class="mms-card__title">
+            <span class="mms-card__icon"><i class={`fa-solid fa-${g.icon}`} aria-hidden="true"></i></span>
+            <div>
+              <h2>{g.title}</h2>
+              <p>
+                {g.operator ? 'Operator · ' : ''}{plural(g.businesses.length, 'business', 'businesses')} · {plural(g.businesses.reduce((n: number, b: any) => n + b.projects.length, 0), 'project', 'projects')}
+              </p>
+            </div>
+          </div>
+          <div class="mms-row">
+            {(g.operator || (g.key === 'direct' && isPlatform)) && (
+              <button type="button" class="mms-btn mms-btn--secondary mms-btn--sm" data-open-modal="new-business"
+                data-prefill-operatorId={g.operator ? String(g.operator.id) : ''}>
+                <i class="fa-solid fa-plus" aria-hidden="true"></i> Add business
+              </button>
+            )}
+            {g.operator && (
+              <RowMenu label={`Actions for ${g.title}`}>
+                {isPlatform && (
+                  <button type="button" class="mms-menu__item" role="menuitem" data-open-modal="rename-operator"
+                    data-prefill-operatorId={String(g.operator.id)} data-prefill-name={g.operator.name}>
+                    <i class="fa-solid fa-pen" aria-hidden="true"></i> Rename operator
+                  </button>
+                )}
+                <a class="mms-menu__item" role="menuitem" href={`${base}access?invite=operator:${g.operator.id}`}>
+                  <i class="fa-solid fa-user-shield" aria-hidden="true"></i> Invite operator admin
+                </a>
+              </RowMenu>
+            )}
+          </div>
+        </div>
+        {g.businesses.length === 0 ? (
+          <p class="mms-muted" style="margin:0;padding:18px">
+            {g.operator ? 'No businesses under this operator yet.' : 'No direct businesses yet.'}
+          </p>
+        ) : (
+          <div class="mms-table-card">
+            <table class="mms-table">
+              <thead>
+                <tr><th>Business</th><th>Projects</th><th>People</th><th class="mms-right">Actions</th></tr>
+              </thead>
+              <tbody>
+                {g.businesses.map((b: any) => {
+                  const p = peopleOf.get(String(b.id)) ?? { people: 0, pending: 0 };
+                  return (
+                    <tr>
+                      <td>
+                        <div class="mms-cell-main"><strong>{b.name}</strong><small class="mms-mono">{b.slug}</small></div>
+                      </td>
+                      <td>
+                        {b.projects.length === 0 ? <span class="mms-muted">None yet</span> : (
+                          <div class="mms-cell-main">
+                            <a class="mms-link" href={`${base}projects?business=${b.id}`}>{plural(b.projects.length, 'project', 'projects')}</a>
+                            <small>{b.projects.slice(0, 3).map((x: any) => x.name).join(', ')}{b.projects.length > 3 ? ` +${b.projects.length - 3}` : ''}</small>
+                          </div>
+                        )}
+                      </td>
+                      <td>
+                        {p.people}
+                        {p.pending > 0 && <span class="mms-muted"> · {p.pending} invited</span>}
+                      </td>
+                      <td>
+                        <div class="mms-cell-actions">
+                          <a class="mms-btn mms-btn--secondary mms-btn--sm" href={`${base}projects?new=1&business=${b.id}`}>
+                            <i class="fa-solid fa-plus" aria-hidden="true"></i> New project
+                          </a>
+                          <RowMenu label={`Actions for ${b.name}`}>
+                            <a class="mms-menu__item" role="menuitem" href={`${base}projects?business=${b.id}`}>
+                              <i class="fa-solid fa-globe" aria-hidden="true"></i> View projects
+                            </a>
+                            <button type="button" class="mms-menu__item" role="menuitem" data-open-modal="rename-business"
+                              data-prefill-businessId={String(b.id)} data-prefill-name={b.name}>
+                              <i class="fa-solid fa-pen" aria-hidden="true"></i> Rename
+                            </button>
+                            {isPlatform && (
+                              <button type="button" class="mms-menu__item" role="menuitem" data-open-modal="move-business"
+                                data-prefill-businessId={String(b.id)} data-prefill-operatorId={b.operatorId ?? ''} data-fill-business={b.name}>
+                                <i class="fa-solid fa-arrow-right-arrow-left" aria-hidden="true"></i> Move to operator
+                              </button>
+                            )}
+                            <a class="mms-menu__item" role="menuitem" href={`${base}access?invite=business:${b.id}`}>
+                              <i class="fa-solid fa-user-shield" aria-hidden="true"></i> Invite business admin
+                            </a>
+                          </RowMenu>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+    ))}
+  </div>
+
+  {isPlatform && (
+    <Modal id="new-operator" title="New operator" eyebrow="Organisation" size="sm" intent="operator" busy="Creating operator">
+      <div class="mms-form">
+        <div class="mms-field">
+          <label class="mms-label" for="no-name">Operator name</label>
+          <input id="no-name" class="mms-input" name="name" required maxlength="120" placeholder="Acme Agency" autocomplete="off" />
+          <p class="mms-hint">An agency that resells the platform. Its businesses come next.</p>
+        </div>
+      </div>
+      <Fragment slot="footer">
+        <button type="button" class="mms-btn mms-btn--secondary" data-close-modal>Cancel</button>
+        <button type="submit" class="mms-btn mms-btn--primary">Create operator</button>
+      </Fragment>
+    </Modal>
+  )}
+
+  <!-- The Operator comes first: it decides where the business sits. -->
+  <Modal id="new-business" title="New business" eyebrow="Organisation" size="md" intent="business" busy="Creating business">
+    <div class="mms-form">
+      <div class="mms-field">
+        <label class="mms-label" for="nb-operator">Operator</label>
+        <Select id="nb-operator" name="operatorId" options={operatorOptions} value={defaultOperator} required={!isPlatform} />
+        <p class="mms-hint">{isPlatform ? 'Choose the agency this business belongs to, or none.' : 'Businesses you create belong to your operator.'}</p>
+      </div>
+      <div class="mms-field">
+        <label class="mms-label" for="nb-name">Business name</label>
+        <input id="nb-name" class="mms-input" name="name" required maxlength="120" placeholder="Harbour Suites" autocomplete="off" />
+      </div>
+    </div>
+    <Fragment slot="footer">
+      <button type="button" class="mms-btn mms-btn--secondary" data-close-modal>Cancel</button>
+      <button type="submit" class="mms-btn mms-btn--primary">Create business</button>
+    </Fragment>
+  </Modal>
+
+  <Modal id="rename-business" title="Rename business" eyebrow="Organisation" size="sm" intent="rename-business" busy="Saving">
+    <input type="hidden" name="businessId" />
+    <div class="mms-form">
+      <div class="mms-field">
+        <label class="mms-label" for="rb-name">Business name</label>
+        <input id="rb-name" class="mms-input" name="name" required maxlength="120" />
+        <p class="mms-hint">Its address stays the same.</p>
+      </div>
+    </div>
+    <Fragment slot="footer">
+      <button type="button" class="mms-btn mms-btn--secondary" data-close-modal>Cancel</button>
+      <button type="submit" class="mms-btn mms-btn--primary">Save</button>
+    </Fragment>
+  </Modal>
+
+  {isPlatform && (
+    <>
+      <Modal id="rename-operator" title="Rename operator" eyebrow="Organisation" size="sm" intent="rename-operator" busy="Saving">
+        <input type="hidden" name="operatorId" />
+        <div class="mms-form">
+          <div class="mms-field">
+            <label class="mms-label" for="ro-name">Operator name</label>
+            <input id="ro-name" class="mms-input" name="name" required maxlength="120" />
+          </div>
+        </div>
+        <Fragment slot="footer">
+          <button type="button" class="mms-btn mms-btn--secondary" data-close-modal>Cancel</button>
+          <button type="submit" class="mms-btn mms-btn--primary">Save</button>
+        </Fragment>
+      </Modal>
+
+      <Modal id="move-business" title="Move business" eyebrow="Organisation" size="md" intent="move-business" busy="Moving business">
+        <input type="hidden" name="businessId" />
+        <div class="mms-form">
+          <p style="margin:0">Choose where <strong data-fill="business">this business</strong> belongs.</p>
+          <div class="mms-field">
+            <label class="mms-label" for="mb-operator">Operator</label>
+            <Select id="mb-operator" name="operatorId" options={operatorOptions} value="" />
+          </div>
+          <div class="mms-alert mms-alert--info">
+            <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
+            <span>Its projects, people and agent keys move with it. Administrators of the old operator lose access to them.</span>
+          </div>
+        </div>
+        <Fragment slot="footer">
+          <button type="button" class="mms-btn mms-btn--secondary" data-close-modal>Cancel</button>
+          <button type="submit" class="mms-btn mms-btn--primary">Move business</button>
+        </Fragment>
+      </Modal>
+    </>
+  )}
+</ConsoleLayout>

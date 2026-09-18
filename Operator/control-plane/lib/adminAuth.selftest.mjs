@@ -27,7 +27,7 @@ function check(name, actual, expected) {
 }
 
 const updatedAt = new Date('2026-09-17T10:00:00Z');
-const row = { id: '7', email: 'ops@example.test', updated_at: updatedAt };
+const row = { id: '7', email: 'ops@example.test', updated_at: updatedAt, scope_level: 'platform', operator_id: null, business_id: null };
 const finder = (r) => async (id) => (r && String(r.id) === String(id) ? r : null);
 const reqWith = (cookie, extra = {}) => ({ headers: { cookie, ...extra } });
 
@@ -47,7 +47,11 @@ check('no cookie is refused', readAdminSession(undefined), null);
 // --- the request ------------------------------------------------------------
 check('a request with the admin cookie is signed in',
   await currentAdmin(reqWith(`${ADMIN_COOKIE}=${encodeURIComponent(good)}`), finder(row)),
-  { id: '7', email: 'ops@example.test' });
+  { id: '7', email: 'ops@example.test', scope: { level: 'platform', operatorId: null, businessId: null } });
+check('a business administrator carries its business scope',
+  (await currentAdmin(reqWith(`${ADMIN_COOKIE}=${good}`),
+    finder({ ...row, scope_level: 'business', business_id: '42' }))).scope,
+  { level: 'business', operatorId: null, businessId: '42' });
 check('a request with no cookie is not signed in',
   await currentAdmin(reqWith(undefined), finder(row)), null);
 check('a hub cookie under the admin name is not signed in',
@@ -63,7 +67,9 @@ check('a password reset ends a session signed before it',
 // --- which routes are admin routes -------------------------------------------
 for (const p of ['/api/settings', '/api/ai-guidance-default', '/api/models', '/api/tenants',
   '/api/tenants/acme', '/api/tenants/acme/deploy', '/api/mcp/agents', '/api/mcp/agents/mk_1/revoke',
-  '/api/admin/session']) {
+  '/api/admin/session', '/api/org', '/api/operators', '/api/operators/3', '/api/businesses',
+  '/api/businesses/4/update', '/api/admins', '/api/admins/5/disable',
+  '/api/tenants/acme/people', '/api/tenants/acme/people/9/role', '/api/tenants/acme/move']) {
   check(`admin route: ${p}`, isAdminApiPath(p), true);
 }
 for (const p of OPEN_API_PATHS) check(`open route: ${p}`, isAdminApiPath(p), false);
@@ -93,14 +99,18 @@ for (let i = 0; i < 4; i++) recordLoginFailure('slow@example.test', t0 + i * 20 
 recordLoginFailure('slow@example.test', t0 + 5 * 20 * 60_000);
 check('failures spread beyond the window do not lock', loginLockedFor('slow@example.test', t0 + 5 * 20 * 60_000 + 1), 0);
 
-// --- every /api/ route in server.mjs is gated or deliberately open ------------
-const serverSrc = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '../server.mjs'), 'utf8');
-const literals = new Set([...serverSrc.matchAll(/'(\/api\/[^'\s]*)'/g)].map((m) => m[1]));
+// --- every /api/ route is gated or deliberately open ----------------------------
+// server.mjs and the module it dispatches the levels/people routes to.
+const here = dirname(fileURLToPath(import.meta.url));
+const serverSrc = readFileSync(resolve(here, '../server.mjs'), 'utf8');
+const orgSrc = readFileSync(resolve(here, '../api/orgApi.mjs'), 'utf8');
+const routeSrc = serverSrc + orgSrc;
+const literals = new Set([...routeSrc.matchAll(/'(\/api\/[^'\s]*)'/g)].map((m) => m[1]));
 // Regex routes: the static prefix before the first capture, e.g. /api/tenants/.
-const patterns = [...serverSrc.matchAll(/\/\^((?:\\\/|[a-z-])+)/g)]
+const patterns = [...routeSrc.matchAll(/\/\^((?:\\\/|[a-z-])+)/g)]
   .map((m) => m[1].replace(/\\\//g, '/'))
   .filter((p) => p.startsWith('/api/'));
-check('server.mjs routes were found', literals.size > 5 && patterns.length >= 3, true);
+check('routes were found', literals.size > 8 && patterns.length >= 6, true);
 for (const p of literals) {
   const covered = isAdminApiPath(p) || OPEN_API_PATHS.includes(p);
   check(`server route ${p} is gated or deliberately open`, covered, true);
@@ -115,6 +125,21 @@ check('the gate runs before the tenant proxy',
   gateAt > 0 && gateAt < serverSrc.indexOf('await handleGatewayProxy('), true);
 check('the main server no longer serves the board',
   /path === '\/board'/.test(serverSrc), false);
+check('the levels/people routes are dispatched after the gate',
+  gateAt > 0 && gateAt < serverSrc.indexOf('await handleOrgApi('), true);
+check('an unclaimed admin route never reaches the tenant proxy',
+  serverSrc.indexOf("if (isAdminApiPath(path)) return send(res, 404") > 0
+    && serverSrc.indexOf("if (isAdminApiPath(path)) return send(res, 404") < serverSrc.indexOf('await handleGatewayProxy('), true);
+
+// --- AC-A1.2: project routes resolve the project through the caller's scope -------
+check('server.mjs never looks a project up without a scope',
+  /tenantsRepo\.getTenant\(/.test(serverSrc), false);
+check('the scope-less project listing is used once (the Connector machine view)',
+  (serverSrc.match(/listAllTenants\(/g) || []).length, 1);
+check('orgApi.mjs never looks a project up without a scope',
+  /[^A-Za-z]getTenant\(/.test(orgSrc), false);
+check('every project listing in server.mjs names the scope',
+  (serverSrc.match(/listTenants\(([^)]*)\)/g) || []).every((c) => c === 'listTenants(scope)'), true);
 
 if (failures) {
   console.error(`\n${failures} check(s) failed`);

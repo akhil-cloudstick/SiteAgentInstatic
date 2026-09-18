@@ -3,7 +3,11 @@
  *
  *   node scripts/restore-tenant-login.mjs <slug>
  *
- * Why this exists: `createTenantInvite()` sets `status = 'invited'` so the
+ * Since Phase 1 a re-invite of an active person is refused, so this is only
+ * needed for rows left behind by the older invite flow. It acts on the
+ * project's OWNER row only.
+ *
+ * Why this exists: the old `createTenantInvite()` set `status = 'invited'` so the
  * invite flow can run, and `validateLogin()` only matches `status = 'active'`.
  * So minting an invite link for an account that already has a password LOCKS
  * THAT PERSON OUT until they accept it — their password is still stored and
@@ -37,7 +41,7 @@ const { rows: before } = await query(
           (password_hash is not null)     as has_password,
           (invite_token_hash is not null) as invite_pending
      from siteagent_control.tenant_users
-    where tenant_slug = $1`,
+    where tenant_slug = $1 and role = 'owner' and status <> 'removed'`,
   [slug],
 );
 
@@ -72,7 +76,7 @@ await query(
           invite_token_enc = null,
           invite_expires_at = null,
           updated_at = now()
-    where tenant_slug = $1`,
+    where tenant_slug = $1 and role = 'owner' and status <> 'removed'`,
   [slug],
 );
 
@@ -81,7 +85,7 @@ const { rows: after } = await query(
           (password_hash is not null)     as has_password,
           (invite_token_hash is not null) as invite_pending
      from siteagent_control.tenant_users
-    where tenant_slug = $1`,
+    where tenant_slug = $1 and role = 'owner' and status <> 'removed'`,
   [slug],
 );
 
@@ -92,8 +96,8 @@ console.log(
     `previously generated for it is now dead.`,
 );
 console.log(
-  `\nIf one email owns more than one site, the hub refuses to guess between\n` +
-    `them — sign in with the site name ("${slug}") as the identifier instead.`,
+  `\nIf one email belongs to more than one project, the hub asks which one after\n` +
+    `sign-in. The owner can also sign in with the project name ("${slug}").`,
 );
 
 await close();

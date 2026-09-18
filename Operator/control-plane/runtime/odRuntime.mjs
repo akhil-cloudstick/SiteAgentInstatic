@@ -5,7 +5,8 @@ import { spawn, execSync } from 'node:child_process';
 import { mkdirSync, createWriteStream, existsSync, rmSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import config from '../lib/env.mjs';
-import { signTenantToken } from '../lib/crypto.mjs';
+import { signTenantToken, tenantKey } from '../lib/crypto.mjs';
+import { childEnv } from '../lib/childEnv.mjs';
 import { isPortOpen, waitPortOpen } from '../lib/ports.mjs';
 
 const isWin = process.platform === 'win32';
@@ -208,8 +209,7 @@ export function start(tenant) {
   const daemonCwd = resolve(config.openDesignDir, 'apps', 'daemon');
   const origin = `http://127.0.0.1:${odPort}`;
   const webPort = sharedWebPort();
-  const env = {
-    ...process.env,
+  const env = childEnv({
     // libuv runs every fs call on a threadpool that defaults to FOUR threads, so
     // the daemon can only ever have 4 file operations in flight. That is fine on
     // a local SSD and ruinous here: this repo is served from a network share, so
@@ -239,7 +239,8 @@ export function start(tenant) {
     ].join(','),
     // SSO: the control-plane signs a short-lived token; the OD daemon verifies it
     // with this same secret and mints its own session (Phase 3b, OD-side /sso).
-    OD_SSO_SECRET: config.tokenSecret,
+    // This project's own key (derived from the master), never the master itself.
+    OD_SSO_SECRET: tenantKey(slug),
     OD_TENANT_SLUG: slug,
     // ONE LOGIN: where to bounce an unauthenticated page load. The hub silently
     // re-mints an SSO token when the hub session is alive, so an expired
@@ -276,9 +277,7 @@ export function start(tenant) {
     OD_AI_GATEWAY_URL: `${config.publicBaseUrl}/ai/${signTenantToken(slug)}/design/v1`,
     // Operator-owned media provider keys (image / video / speech generation).
     ...mediaKeyEnv(tenant.mediaKeys),
-  };
-  // Clear inherited control-plane secrets the child shouldn't see.
-  delete env.SETTINGS_ENC_KEY;
+  });
 
   const out = createWriteStream(p.log, { flags: 'a' });
   out.write(`\n[od-runtime] starting ${slug} on :${odPort} @ ${new Date().toISOString()}\n`);
@@ -412,8 +411,7 @@ export function startSharedWeb() {
     } catch { /* dir listing failed; ignore */ }
   }
 
-  const webEnv = {
-    ...process.env,
+  const webEnv = childEnv({
     OD_WEB_PORT: String(webPort),
     // Only the gateway origin and this shared web's own origin are trusted. There
     // is no per-tenant web origin any more.
@@ -424,8 +422,7 @@ export function startSharedWeb() {
     ...(isBuilt
       ? { OD_WEB_OUTPUT_MODE: 'server', OD_WEB_DIST_DIR: prodDist, NODE_ENV: 'production' }
       : { OD_WEB_DIST_DIR: '.next-shared', WATCHPACK_POLLING: 'true', CHOKIDAR_USEPOLLING: 'true' }),
-  };
-  delete webEnv.SETTINGS_ENC_KEY;
+  });
 
   const webArgs = isBuilt
     ? [nextBin, 'start', '--port', String(webPort)]
@@ -470,8 +467,7 @@ export function buildWeb() {
     mkdirSync(logDir, { recursive: true });
     const out = createWriteStream(resolve(logDir, 'web.log'), { flags: 'a' });
     out.write(`\n[od-runtime] building SHARED web (production, basePath=/design) @ ${new Date().toISOString()}\n`);
-    const env = {
-      ...process.env,
+    const env = childEnv({
       OD_WEB_BASE_PATH: '/design',
       OD_WEB_OUTPUT_MODE: 'server',
       // NEXT_PUBLIC_* is inlined at BUILD time, so setting this only on the
@@ -484,8 +480,7 @@ export function buildWeb() {
       OD_WEB_DIST_DIR: `${SHARED_WEB_PREFIX}${Date.now()}`,
       OD_WEB_TSCONFIG_PATH: 'tsconfig.build.json',
       NODE_ENV: 'production',
-    };
-    delete env.SETTINGS_ENC_KEY;
+    });
     const child = spawn('node', [nextBin, 'build'], { cwd: webCwd, env, shell: isWin, windowsHide: true });
     child.stdout.on('data', (d) => out.write(d));
     child.stderr.on('data', (d) => out.write(d));

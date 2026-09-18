@@ -1,19 +1,25 @@
 // Tenant Hub — the tenant-facing surface of the control-plane.
 //   /invite/:token  set a password (one-time), then land in the hub
-//   /login          the ONE login a tenant uses for both tools
+//   /login          the ONE login a person uses for both tools
+//   /login/choose   pick a project, when one email opens several
 //   /hub            advanced -> two cards (OpenDesign + Instatic); lite -> straight to OpenDesign
 //   /logout
-// SSO into each tool is a short-lived signed token the tool validates (Phase 3/4).
+// SSO into each tool is a short-lived token, signed with the PROJECT's key, that
+// names the person and their role; the tool signs them in as that role (Phase 1).
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import config from '../lib/env.mjs';
 import { getTenant } from '../registry/tenants.mjs';
-import { validateLogin, acceptInvite, findByInviteToken } from '../registry/tenantUsers.mjs';
+import { getBusiness } from '../registry/org.mjs';
+import {
+  validateLogin, resolveLogin, acceptInvite, findByInviteToken, findActivePerson, ROLE_LABELS,
+} from '../registry/tenantUsers.mjs';
 import { readActiveProducts } from '../registry/settings.mjs';
-import { signValue, verifyValue } from '../lib/crypto.mjs';
+import { signForTenant } from '../lib/crypto.mjs';
+import {
+  SESSION_COOKIE, SESSION_TTL_SEC, signHubSession, currentPerson, signChooser, readChooser,
+} from './hubSession.mjs';
 
-const SESSION_COOKIE = 'sa_hub';
-const SESSION_TTL_SEC = 7 * 24 * 3600;
 const SSO_TTL_SEC = 120;
 
 // The hub pages (/login, /hub, /invite) must show the SAME MMS mark as the CMS and
@@ -63,14 +69,6 @@ function readForm(req) {
     req.on('error', () => resolve({}));
   });
 }
-function parseCookies(req) {
-  const out = {};
-  (req.headers.cookie || '').split(';').forEach((p) => {
-    const i = p.indexOf('=');
-    if (i > 0) out[p.slice(0, i).trim()] = decodeURIComponent(p.slice(i + 1).trim());
-  });
-  return out;
-}
 // SameSite=None (not Lax) because this cookie now decides WHICH TENANT a request
 // is routed to, and some of those requests come from OpenDesign's preview iframes.
 // Those are sandboxed WITHOUT allow-same-origin, so the browser treats their
@@ -79,8 +77,8 @@ function parseCookies(req) {
 // Requires Secure, which we have (the funnel is HTTPS). CSRF is still covered:
 // the OD daemon validates Origin against OD_ALLOWED_ORIGINS, and state-changing
 // hub routes are POST-only.
-function sessionCookie(slug) {
-  const val = signValue({ sub: slug, kind: 'hub' }, SESSION_TTL_SEC);
+function sessionCookie(person) {
+  const val = signHubSession(person);
   return `${SESSION_COOKIE}=${val}; HttpOnly; Path=/; SameSite=None; Secure; Max-Age=${SESSION_TTL_SEC}`;
 }
 // One login means one logout. The hub cookie is only the OUTER session — each
@@ -111,27 +109,26 @@ function safeNext(raw) {
   if (typeof raw !== 'string' || !raw.startsWith('/') || raw.startsWith('//')) return null;
   return raw;
 }
-function currentSlug(req) {
-  const p = verifyValue(parseCookies(req)[SESSION_COOKIE]);
-  return p && p.kind === 'hub' ? p.sub : null;
-}
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => (
   { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 // The authorized scope carried across a hand-off, per the MMSBUILD shared-header
 // contract: the specialist product renders it in its header row and returns to
-// `hubReturnUrl` on "Back to Product Hub". The registry is infrastructure-only
-// today (slug, ports, tier — no client or project record), so we send the scope
-// we actually hold. The CMS treats every absent field as absent rather than
-// substituting a default, so partial scope degrades cleanly.
+// `hubReturnUrl` on "Back to Product Hub". These parameters are DISPLAY ONLY and
+// unsigned — the person and role that decide what they may do travel inside the
+// signed token. `hubRole` is the portfolio role of the shared header (a
+// business's own people are "client"); `hubClient` is the wire name for the
+// Business.
 // `products` also rides along so the shared header knows whether a Product Hub
 // even exists to link back to. Stamping it on the hand-off (rather than polling
 // for it) is what keeps the header honest: the flags are written by the very
 // redirect that applied them, so the nav can never disagree with the routing
 // decision that produced this session.
-function hubContextParams(tenant, origin, products) {
+function hubContextParams(tenant, origin, products, business) {
   const params = new URLSearchParams();
-  params.set('hubRole', 'operator');
+  params.set('hubRole', 'client');
+  if (business?.name) params.set('hubClient', business.name);
+  params.set('hubProject', tenant.display_name || tenant.slug);
   params.set('hubSite', tenant.slug);
   params.set('hubOrigin', origin);
   params.set('hubReturnUrl', `${config.gatewayOrigin}/hub`);
@@ -143,16 +140,27 @@ function hubContextParams(tenant, origin, products) {
 }
 
 // Short-lived signed SSO hand-off URL for a tool. The tool validates the token
-// (server-side) and mints its own session — see Phase 3 (OD) / Phase 4 (Instatic).
-export function ssoUrl(tenant, target, products) {
-  const token = signValue({ sub: tenant.slug, target, kind: 'sso' }, SSO_TTL_SEC);
+// (server-side, with its project's key) and signs the named person in with
+// their own role — never as the owner by default (NEW-3).
+export function ssoUrl(tenant, target, products, person, business) {
+  if (!person || person.tenant_slug !== tenant.slug) throw new Error('A hand-off needs a person of this project');
+  const token = signForTenant(tenant.slug, {
+    target,
+    kind: 'sso',
+    person: {
+      id: String(person.id),
+      email: person.email || null,
+      role: person.role,
+      name: person.display_name || null,
+    },
+  }, SSO_TTL_SEC);
   // All hand-offs go through the public gateway origin (funnel :443), not the
   // tenant's localhost port, so the URLs work for a remote client.
   if (target === 'instatic') {
     // Root path -> the gateway's session-routed catch-all forwards it to THIS
     // tenant's Instatic (the request carries the sa_hub cookie set at login).
     return `${config.gatewayOrigin}/cms/api/cms/sso?token=${encodeURIComponent(token)}`
-      + `&${hubContextParams(tenant, 'hub', products)}`;
+      + `&${hubContextParams(tenant, 'hub', products, business)}`;
   }
   // OpenDesign: the tenant-agnostic /od mount. The gateway splits /od/sso off to
   // THIS tenant's daemon using the sa_hub cookie set at login — exactly like the
@@ -197,7 +205,7 @@ ${FAVICON_TAG}
 </style></head><body><div class="wrap">${inner}</div></body></html>`;
 }
 
-function loginPage(err, next) {
+function loginPage(err, next, identifier = '') {
   return shell('Sign in', `
     <h1>Sign in</h1>
     <p class="muted">One login for your design studio and CMS.</p>
@@ -205,8 +213,8 @@ function loginPage(err, next) {
     ${next ? '<p class="muted">Your session expired — sign in to pick up where you left off.</p>' : ''}
     <form method="POST" action="/login">
       ${next ? `<input type="hidden" name="next" value="${esc(next)}" />` : ''}
-      <label>Email or account</label>
-      <input name="identifier" autocomplete="username" autofocus required />
+      <label>Email</label>
+      <input name="identifier" autocomplete="username" value="${esc(identifier)}" autofocus required />
       <label>Password</label>
       <input name="password" type="password" autocomplete="current-password" required />
       <button type="submit">Sign in</button>
@@ -227,6 +235,24 @@ function invitePage(token, err) {
     </form>`);
 }
 
+// One email, several projects: the password was right for each, so ask which
+// rather than pick (target architecture, "project chooser").
+function choosePage(token, options, next) {
+  const items = options.map((o) => `
+      <form method="POST" action="/login/choose" style="margin:10px 0 0">
+        <input type="hidden" name="token" value="${esc(token)}" />
+        <input type="hidden" name="uid" value="${esc(o.uid)}" />
+        ${next ? `<input type="hidden" name="next" value="${esc(next)}" />` : ''}
+        <button type="submit" style="margin:0;text-align:left;border-radius:12px;background:#fff;color:var(--text);border:1px solid var(--line)">
+          <strong>${esc(o.project)}</strong><span class="muted"> · ${esc(o.business)} · ${esc(o.role)}</span>
+        </button>
+      </form>`).join('');
+  return shell('Choose a project', `
+    <h1>Choose a project</h1>
+    <p class="muted">Your email opens more than one project. Pick where to work.</p>
+    ${items}`);
+}
+
 // Shown when the operator has turned every product off. A tenant can still sign
 // in (their account is valid), so say plainly why there is nothing here rather
 // than 404ing them into thinking the platform is broken.
@@ -240,8 +266,10 @@ function noProductsPage(tenant) {
     <p class="muted">Your operator has turned off both MMS Design and MMS CMS. Contact them to have one enabled.</p>`);
 }
 
-function hubPage(tenant, products) {
+function hubPage(tenant, products, person) {
   const name = esc(tenant.display_name || tenant.slug);
+  const who = esc(person.display_name || person.email || '');
+  const role = esc(ROLE_LABELS[person.role] || person.role);
   // Only ever offer a card for a product that is actually reachable — the
   // gateway would refuse the click otherwise, which reads as a broken link.
   const designCard = `
@@ -257,7 +285,7 @@ function hubPage(tenant, products) {
   const cards = `${products.design ? designCard : ''}${products.cms ? cmsCard : ''}`;
   return shell(`${name} — Home`, `
     <div class="topbar">
-      <div><h1>Welcome, ${name}</h1><p class="muted">Choose where to work.</p></div>
+      <div><h1>Welcome, ${name}</h1><p class="muted">${who ? `${who} · ` : ''}${role} — choose where to work.</p></div>
       <form method="POST" action="/logout" style="margin:0"><button class="logout" style="background:none;border:0;padding:0;width:auto;margin:0" type="submit">Sign out</button></form>
     </div>
     <!-- The cards link to the hand-off ROUTES, not to a pre-minted token URL.
@@ -268,6 +296,23 @@ function hubPage(tenant, products) {
          token is always seconds old however long the page has been sitting. -->
     <div class="cards">${cards}
     </div>`);
+}
+
+// Start a hub session for `person` and send them on. A deep link into a
+// different project is not theirs to open, so it falls back to that tool's home.
+async function signIn(req, res, person, next) {
+  let target = '/hub';
+  if (next) {
+    const current = await currentPerson(req);
+    const sameProject = !current || current.tenant_slug === person.tenant_slug;
+    target = sameProject ? next : (next.startsWith('/design') ? '/design' : '/hub');
+    // A deep link into a product the operator has turned off goes nowhere, so
+    // fall back to /hub, which resolves to whatever IS available.
+    const products = await readActiveProducts();
+    const wantsDesign = target.startsWith('/design');
+    if ((wantsDesign && !products.design) || (!wantsDesign && !products.cms)) target = '/hub';
+  }
+  redirect(res, target, sessionCookie(person));
 }
 
 // ---- router --------------------------------------------------------------
@@ -288,15 +333,15 @@ export async function handleHub(req, res, method, path) {
   if (ssoRoute && method === 'GET') {
     const tool = ssoRoute[1];
     const next = safeNext(new URL(req.url, 'http://x').searchParams.get('next'));
-    const slug = currentSlug(req);
-    if (!slug) {
+    const person = await currentPerson(req);
+    if (!person) {
       // Come back here after signing in, so the hand-off still happens.
       const back = `/sso/${tool}${next ? `?next=${encodeURIComponent(next)}` : ''}`;
-      redirect(res, `/login?next=${encodeURIComponent(back)}`);
+      redirect(res, `/login?next=${encodeURIComponent(back)}`, clearCookie());
       return true;
     }
-    const tenant = await getTenant(slug);
-    if (!tenant) { redirect(res, '/login'); return true; }
+    const tenant = await getTenant(person.tenant_slug);
+    if (!tenant || tenant.status === 'removed') { redirect(res, '/login', clearCookie()); return true; }
     // A bookmarked /sso/<tool> must not hand off to a product the operator has
     // turned off — without this check it is a straight bypass of the gate.
     const products = await readActiveProducts();
@@ -305,7 +350,7 @@ export async function handleHub(req, res, method, path) {
       return true;
     }
     const target = tool === 'cms' ? 'instatic' : 'od';
-    let url = ssoUrl(tenant, target, products);
+    let url = ssoUrl(tenant, target, products, person, await getBusiness(tenant.business_id));
     if (next) url += `&redirect=${encodeURIComponent(next)}`;
     redirect(res, url);
     return true;
@@ -324,34 +369,41 @@ export async function handleHub(req, res, method, path) {
   if (path === '/login' && method === 'POST') {
     const f = await readForm(req);
     const next = safeNext(f.next);
-    const result = await validateLogin(f.identifier, f.password);
-    if (!result) { html(res, 401, loginPage('Wrong email/account or password.', next)); return true; }
-    // The password was right for more than one site, so the email alone does not
-    // say which. Naming them and asking is the only answer that cannot land
-    // someone on the wrong client's content.
-    if (typeof result !== 'string') {
-      html(res, 401, loginPage(
-        `That email owns more than one site (${result.ambiguous.join(', ')}). ` +
-          `Sign in with the site name instead of the email.`,
-        next,
-      ));
+    const result = resolveLogin(await validateLogin(f.identifier, f.password));
+    if (!result) { html(res, 401, loginPage('Wrong email or password.', next, f.identifier)); return true; }
+    // The password was right for more than one project, so the email alone does
+    // not say which. Asking is the only answer that cannot land someone on the
+    // wrong client's content.
+    if (result.choose) {
+      const options = await Promise.all(result.choose.map(async (p) => {
+        const t = await getTenant(p.tenant_slug);
+        const b = t ? await getBusiness(t.business_id) : null;
+        return {
+          uid: String(p.id),
+          project: t?.display_name || p.tenant_slug,
+          business: b?.name || '',
+          role: ROLE_LABELS[p.role] || p.role,
+        };
+      }));
+      html(res, 200, choosePage(signChooser(result.choose), options, next));
       return true;
     }
-    const slug = result;
-    // Back to where they were. If they signed in as a DIFFERENT tenant the deep
-    // link is not theirs to open, so drop them at that tool's home instead of a
-    // 404: /design/... -> /design, anything else -> /hub.
-    let target = '/hub';
-    if (next) {
-      const sameTenant = currentSlug(req) === null || currentSlug(req) === slug;
-      target = sameTenant ? next : (next.startsWith('/design') ? '/design' : '/hub');
-      // A deep link into a product the operator has turned off goes nowhere, so
-      // fall back to /hub, which resolves to whatever IS available.
-      const products = await readActiveProducts();
-      const wantsDesign = target.startsWith('/design');
-      if ((wantsDesign && !products.design) || (!wantsDesign && !products.cms)) target = '/hub';
+    await signIn(req, res, result, next);
+    return true;
+  }
+
+  // POST /login/choose — the project picked from the chooser.
+  if (path === '/login/choose' && method === 'POST') {
+    const f = await readForm(req);
+    const next = safeNext(f.next);
+    const uids = readChooser(f.token);
+    if (!uids || !uids.includes(String(f.uid))) {
+      html(res, 401, loginPage('That choice expired — sign in again.', next));
+      return true;
     }
-    redirect(res, target, sessionCookie(slug));
+    const person = await findActivePerson(f.uid);
+    if (!person) { html(res, 401, loginPage('That account is no longer active.', next)); return true; }
+    await signIn(req, res, person, next);
     return true;
   }
 
@@ -369,9 +421,9 @@ export async function handleHub(req, res, method, path) {
       const f = await readForm(req);
       if (!f.password || f.password.length < 8) { html(res, 400, invitePage(token, 'Password must be at least 8 characters.')); return true; }
       if (f.password !== f.confirm) { html(res, 400, invitePage(token, 'Passwords do not match.')); return true; }
-      const slug = await acceptInvite(token, f.password);
-      if (!slug) { html(res, 410, invitePage(token, 'This invite is no longer valid.')); return true; }
-      redirect(res, '/hub', sessionCookie(slug));
+      const person = await acceptInvite(token, f.password);
+      if (!person) { html(res, 410, invitePage(token, 'This invite is no longer valid.')); return true; }
+      redirect(res, '/hub', sessionCookie(person));
       return true;
     }
   }
@@ -393,19 +445,20 @@ export async function handleHub(req, res, method, path) {
 
   // GET /hub  (requires session)
   if (path === '/hub' && method === 'GET') {
-    const slug = currentSlug(req);
-    if (!slug) { redirect(res, '/login'); return true; }
-    const tenant = await getTenant(slug);
-    if (!tenant) { redirect(res, '/login', clearCookie()); return true; }
+    const person = await currentPerson(req);
+    if (!person) { redirect(res, '/login', clearCookie()); return true; }
+    const tenant = await getTenant(person.tenant_slug);
+    if (!tenant || tenant.status === 'removed') { redirect(res, '/login', clearCookie()); return true; }
+    const business = await getBusiness(tenant.business_id);
     // Lite = OpenDesign only → straight in. Advanced = two cards.
     const products = await readActiveProducts();
-    if ((tenant.tier || 'advanced') === 'lite') { redirect(res, ssoUrl(tenant, 'od', products)); return true; }
+    if ((tenant.tier || 'advanced') === 'lite') { redirect(res, ssoUrl(tenant, 'od', products, person, business)); return true; }
     // With only one product available there is nothing to choose, so skip the
     // chooser entirely rather than showing a one-card page.
     if (!products.design && !products.cms) { html(res, 200, noProductsPage(tenant)); return true; }
-    if (!products.cms) { redirect(res, ssoUrl(tenant, 'od', products)); return true; }
-    if (!products.design) { redirect(res, ssoUrl(tenant, 'instatic', products)); return true; }
-    html(res, 200, hubPage(tenant, products));
+    if (!products.cms) { redirect(res, ssoUrl(tenant, 'od', products, person, business)); return true; }
+    if (!products.design) { redirect(res, ssoUrl(tenant, 'instatic', products, person, business)); return true; }
+    html(res, 200, hubPage(tenant, products, person));
     return true;
   }
 

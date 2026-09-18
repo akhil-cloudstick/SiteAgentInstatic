@@ -1,7 +1,7 @@
 // Reverse-proxy the single public funnel origin to the right per-tenant backend,
 // so the operator + every tenant's OpenDesign + Instatic all live behind ONE URL.
 //
-//   /operator/*    -> the Astro operator console (open access, no login).
+//   /operator/*    -> the Astro operator console (admin sign-in required; R14).
 //
 //   /design/*      -> the ONE shared OpenDesign web build, path preserved (its
 //                     Next basePath is a fixed `/design`). Daemon-owned paths under
@@ -24,14 +24,14 @@
 import http from 'node:http';
 import config from '../lib/env.mjs';
 import { getTenant } from '../registry/tenants.mjs';
+import { getBusiness } from '../registry/org.mjs';
 import { readActiveProducts } from '../registry/settings.mjs';
-import { verifyValue } from '../lib/crypto.mjs';
+import { currentPersonCached } from '../hub/hubSession.mjs';
 import * as odRuntime from '../runtime/odRuntime.mjs';
 import * as tenantRuntime from '../runtime/tenantRuntime.mjs';
 import { ensureOdUp, ensureTenantUp } from '../provisioner/provision.mjs';
 import { startingPage } from './starting.mjs';
 
-const HUB_COOKIE = 'sa_hub';
 // Fixed, tenant-agnostic mount point for the ONE shared OpenDesign web build.
 // It must match the Next basePath in odRuntime.buildWeb()/startSharedWeb().
 const OD_PREFIX = '/design';
@@ -42,18 +42,13 @@ const OD_PREFIX = '/design';
 // does not need its own origin.
 const CONNECTOR_PREFIX = '/connector-mcp';
 
-// Resolve the tenant slug from the signed hub session cookie (same cookie
-// hub.mjs issues on login). Returns null when there is no valid session.
-function sessionSlug(req) {
-  const raw = req.headers.cookie || '';
-  for (const part of raw.split(';')) {
-    const eq = part.indexOf('=');
-    if (eq < 0) continue;
-    if (part.slice(0, eq).trim() !== HUB_COOKIE) continue;
-    const payload = verifyValue(decodeURIComponent(part.slice(eq + 1).trim()));
-    return payload && payload.kind === 'hub' ? payload.sub : null;
-  }
-  return null;
+// Resolve the project from the signed hub session (the cookie hub.mjs issues),
+// and only while the PERSON behind it is still active and unchanged: removing
+// someone, or changing their role, stops their traffic here within the cache
+// window (hubSession.mjs), not at their cookie's expiry. Null when signed out.
+async function sessionSlug(req) {
+  const person = await currentPersonCached(req);
+  return person ? person.tenant_slug : null;
 }
 
 // ---- Product Hub context hand-off ---------------------------------------
@@ -67,10 +62,8 @@ function sessionSlug(req) {
 // which `apps/web/src/state/hubContext.ts` validates and consumes.
 //
 // The scope is derived from the SIGNED session only, never from the URL: a
-// hand-edited address cannot widen it. The registry is infrastructure-only
-// (slug, ports, tier, owner) and holds no project record, so `project` is sent
-// as null rather than invented — the contract forbids substituting a default,
-// and the header renders the narrower scope cleanly.
+// hand-edited address cannot widen it. `client` is the wire name for the
+// Business, `project` the project's display name.
 // "harbour-suites" -> "Harbour Suites"; "acme_co" -> "Acme Co".
 function titleFromSlug(slug) {
   return String(slug || '')
@@ -80,11 +73,11 @@ function titleFromSlug(slug) {
     .join(' ');
 }
 
-// The signed-in person, from the only identity the registry holds. Initials feed
-// the shared header's account avatar; two letters at most, like the reference.
-function userFromTenant(tenant) {
-  const local = String(tenant?.owner_email || '').split('@')[0];
-  const name = titleFromSlug(local) || titleFromSlug(tenant?.slug) || null;
+// The signed-in person. Initials feed the shared header's account avatar; two
+// letters at most, like the reference.
+function userFromPerson(person, tenant) {
+  const local = String(person?.email || '').split('@')[0];
+  const name = String(person?.display_name || '').trim() || titleFromSlug(local) || titleFromSlug(tenant?.slug) || null;
   if (!name) return null;
   const initials = name
     .split(/\s+/)
@@ -95,8 +88,8 @@ function userFromTenant(tenant) {
   return { name, initials: initials || name.slice(0, 2).toUpperCase() };
 }
 
-async function hubContextFor(tenant) {
-  const client = titleFromSlug(tenant?.slug) || null;
+async function hubContextFor(tenant, person) {
+  const business = tenant?.business_id ? await getBusiness(tenant.business_id) : null;
   const products = await readActiveProducts();
   return {
     // The ORIGIN, not the origin + '/hub'. The shared header appends hub-relative
@@ -106,16 +99,52 @@ async function hubContextFor(tenant) {
     hubBaseUrl: config.gatewayOrigin,
     designActive: products.design,
     cmsActive: products.cms,
-    role: 'operator',
-    user: userFromTenant(tenant),
-    client,
-    // No project record exists in the control-plane registry yet. Absent, not
-    // guessed — MMS Design shows the client scope and its own project chooser.
-    project: null,
+    // The shared header's portfolio role: a business's own people are "client".
+    role: 'client',
+    user: userFromPerson(person, tenant),
+    client: business?.name || titleFromSlug(tenant?.slug) || null,
+    project: tenant?.display_name || tenant?.slug || null,
     site: tenant?.slug || null,
     origin: 'hub',
     returnUrl: `${config.gatewayOrigin}/hub`,
   };
+}
+
+// The console's Astro dev server answers its own asset requests at the ROOT —
+// `/@fs/…` for files outside the app (the shared MMS header's source, its fonts
+// and logo), `/src/…` for the app's own modules, `/@vite/…` for the dev client.
+// Those URLs carry no `/operator` prefix, so through this gateway they would
+// fall to the tenant catch-all and 404: the console renders with no icons and a
+// broken logo. Route them to the console instead — but only when the request
+// came FROM the console (its page, or one of its own modules), so a tenant site
+// that happens to serve `/src/...` is unaffected.
+//
+// A built console needs none of this: everything it serves lives under
+// `/operator/_astro/`.
+// `/@…` belongs to Vite and nothing else, so those route on the path alone.
+// `/src/` and `/node_modules/` are ordinary-looking paths a published tenant
+// site could serve, so they additionally have to come from the console.
+const VITE_ONLY_PREFIXES = ['/@fs/', '/@id/', '/@vite/', '/@react-refresh'];
+const SHARED_SHAPE_PREFIXES = ['/src/', '/node_modules/'];
+const DEV_ASSET_PREFIXES = [...VITE_ONLY_PREFIXES, ...SHARED_SHAPE_PREFIXES];
+
+function fromConsole(referer) {
+  if (!referer) return false;
+  let refPath;
+  try {
+    refPath = new URL(referer).pathname;
+  } catch {
+    return false;
+  }
+  return refPath === '/operator'
+    || refPath.startsWith('/operator/')
+    || DEV_ASSET_PREFIXES.some((p) => refPath.startsWith(p));
+}
+
+function isConsoleDevAsset(req, path) {
+  if (VITE_ONLY_PREFIXES.some((p) => path.startsWith(p))) return true;
+  if (!SHARED_SHAPE_PREFIXES.some((p) => path.startsWith(p))) return false;
+  return fromConsole(req.headers.referer);
 }
 
 // Serialized into a <script> block. Only `<` needs escaping: an unescaped
@@ -343,8 +372,9 @@ async function resolveBackend(req, path) {
       rewritePath: rest === '/' ? '/mcp' : rest.startsWith('?') ? '/mcp' + rest : rest,
     };
   }
-  // Operator console (Astro, served with base=/operator). No auth — open access.
-  if (path === '/operator' || path.startsWith('/operator/')) {
+  // Operator console (Astro, served with base=/operator). The console itself
+  // requires an admin sign-in (ui/src/middleware.ts), and so does every API it calls.
+  if (path === '/operator' || path.startsWith('/operator/') || isConsoleDevAsset(req, path)) {
     return { port: config.operatorConsolePort, kind: 'operator' };
   }
   // Explicit /design/... — ONE shared web build serves every tenant, so the slug
@@ -366,7 +396,7 @@ async function resolveBackend(req, path) {
     if (!(await readActiveProducts()).design) return null;
     const restPath = path.slice(OD_PREFIX.length) || '/';
     if (isDaemonPath(restPath)) {
-      const slug = sessionSlug(req);
+      const slug = await sessionSlug(req);
       // No (or expired) session. For a top-level page load, bounce to /login and
       // come back afterwards — never dead-end on a bare error string. For a
       // sub-resource (fetch/XHR/iframe) a redirect would be useless, so answer
@@ -400,11 +430,11 @@ async function resolveBackend(req, path) {
     if (!web.ready) return startingTarget({ tool: 'design', continueUrl: req.url || path, state: web });
     const target = { port: odRuntime.sharedWebPort(), kind: 'od', prefix: OD_PREFIX, continueUrl: req.url || path };
     if (isDocumentRequest(req)) {
-      const slug = sessionSlug(req);
-      const tenant = slug ? await getTenant(slug) : null;
+      const person = await currentPersonCached(req);
+      const tenant = person ? await getTenant(person.tenant_slug) : null;
       // No session, or a session whose tenant is gone: inject nothing. The app
       // then renders its no-Hub shape rather than a stale or borrowed scope.
-      if (tenant) target.injectHead = hubContextScript(await hubContextFor(tenant));
+      if (tenant) target.injectHead = hubContextScript(await hubContextFor(tenant, person));
     }
     return target;
   }
@@ -416,7 +446,7 @@ async function resolveBackend(req, path) {
   if (isFromOdPage(req) && req.headers['sec-fetch-dest'] !== 'document') {
     if (!(await readActiveProducts()).design) return null;
     if (isDaemonPath(path)) {
-      const slug = sessionSlug(req);
+      const slug = await sessionSlug(req);
       if (slug) {
         const t = await getTenant(slug);
         if (t?.od_port) {
@@ -441,7 +471,7 @@ async function resolveBackend(req, path) {
   // /design gate above — it also covers a bare `/`, which lands here rather
   // than at /hub for a signed-in tenant.
   if (!(await readActiveProducts()).cms) return null;
-  const slug = sessionSlug(req);
+  const slug = await sessionSlug(req);
   if (slug) {
     const t = await getTenant(slug);
     if (t?.port) {
@@ -499,7 +529,7 @@ async function serveReady(req, res) {
     res.end(body);
   };
 
-  const slug = sessionSlug(req);
+  const slug = await sessionSlug(req);
   if (!slug) { json({ ready: false, signedOut: true }); return; }
   const tenant = await getTenant(slug);
   if (!tenant) { json({ ready: false, signedOut: true }); return; }

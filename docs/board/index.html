@@ -49,13 +49,13 @@
   <h1>MMSBUILD delivery board</h1>
   <p class="meta">
     Modules are the phases of <code>docs/prd/mmsbuild-prd.md</code>, tasks are its requirements, subtasks its acceptance criteria — ids unchanged.<br>
-    Generated 2026-09-17 12:03 UTC from commit <code>cafaf26</code>.
+    Generated 2026-09-18 05:29 UTC from commit <code>43ea0e6</code>.
   </p>
   <div class="legend">
     <p><strong>Build</strong> is ours: <span class="chip todo">Not started</span> <span class="chip doing">In progress</span> <span class="chip built">Built</span> <span class="chip blocked">Blocked</span></p>
     <p><strong>Acceptance run</strong> is yours, and we never set it: <span class="chip v-pending">Not yet verified</span> <span class="chip v-pass">Verified</span> <span class="chip v-fail">Failed</span></p>
     <p>Modules are the PRD's phases, tasks are its requirements, subtasks are its acceptance criteria. Ids match the PRD exactly, so an acceptance run maps to this board line for line. `status` is ours — what is built. `verified` belongs to the acceptance run and is never set by us.</p>
-    <p>Totals — tasks: <span class="chip todo">16 not started</span> <span class="chip doing">9 in progress</span> <span class="chip built">6 built</span> &nbsp;·&nbsp; acceptance criteria: <span class="chip todo">32 not started</span> <span class="chip doing">4 in progress</span> <span class="chip built">20 built</span></p>
+    <p>Totals — tasks: <span class="chip todo">11 not started</span> <span class="chip doing">9 in progress</span> <span class="chip built">11 built</span> &nbsp;·&nbsp; acceptance criteria: <span class="chip todo">24 not started</span> <span class="chip doing">4 in progress</span> <span class="chip built">28 built</span></p>
   </div>
   <section class="module">
     <h2><span class="id">P0</span> Phase 0 — Close the surface</h2>
@@ -111,100 +111,100 @@
   <section class="module">
     <h2><span class="id">P1</span> Phase 1 — The levels</h2>
     <p class="summary">Operator and Business above Project, with roles that hold when the interface is bypassed.</p>
-    <p class="counts"><span class="chip todo">4 not started</span></p>
-    <details class="task" >
+    <p class="counts"><span class="chip built">4 built</span></p>
+    <details class="task" open>
       <summary>
         <span class="id">R1</span>
         <span class="task-title">Operator and Business levels above Project</span>
-        <span class="chip todo">Not started</span>
-        <span class="counts"><span class="chip todo">2 not started</span></span>
+        <span class="chip built">Built</span>
+        <span class="counts"><span class="chip built">2 built</span></span>
       </summary>
-      <p class="depends">Depends on R14</p><p class="note">Per-project isolation beneath it is already real and database-enforced; this adds the levels above.</p>
+      <p class="depends">Depends on R14</p><p class="note">Built 2026-09-17: Operators own Businesses, Businesses own projects, and a Business with no Operator sits directly under the platform. Every stored record carries its Operator and Business, stamped by the database, so moving a project or a Business re-addresses everything under it. Console accounts are scoped to the platform, one Operator or one Business; every read and change is limited to that scope, and a project outside it answers &quot;not found&quot;. The chain is listed in the console's Organisation page and by the organisation API. The existing projects each became a Business of their own; the staging copy shares its site's. Project processes now hold only their own signing key and no control-plane credentials, so a project cannot reach another Business through its own server either. Builder smoke test 2026-09-17: an Operator and a Business under it were created in the console. The console was then redesigned to match the MMS-CMS — the shared MMS header, pages in setup order (Organisation → Projects → People → Access), dialogs for every create and change, confirmations for destructive actions, and themed dropdowns. Builder check 2026-09-18: the redesigned console was confirmed working. Two faults found in that check are fixed — a dropdown inside a dialog drew its options behind the dialog, so they were invisible, and the console was being served in development mode, which made every page fetch its source file by file. The console now runs from its build and each page asks the control plane for everything it needs at once: pages that took 1–2 seconds now answer in 15–30 ms.</p>
       <table>
         <thead><tr><th>Acceptance</th><th>Pass means</th><th>Build</th><th>Acceptance run</th></tr></thead>
         <tbody>
         <tr>
           <td class="id">AC-A1.1</td>
           <td>The Operator → Business → Project chain is queryable; each level resolves its children</td>
-          <td><span class="chip todo">Not started</span></td>
+          <td><span class="chip built">Built</span></td>
           <td><span class="chip v-pending">Not yet verified</span></td>
         </tr>
         <tr>
           <td class="id">AC-A1.2</td>
           <td>Cross-Business read and write denied at the server; no foreign data in any listing</td>
-          <td><span class="chip todo">Not started</span></td>
+          <td><span class="chip built">Built</span></td>
           <td><span class="chip v-pending">Not yet verified</span></td>
         </tr>
         </tbody>
       </table>
     </details>
-    <details class="task" >
+    <details class="task" open>
       <summary>
         <span class="id">R3</span>
         <span class="task-title">Roles, and more than one person per project</span>
-        <span class="chip todo">Not started</span>
-        <span class="counts"><span class="chip todo">2 not started</span></span>
+        <span class="chip built">Built</span>
+        <span class="counts"><span class="chip built">2 built</span></span>
       </summary>
-      <p class="depends">Depends on R1</p><p class="note">Adopt the CMS's existing four roles and ~40 capabilities rather than duplicating them.</p>
+      <p class="depends">Depends on R1</p><p class="note">Built 2026-09-17: a project has any number of people, each with one of the CMS's own four roles — Owner, Publisher (the CMS admin role), Author (the CMS client role: edits content, cannot publish) and Viewer. People are invited, re-roled and removed from the console's People page. The CMS enforces the role on every request, so a denial holds for a direct call as well as in the interface. A role change or removal reaches the CMS at once, including for a session that is already open. Live since the 2026-09-17 restart.</p>
       <table>
         <thead><tr><th>Acceptance</th><th>Pass means</th><th>Build</th><th>Acceptance run</th></tr></thead>
         <tbody>
         <tr>
           <td class="id">AC-A3.1</td>
           <td>Publisher-role action allowed; the same action denied to an author role</td>
-          <td><span class="chip todo">Not started</span></td>
+          <td><span class="chip built">Built</span></td>
           <td><span class="chip v-pending">Not yet verified</span></td>
         </tr>
         <tr>
           <td class="id">AC-A3.2</td>
           <td>The denial holds when the interface is bypassed</td>
-          <td><span class="chip todo">Not started</span></td>
+          <td><span class="chip built">Built</span></td>
           <td><span class="chip v-pending">Not yet verified</span></td>
         </tr>
         </tbody>
       </table>
     </details>
-    <details class="task" >
+    <details class="task" open>
       <summary>
         <span class="id">NEW-2</span>
         <span class="task-title">Inviting a second person must not overwrite the first</span>
-        <span class="chip todo">Not started</span>
-        <span class="counts"><span class="chip todo">1 not started</span></span>
+        <span class="chip built">Built</span>
+        <span class="counts"><span class="chip built">1 built</span></span>
       </summary>
-      <p class="depends">Depends on R1</p><p class="note">Concrete blocker under R3: today the invite path overwrites the existing account.</p>
+      <p class="depends">Depends on R1</p><p class="note">Built 2026-09-17: an invite adds an account. Re-inviting someone who already has access is refused instead of locking them out; re-inviting someone still invited only replaces their link. When one email belongs to several projects, sign-in asks which project rather than picking one. Live since the 2026-09-17 restart.</p>
       <table>
         <thead><tr><th>Acceptance</th><th>Pass means</th><th>Build</th><th>Acceptance run</th></tr></thead>
         <tbody>
         <tr>
           <td class="id">NEW-2a</td>
           <td>A second invite adds an account rather than replacing the first</td>
-          <td><span class="chip todo">Not started</span></td>
+          <td><span class="chip built">Built</span></td>
           <td><span class="chip v-pending">Not yet verified</span></td>
         </tr>
         </tbody>
       </table>
     </details>
-    <details class="task" >
+    <details class="task" open>
       <summary>
         <span class="id">NEW-3</span>
         <span class="task-title">A portal sign-in arrives with its own role, not as the owner</span>
-        <span class="chip todo">Not started</span>
-        <span class="counts"><span class="chip todo">2 not started</span></span>
+        <span class="chip built">Built</span>
+        <span class="counts"><span class="chip built">2 built</span></span>
       </summary>
-      <p class="depends">Depends on R3</p><p class="note">The wire format already carries a role field and recognises four role names.</p>
+      <p class="depends">Depends on R3</p><p class="note">Built 2026-09-17: the hub's signed hand-off names the person and their role; the CMS signs them in as their own account with that role, and the design studio records who is working. Step-up is never pre-satisfied: it asks for the person's hub password, checked by the control plane, and an unreachable check fails. Sessions that the old hand-off opened with step-up already satisfied are ended at upgrade. The design studio's Share to CMS now brings the person into the CMS as themselves. Only the agent gateway and the studio's own server-side staging use a machine sign-in, which the hub never issues. Live since the 2026-09-17 daemon rebuild and restart.</p>
       <table>
         <thead><tr><th>Acceptance</th><th>Pass means</th><th>Build</th><th>Acceptance run</th></tr></thead>
         <tbody>
         <tr>
           <td class="id">NEW-3a</td>
           <td>An author role is denied an owner-only action inside the CMS</td>
-          <td><span class="chip todo">Not started</span></td>
+          <td><span class="chip built">Built</span></td>
           <td><span class="chip v-pending">Not yet verified</span></td>
         </tr>
         <tr>
           <td class="id">NEW-3b</td>
           <td>Step-up is demanded, not pre-satisfied</td>
-          <td><span class="chip todo">Not started</span></td>
+          <td><span class="chip built">Built</span></td>
           <td><span class="chip v-pending">Not yet verified</span></td>
         </tr>
         </tbody>
@@ -665,7 +665,7 @@
   <section class="module">
     <h2><span class="id">E</span> Security acceptance — the locked ten</h2>
     <p class="summary">Run by someone other than the builder, on a throwaway or staging project, never on a live site. Five have no control at all today.</p>
-    <p class="counts"><span class="chip todo">7 not started</span> <span class="chip doing">1 in progress</span> <span class="chip built">2 built</span></p>
+    <p class="counts"><span class="chip todo">6 not started</span> <span class="chip doing">1 in progress</span> <span class="chip built">3 built</span></p>
     <details class="task" open>
       <summary>
         <span class="id">E1</span>
@@ -746,21 +746,21 @@
         </tbody>
       </table>
     </details>
-    <details class="task" >
+    <details class="task" open>
       <summary>
         <span class="id">E5</span>
         <span class="task-title">Cross-account access blocked</span>
-        <span class="chip todo">Not started</span>
-        <span class="counts"><span class="chip todo">1 not started</span></span>
+        <span class="chip built">Built</span>
+        <span class="counts"><span class="chip built">1 built</span></span>
       </summary>
-      <p class="depends">Depends on R1</p><p class="note">Covered by AC-A1.2.</p>
+      <p class="depends">Depends on R1</p><p class="note">Covered by AC-A1.2, built 2026-09-17.</p>
       <table>
         <thead><tr><th>Acceptance</th><th>Pass means</th><th>Build</th><th>Acceptance run</th></tr></thead>
         <tbody>
         <tr>
           <td class="id">E5</td>
           <td>Covered by AC-A1.2</td>
-          <td><span class="chip todo">Not started</span></td>
+          <td><span class="chip built">Built</span></td>
           <td><span class="chip v-pending">Not yet verified</span></td>
         </tr>
         </tbody>

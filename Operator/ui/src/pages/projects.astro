@@ -1,0 +1,464 @@
+---
+// Projects — every website in this administrator's reach, one table with
+// search and filters (the approved roster layout). Create and change happen in
+// dialogs; destructive actions ask first.
+import ConsoleLayout from '../components/ConsoleLayout.astro';
+import PageHeader from '../components/PageHeader.astro';
+import Modal from '../components/Modal.astro';
+import ConfirmModal from '../components/ConfirmModal.astro';
+import OnceLinkModal from '../components/OnceLinkModal.astro';
+import RowMenu from '../components/RowMenu.astro';
+import Select from '../components/Select.astro';
+import StatusChip from '../components/StatusChip.astro';
+import EmptyState from '../components/EmptyState.astro';
+import { basePath, cpFetch, cpLoad } from '../lib/cp';
+import { flashLink, takeLink, okJson } from '../lib/org';
+
+const base = basePath();
+const scope = Astro.locals.admin?.scope ?? { level: 'platform' };
+// A Business administrator works inside one Business: nothing to move between.
+const canMove = scope.level !== 'business';
+let error = '';
+
+const json = (body: unknown) => ({
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(body),
+});
+
+if (Astro.request.method === 'POST') {
+  const f = await Astro.request.formData();
+  const intent = String(f.get('intent') || '');
+  const slug = String(f.get('slug') || '');
+  const valid = /^[a-z0-9-]+$/.test(slug);
+  try {
+    if (intent === 'add') {
+      const r = await cpFetch(Astro.cookies, '/api/tenants', json({
+        businessId: f.get('businessId'),
+        name: f.get('name'),
+        ownerEmail: f.get('ownerEmail'),
+        tier: f.get('tier'),
+        cfProject: f.get('cfProject'),
+        customDomain: f.get('customDomain'),
+      }));
+      const j = await okJson(r, 'Could not create the project');
+      // The owner's invite link, shown once (NEW-1).
+      flashLink(Astro.cookies, Astro.request, { kind: 'owner', slug: j.slug, label: `the owner of ${j.slug}`, url: j.inviteUrl });
+    } else if (valid && intent === 'edit') {
+      await okJson(await cpFetch(Astro.cookies, `/api/tenants/${slug}/update`, json({
+        displayName: f.get('displayName'),
+        ownerEmail: f.get('ownerEmail'),
+        tier: f.get('tier'),
+        cfProject: f.get('cfProject'),
+        customDomain: f.get('customDomain'),
+        // An unticked checkbox is absent from the body, so presence IS the value.
+        searchIndexing: f.get('searchIndexing') === 'on',
+      })), 'Could not save the project');
+    } else if (valid && intent === 'move') {
+      await okJson(await cpFetch(Astro.cookies, `/api/tenants/${slug}/move`, json({ businessId: f.get('businessId') })), 'Could not move the project');
+    } else if (valid && intent === 'deploy') {
+      await okJson(await cpFetch(Astro.cookies, `/api/tenants/${slug}/deploy`, { method: 'POST' }), 'Publishing failed');
+    } else if (valid && intent === 'repair') {
+      await okJson(await cpFetch(Astro.cookies, `/api/tenants/${slug}/repair`, { method: 'POST' }), 'Cloudflare setup failed');
+    } else if (valid && intent === 'start') {
+      await okJson(await cpFetch(Astro.cookies, `/api/tenants/${slug}/start`, { method: 'POST' }), 'Could not start the project');
+    } else if (valid && intent === 'remove') {
+      const cf = f.get('deleteCf') ? '?cf=1' : '';
+      await okJson(await cpFetch(Astro.cookies, `/api/tenants/${slug}${cf}`, { method: 'DELETE' }), 'Could not remove the project');
+    }
+    return Astro.redirect(`${base}projects`, 303);
+  } catch (e) {
+    error = (e as Error).message;
+  }
+}
+
+let tenants: any[] = [];
+let businesses: any[] = [];
+try {
+  // Both listings at once: the table and the Business filter don't wait on
+  // each other.
+  const [list, biz] = await Promise.all([
+    cpLoad(Astro.cookies, '/api/tenants'),
+    cpLoad(Astro.cookies, '/api/businesses'),
+  ]);
+  if (list.ok) tenants = list.body.tenants || [];
+  else error = error || list.body.error || `Could not list projects (${list.status})`;
+  if (biz.ok) businesses = biz.body.businesses || [];
+} catch (e) {
+  error = error || `The control plane is not reachable. Is it running? (${(e as Error).message})`;
+}
+
+const businessLabel = (b: any) => (b.operator_name ? `${b.name} · ${b.operator_name}` : `${b.name} · direct`);
+const businessOptions = businesses.map((b) => ({ value: String(b.id), label: businessLabel(b) }));
+const tierOptions = [
+  { value: 'advanced', label: 'Advanced', hint: 'MMS-Design and MMS-CMS' },
+  { value: 'lite', label: 'Lite', hint: 'MMS-Design only' },
+];
+const statusOptions = [
+  { value: 'running', label: 'Running' },
+  { value: 'stopped', label: 'Stopped' },
+  { value: 'provisioning', label: 'Setting up' },
+  { value: 'failed', label: 'Failed' },
+];
+
+// The address a person uses to sign in, as the browser sees this console.
+const fwdHost = Astro.request.headers.get('x-forwarded-host');
+const publicOrigin = fwdHost ? `https://${fwdHost}` : Astro.url.origin;
+const hubSignIn = `${publicOrigin}/login`;
+
+const stateOf = (t: any) =>
+  t.status === 'failed' ? 'failed'
+    : t.status === 'provisioning' ? 'provisioning'
+      : t.running ? 'running' : 'stopped';
+const liveUrl = (t: any) => (t.custom_domain ? `https://${t.custom_domain}` : t.pages_url || '');
+const fmtDate = (s: string | null) => (s ? new Date(s).toLocaleString() : '—');
+
+// Provisioning progress (the page reloads until it settles).
+const PROGRESS: Record<string, [string, number]> = {
+  new: ['Starting…', 12],
+  db_ready: ['Database ready…', 40],
+  up: ['Site booting…', 72],
+  seeded: ['Setting up Cloudflare…', 92],
+};
+const prov = tenants.find((t) => t.status === 'provisioning') || null;
+const link = takeLink(Astro.cookies, !!prov);
+
+// Deep link from Organisation: /projects?new=1&business=<id>
+const wantNew = Astro.url.searchParams.get('new') === '1' && !error;
+const presetBusiness = Astro.url.searchParams.get('business') || (businesses.length === 1 ? String(businesses[0].id) : null);
+---
+<ConsoleLayout title="Projects" active="projects">
+  <PageHeader title="Projects" eyebrow="Websites">
+    Every website in your reach. Each project belongs to a business and has its own people, CMS and design studio.
+    <Fragment slot="actions">
+      <button type="button" class="mms-btn mms-btn--primary" data-open-modal="new-project" disabled={businesses.length === 0}>
+        <i class="fa-solid fa-plus" aria-hidden="true"></i> New project
+      </button>
+    </Fragment>
+  </PageHeader>
+
+  {error && <div class="mms-alert mms-alert--err" role="alert" style="margin-bottom:16px"><i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i><span>{error}</span></div>}
+  {businesses.length === 0 && !error && (
+    <div class="mms-alert mms-alert--info" style="margin-bottom:16px">
+      <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
+      <span>A project belongs to a business. <a class="mms-link" href={`${base}org`}>Create a business</a> first.</span>
+    </div>
+  )}
+
+  <div class="mms-toolbar" data-filter-for="projects-table">
+    <label class="mms-search">
+      <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+      <span class="mms-sr-only">Search projects</span>
+      <input type="search" placeholder="Search by name or address" data-filter="search" />
+    </label>
+    {businesses.length > 1 && (
+      <Select name="businessFilter" ariaLabel="Filter by business" placeholder="All businesses"
+        options={[{ value: '', label: 'All businesses' }, ...businessOptions]} attrs={{ 'data-filter': 'business' }} />
+    )}
+    <Select name="statusFilter" ariaLabel="Filter by status" placeholder="All statuses"
+      options={[{ value: '', label: 'All statuses' }, ...statusOptions]} attrs={{ 'data-filter': 'status' }} />
+    <span class="mms-toolbar__count" data-filter-count></span>
+  </div>
+  <div class="mms-table-card">
+    {tenants.length === 0 ? (
+      <EmptyState icon="globe" title="No projects yet">
+        Create a project to provision its website, CMS and design studio.
+      </EmptyState>
+    ) : (
+      <table class="mms-table" id="projects-table">
+        <thead>
+          <tr><th>Project</th><th>Business</th><th>Status</th><th>People</th><th>Live site</th><th class="mms-right">Actions</th></tr>
+        </thead>
+        <tbody>
+          {tenants.map((t) => {
+            const state = stateOf(t);
+            const name = t.display_name || t.slug;
+            const url = liveUrl(t);
+            return (
+              <tr data-row data-search={`${name} ${t.slug} ${t.business_name ?? ''} ${t.custom_domain ?? ''}`} data-business={String(t.business_id ?? '')} data-status={state}>
+                <td>
+                  <div class="mms-cell-main">
+                    <strong>{name}</strong>
+                    <small>
+                      <span class="mms-mono">{t.slug}</span>
+                      {' · '}
+                      <StatusChip small tone={t.tier === 'lite' ? 'warning' : 'blue'}>{t.tier === 'lite' ? 'Lite' : 'Advanced'}</StatusChip>
+                    </small>
+                  </div>
+                </td>
+                <td>
+                  <div class="mms-cell-main">
+                    <strong style="font-size:13px">{t.business_name || '—'}</strong>
+                    <small>{t.operator_name || 'Direct'}</small>
+                  </div>
+                </td>
+                <td>
+                  {state === 'running' && <StatusChip tone="success" dot>Running</StatusChip>}
+                  {state === 'stopped' && <StatusChip tone="warning" dot>Stopped</StatusChip>}
+                  {state === 'provisioning' && <StatusChip tone="blue" dot>Setting up</StatusChip>}
+                  {state === 'failed' && <StatusChip tone="danger" dot title={t.last_error || ''}>Failed</StatusChip>}
+                  {!t.hub_activated && state !== 'failed' && (
+                    <div class="mms-hint" style="margin-top:4px">{t.invite_pending ? 'Owner invite pending' : 'Owner not signed up'}</div>
+                  )}
+                </td>
+                <td>
+                  <a class="mms-link" href={`${base}people?project=${t.slug}`}>
+                    {Number(t.people_count) || 0} {Number(t.people_count) === 1 ? 'person' : 'people'}
+                  </a>
+                  {Number(t.people_pending) > 0 && <div class="mms-hint">{t.people_pending} invited</div>}
+                </td>
+                <td>
+                  {url ? (
+                    <a class="mms-link" href={url} target="_blank" rel="noreferrer">{url.replace(/^https?:\/\//, '')} <i class="fa-solid fa-arrow-up-right-from-square" style="font-size:10px" aria-hidden="true"></i></a>
+                  ) : <span class="mms-muted">Not published</span>}
+                  <div class="mms-hint">
+                    {!t.last_deploy_at && url ? 'Placeholder · ' : ''}
+                    {t.search_indexing === true ? 'Indexable' : (t.custom_domain ? 'Hidden from search — turn on before deploying' : 'Hidden from search')}
+                  </div>
+                </td>
+                <td>
+                  <div class="mms-cell-actions">
+                    {state === 'running' && (
+                      <a class="mms-btn mms-btn--secondary mms-btn--sm" href="/login" target="_blank" rel="noreferrer">Open</a>
+                    )}
+                    <RowMenu label={`Actions for ${name}`}>
+                      <button type="button" class="mms-menu__item" role="menuitem" data-open-modal={`details-${t.slug}`}>
+                        <i class="fa-solid fa-circle-info" aria-hidden="true"></i> Details
+                      </button>
+                      <button type="button" class="mms-menu__item" role="menuitem" data-open-modal="edit-project"
+                        data-fill-title={`Edit ${name}`}
+                        data-prefill-slug={t.slug}
+                        data-prefill-displayName={t.display_name || ''}
+                        data-prefill-ownerEmail={t.owner_email || ''}
+                        data-prefill-tier={t.tier === 'lite' ? 'lite' : 'advanced'}
+                        data-prefill-cfProject={t.cf_project || ''}
+                        data-prefill-customDomain={t.custom_domain || ''}
+                        data-prefill-searchIndexing={t.search_indexing === true ? 'true' : 'false'}>
+                        <i class="fa-solid fa-pen" aria-hidden="true"></i> Edit
+                      </button>
+                      <a class="mms-menu__item" role="menuitem" href={`${base}people?project=${t.slug}`}>
+                        <i class="fa-solid fa-users" aria-hidden="true"></i> People
+                      </a>
+                      {canMove && businesses.length > 1 && (
+                        <button type="button" class="mms-menu__item" role="menuitem" data-open-modal="move-project"
+                          data-fill-project={name} data-prefill-slug={t.slug} data-prefill-businessId={String(t.business_id)}>
+                          <i class="fa-solid fa-arrow-right-arrow-left" aria-hidden="true"></i> Move to business
+                        </button>
+                      )}
+                      <button type="button" class="mms-menu__item" role="menuitem" data-copy={hubSignIn}>
+                        <i class="fa-solid fa-link" aria-hidden="true"></i> <span class="mms-copy-label">Copy sign-in link</span>
+                      </button>
+                      <div class="mms-menu__sep"></div>
+                      {state === 'stopped' && (
+                        <form method="POST" data-busy={`Starting ${name}`}>
+                          <input type="hidden" name="intent" value="start" />
+                          <input type="hidden" name="slug" value={t.slug} />
+                          <button type="submit" class="mms-menu__item" role="menuitem"><i class="fa-solid fa-play" aria-hidden="true"></i> Start</button>
+                        </form>
+                      )}
+                      {t.published ? (
+                        <form method="POST" data-busy="Publishing to Cloudflare">
+                          <input type="hidden" name="intent" value="deploy" />
+                          <input type="hidden" name="slug" value={t.slug} />
+                          <button type="submit" class="mms-menu__item" role="menuitem">
+                            <i class="fa-solid fa-cloud-arrow-up" aria-hidden="true"></i> {t.last_deploy_at ? 'Re-deploy' : 'Publish to Cloudflare'}
+                          </button>
+                        </form>
+                      ) : (
+                        <button type="button" class="mms-menu__item" role="menuitem" disabled title="Publish the site from its MMS-CMS first">
+                          <i class="fa-solid fa-cloud-arrow-up" aria-hidden="true"></i> Re-deploy
+                        </button>
+                      )}
+                      <form method="POST" data-busy="Retrying Cloudflare setup">
+                        <input type="hidden" name="intent" value="repair" />
+                        <input type="hidden" name="slug" value={t.slug} />
+                        <button type="submit" class="mms-menu__item" role="menuitem" title="Re-run Cloudflare setup, e.g. after fixing the API token">
+                          <i class="fa-solid fa-rotate" aria-hidden="true"></i> Retry Cloudflare
+                        </button>
+                      </form>
+                      <div class="mms-menu__sep"></div>
+                      <button type="button" class="mms-menu__item mms-menu__item--danger" role="menuitem" data-open-modal="remove-project"
+                        data-prefill-slug={t.slug}
+                        data-fill-message={`Remove ${name}? Its content, files and site are deleted permanently.`}>
+                        <i class="fa-solid fa-trash-can" aria-hidden="true"></i> Remove
+                      </button>
+                    </RowMenu>
+                  </div>
+
+                  <Modal id={`details-${t.slug}`} title={name} eyebrow="Project details" size="lg">
+                    <dl class="mms-kv">
+                      <dt>Address (fixed)</dt><dd class="mms-mono">{t.slug}</dd>
+                      <dt>Business</dt><dd>{t.business_name || '—'}{t.operator_name ? ` · ${t.operator_name}` : ' · direct'}</dd>
+                      <dt>Owner email</dt><dd>{t.owner_email || '—'}</dd>
+                      <dt>Status</dt><dd>{state === 'running' ? 'Running' : state === 'stopped' ? 'Stopped' : state === 'provisioning' ? 'Setting up' : 'Failed'}</dd>
+                      <dt>CMS (internal)</dt>
+                      <dd>{t.running && t.admin_url ? (
+                        <span class="mms-row"><span class="mms-mono">{t.admin_url}</span><button type="button" class="mms-iconbtn" data-copy={t.admin_url} aria-label="Copy CMS address"><i class="fa-solid fa-copy" aria-hidden="true"></i></button></span>
+                      ) : <span class="mms-muted">Not running</span>}</dd>
+                      <dt>Cloudflare project</dt><dd class="mms-mono">{t.cf_project || '—'}</dd>
+                      <dt>Cloudflare address</dt><dd>{t.pages_url ? <a class="mms-link" href={t.pages_url} target="_blank" rel="noreferrer">{t.pages_url}</a> : <span class="mms-muted">Created on first publish</span>}</dd>
+                      <dt>Custom domain</dt><dd>{t.custom_domain ? <a class="mms-link" href={`https://${t.custom_domain}`} target="_blank" rel="noreferrer">{t.custom_domain}</a> : <span class="mms-muted">None</span>}</dd>
+                      <dt>Search indexing</dt>
+                      <dd>{t.search_indexing === true
+                        ? 'Allowed — robots.txt permits crawling'
+                        : `Blocked — every deploy ships Disallow: / and X-Robots-Tag: noindex${t.custom_domain ? '; deploying to the custom domain is refused while this is off' : ''}`}</dd>
+                      <dt>Published</dt><dd>{t.last_deploy_at ? `Yes · ${fmtDate(t.last_deploy_at)}${t.last_deploy_status ? ` (${t.last_deploy_status})` : ''}` : 'Placeholder only — not published yet'}</dd>
+                      <dt>Internal port</dt><dd class="mms-mono">{t.port ?? '—'}</dd>
+                      <dt>Created</dt><dd>{fmtDate(t.created_at)}</dd>
+                      {t.last_error && <><dt>Last error</dt><dd style="color:var(--mms-danger)">{t.last_error}</dd></>}
+                    </dl>
+                    <Fragment slot="footer">
+                      <button type="button" class="mms-btn mms-btn--primary" data-close-modal>Close</button>
+                    </Fragment>
+                  </Modal>
+                </td>
+              </tr>
+            );
+          })}
+          <tr class="mms-no-results" hidden><td colspan="6">No projects match these filters.</td></tr>
+        </tbody>
+      </table>
+    )}
+  </div>
+
+  <!-- New project: the Business comes first — a project always belongs to one. -->
+  <Modal id="new-project" title="New project" eyebrow="Projects" size="lg" intent="add" busy="Creating project" openOnLoad={wantNew}>
+    <div class="mms-form">
+      <div class="mms-field">
+        <label class="mms-label" for="np-business">Business</label>
+        <Select id="np-business" name="businessId" required placeholder="Choose a business" options={businessOptions} value={presetBusiness} />
+      </div>
+      <div class="mms-grid2">
+        <div class="mms-field">
+          <label class="mms-label" for="np-name">Project name</label>
+          <input id="np-name" class="mms-input" name="name" required placeholder="Acme Co" autocomplete="off" />
+          <p class="mms-hint">Its address is made from the name and can't change later.</p>
+        </div>
+        <div class="mms-field">
+          <label class="mms-label" for="np-owner">Owner email <small>(optional)</small></label>
+          <input id="np-owner" class="mms-input" name="ownerEmail" type="email" placeholder="owner@acme.com" />
+          <p class="mms-hint">You get the owner's one-time invite link next.</p>
+        </div>
+      </div>
+      <div class="mms-field">
+        <label class="mms-label" for="np-tier">Plan</label>
+        <Select id="np-tier" name="tier" options={tierOptions} value="advanced" />
+      </div>
+      <details class="mms-advanced">
+        <summary>Advanced — Cloudflare</summary>
+        <div class="mms-form">
+          <div class="mms-grid2">
+            <div class="mms-field">
+              <label class="mms-label" for="np-cf">Cloudflare project name</label>
+              <input id="np-cf" class="mms-input" name="cfProject" placeholder="siteagent-acme" />
+              <p class="mms-hint">Leave blank for siteagent-&lt;address&gt;.</p>
+            </div>
+            <div class="mms-field">
+              <label class="mms-label" for="np-domain">Custom domain</label>
+              <input id="np-domain" class="mms-input" name="customDomain" placeholder="acme.example.com" />
+              <p class="mms-hint">Attached automatically when its zone is in your Cloudflare account.</p>
+            </div>
+          </div>
+        </div>
+      </details>
+      <p class="mms-hint">Setting up takes about a minute and runs in the background. The site starts with a “Coming soon” page.</p>
+    </div>
+    <Fragment slot="footer">
+      <button type="button" class="mms-btn mms-btn--secondary" data-close-modal>Cancel</button>
+      <button type="submit" class="mms-btn mms-btn--primary">Create project</button>
+    </Fragment>
+  </Modal>
+
+  <Modal id="edit-project" title="Edit project" eyebrow="Projects" size="lg" intent="edit" busy="Saving changes">
+    <input type="hidden" name="slug" />
+    <div class="mms-form">
+      <div class="mms-grid2">
+        <div class="mms-field">
+          <label class="mms-label" for="ep-name">Display name</label>
+          <input id="ep-name" class="mms-input" name="displayName" placeholder="Acme Co" />
+        </div>
+        <div class="mms-field">
+          <label class="mms-label" for="ep-owner">Owner email</label>
+          <input id="ep-owner" class="mms-input" name="ownerEmail" type="email" placeholder="owner@acme.com" />
+        </div>
+      </div>
+      <div class="mms-field">
+        <label class="mms-label" for="ep-tier">Plan</label>
+        <Select id="ep-tier" name="tier" options={tierOptions} value="advanced" />
+        <p class="mms-hint">Moving from Lite to Advanced adds the MMS-CMS to the project.</p>
+      </div>
+      <label class="mms-switch">
+        <input type="checkbox" name="searchIndexing" />
+        <span>Allow search engines to index this site</span>
+      </label>
+      <p class="mms-hint" style="margin-top:-8px">Off by default: every deploy then ships robots.txt Disallow and a noindex header — right for staging, wrong for a live site. Deploying a custom domain with this off is refused.</p>
+      <details class="mms-advanced">
+        <summary>Advanced — Cloudflare</summary>
+        <div class="mms-form">
+          <div class="mms-grid2">
+            <div class="mms-field">
+              <label class="mms-label" for="ep-cf">Cloudflare project name</label>
+              <input id="ep-cf" class="mms-input" name="cfProject" placeholder="siteagent-acme" />
+              <p class="mms-hint">Affects future deploys only.</p>
+            </div>
+            <div class="mms-field">
+              <label class="mms-label" for="ep-domain">Custom domain</label>
+              <input id="ep-domain" class="mms-input" name="customDomain" placeholder="acme.example.com" />
+            </div>
+          </div>
+        </div>
+      </details>
+    </div>
+    <Fragment slot="footer">
+      <button type="button" class="mms-btn mms-btn--secondary" data-close-modal>Cancel</button>
+      <button type="submit" class="mms-btn mms-btn--primary">Save changes</button>
+    </Fragment>
+  </Modal>
+
+  {canMove && businesses.length > 1 && (
+    <Modal id="move-project" title="Move project" eyebrow="Projects" intent="move" busy="Moving project">
+      <input type="hidden" name="slug" />
+      <div class="mms-form">
+        <p style="margin:0">Move <strong data-fill="project">this project</strong> to another business.</p>
+        <div class="mms-field">
+          <label class="mms-label" for="mp-business">Business</label>
+          <Select id="mp-business" name="businessId" required options={businessOptions} />
+        </div>
+        <p class="mms-hint">Its people and agent keys move with it. Administrators of the old business lose access to it.</p>
+      </div>
+      <Fragment slot="footer">
+        <button type="button" class="mms-btn mms-btn--secondary" data-close-modal>Cancel</button>
+        <button type="submit" class="mms-btn mms-btn--primary">Move project</button>
+      </Fragment>
+    </Modal>
+  )}
+
+  <ConfirmModal id="remove-project" title="Remove project" intent="remove" confirmLabel="Remove project" fields={['slug']} busy="Removing project">
+    <Fragment slot="message">Remove this project? Its content, files and site are deleted permanently.</Fragment>
+    <label class="mms-check">
+      <input type="checkbox" name="deleteCf" />
+      <span>Also delete the Cloudflare site<small>Otherwise the published site stays online.</small></span>
+    </label>
+  </ConfirmModal>
+
+  {prov && (
+    <Modal id="provisioning" title={`Setting up ${prov.display_name || prov.slug}`} eyebrow="Please wait" locked openOnLoad size="lg">
+      <div class="mms-form">
+        <p class="mms-hint" style="margin:0">This runs in the background and usually takes under a minute.</p>
+        <div class="mms-bar"><span style={`width:${(PROGRESS[prov.provision_state] ?? ['', 8])[1]}%`}></span></div>
+        <p style="margin:0;font-weight:650"><span class="mms-spinner" style="vertical-align:-3px;margin-right:8px"></span>{(PROGRESS[prov.provision_state] ?? ['Working…'])[0]}</p>
+        {link && link.slug === prov.slug && (
+          <div class="mms-form">
+            <p style="margin:0"><strong>Owner invite link — shown once.</strong> Copy it now.</p>
+            <div class="mms-copyrow">
+              <code class="mms-code" id="prov-link">{link.url}</code>
+              <button type="button" class="mms-btn mms-btn--secondary" data-copy-target="prov-link"><i class="fa-solid fa-copy" aria-hidden="true"></i> <span class="mms-copy-label">Copy</span></button>
+            </div>
+          </div>
+        )}
+      </div>
+    </Modal>
+    <script is:inline>setTimeout(() => location.reload(), 2500);</script>
+  )}
+  {!prov && <OnceLinkModal link={link} />}
+</ConsoleLayout>

@@ -1,0 +1,14 @@
+---
+// A status chip in the approved roster style. `tone` picks the tint.
+interface Props {
+  tone?: 'success' | 'danger' | 'warning' | 'blue' | 'violet' | 'neutral';
+  small?: boolean;
+  dot?: boolean;
+  title?: string;
+}
+const { tone = 'neutral', small = false, dot = false, title } = Astro.props;
+---
+<span class:list={['mms-chip', tone !== 'neutral' && `mms-chip--${tone}`, small && 'mms-chip--sm']} title={title}>
+  {dot && <span class="mms-dot" aria-hidden="true"></span>}
+  <slot />
+</span>

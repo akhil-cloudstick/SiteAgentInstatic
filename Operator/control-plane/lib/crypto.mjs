@@ -42,6 +42,39 @@ export function verifyTenantToken(token) {
   return slug;
 }
 
+// --- Per-project signing key (Phase 1) -------------------------------------
+// A project's CMS and Design processes verify the hand-offs we send them, so
+// they need a key — but never the master `tokenSecret`, which also signs every
+// hub and admin session. Each project gets a key derived from the master and
+// its own slug: a project process can mint tokens only for itself, and a
+// token minted for project A fails on project B.
+export function tenantKey(slug) {
+  if (typeof slug !== 'string' || !slug) throw new Error('tenantKey needs a project slug');
+  return createHmac('sha256', config.tokenSecret).update(`tenant-sso:${slug}`).digest('hex');
+}
+
+/** Same wire format as signValue, keyed to one project. */
+export function signForTenant(slug, payload, ttlSec = 120) {
+  const body = JSON.stringify({ ...payload, sub: slug, exp: Date.now() + ttlSec * 1000 });
+  const b64 = Buffer.from(body, 'utf8').toString('base64url');
+  const mac = createHmac('sha256', tenantKey(slug)).update(b64).digest('base64url');
+  return `${b64}.${mac}`;
+}
+
+/** The payload, when `token` was signed for this project and is unexpired. */
+export function verifyForTenant(slug, token) {
+  if (typeof token !== 'string' || !token.includes('.')) return null;
+  const idx = token.lastIndexOf('.');
+  const b64 = token.slice(0, idx);
+  const a = Buffer.from(token.slice(idx + 1));
+  const b = Buffer.from(createHmac('sha256', tenantKey(slug)).update(b64).digest('base64url'));
+  if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
+  let payload;
+  try { payload = JSON.parse(Buffer.from(b64, 'base64url').toString('utf8')); } catch { return null; }
+  if (!payload || payload.sub !== slug || typeof payload.exp !== 'number' || Date.now() > payload.exp) return null;
+  return payload;
+}
+
 export const genPassword = (n = 18) => randomBytes(n).toString('base64url');
 export const genSecretKeyHex = () => randomBytes(32).toString('hex');
 

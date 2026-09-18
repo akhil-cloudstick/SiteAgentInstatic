@@ -1288,4 +1288,18 @@ export const sqliteMigrations: Migration[] = [
        where trim(lower(display_name)) = trim(lower(email));
     `,
   },
+  {
+    // MMS Phase 1 (NEW-3) — see the Postgres twin for the full rationale.
+    // SQLite has no ADD COLUMN IF NOT EXISTS; the runner applies each id once.
+    id: '029_hub_identity',
+    sql: `
+      alter table users add column auth_source text not null default 'local';
+      alter table sessions add column hub_person_id text;
+      update sessions
+         set revoked_at = current_timestamp
+       where revoked_at is null
+         and step_up_expires_at is not null
+         and step_up_expires_at = expires_at;
+    `,
+  },
 ]

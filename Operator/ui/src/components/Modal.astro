@@ -1,0 +1,57 @@
+---
+// A dialog in the MMS-CMS look: raised header with eyebrow + title + close,
+// a scrolling body, a right-aligned footer. Opened by any element carrying
+// `data-open-modal="<id>"` (see scripts/console.ts), closed by the close
+// button, the backdrop or Escape — except `locked` dialogs (progress), which
+// stay open until the page moves on.
+//
+// With `intent`, the body and footer are wrapped in a POST form carrying that
+// intent, so a create/edit dialog is one form.
+interface Props {
+  id: string;
+  title: string;
+  eyebrow?: string;
+  size?: 'sm' | 'md' | 'lg' | 'xl';
+  locked?: boolean;
+  /** Open as soon as the page loads (deep links, results shown once). */
+  openOnLoad?: boolean;
+  intent?: string;
+  /** Label for the busy overlay while the form submits. */
+  busy?: string;
+  /** Page-relative form action; defaults to the current page. */
+  action?: string;
+}
+const { id, title, eyebrow, size = 'md', locked = false, openOnLoad = false, intent, busy, action } = Astro.props;
+const hasFooter = Astro.slots.has('footer');
+---
+<dialog
+  id={id}
+  class:list={['mms-modal', size !== 'md' && `mms-modal--${size}`]}
+  aria-labelledby={`${id}-title`}
+  data-locked={locked ? '' : undefined}
+  data-open-on-load={openOnLoad ? '' : undefined}
+>
+  <div class="mms-modal__head">
+    <div>
+      {eyebrow && <p class="mms-eyebrow">{eyebrow}</p>}
+      <h2 id={`${id}-title`} data-fill="title">{title}</h2>
+    </div>
+    {!locked && (
+      <button type="button" class="mms-iconbtn" data-close-modal aria-label="Close">
+        <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+      </button>
+    )}
+  </div>
+  {intent ? (
+    <form method="POST" class="mms-modal__form" data-busy={busy} action={action}>
+      <input type="hidden" name="intent" value={intent} />
+      <div class="mms-modal__body"><slot /></div>
+      {hasFooter && <div class="mms-modal__foot"><slot name="footer" /></div>}
+    </form>
+  ) : (
+    <>
+      <div class="mms-modal__body"><slot /></div>
+      {hasFooter && <div class="mms-modal__foot"><slot name="footer" /></div>}
+    </>
+  )}
+</dialog>

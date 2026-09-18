@@ -1,0 +1,28 @@
+---
+// The page heading: optional breadcrumb, eyebrow, title and lede on the left;
+// the page's primary actions on the right.
+interface Props {
+  title: string;
+  eyebrow?: string;
+  crumbs?: Array<{ label: string; href?: string }>;
+}
+const { title, eyebrow, crumbs = [] } = Astro.props;
+---
+<header class="mms-page-head">
+  <div>
+    {crumbs.length > 0 && (
+      <nav class="mms-crumbs" aria-label="Breadcrumb">
+        {crumbs.map((c, i) => (
+          <>
+            {i > 0 && <i class="fa-solid fa-chevron-right" style="font-size:9px" aria-hidden="true"></i>}
+            {c.href ? <a href={c.href}>{c.label}</a> : <span>{c.label}</span>}
+          </>
+        ))}
+      </nav>
+    )}
+    {eyebrow && <p class="mms-eyebrow">{eyebrow}</p>}
+    <h1>{title}</h1>
+    {Astro.slots.has('default') && <p class="mms-lede"><slot /></p>}
+  </div>
+  {Astro.slots.has('actions') && <div class="mms-page-actions"><slot name="actions" /></div>}
+</header>

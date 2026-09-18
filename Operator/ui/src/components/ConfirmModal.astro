@@ -1,0 +1,30 @@
+---
+// A confirmation for anything destructive or irreversible — replaces native
+// confirm(). The trigger fills the hidden fields and the message through
+// `data-prefill-<name>` (see scripts/console.ts); the default slot can add
+// extra choices (e.g. "also delete the Cloudflare site").
+import Modal from './Modal.astro';
+
+interface Props {
+  id: string;
+  title: string;
+  intent: string;
+  confirmLabel: string;
+  /** Hidden inputs the trigger fills, e.g. ['slug'] or ['personId']. */
+  fields?: string[];
+  tone?: 'danger' | 'primary';
+  busy?: string;
+}
+const { id, title, intent, confirmLabel, fields = [], tone = 'danger', busy } = Astro.props;
+---
+<Modal id={id} title={title} eyebrow="Please confirm" size="sm" intent={intent} busy={busy}>
+  {fields.map((name) => <input type="hidden" name={name} />)}
+  <div class="mms-form">
+    <p style="margin:0" data-fill="message"><slot name="message" /></p>
+    <slot />
+  </div>
+  <Fragment slot="footer">
+    <button type="button" class="mms-btn mms-btn--secondary" data-close-modal>Cancel</button>
+    <button type="submit" class:list={['mms-btn', tone === 'danger' ? 'mms-btn--danger' : 'mms-btn--primary']}>{confirmLabel}</button>
+  </Fragment>
+</Modal>

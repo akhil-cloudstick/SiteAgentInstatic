@@ -3,6 +3,7 @@ import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { allowedSlugs, tenantAllowed, ALLOWLIST_FILE } from './control-plane/lib/connectorAllowlist.mjs';
 import { dirname, resolve } from 'node:path';
+import { existsSync, readdirSync, statSync } from 'node:fs';
 import * as tenantsRepo from './control-plane/registry/tenants.mjs';
 import { decrypt } from './control-plane/lib/crypto.mjs';
 
@@ -40,7 +41,7 @@ const allowed = () => allowedSlugs({ onWarn: (m) => console.log(`${DIM}connector
  */
 async function buildTargets() {
   const targets = {};
-  const rows = await tenantsRepo.listTenants();
+  const rows = await tenantsRepo.listAllTenants();
   const allow = allowed();
   for (const t of rows) {
     // FAIL CLOSED. An unlisted tenant is not reachable, and an EMPTY list means
@@ -94,7 +95,7 @@ async function buildTargets() {
  * the box.
  */
 async function underivableTenants() {
-  const rows = await tenantsRepo.listTenants();
+  const rows = await tenantsRepo.listAllTenants();
   const allow = allowed();
   return rows
     .filter((t) => tenantAllowed(t, allow))
@@ -151,9 +152,60 @@ if (!connectorReady) {
   );
 }
 
+// The console runs from its build, not from Astro's dev server. In dev mode the
+// browser downloads every module as its own file, which over the funnel — and
+// off this network drive — cost seconds per page; the build serves two bundled
+// files instead. Set CONSOLE_DEV=1 for hot reloading while editing the console
+// (rebuild afterwards with `npm run console:build`).
+const consoleEntry = resolve(HERE, 'ui', 'dist', 'server', 'entry.mjs');
+const consoleBuilt = existsSync(consoleEntry);
+const consoleDev = process.env.CONSOLE_DEV === '1' || !consoleBuilt;
+
+/** Newest change under a console source folder, so a stale build is announced. */
+function newestChange(dir) {
+  let newest = 0;
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const full = resolve(dir, entry.name);
+    newest = Math.max(newest, entry.isDirectory() ? newestChange(full) : statSync(full).mtimeMs);
+  }
+  return newest;
+}
+if (consoleBuilt && !consoleDev) {
+  try {
+    const sources = ['ui/src', 'ui/public'].filter((d) => existsSync(resolve(HERE, d)));
+    const newest = Math.max(
+      ...sources.map((d) => newestChange(resolve(HERE, d))),
+      statSync(resolve(HERE, 'ui', 'astro.config.mjs')).mtimeMs,
+    );
+    if (newest > statSync(consoleEntry).mtimeMs) {
+      console.log(
+        `${YELLOW}console: the build is older than the console's source — you are about to serve the previous version.\n` +
+          `         Rebuild with: npm run console:build   (from ${HERE})${RESET}`,
+      );
+    }
+  } catch {
+    /* the staleness hint is a convenience, never a reason not to start */
+  }
+}
+if (consoleDev && !consoleBuilt) {
+  console.log(
+    `${DIM}console: no build found — starting Astro's dev server, which is slow to load.\n` +
+      `         Build it once with: npm run console:build   (from ${HERE})${RESET}`,
+  );
+} else if (consoleDev) {
+  console.log(`${DIM}console: CONSOLE_DEV=1 — hot reloading, slower page loads.${RESET}`);
+}
+
 const services = [
   { label: 'control-plane', color: CYAN,    cmd: 'node control-plane/server.mjs' },
-  { label: 'console-ui   ', color: MAGENTA, cmd: 'npm --prefix ui run dev' },
+  {
+    label: 'console-ui   ',
+    color: MAGENTA,
+    cmd: consoleDev ? 'npm --prefix ui run dev' : 'npm --prefix ui run start',
+    // The built server takes its address from the environment; the dev server
+    // takes it from astro.config.mjs. Same address either way.
+    env: consoleDev ? {} : { HOST: '127.0.0.1', PORT: '3000' },
+  },
   { label: 'board        ', color: YELLOW,  cmd: 'node ../.serve/server.cjs' },
   ...(connectorReady
     ? [{

@@ -32,10 +32,12 @@ import {
 } from '../../auth/tokens'
 import {
   createSession,
+  findSessionHubPersonId,
   findUserByPendingMfaSessionHash,
   rotateSessionToken,
   revokeSessionByHash,
 } from '../../auth/sessions'
+import { verifyHubPassword } from '../../auth/hubStepUp'
 import { handleListSessions, handleRevokeSession, handleLogoutAll } from './authSessions'
 import {
   findUserById,
@@ -755,14 +757,41 @@ async function handleStepUp(req: Request, db: DbClient): Promise<Response> {
   const body = await readValidatedBody(req, StepUpBodySchema)
   const password = (body?.password ?? '').trim()
   const mfaCode = (body?.mfaCode ?? '').trim()
-  const passwordOk = await verifyPassword(password, user.passwordHash)
-  if (!passwordOk) {
-    return recordStepUpPasswordFailure(db, req, user, ip)
+  // A session opened from the Product Hub belongs to a hub person, whose
+  // password lives at the hub (MMS Phase 1, NEW-3b): re-check THAT password.
+  // The hub throttles its own guesses; a failure here must not lock the CMS
+  // account, which for the owner is also the Connector's machine login.
+  const hubPersonId = await findSessionHubPersonId(db, idHash)
+  if (hubPersonId) {
+    const verdict = await verifyHubPassword(hubPersonId, password)
+    if (verdict === 'unavailable') {
+      return jsonResponse({ error: 'Your hub could not confirm your password. Try again shortly.' }, { status: 503 })
+    }
+    if (verdict === 'locked') {
+      return jsonResponse({ error: 'Too many attempts. Try again later.' }, { status: 429 })
+    }
+    if (verdict !== 'ok') {
+      await createAuditEvent(db, {
+        actorUserId: user.id,
+        action: 'login.failure',
+        targetType: 'user',
+        targetId: user.id,
+        metadata: { reason: 'step_up', source: 'hub', hubPersonId },
+        ...requestAuditContext(req),
+      })
+      return jsonResponse({ error: 'Invalid password' }, { status: 401 })
+    }
+  } else {
+    const passwordOk = await verifyPassword(password, user.passwordHash)
+    if (!passwordOk) {
+      return recordStepUpPasswordFailure(db, req, user, ip)
+    }
   }
   loginRateLimit.reset(rateLimitKey)
 
   let refreshedUser = user
-  if (user.mfaEnabled) {
+  // CMS-local MFA belongs to local sign-ins; a hub person authenticates at the hub.
+  if (user.mfaEnabled && !hubPersonId) {
     const mfaResult = await verifyStepUpMfa(db, req, user, ip, mfaCode)
     if (mfaResult.failure) return mfaResult.failure
     refreshedUser = mfaResult.user
