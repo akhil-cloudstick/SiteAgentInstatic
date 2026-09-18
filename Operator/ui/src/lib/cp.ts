@@ -51,3 +51,31 @@ export function cpFetch(cookies: AstroCookies, path: string, init: RequestInit =
   if (session) headers.set('cookie', `${ADMIN_COOKIE}=${encodeURIComponent(session)}`);
   return fetch(`${CP}${path}`, { ...init, headers });
 }
+
+export type Loaded = { ok: boolean; status: number; body: any };
+
+// One browser request often needs the same listing twice — the page renders the
+// projects table and the header counts the same projects for its notifications.
+// Each GET is therefore fetched once per request and shared. The key is the
+// request's own AstroCookies object, so nothing leaks between requests or
+// between administrators, and a WeakMap keeps no entry alive after it.
+const requestGets = new WeakMap<AstroCookies, Map<string, Promise<Loaded>>>();
+
+/** A control-plane GET, fetched at most once per browser request. */
+export function cpLoad(cookies: AstroCookies, path: string): Promise<Loaded> {
+  let byPath = requestGets.get(cookies);
+  if (!byPath) {
+    byPath = new Map();
+    requestGets.set(cookies, byPath);
+  }
+  let pending = byPath.get(path);
+  if (!pending) {
+    pending = cpFetch(cookies, path).then(async (res) => ({
+      ok: res.ok,
+      status: res.status,
+      body: await res.json().catch(() => ({})),
+    }));
+    byPath.set(path, pending);
+  }
+  return pending;
+}
