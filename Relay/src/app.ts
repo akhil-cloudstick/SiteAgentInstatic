@@ -508,16 +508,24 @@ async function transition(ticket: Ticket, b: Record<string, unknown>, actor: Act
 
 /**
  * Whose signature approves this property, resolved exactly as the Connector
- * resolves it when it checks a GO: the property's own key when the
- * configuration names one, the default approver otherwise, and a refusal —
- * never a fallback — when a property names a key that cannot be used. The two
- * sides must agree on who the approver is, or an approval means nothing.
+ * resolves it when it checks a GO. The two sides must agree on who the approver
+ * is, or an approval means nothing — so both read the same registry (R6), and
+ * this is the rule they both apply:
+ *
+ *   1. the property's own approver;
+ *   2. otherwise a business-level approver that EXPLICITLY names this property;
+ *   3. otherwise refuse.
+ *
+ * There is no step 4. A property with no approver is refused rather than handed
+ * to a platform-wide key — "a fallback that widens scope on error is a master
+ * key by another name" (PRD 5.3) — and delegation is only ever what somebody
+ * configured, never what a hierarchy implies.
  */
 async function approverFor(
   deps: Deps,
   target: string,
 ): Promise<
-  | { ok: true; publicKey: string; fingerprint: string; scope: 'property' | 'default' }
+  | { ok: true; publicKey: string; fingerprint: string; scope: 'property' | 'business' }
   | { ok: false; status: number; reason: string }
 > {
   const usable = async (key: string): Promise<string | null> => {
@@ -528,23 +536,43 @@ async function approverFor(
     }
   }
 
-  const own = deps.config.propertyApprovers[target]
-  if (own !== undefined) {
-    const fingerprint = await usable(own)
+  const live = await deps.store.listApprovers()
+
+  const own = live.find((a) => a.level === 'project' && a.property === target)
+  if (own) {
+    const fingerprint = await usable(own.publicKey)
     return fingerprint
-      ? { ok: true, publicKey: own, fingerprint, scope: 'property' }
+      ? { ok: true, publicKey: own.publicKey, fingerprint, scope: 'property' }
       : {
           ok: false,
           status: 503,
-          reason: `The approver configured for "${target}" is not a usable Ed25519 public key, so no GO can be granted for it.`,
+          reason: `The approver registered for "${target}" is not a usable Ed25519 public key, so no GO can be granted for it.`,
         }
   }
 
-  const fallback = deps.config.ownerPublicKey
-  const fingerprint = fallback ? await usable(fallback) : null
-  return fingerprint
-    ? { ok: true, publicKey: fallback, fingerprint, scope: 'default' }
-    : { ok: false, status: 503, reason: `No approver is configured for "${target}", so no GO can be granted.` }
+  // A delegated approver reaches only what its registration names. Two
+  // businesses cannot both claim one property: whichever registration named it
+  // is the one that covers it, and a second would have to name it too — which
+  // is visible in the registry rather than inferred from a tree.
+  const delegated = live.find((a) => a.level === 'business' && (a.covers ?? []).includes(target))
+  if (delegated) {
+    const fingerprint = await usable(delegated.publicKey)
+    return fingerprint
+      ? { ok: true, publicKey: delegated.publicKey, fingerprint, scope: 'business' }
+      : {
+          ok: false,
+          status: 503,
+          reason: `The approver registered for "${delegated.property}", which covers "${target}", is not a usable Ed25519 public key, so no GO can be granted.`,
+        }
+  }
+
+  return {
+    ok: false,
+    status: 503,
+    reason:
+      `No approver is registered for "${target}", so no GO can be granted for it. ` +
+      'Register one, or configure a business-level approver that names it.',
+  }
 }
 
 async function grantGo(ticket: Ticket, b: Record<string, unknown>, actor: Actor, deps: Deps): Promise<Out> {

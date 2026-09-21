@@ -13,6 +13,7 @@ import { goLines, ticketLine } from './export'
 import type { GoAction } from './go'
 import type { Blobs, Store } from './store'
 import type {
+  ApproverRecord,
   ArtefactMeta,
   Evidence,
   ExportLine,
@@ -180,6 +181,38 @@ const toFlag = (r: FlagRow): FlagRecord => ({
   validatorStalled: r.validator_stalled === 1,
   at: r.at,
 })
+
+interface ApproverRow {
+  id: string
+  seq: number
+  property: string
+  level: string
+  covers: string | null
+  public_key: string
+  fingerprint: string
+  effective_from: string
+  retired_at: string | null
+  registered_by: string
+  reason: string | null
+  created_at: string
+}
+
+function approverFromRow(r: ApproverRow): ApproverRecord {
+  return {
+    id: r.id,
+    seq: r.seq,
+    property: r.property,
+    level: r.level === 'business' ? 'business' : 'project',
+    covers: r.covers ? (JSON.parse(r.covers) as string[]) : null,
+    publicKey: r.public_key,
+    fingerprint: r.fingerprint,
+    effectiveFrom: r.effective_from,
+    retiredAt: r.retired_at,
+    registeredBy: r.registered_by,
+    reason: r.reason,
+    createdAt: r.created_at,
+  }
+}
 
 export class D1Store implements Store {
   constructor(private readonly db: D1Database) {}
@@ -357,6 +390,71 @@ export class D1Store implements Store {
     const result = await this.db
       .prepare('UPDATE gos SET consumed_at = ?, consumed_seq = ? WHERE ticket_id = ? AND consumed_at IS NULL')
       .bind(at, seq, ticketId)
+      .run()
+    return result.meta.changes === 1
+  }
+
+  // ---- the approver registry (R6) ----------------------------------------
+  //
+  // One live row per property, enforced by a partial unique index. A rotation
+  // is a retirement and an insert in ONE batch, so there is never an instant
+  // with two live identities for a property, and never one with none by
+  // accident.
+
+  async listApprovers(): Promise<ApproverRecord[]> {
+    const { results } = await this.db
+      .prepare('SELECT * FROM approvers WHERE retired_at IS NULL ORDER BY property')
+      .all<ApproverRow>()
+    return (results ?? []).map(approverFromRow)
+  }
+
+  async listApproverHistory(property?: string): Promise<ApproverRecord[]> {
+    const { results } = property
+      ? await this.db
+          .prepare('SELECT * FROM approvers WHERE property = ? ORDER BY seq DESC')
+          .bind(property)
+          .all<ApproverRow>()
+      : await this.db.prepare('SELECT * FROM approvers ORDER BY seq DESC').all<ApproverRow>()
+    return (results ?? []).map(approverFromRow)
+  }
+
+  async registerApprover(a: ApproverRecord): Promise<boolean> {
+    // Retire first, insert second, in one batch. Were these separate calls a
+    // failure between them would leave the property with no approver — which
+    // refuses everything, correctly, but for a reason nobody asked for.
+    const statements = [
+      this.db
+        .prepare('UPDATE approvers SET retired_at = ? WHERE property = ? AND retired_at IS NULL')
+        .bind(a.effectiveFrom, a.property),
+      this.db
+        .prepare(
+          `INSERT INTO approvers
+             (id, seq, property, level, covers, public_key, fingerprint,
+              effective_from, retired_at, registered_by, reason, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?)`,
+        )
+        .bind(
+          a.id,
+          a.seq,
+          a.property,
+          a.level,
+          a.covers ? JSON.stringify(a.covers) : null,
+          a.publicKey,
+          a.fingerprint,
+          a.effectiveFrom,
+          a.registeredBy,
+          a.reason,
+          a.createdAt,
+        ),
+    ]
+    const results = await this.db.batch(statements)
+    return (results[1]?.meta.changes ?? 0) === 1
+  }
+
+  async retireApprover(property: string, at: string): Promise<boolean> {
+    const result = await this.db
+      .prepare('UPDATE approvers SET retired_at = ? WHERE property = ? AND retired_at IS NULL')
+      .bind(at, property)
       .run()
     return result.meta.changes === 1
   }

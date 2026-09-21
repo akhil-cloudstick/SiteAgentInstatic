@@ -105,6 +105,30 @@ export interface GoRecord {
   consumedSeq: number | null
 }
 
+/**
+ * Who may approve a property, and from when (R6).
+ *
+ * One live row per property; a rotation retires the old row and inserts a new
+ * one, so the registry is both the current answer and the history that explains
+ * an old receipt. A retired row authorises nothing.
+ */
+export interface ApproverRecord {
+  id: string
+  seq: number
+  /** The property, or — for a business-level row — the business's own name. */
+  property: string
+  level: 'project' | 'business'
+  /** Properties a business-level approver may approve. Explicit, never inferred. */
+  covers: string[] | null
+  publicKey: string
+  fingerprint: string
+  effectiveFrom: string
+  retiredAt: string | null
+  registeredBy: string
+  reason: string | null
+  createdAt: string
+}
+
 export interface FlagRecord {
   seq: number
   ticketId: string

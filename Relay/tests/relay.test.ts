@@ -167,8 +167,11 @@ test('a GO longer than four hours is refused', async () => {
   expect(long.json.error).toMatch(/more than 4h/)
 })
 
-test('with no owner key configured, no GO can be granted', async () => {
-  const r = relay({ ownerPublicKey: '' })
+test('with nothing in the approver registry, no GO can be granted', async () => {
+  // The approver moved from a platform-wide configured key to a per-property
+  // registry (R6), so "no key configured" became "nothing registered" — and it
+  // refuses for the property rather than for the whole relay.
+  const r = relay({ ownerPublicKey: '', approvers: {} })
   const dr = await openDeployRequest(r)
   expect((await grant(r, dr)).status).toBe(503)
   expect((await r.call(OWNER, 'GET', '/')).text).toMatch(/No owner key configured/)

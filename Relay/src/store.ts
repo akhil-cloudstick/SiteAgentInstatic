@@ -6,6 +6,7 @@
  */
 
 import type {
+  ApproverRecord,
   ArtefactMeta,
   ExportLine,
   FlagRecord,
@@ -50,6 +51,19 @@ export interface Store {
   insertGo(record: GoRecord): Promise<boolean>
   /** False when the GO was already consumed. */
   consumeGo(ticketId: string, at: string, seq: number): Promise<boolean>
+
+  /** Every live approver, newest first. The registry both ends read (R6). */
+  listApprovers(): Promise<ApproverRecord[]>
+  /** Every registration including retired ones — the history behind old receipts. */
+  listApproverHistory(property?: string): Promise<ApproverRecord[]>
+  /**
+   * Register an approver, retiring the property's current one in the same
+   * step. False when the property moved underneath us, so a rotation can never
+   * leave two live identities.
+   */
+  registerApprover(record: ApproverRecord): Promise<boolean>
+  /** Retire without a replacement: the property is then left with no approver. */
+  retireApprover(property: string, at: string): Promise<boolean>
 
   getIdempotency(subject: string, key: string): Promise<IdempotencyRecord | null>
   putIdempotency(record: IdempotencyRecord): Promise<void>

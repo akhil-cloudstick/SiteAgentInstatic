@@ -7,6 +7,7 @@
 import { goLines, ticketLine } from './export'
 import type { Blobs, Store } from './store'
 import type {
+  ApproverRecord,
   ArtefactMeta,
   ExportLine,
   FlagRecord,
@@ -28,6 +29,8 @@ export class MemoryStore implements Store {
   private readonly gos = new Map<string, GoRecord>()
   private readonly flags: FlagRecord[] = []
   private readonly idempotency = new Map<string, IdempotencyRecord>()
+  private readonly approvers: ApproverRecord[] = []
+
 
   async nextSeq(): Promise<number> {
     return ++this.seq
@@ -123,6 +126,39 @@ export class MemoryStore implements Store {
     g.consumedAt = at
     g.consumedSeq = seq
     return true
+  }
+
+  // ---- the approver registry (R6) ----------------------------------------
+  // Mirrors the D1 store's contract: append-only, one live row per property.
+
+  async listApprovers(): Promise<ApproverRecord[]> {
+    return this.approvers.filter((a) => a.retiredAt === null).sort((a, b) => a.property.localeCompare(b.property))
+  }
+
+  async listApproverHistory(property?: string): Promise<ApproverRecord[]> {
+    const rows = property ? this.approvers.filter((a) => a.property === property) : [...this.approvers]
+    return rows.sort((a, b) => b.seq - a.seq)
+  }
+
+  async registerApprover(record: ApproverRecord): Promise<boolean> {
+    // Retiring and inserting together is what keeps a rotation atomic: the
+    // property is never left with two live identities, nor with none.
+    for (const a of this.approvers) {
+      if (a.property === record.property && a.retiredAt === null) a.retiredAt = record.effectiveFrom
+    }
+    this.approvers.push({ ...record, retiredAt: null })
+    return true
+  }
+
+  async retireApprover(property: string, at: string): Promise<boolean> {
+    let retired = false
+    for (const a of this.approvers) {
+      if (a.property === property && a.retiredAt === null) {
+        a.retiredAt = at
+        retired = true
+      }
+    }
+    return retired
   }
 
   async getIdempotency(subject: string, key: string): Promise<IdempotencyRecord | null> {

@@ -11,6 +11,20 @@ export interface Vectors {
   owner: { seedHex: string; publicKey: string; fingerprint: string }
   other: { seedHex: string; publicKey: string; fingerprint: string }
   cases: { name: string; message?: string; go: Go; valid: boolean }[]
+  /** Approver-resolution cases both sides must agree on (R6 + R10). */
+  resolution?: {
+    name: string
+    registry: {
+      property: string
+      level: 'project' | 'business'
+      covers?: string[]
+      publicKey: string
+      fingerprint: string
+      effectiveFrom: string
+    }[]
+    target: string
+    expect: { ok: boolean; fingerprint?: string; scope?: string }
+  }[]
 }
 
 export const VECTORS = JSON.parse(
@@ -39,7 +53,25 @@ export interface CallResult {
   headers: Headers
 }
 
-export function relay(options: { ownerPublicKey?: string; propertyApprovers?: Record<string, string> } = {}) {
+/**
+ * A relay for tests.
+ *
+ * `approvers` seeds the registry. It has a default because the platform-wide
+ * fallback is gone (R6): a property with no registered approver refuses every
+ * GO, which is the point of the requirement but would otherwise make every
+ * unrelated test set one up by hand. Pass `approvers: {}` to test that refusal
+ * deliberately.
+ */
+export function relay(
+  options: {
+    ownerPublicKey?: string
+    propertyApprovers?: Record<string, string>
+    /** property -> public key, registered at project level before the first call. */
+    approvers?: Record<string, string>
+    /** business name -> { key, covers } for delegated approvers. */
+    delegated?: Record<string, { publicKey: string; covers: string[] }>
+  } = {},
+) {
   const store = new MemoryStore()
   const blobs = new MemoryBlobs()
   const events: RelayEvent[] = []
@@ -55,6 +87,43 @@ export function relay(options: { ownerPublicKey?: string; propertyApprovers?: Re
     },
     now: () => new Date(now),
     notify: (event) => events.push(event),
+  }
+
+  // Seeded synchronously into the in-memory store so a test's first call
+  // already resolves an approver.
+  const seeded = options.approvers ?? { sheeltron: VECTORS.owner.publicKey, 'sheeltron-staging': VECTORS.owner.publicKey }
+  let approverSeq = 0
+  for (const [property, publicKey] of Object.entries(seeded)) {
+    void store.registerApprover({
+      id: `apr_${++approverSeq}`,
+      seq: approverSeq,
+      property,
+      level: 'project',
+      covers: null,
+      publicKey,
+      fingerprint: publicKey === VECTORS.other.publicKey ? VECTORS.other.fingerprint : VECTORS.owner.fingerprint,
+      effectiveFrom: '2026-09-14T00:00:00.000Z',
+      retiredAt: null,
+      registeredBy: 'owner@example.test',
+      reason: 'test fixture',
+      createdAt: '2026-09-14T00:00:00.000Z',
+    })
+  }
+  for (const [property, d] of Object.entries(options.delegated ?? {})) {
+    void store.registerApprover({
+      id: `apr_${++approverSeq}`,
+      seq: approverSeq,
+      property,
+      level: 'business',
+      covers: d.covers,
+      publicKey: d.publicKey,
+      fingerprint: d.publicKey === VECTORS.other.publicKey ? VECTORS.other.fingerprint : VECTORS.owner.fingerprint,
+      effectiveFrom: '2026-09-14T00:00:00.000Z',
+      retiredAt: null,
+      registeredBy: 'owner@example.test',
+      reason: 'test fixture',
+      createdAt: '2026-09-14T00:00:00.000Z',
+    })
   }
 
   let keys = 0
