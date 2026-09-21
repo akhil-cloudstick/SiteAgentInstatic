@@ -251,8 +251,19 @@ export function start(tenant) {
     // daemon's localhost OD_INSTATIC_URL which a remote client can't reach.
     OD_GATEWAY_ORIGIN: config.gatewayOrigin,
     // Advanced tenants: where this tenant's Instatic lives, so "Share to CMS" can
-    // push there. Unset for lite tenants (no Instatic) -> the button is inert.
-    ...(tenant.instaticUrl ? { OD_INSTATIC_URL: tenant.instaticUrl } : {}),
+    // push there. Lite tenants get an EMPTY string rather than nothing at all
+    // (R4): `OD_INSTATIC_URL` is not credential-shaped, so lib/childEnv.mjs
+    // passes an inherited one through — leaving it unset meant a stray value in
+    // the control plane's own environment became that daemon's CMS destination.
+    // Empty is falsy where the daemon reads it, so the button stays inert.
+    OD_INSTATIC_URL: tenant.instaticUrl || '',
+    // Where the design studio keeps its own machine-level state, including its
+    // Cloudflare deploy credentials. Upstream defaults this to ~/.open-design,
+    // which every daemon on this host shares — one Cloudflare token, writable by
+    // any project's UI, able to attach any domain in that account (R4,
+    // AC-A2.3). Per project, so a project's studio can reach nothing but its
+    // own. The platform publishes through MMS-CMS regardless (PRD §5.1).
+    OD_USER_STATE_DIR: resolve(p.dataDir, 'user-state'),
     // Advanced tenants also get the website build rule OD must follow so their
     // pages import into Instatic cleanly. OD reads this file live (cached by
     // mtime), so editing it updates the enforced rule with no redeploy. Only

@@ -46,6 +46,39 @@ function sanitizeCfProject(s) {
   const v = String(s || '').toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 58);
   return v || null;
 }
+
+/**
+ * One project, one domain (R4, AC-A2.3).
+ *
+ * The Cloudflare project and the custom domain say WHERE a publish lands, and
+ * nothing downstream re-checks that the destination belongs to the project
+ * being deployed. Two projects naming the same one — a typo, or a `-staging`
+ * clone that kept its source's — meant publishing A uploaded A's site onto B's
+ * live domain. The database refuses it now; this is the same rule stated early,
+ * so the message names the project holding it rather than surfacing a
+ * constraint violation.
+ */
+async function assertDomainFree(column, value, exceptSlug = null) {
+  if (!value) return;
+  const isDomain = column === 'custom_domain';
+  const { rows } = await query(
+    `select slug, display_name from siteagent_control.tenants
+      where ${isDomain ? 'lower(custom_domain) = lower($1)' : 'cf_project = $1'}
+        and status <> 'removed' and ($2::text is null or slug <> $2)
+      limit 1`,
+    [value, exceptSlug],
+  );
+  const taken = rows[0];
+  if (!taken) return;
+  const what = isDomain ? 'domain' : 'Cloudflare project';
+  throw Object.assign(
+    new Error(
+      `“${value}” is already the ${what} of ${taken.display_name || taken.slug}. `
+      + `Two projects cannot share one — publishing either would overwrite the other's live site.`,
+    ),
+    { status: 409 },
+  );
+}
 // schema/role identifiers derived from slug (hyphens -> underscores), validated.
 function names(slug) {
   const base = slug.replace(/-/g, '_');
@@ -122,6 +155,10 @@ export async function provisionTenant({ name, ownerEmail, cfProject, customDomai
   const odWebPort = await allocateOdWebPort();
   const cf_project = sanitizeCfProject(cfProject) || `siteagent-${slug}`;
   const custom_domain = String(customDomain || '').trim().toLowerCase() || null;
+  // Before any of the heavy work: a project that would publish onto another
+  // project's domain must not be created at all (R4, AC-A2.3).
+  await assertDomainFree('cf_project', cf_project, slug);
+  await assertDomainFree('custom_domain', custom_domain, slug);
 
   // 0) registry row (synchronous, so the console shows the tenant immediately as
   //    'provisioning'). The heavy work then runs in the BACKGROUND — the POST
@@ -328,11 +365,15 @@ export async function editTenant(slug, { displayName, ownerEmail, cfProject, cus
   if (ownerEmail !== undefined) fields.owner_email = String(ownerEmail || '').trim() || null;
   if (cfProject !== undefined) {
     const cp = sanitizeCfProject(cfProject);
-    if (cp) fields.cf_project = cp;
+    if (cp) {
+      await assertDomainFree('cf_project', cp, slug);
+      fields.cf_project = cp;
+    }
   }
   let domainChanged = false;
   if (customDomain !== undefined) {
     const cd = String(customDomain || '').trim().toLowerCase() || null;
+    await assertDomainFree('custom_domain', cd, slug);
     domainChanged = cd !== (row.custom_domain || null);
     fields.custom_domain = cd;
   }

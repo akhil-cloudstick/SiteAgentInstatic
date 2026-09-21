@@ -543,3 +543,21 @@ create index if not exists tenant_users_staff on siteagent_control.tenant_users 
 -- than probed per project on every page load: probing opened an owner session
 -- inside every tenant, which is exactly what R5 forbids.
 alter table siteagent_control.tenants add column if not exists bridge_installed_at timestamptz;
+
+-- ---------------------------------------------------------------------------
+-- Phase 3 (R4, AC-A2.3) — one project, one domain.
+--
+-- `cf_project` and `custom_domain` were free text with nothing stopping two
+-- projects from naming the same one. A typo, or a `-staging` clone that kept
+-- its source's Cloudflare project, was enough: publishing project A then
+-- uploaded A's site onto B's live domain, because the deploy path never
+-- re-checks that the Cloudflare project belongs to the project being deployed.
+--
+-- Partial, because a removed project must not keep a domain hostage — its name
+-- is free again the moment it is gone.
+create unique index if not exists tenants_cf_project_unique
+  on siteagent_control.tenants (cf_project)
+  where cf_project is not null and status <> 'removed';
+create unique index if not exists tenants_custom_domain_unique
+  on siteagent_control.tenants (lower(custom_domain))
+  where custom_domain is not null and custom_domain <> '' and status <> 'removed';

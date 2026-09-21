@@ -16,6 +16,14 @@ export type ShareBlockKind =
   | 'compliance'
   /** No CMS is attached to this workspace (lite tenant, no `OD_INSTATIC_URL`). */
   | 'not-connected'
+  /**
+   * The project already has a website, built from a DIFFERENT design.
+   *
+   * Sharing this one would replace it, so the CMS stopped before anything was
+   * touched. No amount of editing this design changes that, so — like
+   * `not-connected`, and unlike a compliance failure — there is nothing to fix.
+   */
+  | 'site-exists'
   /** Transport / sign-in / staging failure — retrying is the only remedy. */
   | 'unavailable';
 
@@ -65,9 +73,11 @@ export async function pushProjectToCms(
     const kind: ShareBlockKind =
       code === 'CMS_NOT_CONNECTED'
         ? 'not-connected'
-        : code === 'CMS_COMPLIANCE_FAILED' || response.status === 422
-          ? 'compliance'
-          : 'unavailable';
+        : code === 'SITE_ALREADY_EXISTS' || response.status === 409
+          ? 'site-exists'
+          : code === 'CMS_COMPLIANCE_FAILED' || response.status === 422
+            ? 'compliance'
+            : 'unavailable';
     setBlock({
       kind,
       reason: reason || 'Your site editor couldn’t import this page.',

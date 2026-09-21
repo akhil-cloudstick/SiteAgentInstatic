@@ -45,9 +45,16 @@ export function useStagedSiteImportHandoff({ enabled }: UseStagedSiteImportHando
 
     // Strip the one-shot token from the address bar immediately (not via
     // useUrlQuerySync — this is a one-shot consume, not an ongoing mirror).
+    // What this share would replace, if anything (MMSBUILD R2). It rides in
+    // the address because the staged payload is single-use and burned on read.
+    const replacingDesign = initialParams.get('confirmReplace')
+    const replacingPages = Number(initialParams.get('confirmPages') || 0)
+
     if (typeof window !== 'undefined') {
       const url = new URL(window.location.href)
       url.searchParams.delete('importToken')
+      url.searchParams.delete('confirmReplace')
+      url.searchParams.delete('confirmPages')
       window.history.replaceState({}, '', url.pathname + url.search + url.hash)
     }
 
@@ -56,7 +63,12 @@ export function useStagedSiteImportHandoff({ enabled }: UseStagedSiteImportHando
         const result = await apiRequest(`/cms/api/cms/import/staged/${encodeURIComponent(token)}`, {
           schema: StagedImportResponseSchema,
         })
-        setPendingSiteImportFileMap({ files: result.files })
+        setPendingSiteImportFileMap({
+          files: result.files,
+          ...(replacingDesign
+            ? { replacing: { design: replacingDesign, pages: replacingPages } }
+            : {}),
+        })
         openSiteImport()
       } catch (err) {
         const message = err instanceof ApiError ? err.message : 'Import link expired or already used'

@@ -22,6 +22,8 @@ interface SiteImportFooterProps {
   cmsCanImport: boolean
   cmsImportButtonLabel: string
   onBack: () => void
+  /** Agreed to replace unpublished work with a different design (R2). */
+  onReplaceConfirmed: () => void
   onClose: () => void
   onAnalyzeNext: () => void
   onCmsAnalyzeNext: () => void
@@ -42,6 +44,7 @@ export function SiteImportFooter({
   cmsCanImport,
   cmsImportButtonLabel,
   onBack,
+  onReplaceConfirmed,
   onClose,
   onAnalyzeNext,
   onCmsAnalyzeNext,
@@ -51,6 +54,22 @@ export function SiteImportFooter({
   onOpenSite,
 }: SiteImportFooterProps) {
   if (step === 'drop') return null
+
+  // A different design over unpublished work. The destructive action is the
+  // one that has to be chosen, so Cancel is the resting state and the button
+  // that proceeds says what it does rather than "Continue".
+  if (step === 'replace-warning') {
+    return (
+      <>
+        <Button variant="secondary" type="button" onClick={onClose}>
+          Cancel
+        </Button>
+        <Button variant="destructive" type="button" onClick={onReplaceConfirmed}>
+          Replace the site
+        </Button>
+      </>
+    )
+  }
 
   if (step === 'analyze') {
     if (cmsBundleState) {

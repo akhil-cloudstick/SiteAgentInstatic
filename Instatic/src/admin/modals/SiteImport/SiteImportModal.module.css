@@ -27,3 +27,21 @@
   color: var(--text-subtle);
   font-variant-numeric: tabular-nums;
 }
+
+/* The "this replaces the site that is here" step (MMSBUILD R2). Plain prose in
+   the dialog's own body padding — this step asks a question, so it reads as
+   writing rather than as a panel of controls. */
+.replaceWarning {
+  display: grid;
+  gap: 12px;
+  padding: 20px 24px;
+  font-size: var(--text-sm);
+  line-height: 1.6;
+  color: var(--text);
+}
+.replaceWarning p {
+  margin: 0;
+}
+.replaceWarning strong {
+  font-weight: 650;
+}

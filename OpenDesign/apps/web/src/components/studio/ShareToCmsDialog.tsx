@@ -47,6 +47,10 @@ export function ShareToCmsDialog({ block, onClose, onFix }: ShareToCmsDialogProp
 
   // Only a compliance rejection is something the agent can repair in place.
   const fixable = block.kind === 'compliance' && Boolean(onFix);
+  // A refusal to overwrite an existing website is not an error and not a
+  // limitation of this design — it is the platform protecting a live site, so
+  // it is titled as such rather than borrowing "add some files first".
+  const siteExists = block.kind === 'site-exists';
 
   return createPortal(
     <div
@@ -73,11 +77,15 @@ export function ShareToCmsDialog({ block, onClose, onFix }: ShareToCmsDialogProp
           <FaIcon name="xmark" size={15} />
         </button>
         <span className="dialog-icon" aria-hidden="true">
-          <FaIcon name={fixable ? 'wand-magic-sparkles' : 'circle-info'} size={22} />
+          <FaIcon name={fixable ? 'wand-magic-sparkles' : siteExists ? 'shield-halved' : 'circle-info'} size={22} />
         </span>
         <p className="dialog-eyebrow">{t('studio.shareDialogEyebrow')}</p>
         <h2 id={titleId}>
-          {fixable ? t('studio.shareDialogTitle') : t('studio.shareDisabledHint')}
+          {fixable
+            ? t('studio.shareDialogTitle')
+            : siteExists
+              ? t('studio.shareSiteExistsTitle')
+              : t('studio.shareDisabledHint')}
         </h2>
         {fixable ? <p>{t('studio.shareDialogBody')}</p> : null}
         {block.reason.trim() ? (

@@ -193,7 +193,7 @@
         {
           "id": "R2",
           "title": "A second website cannot silently destroy the first",
-          "status": "todo",
+          "status": "built",
           "dependsOn": [
             "R1"
           ],
@@ -201,15 +201,16 @@
             {
               "id": "AC-A2.1",
               "text": "A second design is refused or lands distinctly; site A still resolves with A's content",
-              "status": "todo",
+              "status": "built",
               "verified": "pending"
             }
-          ]
+          ],
+          "note": "Built 2026-09-18: a share now says which design it is carrying, and a website records the design it was built from — until now the handover was files and nothing else, so \"this design again\" and \"a different design\" arrived down one path looking identical. That is what destroyed the first website: the wizard empties the site before it plans the import, which is exactly why no conflict was ever detected and why the result read as a successful update. A different design into a project with a published website is now refused, before anything is staged, with a message naming how many pages are there and which design built them. A different design over unpublished work is not refused — iterating before launch is normal — but the wizard stops and names what would go, and nothing is touched until the person agrees. Re-sharing the SAME design still overwrites in place, unchanged: \"no duplicates on re-share\" depends on it, and it is the thing most easily broken by fixing the rest. The PRD referred to \"a different design\" and to \"already has a website\" without defining either; both are defined in the PRD now."
         },
         {
           "id": "R4",
           "title": "The CMS destination belongs to the project",
-          "status": "todo",
+          "status": "built",
           "dependsOn": [
             "R1",
             "R2"
@@ -218,16 +219,17 @@
             {
               "id": "AC-A2.2",
               "text": "A design's destination cannot be pointed at another project's CMS",
-              "status": "todo",
+              "status": "built",
               "verified": "pending"
             },
             {
               "id": "AC-A2.3",
               "text": "Publishing to A changes A's domain and not B's, verified by fetching both",
-              "status": "todo",
+              "status": "built",
               "verified": "pending"
             }
-          ]
+          ],
+          "note": "Built 2026-09-18: nothing ever chose the wrong CMS — the destination is one value per design-studio process, with no parameter, setting or screen — but nothing checked either: a mis-aimed push failed only because the receiving project’s key would reject the token, an accident rather than a rule. The CMS now refuses a hand-off that does not name it, and refuses one when it does not know which project it is, rather than accepting anything. The destination is also always stated rather than inherited, so a stray value in the control plane’s environment can no longer become a lite project’s CMS. On the domain side, the Cloudflare project and the custom domain were free text with no uniqueness rule, so two projects could name one destination — a typo, or a -staging clone keeping its source’s — and publishing either would have uploaded onto the other’s live domain; the database now refuses it and the console says which project already holds it. Separately, the design studio kept its Cloudflare credentials in a directory shared by every project on the host, letting any project’s studio attach any domain in that account; each project now keeps its own, and MMS-CMS stays the sole publisher (PRD §5.1)."
         }
       ]
     },

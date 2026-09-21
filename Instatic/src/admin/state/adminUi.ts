@@ -43,7 +43,16 @@ interface AdminUiState {
    * landing straight on "Review import" — see `useStagedSiteImportHandoff`.
    * `null` once consumed or when no staged import is pending.
    */
-  pendingSiteImportFileMap: { files: Record<string, { base64: string; mimeType?: string }> } | null
+  pendingSiteImportFileMap: {
+    files: Record<string, { base64: string; mimeType?: string }>
+    /**
+     * Set when this share carries a DIFFERENT design into a project that
+     * already holds unpublished work (MMSBUILD R2). The import replaces rather
+     * than merges, so the person is told what goes before it goes. A published
+     * website never gets this far — that share is refused outright.
+     */
+    replacing?: { design: string; pages: number }
+  } | null
   setPendingSiteImportFileMap: (
     fileMap: { files: Record<string, { base64: string; mimeType?: string }> } | null,
   ) => void

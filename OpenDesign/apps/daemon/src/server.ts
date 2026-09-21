@@ -7886,12 +7886,35 @@ export async function startServer({
       // commit here. The browser runs the exact same "Import Site" wizard a manual
       // drag-drop import uses (buildImportPlan + commitImportPlan against the live
       // editor store), so Share to CMS can never drift from what manual import does.
+      //    The design is NAMED in the handover (MMSBUILD R2). Without it the
+      //    CMS cannot tell this design being updated from a different design
+      //    arriving — and it used to treat both the same way, which destroyed
+      //    whatever website was already there and called it a success.
       const stageRes = await fetch(`${instaticUrl}/cms/api/cms/import/site-html`, {
         method: 'POST',
         headers: { 'content-type': 'application/json', cookie },
-        body: JSON.stringify({ files }),
+        body: JSON.stringify({
+          files,
+          design: { id: String(project.id), name: project.name ?? undefined },
+        }),
       });
-      const staged = (await stageRes.json().catch(() => ({}))) as { token?: string; error?: string };
+      const staged = (await stageRes.json().catch(() => ({}))) as {
+        token?: string;
+        error?: string;
+        code?: string;
+        confirm?: { replacing: string; pages: number };
+      };
+      // A refusal is not a failure of the CMS — it is the CMS protecting a
+      // website that is already there. Passed through with its own code and
+      // its own words, so the studio can say what happened.
+      if (stageRes.status === 409) {
+        return sendApiError(
+          res,
+          409,
+          staged.code || 'SITE_ALREADY_EXISTS',
+          staged.error || 'This project already has a website built from another design.',
+        );
+      }
       if (!stageRes.ok || !staged.token) {
         return sendApiError(res, 502, 'CMS_IMPORT_FAILED', staged?.error || 'CMS import failed');
       }
@@ -7905,7 +7928,13 @@ export async function startServer({
       if (!gatewayOrigin) {
         return sendApiError(res, 503, 'CMS_HANDOFF_UNAVAILABLE', 'The hub address is not configured, so the CMS cannot be opened.');
       }
-      const siteImportPath = `/cms/site?importToken=${encodeURIComponent(staged.token)}`;
+      // The wizard asks before it replaces unpublished work, so it needs to
+      // know there is any (R2). Carried in the address rather than fetched
+      // again: the staged payload is single-use and burned on read.
+      const confirmQuery = staged.confirm
+        ? `&confirmReplace=${encodeURIComponent(staged.confirm.replacing)}&confirmPages=${staged.confirm.pages}`
+        : '';
+      const siteImportPath = `/cms/site?importToken=${encodeURIComponent(staged.token)}${confirmQuery}`;
       const redirectUrl = `${gatewayOrigin}/sso/cms?next=${encodeURIComponent(siteImportPath)}`;
       return res.json({ ok: true, redirectUrl });
     } catch (caught) {

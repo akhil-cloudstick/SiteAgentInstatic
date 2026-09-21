@@ -4516,6 +4516,9 @@ export const en: Dict = {
   'studio.factFiles': 'Files',
   'studio.shareToCms': 'Share to CMS',
   'studio.shareDisabledHint': 'Add website files before sharing to CMS',
+  // Shown when the project already has a website built from another design:
+  // sharing this one would replace it, so nothing was touched (MMSBUILD R2).
+  'studio.shareSiteExistsTitle': 'This project already has a website',
   'studio.shareDialogEyebrow': 'SHARE TO CMS',
   'studio.shareDialogTitle': 'Your design looks great — one quick fix',
   'studio.shareDialogBody': 'This page needs a few technical tweaks before it can go into your site editor. Choose Fix it and MMS Design will handle them without changing how anything looks — then Share to CMS again.',

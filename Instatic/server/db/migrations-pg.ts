@@ -1265,4 +1265,27 @@ export const pgMigrations: Migration[] = [
          and step_up_expires_at = expires_at;
     `,
   },
+  {
+    // Which design this website came from (MMSBUILD R2).
+    //
+    // A share used to arrive as files and nothing else, so the CMS could not
+    // tell "the same design again" — which must overwrite in place — from "a
+    // different design" — which would destroy the website that is already
+    // here. Both took the same path, and the second one read as a successful
+    // update. Recording the design that landed is what makes the two
+    // distinguishable at all.
+    //
+    // Its own table rather than a field on `site`, because the site shell is
+    // wiped and rebuilt by the very import this record governs.
+    id: '030_site_design_origin',
+    sql: `
+      create table if not exists site_design_origin (
+        site_id         text primary key default 'default',
+        design_id       text not null,
+        design_name     text,
+        first_shared_at timestamptz not null default current_timestamp,
+        last_shared_at  timestamptz not null default current_timestamp
+      );
+    `,
+  },
 ]

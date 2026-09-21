@@ -90,10 +90,24 @@ function verifySigned(token: string): unknown {
   }
 }
 
+/**
+ * Is this token addressed to THIS project (R4, AC-A2.2)?
+ *
+ * The signing key already makes a token minted for another project fail, since
+ * every project derives its own. But that is a side effect of key derivation,
+ * not a stated rule — and the rule the platform owes is "a design can only ever
+ * reach its own project's CMS". So the project is named and checked.
+ *
+ * A missing slug used to skip the check entirely (`!slug ||`), which made an
+ * unconfigured install accept a token addressed to anyone. It now refuses:
+ * a CMS that does not know which project it is cannot decide that a token is
+ * meant for it.
+ */
 function forThisProject(payload: { sub: string; exp: number }): boolean {
   if (Date.now() > payload.exp) return false
   const slug = tenantSlug()
-  return !slug || payload.sub === slug
+  if (!slug) return false
+  return payload.sub === slug
 }
 
 export function verifySsoToken(token: string): SsoToken | null {

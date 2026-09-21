@@ -1302,4 +1302,19 @@ export const sqliteMigrations: Migration[] = [
          and step_up_expires_at = expires_at;
     `,
   },
+  {
+    // Which design this website came from (MMSBUILD R2). See the Postgres twin
+    // for why it is its own table: the site shell is wiped by the very import
+    // this record governs.
+    id: '030_site_design_origin',
+    sql: `
+      create table if not exists site_design_origin (
+        site_id         text primary key default 'default',
+        design_id       text not null,
+        design_name     text,
+        first_shared_at text not null default current_timestamp,
+        last_shared_at  text not null default current_timestamp
+      );
+    `,
+  },
 ]

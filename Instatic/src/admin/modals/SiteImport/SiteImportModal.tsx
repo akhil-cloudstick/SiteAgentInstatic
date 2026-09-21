@@ -84,7 +84,7 @@ import type {
 // Types
 // ---------------------------------------------------------------------------
 
-export type Step = 'drop' | 'analyze' | 'conflicts' | 'run'
+export type Step = 'drop' | 'replace-warning' | 'analyze' | 'conflicts' | 'run'
 
 export type { ImportSelection }
 
@@ -246,6 +246,10 @@ export function SiteImportModal({ onCmsBundleImportComplete }: SiteImportModalPr
   const pendingFileMap = useAdminUi((s) => s.pendingSiteImportFileMap)
   const setPendingSiteImportFileMap = useAdminUi((s) => s.setPendingSiteImportFileMap)
   const consumedPendingImportRef = useRef(false)
+  // What this share replaces, and the files held back until the person agrees.
+  const [replaceNotice, setReplaceNotice] = useState<{ design: string; pages: number } | null>(null)
+  const [stagedFiles, setStagedFiles] = useState<FileMap['files'] | null>(null)
+  const replaceAgreedRef = useRef(false)
   useEffect(() => {
     if (consumedPendingImportRef.current) return
     if (!pendingFileMap) return
@@ -255,6 +259,17 @@ export function SiteImportModal({ onCmsBundleImportComplete }: SiteImportModalPr
     for (const [path, entry] of Object.entries(pendingFileMap.files)) {
       files[path] = { bytes: base64ToBytes(entry.base64), mimeType: entry.mimeType }
     }
+    // A different design arriving over unpublished work: say so, and let the
+    // person decide, BEFORE the site is blanked (MMSBUILD R2). Everything below
+    // this point destroys what is here, which is why the question comes first
+    // rather than inside the commit.
+    if (pendingFileMap.replacing && !replaceAgreedRef.current) {
+      setReplaceNotice(pendingFileMap.replacing)
+      setStagedFiles(files)
+      setStep('replace-warning')
+      return
+    }
+
     setBusy(true)
     setErrorMsg(null)
     void (async () => {
@@ -560,10 +575,36 @@ export function SiteImportModal({ onCmsBundleImportComplete }: SiteImportModalPr
     closeModal()
   }
 
+  /**
+   * The person agreed to replace the unpublished work. Runs precisely the path
+   * that was held back — the same blank-then-plan a re-share uses — so the
+   * warning changes when it happens, never what happens.
+   */
+  function handleReplaceConfirmed(): void {
+    if (!stagedFiles) return
+    replaceAgreedRef.current = true
+    setReplaceNotice(null)
+    setBusy(true)
+    setErrorMsg(null)
+    const files = stagedFiles
+    void (async () => {
+      try {
+        const current = await ensureCurrentSiteForStaticImport()
+        useEditorStore.getState().loadSite(blankImportedDesign(current))
+        await finalizePlan({ files })
+      } catch (err) {
+        console.error('[SiteImportModal] staged import failed:', err)
+        setErrorMsg(describeIngestError(err))
+        setBusy(false)
+      }
+    })()
+  }
+
   // ── Step titles ───────────────────────────────────────────────────────────
 
   const titleByStep: Record<Step, string> = {
     drop: 'Import site',
+    'replace-warning': 'This replaces the site that is here',
     analyze: 'Review import',
     conflicts: 'Resolve conflicts',
     // The Import step title tracks its phase: "Importing" while running,
@@ -582,7 +623,7 @@ export function SiteImportModal({ onCmsBundleImportComplete }: SiteImportModalPr
       title={titleByStep[step]}
       eyebrow={BRAND_NAME}
       size={step === 'analyze' ? '2xl' : 'xl'}
-      tone={isCmsReplace ? 'danger' : 'neutral'}
+      tone={isCmsReplace || step === 'replace-warning' ? 'danger' : 'neutral'}
       footer={step === 'drop' ? undefined : (
         <SiteImportFooter
           step={step}
@@ -595,6 +636,7 @@ export function SiteImportModal({ onCmsBundleImportComplete }: SiteImportModalPr
           cmsCanImport={cmsCanImport}
           cmsImportButtonLabel={cmsImportButtonLabel}
           onBack={handleBack}
+          onReplaceConfirmed={handleReplaceConfirmed}
           onClose={handleClose}
           onAnalyzeNext={handleAnalyzeNext}
           onCmsAnalyzeNext={handleCmsAnalyzeNext}
@@ -609,6 +651,27 @@ export function SiteImportModal({ onCmsBundleImportComplete }: SiteImportModalPr
       closeOnBackdrop={runProgress.phase !== 'applying' && !isCmsImporting}
     >
       <div className={styles.body}>
+        {step === 'replace-warning' && replaceNotice && (
+          <div className={styles.replaceWarning}>
+            <p>
+              This project already holds{' '}
+              <strong>
+                {replaceNotice.pages > 0
+                  ? `${replaceNotice.pages} unpublished page${replaceNotice.pages === 1 ? '' : 's'}`
+                  : 'unpublished work'}
+              </strong>{' '}
+              from <strong>{replaceNotice.design}</strong>.
+            </p>
+            <p>
+              A share replaces the site rather than adding to it: those pages, along with the
+              layouts, fonts and colours that came with them, are removed and rebuilt from the
+              design you are sharing now. Nothing published is affected, because this project has
+              no published website yet.
+            </p>
+            <p>Nothing has been changed so far.</p>
+          </div>
+        )}
+
         {step === 'drop' && (
           <DropStep
             busy={busy}

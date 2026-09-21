@@ -227,7 +227,39 @@ differ, this PRD governs.)
 | **Why** | This is the worst behaviour in the as-is system and the honest-list item 2: the second share blanks the CMS and rebuilds it, so the first website is destroyed with no warning, no conflict prompt and no duplicate. It reads exactly like a successful update. |
 | **Acceptance** | **AC-A2.1** — in a project with published site A, share a different design B: the platform refuses with a clear message, or lands B as a distinct site; **site A's routes still resolve with A's content afterwards.** A silent overwrite is a FAIL. |
 | **Depends on** | R1 |
-| **Status** | ❌ Not started. |
+| **Status** | ✅ Built 2026-09-18. |
+
+##### What "a different design" means (decided here)
+
+The acceptance criterion turns on the difference between a design being
+**updated** and a **different** design arriving, and neither was defined — nor
+could the platform tell them apart: a share carried files and nothing else, so
+both arrived down one path looking identical. That is the whole mechanism
+behind the destruction, not a detail of it.
+
+- **A design is identified by its own id** — the one the design studio already
+  has. The share now carries it, and a website records the design it was built
+  from. Same id is the same website being brought up to date; a different id is
+  a second website.
+- **A share that names no design at all** is treated as a different one, and so
+  refused, against a published website. A handover that cannot say what it is
+  cannot be shown to be the same one, and a live site is not where to assume the
+  best.
+- **"Already has a website"** is read in two degrees, because unpublished work
+  can be destroyed just as finally as published work:
+  - a **published** website — the share is refused outright, which is what
+    AC-A2.1 requires;
+  - **unpublished pages only** — the share is allowed but asks first, naming the
+    design and the number of pages that would go. Refusing here would block the
+    ordinary share-look-share-again loop before a site is launched.
+- **Re-sharing the same design still overwrites in place**, unchanged. The
+  "no duplicates on re-share" behaviour the whole feature rests on depends on
+  exactly that, and it is the thing most easily broken by fixing the rest.
+
+**No deliberate-replace override is built here.** The PRD does not ask for one,
+and a replace is not yet recoverable — R15 (Phase 6) is where that is fixed, and
+today's replace path takes no snapshot at all. Handing out a destructive button
+before then would trade a silent failure for a loud one.
 
 #### R4 — The CMS destination belongs to the project
 
@@ -237,7 +269,26 @@ differ, this PRD governs.)
 | **Why** | Today the destination belongs to the design *workspace*, not to the individual design — which is the mechanism behind R2's failure. Fixing R2 without fixing this leaves the aiming problem in place. |
 | **Acceptance** | **AC-A2.2** — attempt to point a design's destination at another project's CMS: not possible; the destination resolves to the design's own project only. **AC-A2.3** — publish to project A only, then fetch both domains: the change appears on A's domain and not on B's. |
 | **Depends on** | R1, R2 |
-| **Status** | ❌ Not started. |
+| **Status** | ✅ Built 2026-09-18. |
+
+##### What was actually aiming wrong
+
+Nothing ever *chose* the wrong CMS: the destination is one value set per design
+studio process, with no request parameter, no setting and no screen. But nothing
+*checked* either — a mis-aimed destination failed only because the receiving
+project's signing key would reject the token, which is a fail-closed accident
+rather than the stated rule. The rule is now stated: the CMS refuses a hand-off
+that does not name it, and refuses one when it does not know which project it
+is, instead of accepting anything.
+
+The domain half was weaker than the failure described above. The Cloudflare
+project and the custom domain were free text with no uniqueness rule, so two
+projects could name one destination — a typo, or a `-staging` clone keeping its
+source's — and publishing either would upload onto the other's live domain.
+Separately, the design studio's own deploy kept its Cloudflare credentials in a
+directory shared by every project on the host, letting any project's studio
+attach any domain in that account. Both are closed; the second also follows from
+§5.1, which settles that MMS-CMS is the sole publisher.
 
 ---
 
