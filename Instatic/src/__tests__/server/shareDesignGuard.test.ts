@@ -142,8 +142,22 @@ describe('a second design cannot silently destroy the first (AC-A2.1)', () => {
     expect(judgeShare(origin('design-a'), live, undefined).verdict).toBe('refuse')
   })
 
-  it('refuses a different design even when the first was never named', () => {
-    expect(judgeShare(null, live, { id: 'design-b' }).verdict).toBe('refuse')
+  // A website built before the platform recorded any of this has no origin.
+  // Reading that absence as evidence of a second design would lock every
+  // existing project out of its own studio, so the first identified share is
+  // adopted — and the project is protected from then on.
+  it('adopts the first identified design for a website that predates the check', () => {
+    expect(judgeShare(null, live, { id: 'design-b' }).verdict).toBe('allow')
+  })
+
+  it('protects that website from the NEXT different design, once adopted', () => {
+    expect(judgeShare(origin('design-b'), live, { id: 'design-c' }).verdict).toBe('refuse')
+  })
+
+  it('says plainly when a share simply did not identify itself', () => {
+    const v = judgeShare(null, live, undefined)
+    if (v.verdict !== 'refuse') throw new Error('expected a refusal')
+    expect(v.message).toContain('did not say which design')
   })
 })
 

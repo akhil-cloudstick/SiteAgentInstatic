@@ -87,17 +87,38 @@ export function judgeShare(
   // Nothing here yet, so nothing to lose.
   if (status.publishedPages === 0 && status.draftPages === 0) return { verdict: 'allow' }
 
+  // A website that predates this check, meeting an identified design for the
+  // first time: adopt it as the origin rather than refuse.
+  //
+  // R2 authorises refusing a second, DIFFERENT design. An unknown one is not
+  // the same thing: every website built before the platform recorded any of
+  // this has no origin, so treating that absence as evidence would lock each of
+  // those projects out of its own studio \u2014 the first share after the upgrade
+  // refused even when it comes from the very design that built the site. There
+  // is no second design here, only no history, and a project has one studio.
+  // So the first identified share is taken as the origin, and from that moment
+  // the project is protected exactly as intended.
+  if (!origin && incoming?.id) return { verdict: 'allow' }
+
   const was = origin?.designName || origin?.designId || null
   if (status.hasPublishedVersion) {
-    const built = was ? ` It was built from \u201c${was}\u201d.` : ''
+    const site =
+      `This project already has a published website of ${status.publishedPages} `
+      + `page${status.publishedPages === 1 ? '' : 's'}.`
+    // Two different reasons reach here and they need different words. Telling
+    // someone their design is "different" when the truth is "this share never
+    // said which design it is" sends them looking in the wrong place \u2014 the fix
+    // for that one is to update the design studio.
+    const why = incoming?.id
+      ? ` It was built from \u201c${was}\u201d. Sharing a different design would replace it, so it has been stopped.`
+        + ' Share this design into a project of its own, or have the existing website removed first.'
+      : ' This share did not say which design it came from, so there is no way to tell whether it would'
+        + ' update this website or replace it \u2014 and it has been stopped rather than risk the second.'
+        + ' Updating the design studio to a current build fixes this.'
     return {
       verdict: 'refuse',
       existing: { design: was, pages: status.publishedPages },
-      message:
-        `This project already has a published website of ${status.publishedPages} `
-        + `page${status.publishedPages === 1 ? '' : 's'}.${built} `
-        + 'Sharing a different design would replace it, so it has been stopped. '
-        + 'Share this design into a project of its own, or have the existing website removed first.',
+      message: site + why,
     }
   }
 
