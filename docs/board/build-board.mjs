@@ -17,7 +17,20 @@ import { fileURLToPath } from 'node:url'
 const HERE = dirname(fileURLToPath(import.meta.url))
 const board = JSON.parse(readFileSync(resolve(HERE, 'board.json'), 'utf8'))
 
-const STATUS_LABEL = { todo: 'Not started', doing: 'In progress', built: 'Built', blocked: 'Blocked' }
+// "Awaiting owner" exists because "Blocked" was answering the wrong question.
+// A board is read to find out WHOSE MOVE IT IS, and those are different answers:
+// blocked means something is stuck and needs solving, while awaiting-owner means
+// the work is finished here and is waiting on an action only the owner can take
+// — a Cloudflare deploy, say. Reporting the second as the first makes finished
+// work look like a problem; reporting it as "in progress" would be worse, since
+// that hides the fact that the next move is not ours.
+const STATUS_LABEL = {
+  todo: 'Not started',
+  doing: 'In progress',
+  built: 'Built',
+  'awaiting-owner': 'Awaiting owner',
+  blocked: 'Blocked',
+}
 const VERIFY_LABEL = { pending: 'Not yet verified', pass: 'Verified', fail: 'Failed' }
 
 function commit() {
@@ -91,6 +104,8 @@ const html = `<!doctype html>
     color-scheme: light dark;
     --bg: #fbfaf7; --fg: #1a1a1a; --muted: #5d5d5d; --line: #e2ded6; --card: #fff;
     --todo: #8a8a8a; --doing: #c47f17; --built: #1f7a4d; --blocked: #b3261e; --pending: #6b6b6b;
+    /* Finished here, waiting on a person outside this repo — not a failure, so not red. */
+    --awaiting: #2f6f9f;
   }
   @media (prefers-color-scheme: dark) {
     :root { --bg: #14161a; --fg: #f2f2f0; --muted: #a6a6a6; --line: #2c3037; --card: #1b1e24; }
@@ -122,6 +137,7 @@ const html = `<!doctype html>
   .chip { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 12px; font-weight: 600;
           border: 1px solid currentColor; white-space: nowrap; }
   .todo { color: var(--todo); } .doing { color: var(--doing); } .built { color: var(--built); } .blocked { color: var(--blocked); }
+  .awaiting-owner { color: var(--awaiting); }
   .v-pending { color: var(--pending); } .v-pass { color: var(--built); } .v-fail { color: var(--blocked); }
   @media (max-width: 560px) { body { padding: 20px 14px 48px; } table { font-size: 13px; } }
 </style>

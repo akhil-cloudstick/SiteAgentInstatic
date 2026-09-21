@@ -10,11 +10,14 @@
  * Cloudflare Access sits in front of the whole relay, so this one path needs
  * its own Access application with a Bypass policy (README, "Deploy").
  *
- * `live` is true only when the relay would both serve requests and record a
- * GO: Access and roles configured, and an owner key present that is a real
- * 32-byte Ed25519 key.
+ * `live` is true when Access and roles are configured and the relay holds a
+ * real 32-byte Ed25519 owner key. It deliberately does NOT claim that any given
+ * property can be approved: that depends on the approver registry, which this
+ * route does not read because health must never touch storage. `/api/approvers`
+ * answers that question, and needs no login either.
  */
 
+import { APPROVERS_PATH } from './approvers'
 import { readConfig, type Env } from './config'
 import { base64ToBytes, keyFingerprint } from './go'
 import { RELAY_VERSION } from './version'
@@ -42,41 +45,24 @@ async function ownerKeyFingerprint(env: Env): Promise<string | null> {
   return fingerprintOf(env.OWNER_PUBLIC_KEY?.trim() ?? '')
 }
 
-/**
- * Per-property approver fingerprints, so the key a property is approved by can
- * be compared against the Connector's policy without logging in — the same
- * check the single owner fingerprint already allows for the default approver.
- */
-async function propertyApproverFingerprints(env: Env): Promise<Record<string, string>> {
-  const out: Record<string, string> = {}
-  const raw = env.PROPERTY_APPROVERS?.trim() ?? ''
-  if (!raw) return out
-  try {
-    const parsed = JSON.parse(raw) as Record<string, unknown>
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return out
-    for (const [property, key] of Object.entries(parsed)) {
-      if (typeof key !== 'string') continue
-      const fingerprint = await fingerprintOf(key.trim())
-      if (fingerprint) out[property] = fingerprint
-    }
-  } catch {
-    // Malformed: `readConfig` reports it and keeps the relay shut. Nothing to show.
-  }
-  return out
-}
-
 export async function health(request: Request, env: Env): Promise<Response> {
   if (request.method !== 'GET' && request.method !== 'HEAD') {
     return new Response(JSON.stringify({ error: 'Use GET.' }), { status: 405, headers: HEADERS })
   }
   const fingerprint = await ownerKeyFingerprint(env)
-  const approvers = await propertyApproverFingerprints(env)
   const body = {
-    // A relay that approves only named properties is live without a default key.
-    live: readConfig(env).ok && (fingerprint !== null || Object.keys(approvers).length > 0),
+    live: readConfig(env).ok && fingerprint !== null,
     version: RELAY_VERSION,
     ownerKeyFingerprint: fingerprint,
-    approvers,
+    // Not the approvers themselves — a pointer to where they are.
+    //
+    // This field used to publish a property → fingerprint map read out of an
+    // environment variable. Once approvers moved into the registry that map
+    // became a second copy that could disagree with the one actually deciding
+    // approvals, which is the exact failure R6 exists to remove. The registry
+    // route needs no credential either, so nothing is lost by sending a reader
+    // one step further to the answer that is true.
+    approverRegistry: APPROVERS_PATH,
   }
   return new Response(request.method === 'HEAD' ? null : JSON.stringify(body), { status: 200, headers: HEADERS })
 }

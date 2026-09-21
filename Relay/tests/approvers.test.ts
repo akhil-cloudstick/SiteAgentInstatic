@@ -13,10 +13,22 @@
 import { expect, test } from 'bun:test'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { OTHER_KEY, OWNER, OWNER_KEY, goFor, openDeployRequest, relay, signGo, type Relay } from './helpers'
+import {
+  BUILDER,
+  OTHER_KEY,
+  OWNER,
+  OWNER_KEY,
+  VALIDATOR,
+  goFor,
+  openDeployRequest,
+  relay,
+  signGo,
+  type Relay,
+} from './helpers'
+import { approvers } from '../src/approvers'
 import { readConfig, type Env } from '../src/config'
 import { health } from '../src/health'
-import type { Ticket } from '../src/types'
+import type { Actor, Ticket } from '../src/types'
 
 const VECTORS = JSON.parse(
   readFileSync(resolve(import.meta.dir, '../../docs/relay/go-test-vectors.json'), 'utf8'),
@@ -159,26 +171,35 @@ test('a relay with an empty registry grants nothing', async () => {
   expect(res.json.error).toContain('No approver is registered')
 })
 
-test('a malformed approver map keeps the relay shut rather than falling back to the platform key', () => {
-  expect(readConfig({ ...ENV, PROPERTY_APPROVERS: '{not json' }).ok).toBe(false)
-  expect(readConfig({ ...ENV, PROPERTY_APPROVERS: '["sheeltron"]' }).ok).toBe(false)
-  expect(readConfig({ ...ENV, PROPERTY_APPROVERS: '{"sheeltron":42}' }).ok).toBe(false)
-
-  const good = readConfig({ ...ENV, PROPERTY_APPROVERS: `{"sheeltron":"${VECTORS.other.publicKey}"}` })
-  expect(good.ok).toBe(true)
-  if (good.ok) expect(good.relay.propertyApprovers).toEqual({ sheeltron: VECTORS.other.publicKey })
+// This test used to assert the opposite: that a WELL-FORMED approver map was
+// accepted and parsed. It was, and by then it decided nothing — the registry
+// had taken over. An operator setting it would have seen the relay start and
+// concluded they had designated an approver.
+test('the old approver-map setting is refused outright, in every shape', () => {
+  for (const raw of [
+    '{not json',
+    '["sheeltron"]',
+    '{"sheeltron":42}',
+    `{"sheeltron":"${VECTORS.other.publicKey}"}`,
+  ]) {
+    const read = readConfig({ ...ENV, PROPERTY_APPROVERS: raw })
+    expect({ raw, ok: read.ok }).toEqual({ raw, ok: false })
+    if (!read.ok) expect(read.problems.join(' ')).toContain('POST /api/approvers')
+  }
+  expect(readConfig(ENV).ok).toBe(true)
 })
 
-test('health publishes each property approver fingerprint, so both sides can be compared without logging in', async () => {
+test('health points at the registry rather than publishing a second copy of it', async () => {
   const res = await health(new Request('https://relay.test/api/health'), {
     ...ENV,
     OWNER_PUBLIC_KEY: VECTORS.owner.publicKey,
-    PROPERTY_APPROVERS: `{"sheeltron":"${VECTORS.other.publicKey}"}`,
   })
-  const body = (await res.json()) as { live: boolean; ownerKeyFingerprint: string; approvers: Record<string, string> }
+  const body = (await res.json()) as Record<string, unknown>
   expect(body.live).toBe(true)
   expect(body.ownerKeyFingerprint).toBe(VECTORS.owner.fingerprint)
-  expect(body.approvers).toEqual({ sheeltron: VECTORS.other.fingerprint })
+  expect(body.approverRegistry).toBe('/api/approvers')
+  // The field that could disagree with the registry is gone, not merely empty.
+  expect('approvers' in body).toBe(false)
 })
 
 /**
@@ -227,4 +248,177 @@ test('the relay resolves approvers exactly as the shared vectors say (R10)', asy
       expect({ case: c.name, status: granted.status }).toEqual({ case: c.name, status: 503 })
     }
   }
+})
+
+// --- The registry's write door (R6: first-class registration) -----------------
+//
+// These exercise the ROUTE, not the store. The distinction matters: the store
+// methods and their tests existed before the route did, which is exactly why
+// the requirement looked finished while registering an approver still meant a
+// developer running `wrangler d1 execute` against the production database.
+
+const register = (r: Relay, actor: Actor, body: unknown) => r.call(actor, 'POST', '/api/approvers', body)
+
+test('a project born with no approver can be given one through the route, and then approves (R6)', async () => {
+  // Nothing seeded: this is a new project exactly as provisioning leaves it.
+  const r = relay({ approvers: {} })
+  const ticket = await openDeployRequest(r, { target: 'greenkitchen' })
+
+  const beforeAnyoneIsRegistered = await grantWith(r, ticket, OWNER_KEY)
+  expect(beforeAnyoneIsRegistered.status).toBe(503)
+  expect(beforeAnyoneIsRegistered.json.error).toContain('No approver is registered')
+
+  const registered = await register(r, OWNER, {
+    property: 'greenkitchen',
+    level: 'project',
+    publicKey: VECTORS.owner.publicKey,
+    reason: 'provisioned',
+  })
+  expect(registered.status).toBe(201)
+  expect(registered.json.approver.fingerprint).toBe(VECTORS.owner.fingerprint)
+  // A first registration retires nothing, and says so rather than leaving the
+  // caller to guess whether it replaced something.
+  expect(registered.json.retired).toBeNull()
+
+  const now = await grantWith(r, ticket, OWNER_KEY)
+  expect(now.status).toBe(200)
+  expect(now.json.ownerKeyFingerprint).toBe(VECTORS.owner.fingerprint)
+})
+
+test('only the owner may write the registry', async () => {
+  const r = relay({ approvers: {} })
+  for (const actor of [BUILDER, VALIDATOR]) {
+    const res = await register(r, actor, {
+      property: 'greenkitchen',
+      level: 'project',
+      publicKey: VECTORS.other.publicKey,
+    })
+    expect({ role: actor.role, status: res.status }).toEqual({ role: actor.role, status: 403 })
+  }
+  // And nothing was written on the way to being refused.
+  expect(await r.store.listApprovers()).toEqual([])
+})
+
+test('rotation through the route: the old identity stops being accepted immediately (AC-B6.2)', async () => {
+  const r = relay({ approvers: { sheeltron: VECTORS.owner.publicKey } })
+
+  const rotated = await register(r, OWNER, {
+    property: 'sheeltron',
+    level: 'project',
+    publicKey: VECTORS.other.publicKey,
+    reason: 'quarterly rotation',
+  })
+  expect(rotated.status).toBe(201)
+  expect(rotated.json.retired.fingerprint).toBe(VECTORS.owner.fingerprint)
+
+  const ticket = await openDeployRequest(r, { target: 'sheeltron' })
+  const byTheRetiredKey = await grantWith(r, ticket, OWNER_KEY)
+  expect(byTheRetiredKey.status).toBe(422)
+  expect(await r.store.getGo(ticket.id)).toBeFalsy()
+
+  const byTheNewKey = await grantWith(r, ticket, OTHER_KEY)
+  expect(byTheNewKey.status).toBe(200)
+  expect(byTheNewKey.json.ownerKeyFingerprint).toBe(VECTORS.other.fingerprint)
+
+  // History is retained so an old receipt can still be explained (PRD 5.3).
+  const history = await r.store.listApproverHistory('sheeltron')
+  expect(history.length).toBe(2)
+  expect(history.filter((a) => a.retiredAt === null).length).toBe(1)
+})
+
+test('one key may not be registered for two properties (AC-B6.3)', async () => {
+  const r = relay({ approvers: { sheeltron: VECTORS.owner.publicKey } })
+  const res = await register(r, OWNER, {
+    property: 'greenkitchen',
+    level: 'project',
+    publicKey: VECTORS.owner.publicKey,
+  })
+  expect(res.status).toBe(409)
+  expect(res.json.error).toContain('sheeltron')
+  expect((await r.store.listApprovers()).some((a) => a.property === 'greenkitchen')).toBe(false)
+})
+
+test('retiring with no replacement leaves the property refusing everything (PRD 5.3)', async () => {
+  const r = relay({ approvers: { sheeltron: VECTORS.owner.publicKey } })
+
+  const retired = await r.call(OWNER, 'POST', '/api/approvers/sheeltron/retire')
+  expect(retired.status).toBe(200)
+  expect(retired.json.retired.fingerprint).toBe(VECTORS.owner.fingerprint)
+  // The response states the consequence rather than reading like a clean 200.
+  expect(retired.json.effect).toContain('no approver')
+
+  const ticket = await openDeployRequest(r, { target: 'sheeltron' })
+  const refused = await grantWith(r, ticket, OWNER_KEY)
+  expect(refused.status).toBe(503)
+  expect(await r.store.getGo(ticket.id)).toBeFalsy()
+})
+
+test('an unusable key is refused at registration, not discovered at GO time', async () => {
+  const r = relay({ approvers: {} })
+  // The realistic mistakes: a truncated paste, a hex string where base64 was
+  // meant, a whole PEM file. Not included — and this is deliberate — is "32
+  // bytes that are not a valid curve point": WebCrypto's raw Ed25519 import
+  // accepts any 32 bytes, so the registration door cannot detect that one and
+  // does not pretend to.
+  const cases = [
+    ['too short', Buffer.from('nowhere near thirty-two bytes').toString('base64')],
+    ['not base64 at all', 'this is not a key'],
+    ['hex where base64 was meant', Buffer.alloc(32, 7).toString('hex')],
+    ['a whole PEM file', '-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA\n-----END PUBLIC KEY-----'],
+  ] as const
+  for (const [name, publicKey] of cases) {
+    const res = await register(r, OWNER, { property: 'greenkitchen', level: 'project', publicKey })
+    expect({ name, status: res.status }).toEqual({ name, status: 422 })
+  }
+  expect(await r.store.listApprovers()).toEqual([])
+})
+
+test('two business approvers may not both claim one property', async () => {
+  const r = relay({
+    approvers: {},
+    delegated: { mmsgroup: { publicKey: VECTORS.owner.publicKey, covers: ['greenkitchen', 'sheeltron'] } },
+  })
+  const res = await register(r, OWNER, {
+    property: 'othergroup',
+    level: 'business',
+    covers: ['greenkitchen'],
+    publicKey: VECTORS.other.publicKey,
+  })
+  expect(res.status).toBe(409)
+  expect(res.json.conflicts).toEqual([{ property: 'greenkitchen', coveredBy: 'mmsgroup' }])
+})
+
+test('a business registration must name what it covers; a project one must not', async () => {
+  const r = relay({ approvers: {} })
+  const businessWithNoCovers = await register(r, OWNER, {
+    property: 'mmsgroup',
+    level: 'business',
+    publicKey: VECTORS.owner.publicKey,
+  })
+  expect(businessWithNoCovers.status).toBe(422)
+  expect(businessWithNoCovers.json.error).toContain('explicit, never implied')
+
+  const projectWithCovers = await register(r, OWNER, {
+    property: 'greenkitchen',
+    level: 'project',
+    covers: ['sheeltron'],
+    publicKey: VECTORS.owner.publicKey,
+  })
+  expect(projectWithCovers.status).toBe(422)
+})
+
+test('the registry is readable without a credential, and writable only with one', async () => {
+  // GET is answered before identity (every field is a public key); the write
+  // door is not, and the two are the same path.
+  const r = relay({ approvers: { sheeltron: VECTORS.owner.publicKey } })
+  const res = await approvers(new Request('https://relay.test/api/approvers'), r.store)
+  expect(res.status).toBe(200)
+  const body = (await res.json()) as { approvers: { property: string; publicKey: string }[] }
+  expect(body.approvers.map((a) => a.property)).toEqual(['sheeltron'])
+
+  const writeAttempt = await approvers(
+    new Request('https://relay.test/api/approvers', { method: 'POST' }),
+    r.store,
+  )
+  expect(writeAttempt.status).toBe(405)
 })

@@ -10,6 +10,7 @@
 import { handleMcpRequest, MCP_ENDPOINT_PATH } from './server'
 import { requiredToken, TOKEN_ENV_VAR } from './auth'
 import { ORIGIN_ENV_VAR } from './origin'
+import { startPushSweeper } from './pushTools'
 
 export interface ServeOptions {
   port: number
@@ -33,5 +34,17 @@ export function serveMcp(options: ServeOptions): { port: number; stop: () => voi
   console.log(`  auth     : Bearer, from ${TOKEN_ENV_VAR}`)
   console.log(`  origins  : ${process.env[ORIGIN_ENV_VAR] ?? '(localhost only)'}`)
 
-  return { port: server.port, stop: () => server.stop() }
+  // A push parked on an owner's signature resumes by itself once that signature
+  // exists (R13). Without this, somebody has to come back and nudge it, which
+  // is the round trip the milestone counts.
+  const sweeper = startPushSweeper()
+  console.log(`  pushes   : parked runs resume automatically`)
+
+  return {
+    port: server.port,
+    stop: () => {
+      sweeper.stop()
+      server.stop()
+    },
+  }
 }

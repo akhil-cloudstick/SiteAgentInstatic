@@ -134,5 +134,8 @@ Against a gated target, each of `connector_import_replace`, `connector_import_ar
   it must refuse. A publish whose draft changes while the CMS is publishing must fail with 412.
 - With the right GO it must run once, and refuse the same GO again.
 
-Against `sheeltron-staging` every one of them must run with no GO. Each gated response carries
-`go.ownerKeyFingerprint`, which must equal the fingerprint `sign-go keygen` printed for you.
+Against `sheeltron-staging` every one of them must behave **exactly as above** — staging is gated
+like production. It used to be exempt; the exemption was removed because "a staging project
+exempted from the approval gate proves nothing" (PRD 5.4), and a rehearsal that starts there has
+to exercise the real loop. Each gated response carries `go.ownerKeyFingerprint`, which must equal
+the fingerprint registered for that property in the approver registry (`GET /api/approvers`).

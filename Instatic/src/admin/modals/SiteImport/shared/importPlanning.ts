@@ -22,6 +22,8 @@ import {
   PathTraversalError,
 } from '@core/siteImport'
 import type { SiteDocument } from '@core/page-tree'
+import { reconcileFonts, type FontReconciliation } from '@core/fonts/reconcile'
+import type { SiteFontsSettings } from '@core/fonts/schemas'
 import { cloneSiteRuntimeConfig, DEFAULT_SITE_RUNTIME } from '@core/site-runtime'
 import { cmsAdapter } from '@core/persistence/cms'
 import { requestCmsSiteReload } from '@admin/state/adminEvents'
@@ -214,13 +216,40 @@ export function blankImportedDesign(site: SiteDocument): SiteDocument {
   }
 }
 
-/** Persist the freshly-imported draft site and broadcast a reload. */
-export async function saveImportedDraftSite(): Promise<void> {
+/**
+ * Persist the freshly-imported draft site and broadcast a reload.
+ *
+ * `fontsBeforeReplace` is the font registry as it stood BEFORE the design was
+ * blanked, and passing it is what keeps a family the new design uses from
+ * disappearing across a re-share (R12, AC-C12.2). It is reconciled rather than
+ * restored wholesale: only families the imported design actually references come
+ * back, so this cannot reintroduce the stale fonts the blank exists to remove.
+ *
+ * Omit it for a merge import, which blanks nothing and so has nothing to carry.
+ */
+export async function saveImportedDraftSite(
+  fontsBeforeReplace?: SiteFontsSettings | null,
+): Promise<FontReconciliation | null> {
   const site = useEditorStore.getState().site
   if (!site) throw new Error('Import completed, but no draft site is loaded.')
+
+  let toSave = site
+  let reconciliation: FontReconciliation | null = null
+  if (fontsBeforeReplace && (fontsBeforeReplace.items?.length ?? 0) > 0) {
+    reconciliation = reconcileFonts(fontsBeforeReplace, site)
+    toSave = { ...site, settings: { ...site.settings, fonts: reconciliation.fonts } }
+    if (reconciliation.restored.length > 0) {
+      console.info(
+        `[SiteImport] kept ${reconciliation.restored.length} font(s) the imported design still uses: ` +
+          reconciliation.restored.join(', '),
+      )
+    }
+  }
+
   // Replace-mode full save — an import deliberately replaces whatever is
   // stored. This is an out-of-relay write, so the collab relay resets the
   // affected docs and every connected editor rebinds to the imported state.
-  await cmsAdapter.saveSite(site)
+  await cmsAdapter.saveSite(toSave)
   requestCmsSiteReload()
+  return reconciliation
 }

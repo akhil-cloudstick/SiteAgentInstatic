@@ -83,10 +83,16 @@ step 8:
 - **Policy 2, action Service Auth:** include **Service Token** — `relay-validator` and `relay-builder`.
 - **Overview:** copy the **Application Audience (AUD) Tag**.
 
-**11. Open only the health check.** Zero Trust → **Access** → **Applications** → **Add an
+**11. Open only the two public reads.** Zero Trust → **Access** → **Applications** → **Add an
 application** → **Self-hosted**. Domain: your `deploy-relay.<your-subdomain>.workers.dev`, path
 `api/health`. One policy, action **Bypass**, include **Everyone**. Every other address keeps the
 login.
+
+Then repeat it for path **`api/approvers`**. That route publishes the approver registry, and the
+side that CHECKS approvals reads it holding no relay credential — every field in it is a public key,
+which is why it answers before identity in the Worker. Without its own Bypass policy Access
+redirects it to a login page and the checking side cannot read the registry at all, while the code
+and the README both say it needs none. Two applications, two Bypass policies; nothing else opens.
 
 ## Part 3 — configure and redeploy
 
@@ -107,6 +113,21 @@ Only Client IDs go in this file, never a Client Secret.
 ```
 npx wrangler deploy
 ```
+
+**13a. Check what actually went live.** A deploy that succeeds is not the same as a deploy that
+carried the change you meant, and the version field only tells you the truth if somebody remembered
+to bump it — once, it was not bumped, and a whole requirement sat committed and undeployed for weeks
+while `/api/health` reported the same number on both sides. So check a route instead of a number:
+
+```
+curl -s https://deploy-relay.<your-subdomain>.workers.dev/api/health
+curl -s https://deploy-relay.<your-subdomain>.workers.dev/api/approvers
+```
+
+The first must report the `version` you just deployed. The second must return JSON with an
+`approvers` array — **not** `{"error":"No such route."}` (the build predates the registry, step 13
+did not take) and **not** an HTML login page (step 11's second Bypass policy is missing). Run both
+from a machine with no relay credential: that is the position the side checking approvals is in.
 
 **14. Optional notifier.** To receive a webhook when tickets change or the validator stalls:
 ```

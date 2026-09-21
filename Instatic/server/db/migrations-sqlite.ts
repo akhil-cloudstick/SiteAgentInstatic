@@ -223,7 +223,7 @@ export const sqliteMigrations: Migration[] = [
 
       insert into data_tables (id, name, slug, kind, route_base, singular_label, plural_label, primary_field_id, system, fields_json)
       values ('posts', 'Posts', 'posts', 'postType', '/posts', 'Post', 'Posts', 'title', 1,
-        '[{"type":"text","id":"title","label":"Title","required":true,"builtIn":true},{"type":"text","id":"slug","label":"Slug","required":true,"builtIn":true},{"type":"richText","id":"body","label":"Body","format":"markdown","builtIn":true},{"type":"media","id":"featuredMedia","label":"Featured media","mediaKind":"image","builtIn":true},{"type":"text","id":"seoTitle","label":"SEO title","builtIn":true},{"type":"longText","id":"seoDescription","label":"SEO description","builtIn":true}]')
+        '[{"type":"text","id":"title","label":"Title","required":true,"builtIn":true},{"type":"text","id":"slug","label":"Slug","required":true,"builtIn":true},{"type":"richText","id":"body","label":"Body","format":"markdown","builtIn":true},{"type":"media","id":"featuredMedia","label":"Featured media","mediaKind":"image","builtIn":true},{"type":"text","id":"seoTitle","label":"SEO title","builtIn":true},{"type":"longText","id":"seoDescription","label":"SEO description","builtIn":true},{"type":"url","id":"canonicalUrl","label":"Canonical URL","builtIn":true},{"type":"text","id":"ogTitle","label":"Open Graph title","builtIn":true},{"type":"longText","id":"ogDescription","label":"Open Graph description","builtIn":true},{"type":"media","id":"ogImage","label":"Open Graph image","builtIn":true},{"type":"longText","id":"jsonLd","label":"JSON-LD structured data","builtIn":true}]')
       on conflict (id) do update
         set name = excluded.name,
             slug = excluded.slug,
@@ -239,7 +239,7 @@ export const sqliteMigrations: Migration[] = [
 
       insert into data_tables (id, name, slug, kind, route_base, singular_label, plural_label, primary_field_id, system, fields_json)
       values ('pages', 'Pages', 'pages', 'page', '', 'Page', 'Pages', 'title', 1,
-        '[{"type":"text","id":"title","label":"Title","required":true,"builtIn":true},{"type":"text","id":"slug","label":"Slug","required":true,"builtIn":true},{"type":"pageTree","id":"body","label":"Body","required":true,"builtIn":true},{"type":"text","id":"seoTitle","label":"SEO title","builtIn":true},{"type":"longText","id":"seoDescription","label":"SEO description","builtIn":true},{"type":"boolean","id":"templateEnabled","label":"Template","builtIn":true},{"type":"longText","id":"templateTarget","label":"Template target","builtIn":true},{"type":"number","id":"templatePriority","label":"Template priority","integer":true,"builtIn":true}]')
+        '[{"type":"text","id":"title","label":"Title","required":true,"builtIn":true},{"type":"text","id":"slug","label":"Slug","required":true,"builtIn":true},{"type":"pageTree","id":"body","label":"Body","required":true,"builtIn":true},{"type":"text","id":"seoTitle","label":"SEO title","builtIn":true},{"type":"longText","id":"seoDescription","label":"SEO description","builtIn":true},{"type":"boolean","id":"templateEnabled","label":"Template","builtIn":true},{"type":"longText","id":"templateTarget","label":"Template target","builtIn":true},{"type":"number","id":"templatePriority","label":"Template priority","integer":true,"builtIn":true},{"type":"url","id":"canonicalUrl","label":"Canonical URL","builtIn":true},{"type":"text","id":"ogTitle","label":"Open Graph title","builtIn":true},{"type":"longText","id":"ogDescription","label":"Open Graph description","builtIn":true},{"type":"media","id":"ogImage","label":"Open Graph image","builtIn":true},{"type":"longText","id":"jsonLd","label":"JSON-LD structured data","builtIn":true}]')
       on conflict (id) do update
         set name = excluded.name,
             slug = excluded.slug,
@@ -1315,6 +1315,55 @@ export const sqliteMigrations: Migration[] = [
         first_shared_at text not null default current_timestamp,
         last_shared_at  text not null default current_timestamp
       );
+    `,
+  },
+  {
+    // The SEO field set joins the stock schema (MMSBUILD R-SEO). See the
+    // Postgres twin for why. `json_insert(..., '$[#]', ...)` appends to the
+    // array; each statement is guarded on its own field id, so re-running adds
+    // nothing and a project that already ran the connector call keeps what it
+    // has.
+    id: '031_stock_seo_fields',
+    sql: `
+      update data_tables
+         set fields_json = json_insert(fields_json, '$[#]',
+               json('{"type":"url","id":"canonicalUrl","label":"Canonical URL","builtIn":true}')),
+             updated_at = current_timestamp
+       where id in ('pages', 'posts')
+         and not exists (select 1 from json_each(data_tables.fields_json)
+                          where json_extract(value, '$.id') = 'canonicalUrl');
+
+      update data_tables
+         set fields_json = json_insert(fields_json, '$[#]',
+               json('{"type":"text","id":"ogTitle","label":"Open Graph title","builtIn":true}')),
+             updated_at = current_timestamp
+       where id in ('pages', 'posts')
+         and not exists (select 1 from json_each(data_tables.fields_json)
+                          where json_extract(value, '$.id') = 'ogTitle');
+
+      update data_tables
+         set fields_json = json_insert(fields_json, '$[#]',
+               json('{"type":"longText","id":"ogDescription","label":"Open Graph description","builtIn":true}')),
+             updated_at = current_timestamp
+       where id in ('pages', 'posts')
+         and not exists (select 1 from json_each(data_tables.fields_json)
+                          where json_extract(value, '$.id') = 'ogDescription');
+
+      update data_tables
+         set fields_json = json_insert(fields_json, '$[#]',
+               json('{"type":"media","id":"ogImage","label":"Open Graph image","builtIn":true}')),
+             updated_at = current_timestamp
+       where id in ('pages', 'posts')
+         and not exists (select 1 from json_each(data_tables.fields_json)
+                          where json_extract(value, '$.id') = 'ogImage');
+
+      update data_tables
+         set fields_json = json_insert(fields_json, '$[#]',
+               json('{"type":"longText","id":"jsonLd","label":"JSON-LD structured data","builtIn":true}')),
+             updated_at = current_timestamp
+       where id in ('pages', 'posts')
+         and not exists (select 1 from json_each(data_tables.fields_json)
+                          where json_extract(value, '$.id') = 'jsonLd');
     `,
   },
 ]

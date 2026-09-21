@@ -66,6 +66,10 @@ export {
 } from './styleRuleTreeShake'
 export { collectContentClassNames, collectScriptClassNames } from './contentClassNames'
 
+// The URL shape of a published site. Shared with the pre-flight projection, so
+// predicted routes and baked routes come from one implementation (AC-C11.3).
+export { applyRoutePolicy, publicRowPath, routeBaseForTable } from './routePolicy'
+
 export { buildSiteFrameworkCss, generateFrameworkCss } from './frameworkCss'
 
 export { collectUserStylesheetCss } from './userStylesheets'

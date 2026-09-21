@@ -16,10 +16,15 @@ export interface Env {
   RELAY_ARTEFACTS: R2Bucket
   OWNER_PUBLIC_KEY?: string
   /**
-   * JSON object: property name → base64 raw Ed25519 public key of that
-   * property's approver, e.g. {"sheeltron":"<base64>"}. Unparseable JSON keeps
-   * the relay shut rather than silently approving properties with the platform
-   * key.
+   * REMOVED. This used to be a JSON map of property → approver key, and it was
+   * the second copy of a mapping that now lives only in the approver registry
+   * (R6: "the registry is the only place this mapping lives, and both ends read
+   * the same registry").
+   *
+   * It is still declared, and setting it still keeps the relay shut, because the
+   * dangerous outcome is not a typo — it is an operator who sets this, sees the
+   * relay start, and believes they have designated an approver while every GO is
+   * resolved from somewhere else entirely.
    */
   PROPERTY_APPROVERS?: string
   ACCESS_TEAM_DOMAIN?: string
@@ -81,37 +86,20 @@ export function readConfig(env: Env): ConfigRead {
     problems.push(`GO_MAX_TTL_HOURS must be greater than 0 and at most ${GO_TTL_CEILING_HOURS}`)
   }
 
-  // Fail-closed on a malformed map: a typo here must not leave properties
-  // approvable by the platform key, which is the one outcome this setting
-  // exists to prevent.
-  const propertyApprovers: Record<string, string> = {}
-  const rawApprovers = value('PROPERTY_APPROVERS')
-  if (rawApprovers) {
-    let parsed: unknown
-    try {
-      parsed = JSON.parse(rawApprovers)
-    } catch {
-      problems.push('PROPERTY_APPROVERS is not valid JSON')
-    }
-    if (parsed !== undefined) {
-      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-        problems.push('PROPERTY_APPROVERS must be a JSON object of property name → base64 public key')
-      } else {
-        for (const [property, key] of Object.entries(parsed as Record<string, unknown>)) {
-          if (typeof key !== 'string' || !key.trim()) {
-            problems.push(`PROPERTY_APPROVERS["${property}"] must be a base64 public key`)
-            continue
-          }
-          propertyApprovers[property.trim()] = key.trim()
-        }
-      }
-    }
+  // Set at all, in any shape: shut. A well-formed value is the more dangerous
+  // case, not the safer one — it starts cleanly and quietly designates nobody.
+  if (value('PROPERTY_APPROVERS')) {
+    problems.push(
+      'PROPERTY_APPROVERS has been replaced by the approver registry and no longer designates anyone. ' +
+        'Unset it, and register each property with POST /api/approvers ' +
+        '{"property","level","publicKey"} as the owner. GET /api/approvers shows what is registered.',
+    )
   }
 
   if (problems.length > 0) return { ok: false, problems }
   return {
     ok: true,
-    relay: { ownerPublicKey: value('OWNER_PUBLIC_KEY'), propertyApprovers, stallMinutes, goMaxTtlHours },
+    relay: { ownerPublicKey: value('OWNER_PUBLIC_KEY'), stallMinutes, goMaxTtlHours },
     access: { teamDomain, aud, ownerEmail, builderEmails, builderTokenIds, validatorTokenId },
     webhookUrl: value('NOTIFY_WEBHOOK_URL'),
     publicUrl: value('PUBLIC_URL').replace(/\/$/, ''),

@@ -112,3 +112,182 @@ export async function fetchRelayArtefact(sha256: string): Promise<RelayFetch> {
   }
   return { ok: true, bytes, relay }
 }
+
+// --- The relay as a place to ASK for something ---------------------------------
+//
+// Fetching an artefact was all the Connector ever did here, because opening a
+// deploy-request was a developer's job: they raised the ticket, waited for the
+// owner, and then came back and ran the import by hand. That is most of the
+// thirteen developer actions R13 has to remove, and none of it needs a person —
+// the Connector already holds a builder credential for this relay, which is
+// exactly the identity that opens a deploy-request.
+//
+// What stays with people is the part that should: the owner signs, and the
+// validator judges. Those are not round trips to a developer.
+
+export interface RelayTicket {
+  id: string
+  type: string
+  state: string
+  title: string
+  action?: string | null
+  target?: string | null
+  sha256?: string | null
+  contentDigest?: string | null
+}
+
+/**
+ * `transient` marks a failure where the relay never answered — it was
+ * unreachable, or the request timed out.
+ *
+ * The distinction is the one R8 is built on: "could not ask" is not a verdict.
+ * A caller that treats an unreachable relay the same as a refusal will abandon
+ * a push whose owner may already have approved it, on the strength of a dropped
+ * connection. A failure carrying an HTTP status is the relay's own answer and
+ * IS definitive.
+ */
+export type RelayCall<T> =
+  | { ok: true; value: T }
+  | { ok: false; reason: string; status?: number; transient?: boolean }
+
+/** One authenticated call to the relay, with the shared failure wording. */
+async function relayRequest(
+  path: string,
+  init: { method: string; body?: unknown; idempotencyKey?: string },
+): Promise<RelayCall<Record<string, unknown>>> {
+  const relay = relayUrl()
+  if (!relay) {
+    return { ok: false, reason: `No relay is configured: set ${RELAY_URL_ENV}, or PUBLIC_URL in Relay/wrangler.toml.` }
+  }
+  const auth = relayHeaders()
+  if (!auth.ok) return auth
+
+  const headers: Record<string, string> = { ...auth.headers }
+  let body: string | undefined
+  if (init.body !== undefined) {
+    body = JSON.stringify(init.body)
+    headers['content-type'] = 'application/json'
+  }
+  // Every relay write needs one. The relay replays a repeated key rather than
+  // acting twice, which is what makes a resumable push safe to retry: a step
+  // that ran but whose answer was lost does not run again.
+  if (init.idempotencyKey) headers['idempotency-key'] = init.idempotencyKey
+
+  let res: Response
+  try {
+    res = await fetch(`${relay}${path}`, {
+      method: init.method,
+      headers,
+      ...(body === undefined ? {} : { body }),
+      redirect: 'manual',
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    })
+  } catch (err) {
+    return {
+      ok: false,
+      reason: `Could not reach the relay at ${relay}: ${err instanceof Error ? err.message : String(err)}`,
+      // The relay said nothing at all, so this is a reason to ask again later
+      // rather than a reason to give up on what was being asked.
+      transient: true,
+    }
+  }
+  if (res.status >= 300 && res.status < 400) {
+    return { ok: false, reason: "The relay's login did not accept the Connector's token (it redirected to the login page)." }
+  }
+  const text = await res.text()
+  let parsed: Record<string, unknown> = {}
+  try {
+    parsed = JSON.parse(text) as Record<string, unknown>
+  } catch {
+    // Left empty; the status carries the message below.
+  }
+  if (!res.ok) {
+    const error = typeof parsed.error === 'string' ? parsed.error : `HTTP ${res.status}`
+    // The status is carried out, not just the sentence. A caller deciding
+    // "still waiting" from "something is wrong" has to read the contract, and
+    // matching on the prose of an error message is a coupling that breaks the
+    // first time somebody improves the wording.
+    return { ok: false, reason: `The relay refused ${init.method} ${path}: ${error}`, status: res.status }
+  }
+  return { ok: true, value: parsed }
+}
+
+/**
+ * Open a deploy-request, the ticket an owner signs a GO against.
+ *
+ * `idempotencyKey` is derived by the caller from the push it belongs to, so
+ * re-running a step that already opened its ticket gets the same ticket back
+ * instead of a second one sitting in the queue for nobody.
+ */
+export async function openRelayDeployRequest(
+  input: {
+    title: string
+    action: 'import' | 'publish'
+    target: string
+    sha256: string
+    contentDigest?: string
+    body?: string
+  },
+  idempotencyKey: string,
+): Promise<RelayCall<RelayTicket>> {
+  const res = await relayRequest('/api/tickets', {
+    method: 'POST',
+    idempotencyKey,
+    body: {
+      type: 'deploy-request',
+      title: input.title,
+      action: input.action,
+      target: input.target,
+      sha256: input.sha256,
+      ...(input.contentDigest ? { contentDigest: input.contentDigest } : {}),
+      ...(input.body ? { body: input.body } : {}),
+    },
+  })
+  if (!res.ok) return res
+  const ticket = res.value.ticket as RelayTicket | undefined
+  if (!ticket?.id) return { ok: false, reason: 'The relay accepted the deploy-request but returned no ticket.' }
+  return { ok: true, value: ticket }
+}
+
+/** A ticket's current state, for deciding whether the wait is over. */
+export async function readRelayTicket(id: string): Promise<RelayCall<RelayTicket>> {
+  const res = await relayRequest(`/api/tickets/${encodeURIComponent(id)}`, { method: 'GET' })
+  if (!res.ok) return res
+  const ticket = res.value.ticket as RelayTicket | undefined
+  if (!ticket?.id) return { ok: false, reason: `The relay returned no ticket for ${id}.` }
+  return { ok: true, value: ticket }
+}
+
+/**
+ * The owner's signed GO for a ticket, when one has been granted.
+ *
+ * `null` means "not yet", which is an ordinary state in a loop that waits for a
+ * person — distinct from a failure to ask, which comes back as `ok: false`.
+ * Collapsing the two is how a loop ends up treating "the owner has not signed"
+ * as "something went wrong" and giving up on a push that is merely waiting.
+ */
+export async function readRelayGo(id: string): Promise<RelayCall<unknown | null>> {
+  const res = await relayRequest(`/api/tickets/${encodeURIComponent(id)}/go`, { method: 'GET' })
+  if (res.ok) return { ok: true, value: res.value.go ?? null }
+
+  // The relay answers 409 for "there is no usable GO" and says which state the
+  // ticket is in. A ticket still sitting with the owner is the ordinary case
+  // and means "not yet"; a ticket that was rejected, or whose GO has expired,
+  // is also a 409 and must NOT be waited on forever, so only the waiting states
+  // come back as null.
+  if (res.status === 409 && /awaiting_go|open|triage/i.test(res.reason)) return { ok: true, value: null }
+  return res
+}
+
+/** Post a note onto a ticket, so the queue carries what the machine did. */
+export async function postRelayMessage(
+  ticketId: string,
+  body: string,
+  idempotencyKey: string,
+): Promise<RelayCall<Record<string, unknown>>> {
+  return relayRequest(`/api/tickets/${encodeURIComponent(ticketId)}/messages`, {
+    method: 'POST',
+    idempotencyKey,
+    body: { kind: 'info', body },
+  })
+}

@@ -176,6 +176,41 @@ function withFonts(site: SiteShell, entries: readonly FontEntry[]): SiteShell {
   }
 }
 
+
+/**
+ * What a site's font library actually holds, and which token resolves to what.
+ *
+ * R12's criterion is that a family the design uses still works after a replace.
+ * Until this existed, the only way to check that was to look at the rendered
+ * page — the same "somebody eyeballs it" dependency the whole phase is removing.
+ * Read-only; the numbers here are what an acceptance run asserts on.
+ */
+async function listFonts(session: InstaticSession): Promise<{
+  fonts: { id: string; family: string; source: string; variants: string[]; subsets: string[]; files: number }[]
+  tokens: { variable: string; family: string | null }[]
+}> {
+  const { site } = await getSiteShell(session)
+  const items = site.settings?.fonts?.items ?? []
+  return {
+    fonts: items.map((f) => ({
+      id: f.id,
+      family: f.family,
+      source: f.source,
+      variants: f.variants ?? [],
+      subsets: f.subsets ?? [],
+      // A registry entry whose files are gone renders nothing, so the count is
+      // reported rather than assumed.
+      files: f.files?.length ?? 0,
+    })),
+    tokens: (site.settings?.fonts?.tokens ?? []).map((t) => ({
+      variable: t.variable,
+      // A token pointing at a family that is no longer installed resolves to
+      // its bare fallback stack — text that silently loses its typeface. Null
+      // here is exactly that case, named.
+      family: items.find((f) => f.id === t.familyId)?.family ?? null,
+    })),
+  }
+}
 async function installGoogleFonts(
   session: InstaticSession,
   requests: readonly FontRequest[],
@@ -479,8 +514,10 @@ export const ADMIN_TOOLS: ConnectorTool[] = [
     description:
       'Add the standard SEO field set — canonical URL, Open Graph title, description and image, ' +
       'and JSON-LD — to a table in one call. WRITES schema; needs a recent connector_step_up. ' +
-      'These fields do not exist in the stock schema, and without them a migrated site cannot ' +
-      'keep its indexed URLs pointing where they did.',
+      'NOT NEEDED for pages or posts on a current project: these are part of the stock schema now, ' +
+      'so a fresh site can set them with no extra step. Re-running is harmless (a field that ' +
+      'already exists is left alone). Still the right call for a project created before that, or ' +
+      'to put the same set on a custom table.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -507,8 +544,10 @@ export const ADMIN_TOOLS: ConnectorTool[] = [
       'published pages never load Google. WRITES the draft site settings (settings.fonts) — ' +
       'nothing is public until the next publish, and on a gated target that publish GO must be ' +
       'taken after this call. Safe to re-run: a family already installed with every requested ' +
-      'variant and subset is skipped. A replace import rewrites the site settings, so run it ' +
-      'again after one. Variants use Google names: "400", "700", "400italic".',
+      'variant and subset is skipped. A replace import now KEEPS the families the incoming design ' +
+      'still refers to and drops only the rest, so re-running after one is needed only for a ' +
+      'family the design uses without naming it anywhere in its CSS. Variants use Google names: ' +
+      '"400", "700", "400italic". connector_list_fonts reports what a site actually has.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -536,6 +575,21 @@ export const ADMIN_TOOLS: ConnectorTool[] = [
         if (typeof requests === 'string') return fail(requests)
         return ok(await installGoogleFonts(requireSession(str(a.target)), requests))
       }),
+  },
+
+  {
+    name: 'connector_list_fonts',
+    description:
+      'The font families a site has installed, with their variants, subsets and file counts, and ' +
+      'what each font token resolves to. Read-only. Use it to confirm a family survived a replace ' +
+      'import, and to catch a token whose family reports null — that text has silently lost its ' +
+      'typeface and falls back to a generic stack.',
+    inputSchema: {
+      type: 'object',
+      properties: { target: targetProp },
+      additionalProperties: false,
+    },
+    handler: async (a) => guarded(async () => ok(await listFonts(requireSession(str(a.target))))),
   },
 
   {

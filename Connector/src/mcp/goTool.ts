@@ -23,8 +23,8 @@ const ok = (value: unknown): ToolResult => ({
   content: [{ type: 'text', text: JSON.stringify(value, null, 2) }],
 })
 
-const fail = (message: string): ToolResult => ({
-  content: [{ type: 'text', text: JSON.stringify({ error: message }, null, 2) }],
+const fail = (message: string, detail?: Record<string, unknown>): ToolResult => ({
+  content: [{ type: 'text', text: JSON.stringify({ error: message, ...(detail ? { detail } : {}) }, null, 2) }],
   isError: true,
 })
 
@@ -36,9 +36,22 @@ export async function runGated<T>(
   action: GoAction,
   binding: GoBinding,
   run: (go: Go | undefined) => Promise<T>,
+  options: {
+    /**
+     * A last check, run after the GO verifies and BEFORE it is spent.
+     *
+     * The order matters and is the same one the replace path uses by hand: a
+     * refusal here must not consume the approval, or the owner has to sign
+     * again for a bundle nobody ever acted on. Returning a refusal stops the
+     * action; returning null lets it proceed.
+     */
+    before?: () => Promise<{ message: string; detail: Record<string, unknown> } | null>
+  } = {},
 ): Promise<ToolResult> {
   const gate = await checkGo({ action, target: targetOf(args), go: args.go, binding })
   if (!gate.ok) return fail(goRefusal(gate.reason))
+  const stop = await options.before?.()
+  if (stop) return fail(stop.message, stop.detail)
   const result = await runUnderGo(gate, run)
   if (!result.ok) return fail(goRefusal(result.reason))
   // A deploy that ran under a GO names the build that ran it, so the record on

@@ -16,6 +16,7 @@
  *     delete routes, and the D1 schema refuses them too.
  */
 
+import { APPROVER_RETIRE, APPROVERS_PATH, registerApprover, retireApprover } from './approvers'
 import type { Deps } from './deps'
 import { toJsonl } from './export'
 import {
@@ -188,6 +189,20 @@ async function routeWrite(
   }
   if (method !== 'POST') return refuse(405, 'Use POST for this route.')
   if (path === '/api/tickets') return createTicket(bytes, actor, deps)
+
+  // The registry's write door (R6: registration, rotation and revocation as
+  // first-class operations). Owner-only — see the note in index.ts.
+  if (path === APPROVERS_PATH || APPROVER_RETIRE.test(path)) {
+    if (actor.role !== 'owner') {
+      return refuse(403, 'Only the owner registers or retires an approver: it decides whose signature counts.')
+    }
+    const at = deps.now().toISOString()
+    const retire = APPROVER_RETIRE.exec(path)
+    if (retire) return retireApprover(decodeURIComponent(retire[1]!), deps.store, at)
+    const body = readObject(bytes)
+    if (!body) return refuse(400, 'The body must be a JSON object.')
+    return registerApprover(body, deps.store, actor.subject, at)
+  }
 
   const match = /^\/api\/tickets\/([^/]+)\/(messages|transition|go)$/.exec(path)
   if (!match) return refuse(404, 'No such route.')

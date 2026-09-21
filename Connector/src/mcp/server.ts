@@ -23,6 +23,7 @@ import { WRITE_TOOLS } from './writeTools'
 import { CRUD_TOOLS } from './crudTools'
 import { IMPORT_TOOLS } from './importTools'
 import { ADMIN_TOOLS } from './adminTools'
+import { PUSH_TOOLS } from './pushTools'
 import { TEMPLATE_TOOLS } from './templateTools'
 import { authorize, unauthorized } from './auth'
 import { originAllowed, originRejected } from './origin'
@@ -160,6 +161,7 @@ export function buildConnectorMcpServer(caller = 'client'): Server {
     ...CRUD_TOOLS,
     ...IMPORT_TOOLS,
     ...ADMIN_TOOLS,
+    ...PUSH_TOOLS,
     ...TEMPLATE_TOOLS,
   ]
   const byName = new Map(ALL_TOOLS.map((t) => [t.name, t]))

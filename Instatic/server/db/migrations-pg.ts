@@ -243,7 +243,7 @@ export const pgMigrations: Migration[] = [
 
       insert into data_tables (id, name, slug, kind, route_base, singular_label, plural_label, primary_field_id, system, fields_json)
       values ('posts', 'Posts', 'posts', 'postType', '/posts', 'Post', 'Posts', 'title', true,
-        '[{"type":"text","id":"title","label":"Title","required":true,"builtIn":true},{"type":"text","id":"slug","label":"Slug","required":true,"builtIn":true},{"type":"richText","id":"body","label":"Body","format":"markdown","builtIn":true},{"type":"media","id":"featuredMedia","label":"Featured media","mediaKind":"image","builtIn":true},{"type":"text","id":"seoTitle","label":"SEO title","builtIn":true},{"type":"longText","id":"seoDescription","label":"SEO description","builtIn":true}]'::jsonb)
+        '[{"type":"text","id":"title","label":"Title","required":true,"builtIn":true},{"type":"text","id":"slug","label":"Slug","required":true,"builtIn":true},{"type":"richText","id":"body","label":"Body","format":"markdown","builtIn":true},{"type":"media","id":"featuredMedia","label":"Featured media","mediaKind":"image","builtIn":true},{"type":"text","id":"seoTitle","label":"SEO title","builtIn":true},{"type":"longText","id":"seoDescription","label":"SEO description","builtIn":true},{"type":"url","id":"canonicalUrl","label":"Canonical URL","builtIn":true},{"type":"text","id":"ogTitle","label":"Open Graph title","builtIn":true},{"type":"longText","id":"ogDescription","label":"Open Graph description","builtIn":true},{"type":"media","id":"ogImage","label":"Open Graph image","builtIn":true},{"type":"longText","id":"jsonLd","label":"JSON-LD structured data","builtIn":true}]'::jsonb)
       on conflict (id) do update
         set name = excluded.name,
             slug = excluded.slug,
@@ -259,7 +259,7 @@ export const pgMigrations: Migration[] = [
 
       insert into data_tables (id, name, slug, kind, route_base, singular_label, plural_label, primary_field_id, system, fields_json)
       values ('pages', 'Pages', 'pages', 'page', '', 'Page', 'Pages', 'title', true,
-        '[{"type":"text","id":"title","label":"Title","required":true,"builtIn":true},{"type":"text","id":"slug","label":"Slug","required":true,"builtIn":true},{"type":"pageTree","id":"body","label":"Body","required":true,"builtIn":true},{"type":"text","id":"seoTitle","label":"SEO title","builtIn":true},{"type":"longText","id":"seoDescription","label":"SEO description","builtIn":true},{"type":"boolean","id":"templateEnabled","label":"Template","builtIn":true},{"type":"longText","id":"templateTarget","label":"Template target","builtIn":true},{"type":"number","id":"templatePriority","label":"Template priority","integer":true,"builtIn":true}]'::jsonb)
+        '[{"type":"text","id":"title","label":"Title","required":true,"builtIn":true},{"type":"text","id":"slug","label":"Slug","required":true,"builtIn":true},{"type":"pageTree","id":"body","label":"Body","required":true,"builtIn":true},{"type":"text","id":"seoTitle","label":"SEO title","builtIn":true},{"type":"longText","id":"seoDescription","label":"SEO description","builtIn":true},{"type":"boolean","id":"templateEnabled","label":"Template","builtIn":true},{"type":"longText","id":"templateTarget","label":"Template target","builtIn":true},{"type":"number","id":"templatePriority","label":"Template priority","integer":true,"builtIn":true},{"type":"url","id":"canonicalUrl","label":"Canonical URL","builtIn":true},{"type":"text","id":"ogTitle","label":"Open Graph title","builtIn":true},{"type":"longText","id":"ogDescription","label":"Open Graph description","builtIn":true},{"type":"media","id":"ogImage","label":"Open Graph image","builtIn":true},{"type":"longText","id":"jsonLd","label":"JSON-LD structured data","builtIn":true}]'::jsonb)
       on conflict (id) do update
         set name = excluded.name,
             slug = excluded.slug,
@@ -1286,6 +1286,55 @@ export const pgMigrations: Migration[] = [
         first_shared_at timestamptz not null default current_timestamp,
         last_shared_at  timestamptz not null default current_timestamp
       );
+    `,
+  },
+  {
+    id: '031_stock_seo_fields',
+    sql: `
+      -- The SEO field set becomes part of the stock schema (MMSBUILD R-SEO).
+      --
+      -- Canonical URL, the Open Graph trio and JSON-LD were added per project by
+      -- a connector call, which made every new site a two-step affair and meant
+      -- a site that skipped the step emitted no canonical tag at all. "A site
+      -- that needs a per-project add-on to emit its own canonical tag is not a
+      -- factory output."
+      --
+      -- The renderer has always read these fields; only the schema was missing.
+      -- So this adds them, and nothing else has to change for a fresh project to
+      -- set them straight away.
+      --
+      -- One statement per field, each guarded on its own id, so the migration is
+      -- idempotent and a project that already ran the connector call keeps the
+      -- field it has rather than gaining a duplicate.
+      update data_tables set fields_json = fields_json ||
+        '{"type":"url","id":"canonicalUrl","label":"Canonical URL","builtIn":true}'::jsonb,
+        updated_at = current_timestamp
+       where id in ('pages', 'posts')
+         and not exists (select 1 from jsonb_array_elements(fields_json) f where f->>'id' = 'canonicalUrl');
+
+      update data_tables set fields_json = fields_json ||
+        '{"type":"text","id":"ogTitle","label":"Open Graph title","builtIn":true}'::jsonb,
+        updated_at = current_timestamp
+       where id in ('pages', 'posts')
+         and not exists (select 1 from jsonb_array_elements(fields_json) f where f->>'id' = 'ogTitle');
+
+      update data_tables set fields_json = fields_json ||
+        '{"type":"longText","id":"ogDescription","label":"Open Graph description","builtIn":true}'::jsonb,
+        updated_at = current_timestamp
+       where id in ('pages', 'posts')
+         and not exists (select 1 from jsonb_array_elements(fields_json) f where f->>'id' = 'ogDescription');
+
+      update data_tables set fields_json = fields_json ||
+        '{"type":"media","id":"ogImage","label":"Open Graph image","builtIn":true}'::jsonb,
+        updated_at = current_timestamp
+       where id in ('pages', 'posts')
+         and not exists (select 1 from jsonb_array_elements(fields_json) f where f->>'id' = 'ogImage');
+
+      update data_tables set fields_json = fields_json ||
+        '{"type":"longText","id":"jsonLd","label":"JSON-LD structured data","builtIn":true}'::jsonb,
+        updated_at = current_timestamp
+       where id in ('pages', 'posts')
+         and not exists (select 1 from jsonb_array_elements(fields_json) f where f->>'id' = 'jsonLd');
     `,
   },
 ]

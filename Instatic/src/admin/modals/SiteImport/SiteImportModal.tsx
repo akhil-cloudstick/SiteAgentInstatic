@@ -79,6 +79,7 @@ import type {
   BundleImportSelection,
   ImportResult as CmsImportResult,
 } from '@core/data/bundleSchema'
+import type { SiteFontsSettings } from '@core/fonts/schemas'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -250,6 +251,17 @@ export function SiteImportModal({ onCmsBundleImportComplete }: SiteImportModalPr
   const [replaceNotice, setReplaceNotice] = useState<{ design: string; pages: number } | null>(null)
   const [stagedFiles, setStagedFiles] = useState<FileMap['files'] | null>(null)
   const replaceAgreedRef = useRef(false)
+  /**
+   * The font registry as it stood before the design was blanked.
+   *
+   * Blanking is what makes a re-share an exact match for its design, and it
+   * takes the font registry with it. A family the new design USES but does not
+   * itself ship an `@font-face` for — one bound to a token, say — then has
+   * nothing to reinstall it, and a correct push lands unstyled. Held here so the
+   * save at the end of the import can put back exactly those and nothing else
+   * (R12, AC-C12.2).
+   */
+  const fontsBeforeReplaceRef = useRef<SiteFontsSettings | null>(null)
   useEffect(() => {
     if (consumedPendingImportRef.current) return
     if (!pendingFileMap) return
@@ -282,6 +294,9 @@ export function SiteImportModal({ onCmsBundleImportComplete }: SiteImportModalPr
         // registry. loadSite only touches the store; the DB is untouched until
         // the import actually commits + saves, so a failed import loses nothing.
         const current = await ensureCurrentSiteForStaticImport()
+        // Snapshot the fonts the blank is about to drop, so the ones the new
+        // design still uses can be put back after the import (R12).
+        fontsBeforeReplaceRef.current = current.settings?.fonts ?? null
         useEditorStore.getState().loadSite(blankImportedDesign(current))
         await finalizePlan({ files })
       } catch (err) {
@@ -453,7 +468,11 @@ export function SiteImportModal({ onCmsBundleImportComplete }: SiteImportModalPr
         phase: 'applying',
         currentItem: 'Saving imported draft…',
       }))
-      await saveImportedDraftSite()
+      // Hands back any font the blank dropped that the imported design still
+      // refers to. Cleared straight after, so a later merge import in the same
+      // session cannot restore fonts it never blanked.
+      await saveImportedDraftSite(fontsBeforeReplaceRef.current)
+      fontsBeforeReplaceRef.current = null
       // Reconcile every category to what was actually committed — skipped pages
       // or rules (conflict resolutions) leave fewer than the planned totals.
       setRunProgress((prev) => ({
@@ -590,6 +609,9 @@ export function SiteImportModal({ onCmsBundleImportComplete }: SiteImportModalPr
     void (async () => {
       try {
         const current = await ensureCurrentSiteForStaticImport()
+        // Snapshot the fonts the blank is about to drop, so the ones the new
+        // design still uses can be put back after the import (R12).
+        fontsBeforeReplaceRef.current = current.settings?.fonts ?? null
         useEditorStore.getState().loadSite(blankImportedDesign(current))
         await finalizePlan({ files })
       } catch (err) {

@@ -99,14 +99,9 @@ The full step-by-step guide, with every dashboard click, is **`DEPLOY.md`**. In 
    owner sends it. Optionally `ROLE_BUILDER_TOKEN_IDS`: service token IDs that act as the builder,
    for tooling that opens tickets and uploads artefacts without a browser.
 
-   Also optional, and the one that matters once more than one property is served:
-   `PROPERTY_APPROVERS`, a JSON object of property name → that property's approver public key, e.g.
-   `{"sheeltron":"<base64>"}`. A property listed there is approved by its own key alone —
-   `OWNER_PUBLIC_KEY` does not approve it — and a property whose key is unusable is refused rather
-   than falling back, so a misconfigured property never becomes approvable by the platform's key.
-   Malformed JSON keeps the relay shut instead. The same map lives in the Connector's
-   `go-policy.json` under `targets`; both sides must agree, and `/api/health` prints each
-   fingerprint so they can be compared without logging in.
+   Do **not** set `PROPERTY_APPROVERS`. It used to hold a property → approver map; approvers now
+   live in the registry (below) and that setting designates nobody, so the relay refuses to start
+   while it is present rather than let anyone believe otherwise.
 6. `npx wrangler secret put NOTIFY_WEBHOOK_URL`
 7. `npx wrangler deploy`, then attach the custom domain to the Worker.
 8. As each identity, `GET /api/whoami` must return the right role.
@@ -125,9 +120,30 @@ It prints `ownerPublicKey` and `fingerprint`. The public key goes into `OWNER_PU
 into `S:\SiteAgentHub\Connector\go-policy.json` (template: `go-policy.example.json`). The private key
 never leaves that machine; `keygen` refuses to write inside a git working tree.
 
-For a property whose own owner designates the approver, put that key in `PROPERTY_APPROVERS` here
-and under `targets` in `go-policy.json` instead. `sign` names the property and the key fingerprint it
-signed with, which is what both sides must list for that property.
+## The approver registry
+
+Which key approves a property is decided in one place, which both ends read (R6). `OWNER_PUBLIC_KEY`
+above is the owner's own identity for display; it approves nothing by itself, and there is no
+fallback — a property with no registered approver refuses every GO, deliberately.
+
+Registering is an owner-only call:
+
+```
+POST /api/approvers        {"property":"sheeltron","level":"project","publicKey":"<base64>"}
+POST /api/approvers        {"property":"acme-group","level":"business","covers":["sheeltron"],"publicKey":"<base64>"}
+POST /api/approvers/sheeltron/retire
+```
+
+Re-registering a property **is** the rotation: the previous identity is retired in the same
+transaction and stops being accepted immediately, while its row is kept so an old receipt can still
+be explained. Retiring without a replacement leaves that property refusing every gated action —
+that is the intended outcome, and the response says so.
+
+One key may not be registered for two properties, and two business approvers may not both cover one
+property; both are refused at registration.
+
+`GET /api/approvers` needs no login (every field is a public key) and is what the Connector reads,
+so the two sides cannot drift.
 
 ## Tests (from `S:\SiteAgentHub\Relay`)
 

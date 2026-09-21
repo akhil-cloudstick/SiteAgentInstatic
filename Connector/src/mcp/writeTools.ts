@@ -247,7 +247,21 @@ export const WRITE_TOOLS: ConnectorTool[] = [
       guarded(async () => {
         const strategy =
           args.strategy === 'merge-add' ? ('merge-add' as const) : ('merge-overwrite' as const)
-        return ok(await importBundle(requireSession(typeof args.target === 'string' ? args.target : undefined), args.bundle, strategy))
+        // This path used to reach the CMS with nothing computed at all. It
+        // reports now, so every import answers AC-C11.2's four items.
+        //
+        // It does not block: a draft import is a merge into a site that already
+        // has content, so a bundle-only projection would refuse correct pushes
+        // (see `preflightRefusal`). Nothing it imports is publicly visible
+        // either — the publish gate is where a draft that would bake broken is
+        // stopped, computed against the draft as it actually stands.
+        const publishProjection = projectPublish(args.bundle)
+        const result = await importBundle(
+          requireSession(typeof args.target === 'string' ? args.target : undefined),
+          args.bundle,
+          strategy,
+        )
+        return ok({ ...(result as Record<string, unknown>), publishProjection })
       }),
   },
 

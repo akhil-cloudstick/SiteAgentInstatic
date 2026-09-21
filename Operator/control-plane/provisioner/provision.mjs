@@ -202,6 +202,23 @@ export async function provisionTenant({ name, ownerEmail, cfProject, customDomai
     slug, cfProject: cf_project, customDomain: custom_domain, status: 'provisioning',
     inviteUrl,
     message: 'Provisioning started (~30–60s). Share the invite link with the tenant.',
+    // A new project has no approver, and until one is registered every gated
+    // action on it refuses — which is correct (no approver means nobody may
+    // approve) but silent, so a first push fails at its first approval with a
+    // message about a registry nobody mentioned. Said here instead, where the
+    // project is being created, and addressed to the only party who can act on
+    // it: registering an approver decides whose signature counts, so it is the
+    // owner's to do and nobody else's.
+    approver: {
+      registered: false,
+      why:
+        `No approver is registered for "${slug}" yet, so imports and publishes on it will refuse. ` +
+        'This is deliberate — there is no platform-wide key that would otherwise cover it.',
+      howToRegister:
+        `The owner registers one on the relay: POST /api/approvers ` +
+        `{"property":"${slug}","level":"project","publicKey":"<their base64 Ed25519 key>"}, ` +
+        `or adds "${slug}" to the covers list of the business-level approver that should reach it.`,
+    },
   };
 }
 

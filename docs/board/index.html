@@ -9,6 +9,8 @@
     color-scheme: light dark;
     --bg: #fbfaf7; --fg: #1a1a1a; --muted: #5d5d5d; --line: #e2ded6; --card: #fff;
     --todo: #8a8a8a; --doing: #c47f17; --built: #1f7a4d; --blocked: #b3261e; --pending: #6b6b6b;
+    /* Finished here, waiting on a person outside this repo — not a failure, so not red. */
+    --awaiting: #2f6f9f;
   }
   @media (prefers-color-scheme: dark) {
     :root { --bg: #14161a; --fg: #f2f2f0; --muted: #a6a6a6; --line: #2c3037; --card: #1b1e24; }
@@ -40,6 +42,7 @@
   .chip { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 12px; font-weight: 600;
           border: 1px solid currentColor; white-space: nowrap; }
   .todo { color: var(--todo); } .doing { color: var(--doing); } .built { color: var(--built); } .blocked { color: var(--blocked); }
+  .awaiting-owner { color: var(--awaiting); }
   .v-pending { color: var(--pending); } .v-pass { color: var(--built); } .v-fail { color: var(--blocked); }
   @media (max-width: 560px) { body { padding: 20px 14px 48px; } table { font-size: 13px; } }
 </style>
@@ -49,13 +52,13 @@
   <h1>MMSBUILD delivery board</h1>
   <p class="meta">
     Modules are the phases of <code>docs/prd/mmsbuild-prd.md</code>, tasks are its requirements, subtasks its acceptance criteria — ids unchanged.<br>
-    Generated 2026-09-21 08:15 UTC from commit <code>408af1c</code>.
+    Generated 2026-09-21 15:04 UTC from commit <code>50fd5ad</code>.
   </p>
   <div class="legend">
-    <p><strong>Build</strong> is ours: <span class="chip todo">Not started</span> <span class="chip doing">In progress</span> <span class="chip built">Built</span> <span class="chip blocked">Blocked</span></p>
+    <p><strong>Build</strong> is ours: <span class="chip todo">Not started</span> <span class="chip doing">In progress</span> <span class="chip built">Built</span> <span class="chip awaiting-owner">Awaiting owner</span> <span class="chip blocked">Blocked</span></p>
     <p><strong>Acceptance run</strong> is yours, and we never set it: <span class="chip v-pending">Not yet verified</span> <span class="chip v-pass">Verified</span> <span class="chip v-fail">Failed</span></p>
     <p>Modules are the PRD's phases, tasks are its requirements, subtasks are its acceptance criteria. Ids match the PRD exactly, so an acceptance run maps to this board line for line. `status` is ours — what is built. `verified` belongs to the acceptance run and is never set by us.</p>
-    <p>Totals — tasks: <span class="chip todo">7 not started</span> <span class="chip doing">6 in progress</span> <span class="chip built">18 built</span> &nbsp;·&nbsp; acceptance criteria: <span class="chip todo">12 not started</span> <span class="chip doing">3 in progress</span> <span class="chip built">41 built</span></p>
+    <p>Totals — tasks: <span class="chip todo">6 not started</span> <span class="chip doing">5 in progress</span> <span class="chip built">19 built</span> <span class="chip awaiting-owner">1 awaiting owner</span> &nbsp;·&nbsp; acceptance criteria: <span class="chip todo">8 not started</span> <span class="chip doing">6 in progress</span> <span class="chip built">40 built</span> <span class="chip awaiting-owner">2 awaiting owner</span></p>
   </div>
   <section class="module">
     <h2><span class="id">P0</span> Phase 0 — Close the surface</h2>
@@ -296,22 +299,22 @@
   <section class="module">
     <h2><span class="id">P4</span> Phase 4 — Governance, with proof</h2>
     <p class="summary">NEW-4 first: nothing in the approver work functions until both ends agree.</p>
-    <p class="counts"><span class="chip built">6 built</span></p>
+    <p class="counts"><span class="chip doing">2 in progress</span> <span class="chip built">4 built</span></p>
     <details class="task" open>
       <summary>
         <span class="id">NEW-4</span>
         <span class="task-title">The issuing side resolves per-property approvers too</span>
-        <span class="chip built">Built</span>
-        <span class="counts"><span class="chip built">1 built</span></span>
+        <span class="chip doing">In progress</span>
+        <span class="counts"><span class="chip doing">1 in progress</span></span>
       </summary>
-      <p class="depends">Depends on R1</p><p class="note">Completed 2026-09-21: c865d10 gave both ends the same RULE over two separate configs — a file committed to git on one side, a Worker variable on the other, kept in step by a human comparing fingerprints. The PRD asks for something narrower: &quot;the registry is the only place this mapping lives, and both ends read the same registry&quot;. That registry now exists, in the relay’s database: append-only, one live approver per property enforced by a partial unique index, with triggers refusing any edit or delete. The checking side reads it through a public endpoint — every field is a public key — and caches it, refreshed every few minutes and REFUSED once older than a GO can live, so a short relay outage changes nothing while a retired key can never outlive its own approvals.</p>
+      <p class="depends">Depends on R1</p><p class="note">Completed 2026-09-21: c865d10 gave both ends the same RULE over two separate configs — a file committed to git on one side, a Worker variable on the other, kept in step by a human comparing fingerprints. The PRD asks for something narrower: &quot;the registry is the only place this mapping lives, and both ends read the same registry&quot;. That registry now exists, in the relay’s database: append-only, one live approver per property enforced by a partial unique index, with triggers refusing any edit or delete. The checking side reads it through a public endpoint — every field is a public key — and caches it, refreshed every few minutes and REFUSED once older than a GO can live, so a short relay outage changes nothing while a retired key can never outlive its own approvals. NOT LIVE YET. The relay on Cloudflare still runs a build from before the approver registry — asked for the registry it answers &quot;No such route&quot; — so this is written and committed but does nothing in production. Redeploying the relay is the owner's to run (it needs a Cloudflare login we do not have), and it also needs the D1 migration applied and a second Access Bypass policy for /api/approvers, without which that route returns a login page instead of the registry. Status stays blocked until the owner confirms the deploy and it has been checked. SECOND CORRECTION, 2026-09-21: this is not only waiting on the deploy — there is build work left here. The registration door is an owner-only HTTP route, and the owner on this relay is a BROWSER identity: the role is matched on the email in a Cloudflare Access assertion, and a service token can never hold it. So the one party permitted to register an approver has no practical way to call the route — they would have to extract an Access token from a browser session to use curl. The route was built without the surface its only permitted caller can reach it through. It belongs on the relay's own owner page, beside the button where they already record a GO, and NOT in the operator console: that console's administrator is a different identity from this relay's owner, so it could not act as them even if it offered to.</p>
       <table>
         <thead><tr><th>Acceptance</th><th>Pass means</th><th>Build</th><th>Acceptance run</th></tr></thead>
         <tbody>
         <tr>
           <td class="id">NEW-4a</td>
           <td>A property-specific approval is issued and then accepted by the checking side</td>
-          <td><span class="chip built">Built</span></td>
+          <td><span class="chip doing">In progress</span></td>
           <td><span class="chip v-pending">Not yet verified</span></td>
         </tr>
         </tbody>
@@ -321,35 +324,35 @@
       <summary>
         <span class="id">R6</span>
         <span class="task-title">Per-property approver: registration, delegation, rotation</span>
-        <span class="chip built">Built</span>
-        <span class="counts"><span class="chip built">4 built</span></span>
+        <span class="chip doing">In progress</span>
+        <span class="counts"><span class="chip doing">4 in progress</span></span>
       </summary>
-      <p class="depends">Depends on R1, NEW-4</p><p class="note">Built 2026-09-21: registration writes one row with an effective-from stamp, and the append-only table is itself the audit record. Rotation retires the old row and inserts the new one in a single batch, so a property is never left with two live identities or none by accident, and the retired identity stops being accepted immediately rather than at the next restart — with history kept so an old receipt can still be explained. Revocation without a replacement leaves the property refusing everything. Delegation is explicit: a business-level approver reaches only the properties its registration names, never what a hierarchy implies. And the fallback is gone: a property with no registered approver is refused rather than handed to the platform-wide key that, until this change, approved every site on the estate — &quot;a fallback that widens scope on error is a master key by another name&quot;.</p>
+      <p class="depends">Depends on R1, NEW-4</p><p class="note">Built 2026-09-21: registration writes one row with an effective-from stamp, and the append-only table is itself the audit record. Rotation retires the old row and inserts the new one in a single batch, so a property is never left with two live identities or none by accident, and the retired identity stops being accepted immediately rather than at the next restart — with history kept so an old receipt can still be explained. Revocation without a replacement leaves the property refusing everything. Delegation is explicit: a business-level approver reaches only the properties its registration names, never what a hierarchy implies. And the fallback is gone: a property with no registered approver is refused rather than handed to the platform-wide key that, until this change, approved every site on the estate — &quot;a fallback that widens scope on error is a master key by another name&quot;. CORRECTION, 2026-09-21: this note previously read as though registration were a first-class operation from the start. It was not. The store methods and the read endpoint shipped in Phase 4, but there was no write route, so registering an approver still meant a developer running wrangler d1 by hand against the production database — one of the thirteen developer actions R13 exists to remove, and one that blocked a new project at step zero, since a project with no approver refuses every gated action. The owner-only write door (POST /api/approvers, POST /api/approvers/&lt;property&gt;/retire) landed in Phase 5, with registration, rotation and revocation each covered by a test that goes through the route rather than calling the store directly — which is how it looked finished while it was not. NOT LIVE YET. The relay on Cloudflare still runs a build from before the approver registry — asked for the registry it answers &quot;No such route&quot; — so this is written and committed but does nothing in production. Redeploying the relay is the owner's to run (it needs a Cloudflare login we do not have), and it also needs the D1 migration applied and a second Access Bypass policy for /api/approvers, without which that route returns a login page instead of the registry. Status stays blocked until the owner confirms the deploy and it has been checked. SECOND CORRECTION, 2026-09-21: this is not only waiting on the deploy — there is build work left here. The registration door is an owner-only HTTP route, and the owner on this relay is a BROWSER identity: the role is matched on the email in a Cloudflare Access assertion, and a service token can never hold it. So the one party permitted to register an approver has no practical way to call the route — they would have to extract an Access token from a browser session to use curl. The route was built without the surface its only permitted caller can reach it through. It belongs on the relay's own owner page, beside the button where they already record a GO, and NOT in the operator console: that console's administrator is a different identity from this relay's owner, so it could not act as them even if it offered to.</p>
       <table>
         <thead><tr><th>Acceptance</th><th>Pass means</th><th>Build</th><th>Acceptance run</th></tr></thead>
         <tbody>
         <tr>
           <td class="id">AC-B6.1</td>
           <td>P's approver accepted; another property's approver refused for the same action</td>
-          <td><span class="chip built">Built</span></td>
+          <td><span class="chip doing">In progress</span></td>
           <td><span class="chip v-pending">Not yet verified</span></td>
         </tr>
         <tr>
           <td class="id">AC-B6.2</td>
           <td>After rotation: old identity refused, new identity accepted</td>
-          <td><span class="chip built">Built</span></td>
+          <td><span class="chip doing">In progress</span></td>
           <td><span class="chip v-pending">Not yet verified</span></td>
         </tr>
         <tr>
           <td class="id">AC-B6.3</td>
           <td>No identity satisfies two properties — a key approving P1 fails on P2</td>
-          <td><span class="chip built">Built</span></td>
+          <td><span class="chip doing">In progress</span></td>
           <td><span class="chip v-pending">Not yet verified</span></td>
         </tr>
         <tr>
           <td class="id">AC-B6.4</td>
           <td>Business approver covers its own projects, never another Business's</td>
-          <td><span class="chip built">Built</span></td>
+          <td><span class="chip doing">In progress</span></td>
           <td><span class="chip v-pending">Not yet verified</span></td>
         </tr>
         </tbody>
@@ -362,7 +365,7 @@
         <span class="chip built">Built</span>
         <span class="counts"><span class="chip built">6 built</span></span>
       </summary>
-      <p class="depends">Depends on R6</p><p class="note">Completed 2026-09-21: the exemption list is removed from the policy, the loader and the gate. A staging project is now gated exactly like a production one, because &quot;a staging project exempted from the approval gate proves nothing&quot; — the loop being rehearsed has to be the real one. The type that carried the gate result can no longer express &quot;passed without an approval&quot; at all, so the exemption cannot be reintroduced by configuration.</p>
+      <p class="depends">Depends on R6</p><p class="note">Completed 2026-09-21: the exemption list is removed from the policy, the loader and the gate. A staging project is now gated exactly like a production one, because &quot;a staging project exempted from the approval gate proves nothing&quot; — the loop being rehearsed has to be the real one. The type that carried the gate result can no longer express &quot;passed without an approval&quot; at all, so the exemption cannot be reintroduced by configuration. NOTE 2026-09-21: the gate itself runs here and refuses correctly, but granting an approval needs the approver registry, which is not deployed (see R6). So the refusal half is provable today and the success half — AC-B7.5, import and publish under separate approvals — is not, until the relay is redeployed.</p>
       <table>
         <thead><tr><th>Acceptance</th><th>Pass means</th><th>Build</th><th>Acceptance run</th></tr></thead>
         <tbody>
@@ -505,22 +508,22 @@
   <section class="module">
     <h2><span class="id">P5</span> Phase 5 — The repeatable push</h2>
     <p class="summary">A new site pushed with zero developer round trips.</p>
-    <p class="counts"><span class="chip todo">1 not started</span> <span class="chip doing">3 in progress</span></p>
+    <p class="counts"><span class="chip built">3 built</span> <span class="chip awaiting-owner">1 awaiting owner</span></p>
     <details class="task" open>
       <summary>
         <span class="id">R11</span>
         <span class="task-title">Pre-flight is the gate</span>
-        <span class="chip doing">In progress</span>
-        <span class="counts"><span class="chip todo">1 not started</span> <span class="chip doing">1 in progress</span> <span class="chip built">1 built</span></span>
+        <span class="chip built">Built</span>
+        <span class="counts"><span class="chip built">3 built</span></span>
       </summary>
-      <p class="depends">Depends on R8</p><p class="note">The pre-flight computes its findings from the real publishing logic and reports all four items. It does not block on them, and it does not yet cover the publish path.</p>
+      <p class="depends">Depends on R8</p><p class="note">Built 2026-09-21: the pre-flight is now a decision, not a report. It carries `ok` and coded findings alongside the sentences it always had, and a blocking finding refuses the import before anything reaches the CMS. Gating one call site was not enough — four paths could land a bundle, and two of them (archive and draft import) computed nothing at all; every path now projects, and the publish path gates too, against the draft as the CMS actually holds it, so a site that would bake broken is caught however its content arrived — bundle import, draft import, or a person editing in the admin. A check that could not run refuses rather than passing. There is no override. Two real bugs surfaced on the way: the projection compared rule ids against rule names, which made both &quot;kept for&quot; lists silently empty for every real bundle (the fixture set name === id, so the suite agreed with itself); and it predicted routes the bake provably never writes — template pages, unpublished rows, and rows of a table with no entry template. The threshold stays at a quarter, deliberately: PRD 5.5 warns against calibrating it against the wrong build, so v4 (8 of 617) and v7 (600 of 666) are both pinned as fixtures — the first must block, the second must pass.</p>
       <table>
         <thead><tr><th>Acceptance</th><th>Pass means</th><th>Build</th><th>Acceptance run</th></tr></thead>
         <tbody>
         <tr>
           <td class="id">AC-C11.1</td>
           <td>A known-broken bundle is reported and blocked before import</td>
-          <td><span class="chip todo">Not started</span></td>
+          <td><span class="chip built">Built</span></td>
           <td><span class="chip v-pending">Not yet verified</span></td>
         </tr>
         <tr>
@@ -532,7 +535,7 @@
         <tr>
           <td class="id">AC-C11.3</td>
           <td>Predicted routes equal published routes</td>
-          <td><span class="chip doing">In progress</span></td>
+          <td><span class="chip built">Built</span></td>
           <td><span class="chip v-pending">Not yet verified</span></td>
         </tr>
         </tbody>
@@ -542,10 +545,10 @@
       <summary>
         <span class="id">R12</span>
         <span class="task-title">Fonts: idempotent install, and survival across a replace</span>
-        <span class="chip doing">In progress</span>
-        <span class="counts"><span class="chip todo">1 not started</span> <span class="chip built">1 built</span></span>
+        <span class="chip built">Built</span>
+        <span class="counts"><span class="chip built">2 built</span></span>
       </summary>
-      <p class="note">Install is genuinely idempotent. Nothing preserves or reinstalls fonts across a replace-style import.</p>
+      <p class="note">Built 2026-09-21: a replace no longer loses the fonts the new design still uses. The design blank stays — it is what stops a re-share accumulating stale fonts from previous shares — but the registry is now reconciled across it rather than simply dropped: a family the incoming design actually references comes back, and one it no longer uses does not. References are read from style rules, from breakpoint variants, and from raw stylesheets, which is where a hand-written design keeps its typography. Tokens return only when their family does, since a token pointing at a missing family resolves to a bare fallback stack — the unstyled result the whole requirement is about. The font files were never deleted by any of this, so what was lost was metadata and what is restored points at bytes that are still there.</p>
       <table>
         <thead><tr><th>Acceptance</th><th>Pass means</th><th>Build</th><th>Acceptance run</th></tr></thead>
         <tbody>
@@ -558,7 +561,7 @@
         <tr>
           <td class="id">AC-C12.2</td>
           <td>Intended fonts render on the live page after a replace-style import</td>
-          <td><span class="chip todo">Not started</span></td>
+          <td><span class="chip built">Built</span></td>
           <td><span class="chip v-pending">Not yet verified</span></td>
         </tr>
         </tbody>
@@ -568,17 +571,17 @@
       <summary>
         <span class="id">R-SEO</span>
         <span class="task-title">Per-page SEO renders unconditionally</span>
-        <span class="chip doing">In progress</span>
-        <span class="counts"><span class="chip doing">1 in progress</span></span>
+        <span class="chip built">Built</span>
+        <span class="counts"><span class="chip built">1 built</span></span>
       </summary>
-      <p class="note">Partly there; must be verified as rendering from the core path rather than an installed extra.</p>
+      <p class="note">Built 2026-09-21: better than this board said, and now complete. Title, description, canonical, Open Graph and JSON-LD were already emitted by the core publisher on the only public render path, with no capability check and no plugin — there is no SEO plugin in the repo at all. What was missing was the schema: five of the seven fields had to be added per project by a connector call, so a site that skipped the step emitted no canonical tag. They are part of the stock pages and posts schema now, for new projects and existing ones alike, and the field names match what the renderer already reads.</p>
       <table>
         <thead><tr><th>Acceptance</th><th>Pass means</th><th>Build</th><th>Acceptance run</th></tr></thead>
         <tbody>
         <tr>
           <td class="id">AC-C-SEO</td>
           <td>SEO fields render in the served page from the core renderer, no add-on</td>
-          <td><span class="chip doing">In progress</span></td>
+          <td><span class="chip built">Built</span></td>
           <td><span class="chip v-pending">Not yet verified</span></td>
         </tr>
         </tbody>
@@ -588,23 +591,23 @@
       <summary>
         <span class="id">R13</span>
         <span class="task-title">A staging project the studio drives itself</span>
-        <span class="chip todo">Not started</span>
-        <span class="counts"><span class="chip todo">2 not started</span></span>
+        <span class="chip awaiting-owner">Awaiting owner</span>
+        <span class="counts"><span class="chip awaiting-owner">2 awaiting owner</span></span>
       </summary>
-      <p class="depends">Depends on R11, R12</p>
+      <p class="depends">Depends on R11, R12</p><p class="note">Built 2026-09-21. One operation runs the whole sequence PRD 5.4 names — pre-flight, import under the owner-signed GO, inspect, publish under a second GO — and it drives the ordinary import and publish tools rather than reimplementing them, so it passes exactly the gates a person would. An orchestrator that called the CMS directly would be a way around those gates, which is the same as not having them. It never blocks on a person: each call advances as far as it can and reports whose move it is, state lives on disk so the wait outlives the process, and the relay's own replay means a resumed step reuses the ticket it already opened instead of putting a second deploy-request in front of the owner. A parked run resumes by itself once the signature exists — by polling, because the relay is a Worker and the Connector listens on loopback behind the gateway, so the webhook that looks more elegant is the one that cannot be delivered. A bundle the pre-flight refuses stops the run BEFORE anyone is asked to approve it. Two things outside the loop were what actually kept the count above zero, and both are fixed: the stack's own launcher read its credentials from whatever shell happened to start it rather than from platform configuration — the literal reading of &quot;without a developer holding the credentials&quot; — and a service that exited stayed dead until somebody noticed, which is a developer round trip by any measure. Services now restart with backoff, and configuration comes from the platform's own file. Project creation also says plainly that a new project has no approver and how the owner registers one, instead of letting a first push fail at its first approval with a message about a registry nobody mentioned. ONE THING DELIBERATELY NOT DONE: the studio's Share-to-CMS path still ends at a browser wizard. That is a decision on record, not an omission — the browser runs the same wizard a manual drag-drop uses, so Share to CMS cannot drift from manual import, and a server-side adapter would be a second implementation of the importer. It costs no DEVELOPER action, which is what this requirement counts; the studio operating its own tool is the studio doing its job. PENDING, and this status was wrong before: it was set to built while the live relay still answered &quot;No such route&quot; for the registry the loop depends on. The loop opens deploy-requests and reads GOs on that relay, so until it is redeployed the push cannot run against production at all — everything asserted above is asserted against tests and a local stack. It moves to built when the owner has deployed and a real push has been run end to end. STATUS, corrected again: &quot;blocked&quot; overstated it — nothing here is stuck. The loop is written, committed and passing; what it waits on is the relay redeploy, which needs a Cloudflare login the owner holds and we do not, and an approver registered for whatever project it pushes to (see R6). It moves to built when both are true and a real push has run end to end.</p>
       <table>
         <thead><tr><th>Acceptance</th><th>Pass means</th><th>Build</th><th>Acceptance run</th></tr></thead>
         <tbody>
         <tr>
           <td class="id">AC-C13.1</td>
           <td>Studio completes preview → import → publish with zero developer actions</td>
-          <td><span class="chip todo">Not started</span></td>
+          <td><span class="chip awaiting-owner">Awaiting owner</span></td>
           <td><span class="chip v-pending">Not yet verified</span></td>
         </tr>
         <tr>
           <td class="id">AC-C13.2</td>
           <td>Milestone — a new site pushed with zero developer round trips</td>
-          <td><span class="chip todo">Not started</span></td>
+          <td><span class="chip awaiting-owner">Awaiting owner</span></td>
           <td><span class="chip v-pending">Not yet verified</span></td>
         </tr>
         </tbody>

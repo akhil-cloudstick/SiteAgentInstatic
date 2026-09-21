@@ -64,8 +64,6 @@ export interface GoPolicy {
   ownerKeyFingerprint?: string
   /** Why `ownerKey` is absent, for the refusal message. */
   keyProblem?: string
-  /** Per-property approvers, by resolved target name. */
-  targets: Record<string, Approver>
 }
 
 export type GoPolicyLoad = { ok: true; policy: GoPolicy } | { ok: false; reason: string }
@@ -118,28 +116,37 @@ export function loadGoPolicy(): GoPolicyLoad {
     return { ok: false, reason: `${file} must hold a JSON object, so no gated action can run.` }
   }
 
-  const p = parsed as { ownerPublicKey?: unknown; targets?: unknown }
-  const policy: GoPolicy = {
-    targets: {},
+  const p = parsed as { ownerPublicKey?: unknown; targets?: unknown; ungated?: unknown }
+
+  // Two settings that used to decide something and no longer do. Both are
+  // refused rather than ignored, because a file that parses cleanly while
+  // designating nobody is the worse failure: it reads like configuration and
+  // behaves like nothing.
+  if (p.targets !== undefined) {
+    return {
+      ok: false,
+      reason:
+        `${file} still has "targets". Whose key approves a property is read from the approver ` +
+        'registry now (R6) and this field designates nobody. Remove it; register approvers with ' +
+        'POST /api/approvers on the relay.',
+    }
+  }
+  if (p.ungated !== undefined) {
+    return {
+      ok: false,
+      reason:
+        `${file} still has "ungated". There is no exemption list — "a staging project exempted from ` +
+        'the approval gate proves nothing" (PRD 5.4). Remove it; staging is gated like production.',
+    }
   }
 
+  const policy: GoPolicy = {}
   const owner = readApprover(p.ownerPublicKey)
   if (owner.key) {
     policy.ownerKey = owner.key
     policy.ownerKeyFingerprint = owner.fingerprint
   } else {
     policy.keyProblem = owner.problem
-  }
-
-  if (p.targets && typeof p.targets === 'object' && !Array.isArray(p.targets)) {
-    for (const [name, entry] of Object.entries(p.targets as Record<string, unknown>)) {
-      const target = name.trim()
-      if (!target) continue
-      const key = entry && typeof entry === 'object' && !Array.isArray(entry)
-        ? (entry as { ownerPublicKey?: unknown }).ownerPublicKey
-        : entry
-      policy.targets[target] = readApprover(key)
-    }
   }
   return { ok: true, policy }
 }
@@ -155,24 +162,8 @@ function readApprover(raw: unknown): Approver {
   }
 }
 
-/**
- * Whose signature approves this property.
- *
- * A property with its own entry is approved by that key alone: an entry that
- * names an unusable key refuses, rather than quietly handing approval of a
- * client's site back to the platform's key.
- */
-export function approverFor(
-  policy: GoPolicy,
-  target: string,
-): { ok: true; key: KeyObject; fingerprint: string; scope: 'property' | 'default' } | { ok: false; problem: string } {
-  const own = policy.targets[target]
-  if (own) {
-    return own.key && own.fingerprint
-      ? { ok: true, key: own.key, fingerprint: own.fingerprint, scope: 'property' }
-      : { ok: false, problem: `${own.problem} for "${target}"` }
-  }
-  return policy.ownerKey && policy.ownerKeyFingerprint
-    ? { ok: true, key: policy.ownerKey, fingerprint: policy.ownerKeyFingerprint, scope: 'default' }
-    : { ok: false, problem: policy.keyProblem ?? 'no ownerPublicKey set' }
-}
+// There is no `approverFor` here any more. It resolved a property's approver
+// from this file, with a fall back to the platform key for anything unlisted —
+// which is the master key P1 forbids. `./registry.ts` answers that question now,
+// from the registry the issuing side writes to, and refuses when nobody is
+// registered instead of widening.

@@ -65,7 +65,6 @@ export interface CallResult {
 export function relay(
   options: {
     ownerPublicKey?: string
-    propertyApprovers?: Record<string, string>
     /** property -> public key, registered at project level before the first call. */
     approvers?: Record<string, string>
     /** business name -> { key, covers } for delegated approvers. */
@@ -81,7 +80,6 @@ export function relay(
     blobs,
     config: {
       ownerPublicKey: options.ownerPublicKey ?? VECTORS.owner.publicKey,
-      propertyApprovers: options.propertyApprovers ?? {},
       stallMinutes: 30,
       goMaxTtlHours: 4,
     },

@@ -32,6 +32,7 @@ import {
 } from '../http/rows'
 import { GO_INPUT_PROP } from '../go/message'
 import { currentRowsDigest, runGated, siteDigestReport } from './goTool'
+import { currentDraftBundle, preflightRefusal, projectPublish } from './publishProjection'
 
 const ok = (value: unknown): ToolResult => ({
   content: [{ type: 'text', text: JSON.stringify(value, null, 2) }],
@@ -41,6 +42,45 @@ const fail = (message: string): ToolResult => ({
   content: [{ type: 'text', text: JSON.stringify({ error: message }, null, 2) }],
   isError: true,
 })
+
+/**
+ * Compare the routes the pre-flight predicted against the routes the publish
+ * actually baked, and say so in the response (AC-C11.3).
+ *
+ * Until the bake reported its own routes, "the routes it predicted exist after
+ * import" could only be checked by a person opening the site — the same
+ * dependency R11 exists to remove. The comparison is reported rather than
+ * enforced: it is evidence about a publish that has already happened, and the
+ * disagreement worth acting on is a `missing` route, which means the prediction
+ * promised a page the site does not have.
+ */
+function withRouteCheck(result: ToolResult, predicted: string[]): ToolResult {
+  const first = result.content[0]
+  if (!first || first.type !== 'text') return result
+  try {
+    const parsed = JSON.parse(first.text) as Record<string, unknown>
+    // `runGated` wraps a gated result as { result, go, connector }.
+    const body = (parsed.result ?? parsed) as Record<string, unknown>
+    const baked = Array.isArray(body.bakedRoutes) ? (body.bakedRoutes as unknown[]).map(String) : null
+    if (!baked) return result
+    const bakedSet = new Set(baked)
+    const predictedSet = new Set(predicted)
+    return ok({
+      ...parsed,
+      routeCheck: {
+        predicted: predicted.length,
+        baked: baked.length,
+        agrees: predicted.length === baked.length && predicted.every((p) => bakedSet.has(p)),
+        /** Predicted but not baked — the prediction promised a page that is not there. */
+        missing: predicted.filter((p) => !bakedSet.has(p)),
+        /** Baked but not predicted — the site has pages the pre-flight did not foresee. */
+        unexpected: baked.filter((b) => !predictedSet.has(b)),
+      },
+    })
+  } catch {
+    return result
+  }
+}
 
 async function guarded(fn: () => Promise<ToolResult>): Promise<ToolResult> {
   try {
@@ -286,9 +326,29 @@ export const CRUD_TOOLS: ConnectorTool[] = [
     handler: async (a) =>
       guarded(async () => {
         const session = requireSession(str(a.target))
+        let predicted: string[] = []
         // The signed draft hash goes to the CMS as the publish precondition, so
         // an edit that lands after this check is still refused.
-        return runGated(a, 'publish', { kind: 'site', session }, (go) => publishSite(session, go?.contentDigest))
+        const result = await runGated(
+          a,
+          'publish',
+          { kind: 'site', session },
+          (go) => publishSite(session, go?.contentDigest),
+          {
+            // R11 on the publish path. The import gate only ever sees a bundle,
+            // and only a replace tells it the whole truth; a draft can also
+            // reach this point through a merge import or through somebody
+            // editing in the admin. This projects the draft as the CMS actually
+            // holds it, so a site that would bake broken is stopped however its
+            // content got there — and stopped before the approval is spent.
+            before: async () => {
+              const projection = projectPublish(await currentDraftBundle(session))
+              predicted = projection.routes.map((r) => r.path)
+              return preflightRefusal(projection, 'publish')
+            },
+          },
+        )
+        return result.isError ? result : withRouteCheck(result, predicted)
       }),
   },
 

@@ -21,7 +21,7 @@ import { GO_INPUT_PROP } from '../go/message'
 import { checkGo, describeGo, goRefusal, runUnderGo } from '../go/verify'
 import { runGated } from './goTool'
 import { connectorRevision } from './revision'
-import { projectPublish } from './publishProjection'
+import { preflightRefusal, projectPublish } from './publishProjection'
 import { saveUploadPart, UPLOAD_MAX_PARTS, UPLOAD_PART_MAX_BYTES } from './uploadStore'
 
 const ok = (value: unknown): ToolResult => ({
@@ -32,6 +32,26 @@ const fail = (message: string, detail?: unknown): ToolResult => ({
   content: [{ type: 'text', text: JSON.stringify({ error: message, detail }, null, 2) }],
   isError: true,
 })
+
+/**
+ * Attach the pre-flight's report to a result that already succeeded.
+ *
+ * AC-C11.2 asks for the four items on the import paths, not only on the
+ * projection tool. The import's own answer is left exactly as it was — this
+ * adds a key, and returns the result untouched if it is not the JSON envelope
+ * every tool here emits.
+ */
+function withProjection(result: ToolResult, publishProjection: unknown): ToolResult {
+  const first = result.content[0]
+  if (!first || first.type !== 'text') return result
+  try {
+    const parsed = JSON.parse(first.text) as unknown
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return result
+    return ok({ ...(parsed as Record<string, unknown>), publishProjection })
+  } catch {
+    return result
+  }
+}
 
 async function guarded(fn: () => Promise<ToolResult>): Promise<ToolResult> {
   try {
@@ -182,9 +202,21 @@ export const IMPORT_TOOLS: ConnectorTool[] = [
         }
         const strategy = a.strategy === 'merge-add' ? ('merge-add' as const) : ('merge-overwrite' as const)
         const session = requireSession(str(a.target))
+        // This path used to reach the CMS with nothing computed at all. It now
+        // projects, so AC-C11.2's four items are reported on every import.
+        //
+        // It does not BLOCK, and that is deliberate: a merge lands beside
+        // content already on the site, so a rule unused by this bundle's pages
+        // may be used by a page already there. Refusing on a bundle-only
+        // projection would stop correct merges. What catches a merge that would
+        // bake broken is the publish gate, which projects the draft as held.
+        const projection = projectPublish(source.value.bundle)
         // The strategy IS the action: a GO for merge-add must not be spendable
         // on merge-overwrite, which replaces what merge-add would have kept.
-        return runGated(a, strategy, { kind: 'bytes', sha256 }, () => importArchive(session, archive, strategy))
+        const result = await runGated(a, strategy, { kind: 'bytes', sha256 }, () =>
+          importArchive(session, archive, strategy),
+        )
+        return result.isError ? result : withProjection(result, projection)
       }),
   },
 
@@ -327,6 +359,17 @@ export const IMPORT_TOOLS: ConnectorTool[] = [
         if (a.previewOnly === true || !gate.ok) {
           return ok({ previewOnly: true, preview: previewReport, go: describeGo(gate) })
         }
+
+        // R11, AC-C11.1: the pre-flight is a gate, not a report. This is a
+        // replace, so the bundle IS the site that results and the projection
+        // describes it exactly.
+        //
+        // It sits AFTER the GO check and the dry run and BEFORE the one call
+        // that deletes everything — the last moment at which refusing still
+        // costs nothing. The motivating incident reached production through
+        // this exact line with the numbers already computed and printed.
+        const refusal = preflightRefusal(previewReport.publishProjection)
+        if (refusal) return fail(refusal.message, { ...refusal.detail, preview: previewReport })
 
         // An archive goes in as an archive: it carries media bytes and media
         // folders that the manifest alone does not, and dropping them silently

@@ -88,21 +88,13 @@ function getCurrentSymlinkPath(uploadsDir: string): string {
  *   /foo/bar   → foo/bar.html
  */
 /**
- * Apply a site's trailing-slash policy to a route it is about to bake.
+ * Re-exported, not defined here.
  *
- * The disk mapping below already understands both forms — `/foo/` becomes
- * `foo/index.html` and `/foo` becomes `foo.html`. Nothing ever asked for the
- * first form, so every site published flat regardless of the URLs it arrived
- * with. This is the single place that decides, so the bake, the sitemap and the
- * artefact reader cannot drift into disagreeing about a site's URL shape.
- *
- * `/` is already the site root and is returned untouched in both modes.
+ * It moved to `@core/publisher/routePolicy` so the pre-flight projection can
+ * predict routes with the same function the bake uses rather than a second
+ * copy of it (AC-C11.3). Callers here are unchanged.
  */
-export function applyRoutePolicy(urlPath: string, trailingSlash?: boolean): string {
-  if (urlPath === '/' || urlPath === '') return '/'
-  const bare = urlPath.replace(/\/+$/, '')
-  return trailingSlash ? `${bare}/` : bare
-}
+export { applyRoutePolicy } from '../../src/core/publisher/routePolicy'
 
 function urlToDiskRelPath(urlPath: string): string {
   // Remove leading slash for relative path construction

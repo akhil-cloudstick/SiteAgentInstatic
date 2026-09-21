@@ -1,9 +1,4 @@
 {
-  "ownerPublicKey": "PASTE the ownerPublicKey printed by: bun cli/sign-go.ts keygen (run by the owner)",
-  "targets": {
-    "example-property": {
-      "ownerPublicKey": "PASTE the approver key this property's own owner designated — it alone approves this property"
-    }
-  },
-  "ungated": ["sheeltron-staging"]
+  "_note": "This file only says that a GO is required at all. WHOSE key approves a property is read from the approver registry on the relay (GET /api/approvers, R6) — there is no per-property map here, and no exemption list: a staging project exempted from the gate proves nothing (PRD 5.4). ownerPublicKey is the owner's own identity, kept for display and backwards compatibility; it approves nothing by itself.",
+  "ownerPublicKey": "PASTE the ownerPublicKey printed by: bun cli/sign-go.ts keygen (run by the owner)"
 }

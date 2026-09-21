@@ -83,6 +83,34 @@ let rows = new Map<string, FixtureRow>()
 let draftSite = 'draft site v1'
 /** Simulates an editor change still in flight, which the CMS flushes in at publish time. */
 let editWhilePublishing = false
+/**
+ * What the CMS returns when the publish pre-flight exports the draft.
+ *
+ * Defaults to a bundle that projects clean — one page, no style rules — so the
+ * gate stays out of the way of tests that are about something else. A test that
+ * wants the pre-flight to refuse replaces it.
+ */
+const cleanExport = () => ({
+  site: { name: 'fixture', styleRules: {} },
+  tables: [{ id: 'pages', slug: 'pages' }],
+  rows: [
+    {
+      id: 'p1',
+      tableId: 'pages',
+      slug: 'index',
+      status: 'published',
+      cells: {
+        title: 'Home',
+        body: { rootNodeId: 'r', nodes: { r: { id: 'r', moduleId: 'base.container', props: {}, children: [], classIds: [] } } },
+      },
+    },
+  ],
+})
+let exportedSite: unknown = cleanExport()
+/** When true the CMS answers /export with bytes that are not a ZIP at all. */
+let exportUnreadable = false
+/** What the CMS says it actually baked. Matches `cleanExport()` by default. */
+let bakedRoutes: string[] = ['/']
 
 const hashOf = (s: string): string => createHash('sha256').update(s).digest('hex')
 const writes = (): string[] => cmsCalls.filter((c) => !c.startsWith('GET '))
@@ -136,7 +164,9 @@ beforeEach(async () => {
     beta: { url: 'http://beta.test', email: 'b@example.test', secret: 'pw' },
     'alpha-staging': { url: 'http://staging.test', email: 's@example.test', secret: 'pw' },
   })
-  writePolicy({ ungated: ['alpha-staging'] })
+  // No exemption list: there is no longer such a thing. `alpha-staging` is in
+  // these tests precisely to prove it is gated like the rest (PRD 5.4).
+  writePolicy({})
   process.env[RELAY_URL_ENV] = 'https://relay.test'
   process.env[REGISTRY_CACHE_ENV] = join(dir, 'approver-cache.json')
   // Every target these tests write to, approved by the owner key.
@@ -149,6 +179,9 @@ beforeEach(async () => {
   failImport = false
   editWhilePublishing = false
   draftSite = 'draft site v1'
+  exportedSite = cleanExport()
+  exportUnreadable = false
+  bakedRoutes = ['/']
   cmsCalls = []
   rows = new Map([
     ['news-1', article('news-1', 'First article')],
@@ -177,7 +210,10 @@ beforeEach(async () => {
           status: 412,
         })
       }
-      return new Response(JSON.stringify({ publishedPages: 1 }), { status: 200 })
+      // `bakedRoutes` is what the real publish reports back: the routes that
+      // actually reached the slot, which the pre-flight's prediction is then
+      // compared against (AC-C11.3).
+      return new Response(JSON.stringify({ publishedPages: 1, bakedRoutes }), { status: 200 })
     }
     const rowRead = /\/data\/rows\/([^/]+)$/.exec(url.pathname)
     if (method === 'GET' && rowRead) {
@@ -185,6 +221,18 @@ beforeEach(async () => {
       return row ? new Response(JSON.stringify(row), { status: 200 }) : new Response('{"error":"not found"}', { status: 404 })
     }
     if (failImport && url.pathname === IMPORT_PATH) return new Response('{"error":"boom"}', { status: 500 })
+    // A site publish now pre-flights the draft as the CMS holds it, which it
+    // reads by exporting the site. A bundle with one page and no style rules
+    // projects clean, so these tests exercise the publish they are about
+    // rather than the gate. `exportedSite` is what a test overrides to make
+    // the pre-flight refuse.
+    if (method === 'GET' && url.pathname.endsWith('/export')) {
+      if (exportUnreadable) return new Response('this is not a zip', { status: 200 })
+      return new Response(
+        zipSync({ '.instatic/site-bundle.json': strToU8(JSON.stringify(exportedSite)) }) as unknown as BodyInit,
+        { status: 200 },
+      )
+    }
     return new Response(JSON.stringify({ ok: true, call }), { status: 200 })
   }) as typeof fetch
 
@@ -462,10 +510,26 @@ test('a missing policy file refuses everything; an unreadable one refuses stagin
   rmSync(process.env[GO_POLICY_ENV]!)
   expect(refusal(await replaceAlpha({ uploadId, go: signGo({ sha256 }) }))).toMatch(/No GO policy/)
 
-  writePolicy('{ "ungated": ["alpha-staging"], ')
+  writePolicy('{ "ownerPublicKey": "abc", ')
   const staging = await importReplace({ target: 'alpha-staging', confirm: 'REPLACE alpha-staging', uploadId })
   expect(refusal(staging)).toMatch(/not readable JSON/)
   expect(cmsCalls).toEqual([])
+})
+
+// Both settings parse cleanly and decide nothing, which is why they are refused
+// rather than ignored: a file that reads like configuration and behaves like an
+// empty one is how a property ends up believed-approved and ungoverned.
+test('a policy still carrying a per-property map or an exemption list refuses, naming what to remove', async () => {
+  const { uploadId, sha256 } = upload()
+  for (const [field, policy] of [
+    ['targets', { targets: { alpha: { ownerPublicKey: VECTORS.owner.publicKey } } }],
+    ['ungated', { ungated: ['alpha-staging'] }],
+  ] as const) {
+    writePolicy(policy)
+    const r = await replaceAlpha({ uploadId, go: signGo({ sha256 }) })
+    expect({ field, refused: refusal(r).includes(field) }).toEqual({ field, refused: true })
+    expect(cmsCalls).toEqual([])
+  }
 })
 
 test('a corrupted ledger refuses rather than forgetting which GOs were spent', async () => {
@@ -495,7 +559,16 @@ test('import then publish under GO — runs, reports the GO, and each GO works o
   const published = await publishSite({ target: 'alpha', go })
   expect(published.isError).toBeUndefined()
   expect(parse(published).go.nonce).toBe(go.nonce)
-  expect(cmsCalls).toEqual([`POST ${PREVIEW_PATH}`, `POST ${IMPORT_PATH}`, `GET ${STATUS_PATH}`, `POST ${PUBLISH_PATH}`])
+  // The GET /export between the status read and the publish is the pre-flight
+  // projecting the draft as the CMS holds it (R11 on the publish path). It
+  // happens after the GO verifies and before it is spent.
+  expect(cmsCalls).toEqual([
+    `POST ${PREVIEW_PATH}`,
+    `POST ${IMPORT_PATH}`,
+    `GET ${STATUS_PATH}`,
+    'GET /cms/api/cms/export',
+    `POST ${PUBLISH_PATH}`,
+  ])
 })
 
 test('a merge import under GO is what a following publish GO binds to', async () => {
@@ -701,4 +774,135 @@ test('the Connector resolves approvers exactly as the shared vectors say (R10)',
       expect({ case: c.name, scope: resolved.scope }).toEqual({ case: c.name, scope: c.expect.scope })
     }
   }
+})
+
+// --- R11 on the publish path --------------------------------------------------
+//
+// The import gate only ever sees a bundle, and only a replace tells it the
+// whole truth. A draft can reach a publish through a merge import, a draft
+// import, or a person editing in the admin — none of which the import gate can
+// speak for. These cover the publish gate, which projects the draft as the CMS
+// actually holds it.
+
+/** A site whose CSS almost entirely fails the publish tree-shake — the incident. */
+const nearlyUnstyledExport = () => {
+  const styleRules: Record<string, unknown> = {}
+  for (let i = 0; i < 40; i++) {
+    styleRules[`sr_dead${i}`] = {
+      id: `sr_dead${i}`,
+      name: `dead-${i}`,
+      kind: 'class',
+      selector: `.dead-${i}`,
+      order: 0,
+      styles: { color: 'red' },
+      contextStyles: {},
+      createdAt: 0,
+      updatedAt: 0,
+    }
+  }
+  return {
+    site: { name: 'fixture', styleRules },
+    tables: [{ id: 'pages', slug: 'pages' }],
+    rows: [
+      {
+        id: 'p1',
+        tableId: 'pages',
+        slug: 'index',
+        status: 'published',
+        cells: {
+          title: 'Home',
+          body: { rootNodeId: 'r', nodes: { r: { id: 'r', moduleId: 'base.container', props: {}, children: [], classIds: [] } } },
+        },
+      },
+    ],
+  }
+}
+
+test('a publish of a site that would bake nearly unstyled is refused, and the GO is NOT spent', async () => {
+  const sha256 = await importUnderGo()
+  exportedSite = nearlyUnstyledExport()
+
+  const go = publishGo(sha256)
+  const refused = await publishSite({ target: 'alpha', go })
+  expect(refusal(refused)).toMatch(/Only 0 of 40 style rules survive/)
+  // Nothing was published — the site is untouched.
+  expect(writes()).toEqual([])
+
+  // The whole point of checking before spending: the owner signed once, the
+  // publish did not happen, and the same signature still works once the site
+  // is fixed. Having to re-sign after a machine-side refusal would make the
+  // gate cost an owner round trip every time it did its job.
+  exportedSite = cleanExport()
+  const published = await publishSite({ target: 'alpha', go })
+  expect(published.isError).toBeUndefined()
+  expect(writes()).toEqual([`POST ${PUBLISH_PATH}`])
+})
+
+test('the publish pre-flight catches content that never passed through an import at all', async () => {
+  // No import in this test: this is the admin-edit route into a broken site,
+  // which is exactly what an import-time-only gate cannot see.
+  exportedSite = nearlyUnstyledExport()
+  const refused = await publishSite({ target: 'alpha', go: publishGo('a'.repeat(64)) })
+  expect(refused.isError).toBe(true)
+  expect(writes()).toEqual([])
+})
+
+test('a publish whose pre-flight cannot read the site refuses rather than assuming it is fine', async () => {
+  const sha256 = await importUnderGo()
+  // The export answers 200 with something that is not an archive. "Could not
+  // check" and "checked and fine" must not produce the same outcome (P2).
+  exportUnreadable = true
+  const refused = await publishSite({ target: 'alpha', go: publishGo(sha256) })
+  expect(refused.isError).toBe(true)
+  expect(refusal(refused)).toMatch(/could not read the site's own export/)
+  expect(writes()).toEqual([])
+})
+
+test('publishing a site with no pages at all is refused, though importing such a bundle is not', async () => {
+  // The asymmetry is deliberate. A bundle of collection entries alone is a fine
+  // thing to import into a site that already has pages; a SITE with no pages
+  // bakes nothing, and at publish time what is projected is what goes live.
+  const sha256 = await importUnderGo()
+  exportedSite = { site: { name: 'fixture', styleRules: {} }, tables: [], rows: [] }
+  const refused = await publishSite({ target: 'alpha', go: publishGo(sha256) })
+  expect(refusal(refused)).toMatch(/carries no pages/)
+  expect(writes()).toEqual([])
+})
+
+test('a publish reports whether the routes the pre-flight predicted are the routes that baked (AC-C11.3)', async () => {
+  const sha256 = await importUnderGo()
+  const published = await publishSite({ target: 'alpha', go: publishGo(sha256) })
+  expect(published.isError).toBeUndefined()
+  expect(parse(published).routeCheck).toEqual({
+    predicted: 1,
+    baked: 1,
+    agrees: true,
+    missing: [],
+    unexpected: [],
+  })
+})
+
+test('a prediction that promised a page the site does not have is reported as missing', async () => {
+  const sha256 = await importUnderGo()
+  // The site bakes only the home page, while the draft the pre-flight read also
+  // carries an about page. Before the bake reported its own routes there was
+  // nothing this could be compared against, and a prediction could drift from
+  // reality indefinitely without anything noticing.
+  const withAbout = cleanExport()
+  withAbout.rows.push({
+    id: 'p2',
+    tableId: 'pages',
+    slug: 'about',
+    status: 'published',
+    cells: {
+      title: 'About',
+      body: { rootNodeId: 'r2', nodes: { r2: { id: 'r2', moduleId: 'base.container', props: {}, children: [], classIds: [] } } },
+    },
+  })
+  exportedSite = withAbout
+  bakedRoutes = ['/']
+
+  const published = await publishSite({ target: 'alpha', go: publishGo(sha256) })
+  expect(published.isError).toBeUndefined()
+  expect(parse(published).routeCheck).toMatchObject({ agrees: false, missing: ['/about'], unexpected: [] })
 })

@@ -31,11 +31,17 @@ export default {
     // identity, and reading nothing else. Everything below it requires both.
     const path = new URL(request.url).pathname
     if (path === HEALTH_PATH) return health(request, env)
-    // The approver registry is read by the side that CHECKS approvals, which
+    // The approver registry is READ by the side that checks approvals, which
     // holds no relay credential and should need none: every field is a public
     // key. Answered here for the same reason health is — before identity, and
     // reading only the registry.
-    if (path === APPROVERS_PATH) return approvers(request, new D1Store(env.RELAY_DB))
+    //
+    // Writing it is the opposite case and falls through to the authenticated
+    // path below, where it is owner-only: registration decides whose signature
+    // counts, so anyone who could write here could appoint themselves.
+    if (path === APPROVERS_PATH && (request.method === 'GET' || request.method === 'HEAD')) {
+      return approvers(request, new D1Store(env.RELAY_DB))
+    }
 
     const cfg = readConfig(env)
     if (!cfg.ok) {

@@ -3,19 +3,15 @@ import type { RelayEvent } from './types'
 
 export interface RelayConfig {
   /**
-   * Base64 raw Ed25519 key of the approver for every property without one of
-   * its own. Empty means only properties listed in `propertyApprovers` can be
-   * approved.
+   * The owner's own identity, shown on the queue and on `/api/whoami` so a
+   * swapped key is visible without logging in.
+   *
+   * It approves NOTHING on its own. Which key approves a property is resolved
+   * from the approver registry and only from there (R6) — there is no default
+   * approver and no fallback, because "a fallback that widens scope on error is
+   * a master key by another name" (PRD 5.3).
    */
   ownerPublicKey: string
-  /**
-   * Per-property approvers, by the target name a deploy-request names. A
-   * property listed here is approved by its own key alone — the platform key
-   * does not approve it, and a key that is unusable refuses rather than falling
-   * back, so a misconfigured property never becomes approvable by the platform.
-   * The Connector resolves the approver on exactly this rule.
-   */
-  propertyApprovers: Record<string, string>
   stallMinutes: number
   goMaxTtlHours: number
 }

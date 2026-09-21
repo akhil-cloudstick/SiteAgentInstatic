@@ -23,20 +23,25 @@
 import type { DbClient } from '../db/client'
 import type { SiteCssBundle } from '@core/publisher'
 import { resolveTemplateChain } from '@core/templates'
-import { normalizeRouteBase } from '@core/templates/templateMatching'
 import {
   getPublishedDataRowByRoute,
   listPublishedRowRoutes,
 } from '../repositories/data/publish'
 import { renderPublishedDataRowTemplate } from './publicRenderer'
 import { applyPublishedHtmlPipeline } from './publishedHtmlPipeline'
-import { applyRoutePolicy, writeArtefact } from './staticArtefact'
+import { applyRoutePolicy, publicRowPath } from '../../src/core/publisher/routePolicy'
+import { writeArtefact } from './staticArtefact'
 import { getLatestSnapshotForVersion } from './publishedSnapshotCache'
 import { snapshotForEntryRoute } from './entryTemplateSnapshot'
 
 interface DataRowBakeResult {
   /** Routes successfully baked into the slot. */
   baked: number
+  /**
+   * Those routes, by address. The full publish reports them so a pre-flight's
+   * predicted routes can be compared against what actually landed (AC-C11.3).
+   */
+  routes: string[]
   /**
    * CSS bundles referenced by the baked HTML. The caller writes their files
    * into the slot alongside the page bundles — entry-template renders can
@@ -45,10 +50,9 @@ interface DataRowBakeResult {
   cssBundles: SiteCssBundle[]
 }
 
-function publicRowPath(routeBase: string, slug: string): string {
-  const normalizedBase = normalizeRouteBase(routeBase)
-  return `${normalizedBase === '/' ? '' : normalizedBase}/${slug}`
-}
+// `publicRowPath` moved to `@core/publisher/routePolicy`, so the pre-flight
+// projection predicts entry routes with the same function that bakes them
+// rather than a second copy (AC-C11.3). Imported above.
 
 /**
  * Bake every published data-row route into `slotDir`. Called by the full
@@ -65,7 +69,7 @@ export async function bakePublishedDataRowArtefacts(
   slotDir: string,
   publishVersion: number,
 ): Promise<DataRowBakeResult> {
-  const result: DataRowBakeResult = { baked: 0, cssBundles: [] }
+  const result: DataRowBakeResult = { baked: 0, routes: [], cssBundles: [] }
 
   const routes = await listPublishedRowRoutes(db)
   if (routes.length === 0) return result
@@ -108,6 +112,7 @@ export async function bakePublishedDataRowArtefacts(
       await writeArtefact(slotDir, urlPath, html)
       result.cssBundles.push(rendered.cssBundle)
       result.baked++
+      result.routes.push(urlPath)
     } catch (err) {
       console.error('[publish:site] failed to bake row artefact for', urlPath, '(falls through to live renderer):', err)
     }

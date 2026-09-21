@@ -10,6 +10,20 @@ import { decrypt } from './control-plane/lib/crypto.mjs';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const CONNECTOR_DIR = resolve(HERE, '..', 'Connector');
 
+// Read Operator/.env before anything looks at process.env (R13).
+//
+// The control plane has always loaded this file; this script never did, so the
+// services it starts took their credentials from whatever shell happened to run
+// it. That is the literal reading of what R13 rules out — "without a developer
+// holding the credentials" (PRD 5.4) — and it showed up as a Connector that
+// silently did not start because one terminal had `MMS_CONNECTOR_MCP_TOKEN` set
+// and the next did not. Platform configuration now comes from the platform's own
+// file, and an environment variable still wins where one is deliberately set.
+try {
+  const envFile = resolve(HERE, '.env');
+  if (typeof process.loadEnvFile === 'function' && existsSync(envFile)) process.loadEnvFile(envFile);
+} catch { /* the file is optional; a missing one is not a reason to refuse to start */ }
+
 const CYAN   = '\x1b[36m';
 const MAGENTA= '\x1b[35m';
 const YELLOW = '\x1b[33m';
@@ -227,26 +241,68 @@ const services = [
 
 console.log(`\n${DIM}Starting SiteAgent dev services...${RESET}\n`);
 
-const procs = services.map(({ label, color, cmd, cwd, env }) => {
+// A service that exits comes back (R13).
+//
+// Until now `exit` only printed a line. In a combined log that line scrolls away
+// in seconds, and the service stays down until somebody notices and restarts the
+// stack by hand — which is a developer round trip, and the kind the milestone
+// counts. The Connector is the one that matters most: everything a studio does
+// goes through it, and nothing else here notices it is gone.
+//
+// Backoff rather than immediate respawn, because the common cause of an instant
+// exit is bad configuration, and a tight loop turns that into a wall of noise
+// that hides the reason. Doubling from 1s to 30s keeps a genuine crash recovered
+// quickly while a misconfigured service settles into one line every half minute.
+const RESTART_MIN_MS = 1_000;
+const RESTART_MAX_MS = 30_000;
+/** Long enough that a service which ran this long was working, not crash-looping. */
+const HEALTHY_AFTER_MS = 60_000;
+
+let shuttingDown = false;
+const procs = [];
+
+function startService({ label, color, cmd, cwd, env }, backoffMs = RESTART_MIN_MS) {
   const prefix = `${color}[${label}]${RESET} `;
+  const startedAt = Date.now();
   const proc = spawn(cmd, {
     shell: true,
     stdio: ['ignore', 'pipe', 'pipe'],
     ...(cwd ? { cwd } : {}),
     env: { ...process.env, ...(env ?? {}) },
   });
+  procs.push(proc);
 
   const print = (chunk) =>
     chunk.toString().split('\n').filter(l => l.trim()).forEach(l => process.stdout.write(prefix + l + '\n'));
 
   proc.stdout.on('data', print);
   proc.stderr.on('data', print);
-  proc.on('exit', code => process.stdout.write(`${prefix}${DIM}exited (${code})${RESET}\n`));
+
+  proc.on('exit', (code) => {
+    const index = procs.indexOf(proc);
+    if (index >= 0) procs.splice(index, 1);
+    if (shuttingDown) return;
+
+    // A service that stayed up is treated as healthy, so an unrelated crash
+    // hours later starts from a short wait rather than the long one it had
+    // climbed to during a bad start earlier in the day.
+    const ranFor = Date.now() - startedAt;
+    const nextBackoff = ranFor >= HEALTHY_AFTER_MS ? RESTART_MIN_MS : Math.min(backoffMs * 2, RESTART_MAX_MS);
+    process.stdout.write(
+      `${prefix}${YELLOW}exited (${code}) — restarting in ${Math.round(backoffMs / 1000)}s${RESET}\n`,
+    );
+    setTimeout(() => {
+      if (!shuttingDown) startService({ label, color, cmd, cwd, env }, nextBackoff);
+    }, backoffMs).unref?.();
+  });
 
   return proc;
-});
+}
+
+for (const service of services) startService(service);
 
 process.on('SIGINT', () => {
+  shuttingDown = true;
   console.log('\nShutting down all services...');
   procs.forEach(p => { try { p.kill('SIGTERM'); } catch {} });
   process.exit(0);

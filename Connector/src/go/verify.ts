@@ -23,7 +23,7 @@ import { draftSiteHash, getRow } from '../http/rows'
 import type { InstaticSession } from '../http/session'
 import { rowsDigest, type RowHashEntry } from '../hash/row'
 import { goMessage, parseGo, type Go, type GoAction } from './message'
-import { approverFor, loadGoPolicy } from './policy'
+import { loadGoPolicy } from './policy'
 import { approverFromRegistry, loadApprovers } from './registry'
 import { isSpent, lastSuccessfulImport, recordOutcome, trySpend } from './ledger'
 

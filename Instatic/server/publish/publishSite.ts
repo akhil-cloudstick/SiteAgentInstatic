@@ -58,6 +58,16 @@ import { runPublishFlush } from './publishFlush'
 
 interface PublishResult {
   publishedPages: number
+  /**
+   * The public routes this publish actually baked.
+   *
+   * Reported because AC-C11.3 asks that "the routes it predicted exist after
+   * import", and without this the pre-flight's prediction could only ever be
+   * compared against itself. `publishedPages` cannot stand in for it: that
+   * counts every page in the site, including template pages, which are never
+   * baked at a route of their own.
+   */
+  bakedRoutes: string[]
 }
 
 export interface PublishDraftSiteOptions {
@@ -229,6 +239,8 @@ async function publishDraftSiteLocked(
   })
 
   const publishedPages = publishedSite.pages.length
+  /** Filled by the bake below; the routes that actually reached the slot. */
+  const bakedRoutes: string[] = []
 
   // Layer A: write static artefacts outside the transaction. Disk artefacts
   // are derived state — a write failure is logged but does not roll back the
@@ -325,6 +337,7 @@ async function publishDraftSiteLocked(
           })
           const html = await applyPublishedHtmlPipeline(rendered, db)
           await writeArtefact(slotDir, urlPath, html)
+          bakedRoutes.push(urlPath)
           // The render's own bundle covers template-composed hashes the raw
           // page bundle above cannot (the merged page's userStyles).
           collectCssFiles(rendered.cssBundle)
@@ -339,6 +352,7 @@ async function publishDraftSiteLocked(
       // ALL row routes would fall to the live renderer after a full publish.
       const rowBake = await bakePublishedDataRowArtefacts(db, slotDir, nextPublishVersion)
       for (const cssBundle of rowBake.cssBundles) collectCssFiles(cssBundle)
+      bakedRoutes.push(...rowBake.routes)
 
       for (const [publicPath, bytes] of assetsByPath) {
         await writeStaticAsset(slotDir, publicPath, bytes)
@@ -356,5 +370,5 @@ async function publishDraftSiteLocked(
   // live while the version counter still reads the old value.
   bumpPublishVersion()
 
-  return { publishedPages, publishedSiteHash }
+  return { publishedPages, publishedSiteHash, bakedRoutes: bakedRoutes.sort() }
 }
