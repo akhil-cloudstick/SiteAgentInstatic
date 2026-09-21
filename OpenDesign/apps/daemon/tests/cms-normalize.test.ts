@@ -130,3 +130,67 @@ describe('cms-normalize — normalizeSiteFiles', () => {
     expect(cssInline.status).toBe('pass');
   });
 });
+
+describe('cms-normalize — a check that cannot run (MMSBUILD R8, AC-B8.1)', () => {
+  /**
+   * A page whose bytes explode the moment they are read. Standing in for any
+   * throw inside the checker — exotic markup, a regex blowing up, an out of
+   * memory — all of which used to reach the same place: an error swallowed into
+   * a warning, and the unchecked site shared as if it had passed.
+   */
+  const explodingPage = () => ({
+    get base64(): string {
+      throw new Error('checker exploded');
+    },
+    mimeType: 'text/html',
+  });
+
+  it('records the page as unchecked instead of losing the verdict', async () => {
+    const { report } = await normalizeSiteFiles({
+      'index.html': explodingPage() as unknown as { base64: string; mimeType?: string },
+    });
+
+    expect(report.unchecked).toHaveLength(1);
+    expect(report.unchecked[0]!.path).toBe('index.html');
+    expect(report.unchecked[0]!.problem).toContain('checker exploded');
+  });
+
+  it('does not report a crash as a compliance failure — they are different answers', async () => {
+    const { report } = await normalizeSiteFiles({
+      'index.html': explodingPage() as unknown as { base64: string; mimeType?: string },
+    });
+
+    // Not counted as a fail: "this breaks the rules" and "nobody could tell"
+    // are different claims, and a caller may need to act on each differently.
+    expect(report.fails).toBe(0);
+    expect(report.warns).toBe(0);
+    // And crucially not an empty, clean-looking report either.
+    expect(report.unchecked.length).toBeGreaterThan(0);
+  });
+
+  it('is distinguishable from a genuinely clean page', async () => {
+    const clean = await normalizeSiteFiles({
+      'index.html': { base64: enc('<!doctype html><html><head><style>:root{--c:#111}</style></head><body><p>Hello</p></body></html>'), mimeType: 'text/html' },
+    });
+    expect(clean.report.unchecked).toEqual([]);
+
+    const crashed = await normalizeSiteFiles({
+      'index.html': explodingPage() as unknown as { base64: string; mimeType?: string },
+    });
+    expect(crashed.report.unchecked).not.toEqual([]);
+
+    // The whole point of the requirement: a caller can tell these apart.
+    expect(clean.report.unchecked.length === 0).not.toBe(crashed.report.unchecked.length === 0);
+  });
+
+  it('one bad page does not destroy the verdict on the others', async () => {
+    const { report } = await normalizeSiteFiles({
+      'broken.html': explodingPage() as unknown as { base64: string; mimeType?: string },
+      'good.html': { base64: enc('<!doctype html><html><head><style>:root{--c:#111}</style></head><body><p>Fine</p></body></html>'), mimeType: 'text/html' },
+    });
+
+    expect(report.unchecked.map((u) => u.path)).toEqual(['broken.html']);
+    // The page that could be checked still has its findings.
+    expect(Object.keys(report.pages)).toContain('good.html');
+  });
+});

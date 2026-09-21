@@ -4,6 +4,8 @@ import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, writeFileSync, readFileSync, realpathSync, statSync, rmSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import * as tenants from '../registry/tenants.mjs';
+import { verifyDeployedSite } from './verify.mjs';
+import { recordReceipt, retainKnownGood, deploymentIdFrom, BUILD_REVISION } from './receipt.mjs';
 import { getSecrets } from '../registry/settings.mjs';
 import * as rt from '../runtime/tenantRuntime.mjs';
 import config from '../lib/env.mjs';
@@ -426,7 +428,18 @@ export function writeRootFiles(dir, row) {
   }
 }
 
-export async function deployTenant(slug, { allowNoindexOnCustomDomain = false } = {}) {
+/**
+ * Deploy a project's baked output, then CHECK that the site serves it (R9).
+ *
+ * `publishedSiteHash` and `publishedPages` come from the CMS publish that
+ * triggered this, and are what let the receipt name the content that went
+ * live. They are absent when an operator re-deploys by hand, which the receipt
+ * records honestly rather than filling in.
+ */
+export async function deployTenant(
+  slug,
+  { allowNoindexOnCustomDomain = false, publishedSiteHash = null, publishedPages = null } = {},
+) {
   const row = await tenants.getTenant(slug);
   if (!row) throw new Error(`Unknown tenant: ${slug}`);
 
@@ -486,10 +499,55 @@ export async function deployTenant(slug, { allowNoindexOnCustomDomain = false } 
     ['pages', 'deploy', dir, `--project-name=${project}`, '--branch=main', '--commit-dirty=true'], env);
 
   if (deploySucceeded(code, out)) {
-    const url = canonicalPagesUrl(project);
-    await tenants.finishDeploy(deploy.id, 'live', url, null);
-    await tenants.updateTenant(slug, { pages_url: url, cf_project: project, last_error: null });
-    return { ok: true, url };
+    const url = row.custom_domain ? `https://${row.custom_domain}` : canonicalPagesUrl(project);
+
+    // The deploy tool says it uploaded. That is not the same as the site
+    // serving what we baked, and until now nothing ever checked (R9,
+    // AC-B9.2). A host that answers its fallback page for a missing route
+    // returns 200 for everything, so this compares each route's own content.
+    const verdict = await verifyDeployedSite(url, dir, bakedUrlPaths(dir)).catch((err) => ({
+      verification: 'unverified',
+      detail: `the check could not run: ${err instanceof Error ? err.message : String(err)}`,
+      checked: 0,
+      failed: 0,
+    }));
+
+    // Keep what was actually UPLOADED — after the root files were written into
+    // the slot, not the CMS's bake before them — so the retained bundle is the
+    // thing that went live and can reconstruct it (AC-B9.3).
+    const keptAt = await retainKnownGood(slug, dir).catch((err) => {
+      console.warn(`[deploy] ${slug} could not retain the bundle: ${err.message}`);
+      return null;
+    });
+
+    const live = verdict.verification !== 'failed';
+    await tenants.finishDeploy(deploy.id, live ? 'live' : 'failed', url, live ? null : verdict.detail);
+    await tenants.updateTenant(slug, {
+      pages_url: url,
+      cf_project: project,
+      last_error: live ? null : `Published, but the site is not serving it: ${verdict.detail}`,
+    });
+
+    await recordReceipt({
+      tenantSlug: slug,
+      contentHash: publishedSiteHash ?? null,
+      publishedPages: publishedPages ?? null,
+      cfProject: project,
+      deployUrl: url,
+      deployId: deploymentIdFrom(out),
+      verification: verdict.verification,
+      verificationDetail: verdict.detail,
+      routesChecked: verdict.checked,
+      routesFailed: verdict.failed,
+      knownGoodPath: keptAt,
+      build: BUILD_REVISION,
+    });
+
+    if (!live) {
+      console.error(`[deploy] ${slug} uploaded but failed verification: ${verdict.detail}`);
+      return { ok: false, error: verdict.detail, url };
+    }
+    return { ok: true, url, verification: verdict.verification };
   }
   // Surface the failure to the operator (the auto-publish webhook path is otherwise
   // silent — it only logged to the console, so a failed live publish looked fine).

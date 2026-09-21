@@ -6,6 +6,7 @@ import { handle } from './app'
 import { authenticate } from './auth'
 import { readConfig, type ConfigRead, type Env } from './config'
 import { runScheduled } from './cron'
+import { approvers, APPROVERS_PATH } from './approvers'
 import { health, HEALTH_PATH } from './health'
 import type { Deps } from './deps'
 import { sendWebhook } from './notify'
@@ -28,7 +29,13 @@ export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     // The one route that needs no login, answered before configuration and
     // identity, and reading nothing else. Everything below it requires both.
-    if (new URL(request.url).pathname === HEALTH_PATH) return health(request, env)
+    const path = new URL(request.url).pathname
+    if (path === HEALTH_PATH) return health(request, env)
+    // The approver registry is read by the side that CHECKS approvals, which
+    // holds no relay credential and should need none: every field is a public
+    // key. Answered here for the same reason health is — before identity, and
+    // reading only the registry.
+    if (path === APPROVERS_PATH) return approvers(request, new D1Store(env.RELAY_DB))
 
     const cfg = readConfig(env)
     if (!cfg.ok) {

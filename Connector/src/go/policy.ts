@@ -1,18 +1,21 @@
 /**
- * Whose signature a GO needs, and which targets need one at all.
+ * That a GO is required at all, and the local settings behind it.
+ *
+ * WHOSE signature approves a property no longer lives here — it moved to the
+ * approver registry both ends read (`./registry.ts`, R6). This file used to
+ * hold a second copy of that map, kept in step with the relay's by a human
+ * comparing fingerprints; a property's approver is now looked up in one place.
  *
  * `go-policy.json` next to the Connector (or wherever `MMS_CONNECTOR_GO_POLICY`
- * points):
+ * points) is what remains:
  *
  *   {
  *     "ownerPublicKey": "<base64 raw Ed25519 key>",
  *     "targets": { "sheeltron": { "ownerPublicKey": "<base64 raw Ed25519 key>" } },
- *     "ungated": ["sheeltron-staging"]
  *   }
  *
- * The approver is per property. A target listed in `targets` is approved by that
- * property's own key; `ownerPublicKey` approves every target with no entry of
- * its own, which is what a single-property pilot uses. A `targets` entry whose
+ * Both fields are read for backwards compatibility and are no longer consulted
+ * when checking a GO. A `targets` entry whose
  * key is unusable refuses that target outright instead of falling back to the
  * default — a property whose approver is misconfigured must never become
  * approvable by the platform's own key.
@@ -20,9 +23,14 @@
  * Fail-closed in the same direction as the target allowlist
  * (`Operator/control-plane/lib/connectorAllowlist.mjs`). A missing or unreadable
  * file does not mean "no gate configured"; it means nothing gated can run and
- * no target is known to be ungated. Forgetting the file costs the ability to
- * deploy, never the control. A readable file with no usable key still honours
- * `ungated` — that is a deliberate state, not a typo — and refuses the rest.
+ * nothing gated can run. Forgetting the file costs the ability to deploy,
+ * never the control.
+ *
+ * There is no exemption list. There used to be one, naming staging properties
+ * that needed no approval; it was removed because "a staging project exempted
+ * from the approval gate proves nothing" (PRD 5.4) — the loop being rehearsed
+ * has to be the real one, and a mechanism that switches the gate off for a
+ * property is one edit away from doing it for a live site.
  *
  * Read on every gated call rather than cached, so a key installed or rotated
  * applies to the next call instead of the next restart. The two tools that read
@@ -58,7 +66,6 @@ export interface GoPolicy {
   keyProblem?: string
   /** Per-property approvers, by resolved target name. */
   targets: Record<string, Approver>
-  ungated: string[]
 }
 
 export type GoPolicyLoad = { ok: true; policy: GoPolicy } | { ok: false; reason: string }
@@ -99,22 +106,21 @@ export function loadGoPolicy(): GoPolicyLoad {
     parsed = JSON.parse(readFileSync(file, 'utf8'))
   } catch (err) {
     // Loud, and still closed. A typo must not open anything — including the
-    // `ungated` list, which is only trusted from a file that actually parsed.
+    // file at all.
     return {
       ok: false,
       reason:
         `${file} is not readable JSON (${err instanceof Error ? err.message : String(err)}), so no ` +
-        'gated action can run and no target is treated as ungated.',
+        'gated action can run.',
     }
   }
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
     return { ok: false, reason: `${file} must hold a JSON object, so no gated action can run.` }
   }
 
-  const p = parsed as { ownerPublicKey?: unknown; targets?: unknown; ungated?: unknown }
+  const p = parsed as { ownerPublicKey?: unknown; targets?: unknown }
   const policy: GoPolicy = {
     targets: {},
-    ungated: Array.isArray(p.ungated) ? p.ungated.map((s) => String(s).trim()).filter(Boolean) : [],
   }
 
   const owner = readApprover(p.ownerPublicKey)

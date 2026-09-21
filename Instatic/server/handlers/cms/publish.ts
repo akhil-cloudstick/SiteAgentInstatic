@@ -110,7 +110,19 @@ export async function handlePublishRoutes(
     // instance). Fires ONLY on explicit Publish, never on autosave.
     const deployWebhook = process.env.INSTATIC_DEPLOY_WEBHOOK?.trim()
     if (deployWebhook) {
-      void fetch(deployWebhook, { method: 'POST' }).catch((err) => {
+      // The call used to carry no body at all, so the side that records the
+      // deploy had no way of knowing WHAT had been published — which is why a
+      // receipt could name a time and a URL and nothing else (R9). The content
+      // identity and the page count now cross with it.
+      void fetch(deployWebhook, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          siteHash: result.publishedSiteHash,
+          publishedPages: result.publishedPages,
+          publishedAt: new Date().toISOString(),
+        }),
+      }).catch((err) => {
         console.error('[publish] deploy webhook failed:', err instanceof Error ? err.message : err)
       })
     }

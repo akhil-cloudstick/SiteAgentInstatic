@@ -8,8 +8,9 @@
  */
 
 import { afterEach, beforeEach, expect, test } from 'bun:test'
-import { createHash } from 'node:crypto'
-import { mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { createHash, createPrivateKey, randomBytes, sign, type KeyObject } from 'node:crypto'
+import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { resolve as resolvePath } from 'node:path'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { strToU8, zipSync } from 'fflate'
@@ -21,7 +22,35 @@ import type { ToolResult } from '../src/mcp/tools'
 import { connect, disconnect } from '../src/http/store'
 import { TARGETS_ENV } from '../src/http/config'
 import { GO_POLICY_ENV } from '../src/go/policy'
+import { forgetApprovers, REGISTRY_CACHE_ENV } from '../src/go/registry'
 import { GO_LEDGER_ENV } from '../src/go/ledger'
+
+/** The signing keys the two sides share for tests, from the pinned vectors. */
+const VECTORS = JSON.parse(
+  readFileSync(resolvePath(import.meta.dir, '../../docs/relay/go-test-vectors.json'), 'utf8'),
+) as { owner: { seedHex: string; publicKey: string; fingerprint: string } }
+
+const PKCS8_ED25519_PREFIX = Buffer.from('302e020100300506032b657004220420', 'hex')
+const OWNER_KEY: KeyObject = createPrivateKey({
+  key: Buffer.concat([PKCS8_ED25519_PREFIX, Buffer.from(VECTORS.owner.seedHex, 'hex')]),
+  format: 'der',
+  type: 'pkcs8',
+})
+
+/** A GO for this exact import, signed by the key the registry names. */
+function signGo(target: string, sha256: string) {
+  const go = {
+    ticketId: 'DR-000001',
+    action: 'import' as const,
+    target,
+    sha256,
+    contentDigest: '-',
+    expiresAt: new Date(Date.now() + 60 * 60_000).toISOString(),
+    nonce: randomBytes(18).toString("base64url"),
+  }
+  const message = `mms-go-v2|${go.ticketId}|${go.action}|${go.target}|${go.sha256}|${go.contentDigest}|${go.expiresAt}|${go.nonce}`
+  return { ...go, signature: sign(null, Buffer.from(message, 'utf8'), OWNER_KEY).toString('base64') }
+}
 
 const RELAY = 'https://relay.test'
 const TOKEN_ID = 'builder-token-id.access'
@@ -69,7 +98,26 @@ beforeEach(async () => {
   writeFileSync(process.env[RELAY_TOKEN_FILE_ENV]!, `CF-Access-Client-Id: ${TOKEN_ID}\nCF-Access-Client-Secret: ${TOKEN_SECRET}\n`)
   process.env[GO_POLICY_ENV] = join(dir, 'go-policy.json')
   process.env[GO_LEDGER_ENV] = join(dir, 'go-ledger.jsonl')
-  writeFileSync(process.env[GO_POLICY_ENV]!, JSON.stringify({ ownerPublicKey: '', ungated: ['staging'] }))
+  writeFileSync(process.env[GO_POLICY_ENV]!, JSON.stringify({}))
+  // Staging is gated like everything else now (R7), so this test registers an
+  // approver and signs, rather than relying on an exemption that no longer exists.
+  process.env[REGISTRY_CACHE_ENV] = join(dir, 'approver-cache.json')
+  forgetApprovers()
+  writeFileSync(
+    process.env[REGISTRY_CACHE_ENV]!,
+    JSON.stringify({
+      at: new Date().toISOString(),
+      approvers: [
+        {
+          property: 'staging',
+          level: 'project',
+          publicKey: VECTORS.owner.publicKey,
+          fingerprint: VECTORS.owner.fingerprint,
+          effectiveFrom: '2026-09-14T00:00:00.000Z',
+        },
+      ],
+    }),
+  )
   process.env[TARGETS_ENV] = JSON.stringify({ staging: { url: 'http://staging.test', email: 's@example.test', secret: 'pw' } })
 
   artefacts = new Map()
@@ -103,7 +151,8 @@ beforeEach(async () => {
 afterEach(() => {
   globalThis.fetch = realFetch
   disconnect()
-  for (const name of [UPLOAD_DIR_ENV, RELAY_URL_ENV, RELAY_TOKEN_FILE_ENV, GO_POLICY_ENV, GO_LEDGER_ENV, TARGETS_ENV]) {
+  forgetApprovers()
+  for (const name of [UPLOAD_DIR_ENV, RELAY_URL_ENV, RELAY_TOKEN_FILE_ENV, GO_POLICY_ENV, GO_LEDGER_ENV, TARGETS_ENV, REGISTRY_CACHE_ENV]) {
     delete process.env[name]
   }
   rmSync(dir, { recursive: true, force: true })
@@ -181,7 +230,12 @@ test('malformed hashes, a second source, or a missing token file are refused wit
 test('connector_import_replace imports straight from a relay artefact by sha256', async () => {
   const hash = onRelay(bundleZip('Imported from the relay'))
   const tool = IMPORT_TOOLS.find((t) => t.name === 'connector_import_replace')!
-  const r: ToolResult = await tool.handler({ target: 'staging', confirm: 'REPLACE staging', relaySha256: hash })
+  const r: ToolResult = await tool.handler({
+    target: 'staging',
+    confirm: 'REPLACE staging',
+    relaySha256: hash,
+    go: signGo('staging', hash),
+  })
   expect(r.isError).toBeUndefined()
   const body = JSON.parse(r.content[0]!.text) as { preview: { sha256: string; bundleSource: string; mediaFilesInArchive: number } }
   expect(body.preview).toMatchObject({ sha256: hash, mediaFilesInArchive: 1 })

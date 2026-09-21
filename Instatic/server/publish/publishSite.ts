@@ -140,11 +140,13 @@ async function publishDraftSiteLocked(
   // the publish lock, on the exact document about to be baked. Checked any
   // earlier, an edit still in the debounce window would be flushed in and
   // published under a hash that never described it.
-  if (options.expectedDraftSiteHash !== undefined) {
-    const actual = siteContentHash(site)
-    if (actual !== options.expectedDraftSiteHash) {
-      throw new DraftChangedError(options.expectedDraftSiteHash, actual)
-    }
+  // The identity of exactly what is being published. It was computed here
+  // already, to check If-Match, and then discarded — which is why a deploy
+  // record could never name the content it carried (R9). It is returned now,
+  // and travels with the deploy webhook.
+  const publishedSiteHash = siteContentHash(site)
+  if (options.expectedDraftSiteHash !== undefined && publishedSiteHash !== options.expectedDraftSiteHash) {
+    throw new DraftChangedError(options.expectedDraftSiteHash, publishedSiteHash)
   }
 
   const runtime = normalizeSiteRuntimeConfig(site.runtime)
@@ -354,5 +356,5 @@ async function publishDraftSiteLocked(
   // live while the version counter still reads the old value.
   bumpPublishVersion()
 
-  return { publishedPages }
+  return { publishedPages, publishedSiteHash }
 }

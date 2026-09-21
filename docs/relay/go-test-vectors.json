@@ -1,5 +1,5 @@
 {
-  "about": "GO signature test vectors. Read by Connector/tests/goGate.test.ts and Relay/tests/go.test.ts so the two verifiers cannot drift. Keys are derived from the published seeds below and are TEST-ONLY. Regenerate with: cd Relay && bun cli/gen-test-vectors.ts",
+  "about": "GO signature AND approver-resolution test vectors. Read by Connector/tests/goGate.test.ts and Relay/tests/go.test.ts so the two verifiers cannot drift. Keys are derived from the published seeds below and are TEST-ONLY. Regenerate with: cd Relay && bun cli/gen-test-vectors.ts",
   "format": "mms-go-v2|ticketId|action|target|sha256|contentDigest|expiresAt|nonce  (UTF-8, Ed25519, base64 signature; contentDigest is 64 hex for publish and \"-\" for every other action)",
   "owner": {
     "seedHex": "6f776e65722d746573742d6b65792d6e6f742d666f722d7265616c2d75736500",
@@ -140,6 +140,175 @@
         "signature": "ZicSP14tr+qS13IhimCYxKjOF8bYo4pGZ0FkZuFxkty3+DIj3nvccCUbNa9bjHSBNToQDDPz43ijQWc92iJ4Aw=="
       },
       "valid": false
+    }
+  ],
+  "resolution": [
+    {
+      "name": "a property's own approver approves it",
+      "registry": [
+        {
+          "property": "sheeltron",
+          "level": "project",
+          "publicKey": "H0e+pDsF6QgrCWcOpOjwu2Mwjc+1ZgvLhySxTDPFI9k=",
+          "fingerprint": "f91e145ff761386b",
+          "effectiveFrom": "2026-09-14T00:00:00.000Z"
+        }
+      ],
+      "target": "sheeltron",
+      "expect": {
+        "ok": true,
+        "fingerprint": "f91e145ff761386b",
+        "scope": "property"
+      }
+    },
+    {
+      "name": "another property's approver does not",
+      "registry": [
+        {
+          "property": "sheeltron",
+          "level": "project",
+          "publicKey": "H0e+pDsF6QgrCWcOpOjwu2Mwjc+1ZgvLhySxTDPFI9k=",
+          "fingerprint": "f91e145ff761386b",
+          "effectiveFrom": "2026-09-14T00:00:00.000Z"
+        },
+        {
+          "property": "global-nettech",
+          "level": "project",
+          "publicKey": "qQbkbv3Jukck+giuyYpeSnQu9j4lgcKArU5tx388hhM=",
+          "fingerprint": "ce9db912d43960cc",
+          "effectiveFrom": "2026-09-14T00:00:00.000Z"
+        }
+      ],
+      "target": "global-nettech",
+      "expect": {
+        "ok": true,
+        "fingerprint": "ce9db912d43960cc",
+        "scope": "property"
+      }
+    },
+    {
+      "name": "a property nobody registered is refused, never handed to another key",
+      "registry": [
+        {
+          "property": "global-nettech",
+          "level": "project",
+          "publicKey": "qQbkbv3Jukck+giuyYpeSnQu9j4lgcKArU5tx388hhM=",
+          "fingerprint": "ce9db912d43960cc",
+          "effectiveFrom": "2026-09-14T00:00:00.000Z"
+        }
+      ],
+      "target": "sheeltron",
+      "expect": {
+        "ok": false
+      }
+    },
+    {
+      "name": "an empty registry approves nothing",
+      "registry": [],
+      "target": "sheeltron",
+      "expect": {
+        "ok": false
+      }
+    },
+    {
+      "name": "a business approver covers a property its registration names",
+      "registry": [
+        {
+          "property": "acme-group",
+          "level": "business",
+          "covers": [
+            "sheeltron"
+          ],
+          "publicKey": "qQbkbv3Jukck+giuyYpeSnQu9j4lgcKArU5tx388hhM=",
+          "fingerprint": "ce9db912d43960cc",
+          "effectiveFrom": "2026-09-14T00:00:00.000Z"
+        }
+      ],
+      "target": "sheeltron",
+      "expect": {
+        "ok": true,
+        "fingerprint": "ce9db912d43960cc",
+        "scope": "business"
+      }
+    },
+    {
+      "name": "a business approver does not reach a property it does not name",
+      "registry": [
+        {
+          "property": "acme-group",
+          "level": "business",
+          "covers": [
+            "sheeltron"
+          ],
+          "publicKey": "qQbkbv3Jukck+giuyYpeSnQu9j4lgcKArU5tx388hhM=",
+          "fingerprint": "ce9db912d43960cc",
+          "effectiveFrom": "2026-09-14T00:00:00.000Z"
+        }
+      ],
+      "target": "global-nettech",
+      "expect": {
+        "ok": false
+      }
+    },
+    {
+      "name": "a property's own approver wins over a business that also names it",
+      "registry": [
+        {
+          "property": "sheeltron",
+          "level": "project",
+          "publicKey": "H0e+pDsF6QgrCWcOpOjwu2Mwjc+1ZgvLhySxTDPFI9k=",
+          "fingerprint": "f91e145ff761386b",
+          "effectiveFrom": "2026-09-14T00:00:00.000Z"
+        },
+        {
+          "property": "acme-group",
+          "level": "business",
+          "covers": [
+            "sheeltron"
+          ],
+          "publicKey": "qQbkbv3Jukck+giuyYpeSnQu9j4lgcKArU5tx388hhM=",
+          "fingerprint": "ce9db912d43960cc",
+          "effectiveFrom": "2026-09-14T00:00:00.000Z"
+        }
+      ],
+      "target": "sheeltron",
+      "expect": {
+        "ok": true,
+        "fingerprint": "f91e145ff761386b",
+        "scope": "property"
+      }
+    },
+    {
+      "name": "a registered key that is unusable refuses, rather than falling back",
+      "registry": [
+        {
+          "property": "sheeltron",
+          "level": "project",
+          "publicKey": "not-a-key",
+          "fingerprint": "",
+          "effectiveFrom": "2026-09-14T00:00:00.000Z"
+        }
+      ],
+      "target": "sheeltron",
+      "expect": {
+        "ok": false
+      }
+    },
+    {
+      "name": "a retired approver is simply absent, and its property is refused",
+      "registry": [
+        {
+          "property": "global-nettech",
+          "level": "project",
+          "publicKey": "qQbkbv3Jukck+giuyYpeSnQu9j4lgcKArU5tx388hhM=",
+          "fingerprint": "ce9db912d43960cc",
+          "effectiveFrom": "2026-09-14T00:00:00.000Z"
+        }
+      ],
+      "target": "sheeltron",
+      "expect": {
+        "ok": false
+      }
     }
   ]
 }

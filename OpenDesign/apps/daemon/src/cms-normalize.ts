@@ -48,6 +48,16 @@ export interface NormalizeReport {
   /** Total fail/warn counts across all pages (post-fix). */
   fails: number;
   warns: number;
+  /**
+   * Pages the checker could not judge, and why (MMSBUILD R8).
+   *
+   * A page in here has NOT been found compliant — it has not been found
+   * anything. The distinction matters because the caller gates on this report:
+   * treating "could not check" as "nothing to report" is how a crash came to
+   * look like a clean pass, which the PRD calls the most dangerous shape a bug
+   * can take. A caller that gates MUST refuse while this is non-empty.
+   */
+  unchecked: { path: string; problem: string }[];
 }
 
 // ---------------------------------------------------------------------------
@@ -491,21 +501,33 @@ export async function normalizeFileMap(
     droppedStylesheets: [],
     fails: 0,
     warns: 0,
+    unchecked: [],
   };
   const unconverted = new Set<string>();
   const referencedCss = new Set<string>();
 
   for (const [path, entry] of Object.entries(files)) {
     if (!isHtmlEntry(path, entry.mimeType)) continue;
-    const html = Buffer.from(entry.bytes).toString('utf8');
-    for (const css of referencedLocalStylesheets(html, path)) referencedCss.add(css);
-    const res = await normalizeHtmlForCms(html, path, reader);
-    out[path] = { bytes: Buffer.from(res.html, 'utf8'), mimeType: entry.mimeType ?? 'text/html' };
-    report.pages[path] = res.findings;
-    for (const u of res.unconverted) unconverted.add(u);
-    for (const f of res.findings) {
-      if (f.status === 'fail') report.fails++;
-      else if (f.status === 'warn') report.warns++;
+    // Per page, so one unparseable page cannot destroy the verdict on every
+    // other one — and so the page that failed is named rather than guessed at.
+    try {
+      const html = Buffer.from(entry.bytes).toString('utf8');
+      for (const css of referencedLocalStylesheets(html, path)) referencedCss.add(css);
+      const res = await normalizeHtmlForCms(html, path, reader);
+      out[path] = { bytes: Buffer.from(res.html, 'utf8'), mimeType: entry.mimeType ?? 'text/html' };
+      report.pages[path] = res.findings;
+      for (const u of res.unconverted) unconverted.add(u);
+      for (const f of res.findings) {
+        if (f.status === 'fail') report.fails++;
+        else if (f.status === 'warn') report.warns++;
+      }
+    } catch (err) {
+      // The page keeps its original bytes, and is recorded as UNJUDGED. It is
+      // deliberately not counted as a fail: a caller that wants to know "did
+      // anything break the rules" and one that wants to know "was everything
+      // actually checked" are asking different questions, and both deserve a
+      // true answer.
+      report.unchecked.push({ path, problem: err instanceof Error ? err.message : String(err) });
     }
   }
 
@@ -529,10 +551,19 @@ export async function normalizeSiteFiles(
   files: Record<string, { base64: string; mimeType?: string }>,
 ): Promise<{ files: Record<string, { base64: string; mimeType?: string }>; report: NormalizeReport }> {
   const byteMap: Record<string, NormalizedFile> = {};
+  // A page that cannot even be decoded is a page that was not checked, and it
+  // is recorded as such rather than thrown past the caller (R8). The loop
+  // inside normalizeFileMap guards the checking; this guards getting there.
+  const undecodable: { path: string; problem: string }[] = [];
   for (const [path, entry] of Object.entries(files)) {
-    byteMap[path] = { bytes: Buffer.from(entry.base64, 'base64'), mimeType: entry.mimeType };
+    try {
+      byteMap[path] = { bytes: Buffer.from(entry.base64, 'base64'), mimeType: entry.mimeType };
+    } catch (err) {
+      undecodable.push({ path, problem: err instanceof Error ? err.message : String(err) });
+    }
   }
   const { files: normalized, report } = await normalizeFileMap(byteMap);
+  report.unchecked.push(...undecodable);
   const outFiles: Record<string, { base64: string; mimeType?: string }> = {};
   for (const [path, entry] of Object.entries(normalized)) {
     const base64 = Buffer.from(entry.bytes).toString('base64');

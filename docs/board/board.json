@@ -245,7 +245,7 @@
           "dependsOn": [
             "R1"
           ],
-          "note": "Built 2026-09-16 (commit c865d10): the relay resolves the approver per property on the same rule the Connector applies — property key alone, no fallback for a property whose key is unusable, malformed configuration keeps the relay shut. Reaches the live relay only when the relay account holder redeploys it.",
+          "note": "Completed 2026-09-21: c865d10 gave both ends the same RULE over two separate configs — a file committed to git on one side, a Worker variable on the other, kept in step by a human comparing fingerprints. The PRD asks for something narrower: \"the registry is the only place this mapping lives, and both ends read the same registry\". That registry now exists, in the relay’s database: append-only, one live approver per property enforced by a partial unique index, with triggers refusing any edit or delete. The checking side reads it through a public endpoint — every field is a public key — and caches it, refreshed every few minutes and REFUSED once older than a GO can live, so a short relay outage changes nothing while a retired key can never outlive its own approvals.",
           "subtasks": [
             {
               "id": "NEW-4a",
@@ -258,12 +258,12 @@
         {
           "id": "R6",
           "title": "Per-property approver: registration, delegation, rotation",
-          "status": "doing",
+          "status": "built",
           "dependsOn": [
             "R1",
             "NEW-4"
           ],
-          "note": "Both ends now resolve a per-property approver. Registration, delegation up Project → Business → Operator, and rotation/revocation as first-class operations are not built.",
+          "note": "Built 2026-09-21: registration writes one row with an effective-from stamp, and the append-only table is itself the audit record. Rotation retires the old row and inserts the new one in a single batch, so a property is never left with two live identities or none by accident, and the retired identity stops being accepted immediately rather than at the next restart — with history kept so an old receipt can still be explained. Revocation without a replacement leaves the property refusing everything. Delegation is explicit: a business-level approver reaches only the properties its registration names, never what a hierarchy implies. And the fallback is gone: a property with no registered approver is refused rather than handed to the platform-wide key that, until this change, approved every site on the estate — \"a fallback that widens scope on error is a master key by another name\".",
           "subtasks": [
             {
               "id": "AC-B6.1",
@@ -274,7 +274,7 @@
             {
               "id": "AC-B6.2",
               "text": "After rotation: old identity refused, new identity accepted",
-              "status": "todo",
+              "status": "built",
               "verified": "pending"
             },
             {
@@ -286,7 +286,7 @@
             {
               "id": "AC-B6.4",
               "text": "Business approver covers its own projects, never another Business's",
-              "status": "todo",
+              "status": "built",
               "verified": "pending"
             }
           ]
@@ -294,11 +294,11 @@
         {
           "id": "R7",
           "title": "Import and publish each gated, bound, and gated separately",
-          "status": "doing",
+          "status": "built",
           "dependsOn": [
             "R6"
           ],
-          "note": "The gate covers eight actions, binds the artefact, expires, is single-use and spends before acting. Outstanding: a property exempted from the gate must not be able to stay exempt in production.",
+          "note": "Completed 2026-09-21: the exemption list is removed from the policy, the loader and the gate. A staging project is now gated exactly like a production one, because \"a staging project exempted from the approval gate proves nothing\" — the loop being rehearsed has to be the real one. The type that carried the gate result can no longer express \"passed without an approval\" at all, so the exemption cannot be reintroduced by configuration.",
           "subtasks": [
             {
               "id": "AC-B7.1",
@@ -341,16 +341,16 @@
         {
           "id": "R8",
           "title": "Fail-closed everywhere",
-          "status": "doing",
+          "status": "built",
           "dependsOn": [
             "R7"
           ],
-          "note": "The approval policy fails closed. The importability check passes the share through when it crashes, and the pre-flight does not block (R11).",
+          "note": "Completed 2026-09-21: the share’s compliance check no longer fails open. It used to pre-seed the outgoing files with the unchecked input and swallow any error into a warning, so a crash in the checker produced an HTTP 200 with a redirect — byte-identical to a clean pass — and staged the unchecked site. The verdict had no way to say \"could not check\": it now does, per page, so one unparseable page cannot destroy the verdict on the others. A crash and an unjudged page both block, under their own error code, distinguishable from a compliance failure and from success. Separately the model-capability check, which deliberately allowed a save through when the catalogue could not be read, now refuses — that was a check reporting a pass because it could not run, which principle P2 forbids in writing.",
           "subtasks": [
             {
               "id": "AC-B8.1",
               "text": "A crashed importability check blocks, distinguishably from a success",
-              "status": "todo",
+              "status": "built",
               "verified": "pending"
             },
             {
@@ -362,7 +362,7 @@
             {
               "id": "AC-B8.3",
               "text": "A check that cannot run yields failure, never a zero-findings pass",
-              "status": "todo",
+              "status": "built",
               "verified": "pending"
             }
           ]
@@ -370,34 +370,34 @@
         {
           "id": "R9",
           "title": "The proof chain: receipt, live verification, known-good, immutability",
-          "status": "todo",
+          "status": "built",
           "dependsOn": [
             "R7"
           ],
-          "note": "None of receipt, live verification, known-good retention or rollback exists on the platform publish path. Adopt the studio deploy path's deploy record and reachability verifier. The current publish wipes the previous generation first, so retention must come before AC-B9.3 is possible. The build revision exists on responses and in the activity log but is not yet written into a durable deploy record.",
+          "note": "Built 2026-09-21: the publish now says what it published. The content hash was computed to check If-Match and then discarded, and the deploy webhook carried no body, so nothing about WHAT went live ever reached the side that recorded the deploy — which is why a receipt could name a time and a URL and nothing else. Receipts are a new append-only table whose triggers refuse any later edit or delete, carrying the content identity, the page count, the Cloudflare project and deployment id, the verification result, the previous receipt, the retained bundle and the build that did it. \"Live\" is no longer a regex over the deploy tool’s output: the site is fetched afterwards and each sampled route must serve ITS OWN page, so a host answering its fallback under a 200 is caught — an HTTP-200 check is explicitly not sufficient. A check that cannot run reports \"unverified\", never success. The bundle that was uploaded is copied out after the deploy writes its root files, because the CMS keeps two generations and destroys the older one as the first step of the next publish, so there was no spare generation to point at.",
           "subtasks": [
             {
               "id": "AC-B9.1",
               "text": "A receipt per publish with every named field present",
-              "status": "todo",
+              "status": "built",
               "verified": "pending"
             },
             {
               "id": "AC-B9.2",
               "text": "Verification fetches the site; a missing route serving a fallback is caught as FAIL",
-              "status": "todo",
+              "status": "built",
               "verified": "pending"
             },
             {
               "id": "AC-B9.3",
               "text": "A known-good bundle is retained and reconstructs the prior state",
-              "status": "todo",
+              "status": "built",
               "verified": "pending"
             },
             {
               "id": "AC-B9.4",
               "text": "Editing or deleting a past receipt is denied",
-              "status": "doing",
+              "status": "built",
               "verified": "pending"
             }
           ]
@@ -409,7 +409,7 @@
           "dependsOn": [
             "R6"
           ],
-          "note": "Two implementations sharing no code, pinned by shared test vectors. The vectors must grow to cover per-property resolution.",
+          "note": "Held and reinforced 2026-09-21: the two implementations still share no code. The shared vectors covered only single-key signature checks, so per-property resolution was asserted twice in two suites that share nothing — the moment R6 landed, the two resolvers could have drifted with all nine signature cases still green. The vectors now carry nine resolution cases as well (own approver, unregistered property, empty registry, delegation covering and not covering, project winning over business, an unusable key, a retired approver), and both sides run them against their own resolver.",
           "subtasks": [
             {
               "id": "AC-B10.1",

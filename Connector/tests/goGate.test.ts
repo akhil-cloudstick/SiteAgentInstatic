@@ -21,6 +21,7 @@ import { ADMIN_TOOLS } from '../src/mcp/adminTools'
 import type { ToolResult } from '../src/mcp/tools'
 import { goMessage, parseGo, type Go } from '../src/go/message'
 import { GO_POLICY_ENV, ownerKeyFromBase64 } from '../src/go/policy'
+import { approverFromRegistry, forgetApprovers, REGISTRY_CACHE_ENV, RELAY_URL_ENV } from '../src/go/registry'
 import { GO_LEDGER_ENV } from '../src/go/ledger'
 import { verifyGoSignature } from '../src/go/verify'
 
@@ -28,6 +29,20 @@ interface Vectors {
   owner: { seedHex: string; publicKey: string; fingerprint: string }
   other: { seedHex: string; publicKey: string; fingerprint: string }
   cases: { name: string; message?: string; go: Go; valid: boolean }[]
+  /** Approver-resolution cases both sides must agree on (R6 + R10). */
+  resolution?: {
+    name: string
+    registry: {
+      property: string
+      level: 'project' | 'business'
+      covers?: string[]
+      publicKey: string
+      fingerprint: string
+      effectiveFrom: string
+    }[]
+    target: string
+    expect: { ok: boolean; fingerprint?: string; scope?: string }
+  }[]
 }
 const VECTORS = JSON.parse(
   readFileSync(resolve(import.meta.dir, '../../docs/relay/go-test-vectors.json'), 'utf8'),
@@ -72,6 +87,37 @@ let editWhilePublishing = false
 const hashOf = (s: string): string => createHash('sha256').update(s).digest('hex')
 const writes = (): string[] => cmsCalls.filter((c) => !c.startsWith('GET '))
 
+/**
+  * Seed the approver registry as the relay would publish it.
+  *
+  * Written straight to the local cache with a current timestamp, so the gate
+  * reads it without a network call — the cache is refreshed on age, and a copy
+  * made now is fresh. Passing no approvers seeds an EMPTY registry, which is a
+  * real state meaning "nobody may approve anything" and is refused; it is not
+  * the same as no registry at all, which is also refused, for a different
+  * reason and with a different message.
+  */
+function writeRegistry(
+  approvers: { property: string; publicKey: string; level?: 'project' | 'business'; covers?: string[] }[],
+  at: string = new Date().toISOString(),
+): void {
+  forgetApprovers()
+  writeFileSync(
+    process.env[REGISTRY_CACHE_ENV]!,
+    JSON.stringify({
+      at,
+      approvers: approvers.map((a) => ({
+        property: a.property,
+        level: a.level ?? 'project',
+        ...(a.covers ? { covers: a.covers } : {}),
+        publicKey: a.publicKey,
+        fingerprint: a.publicKey === VECTORS.other.publicKey ? VECTORS.other.fingerprint : VECTORS.owner.fingerprint,
+        effectiveFrom: '2026-09-14T00:00:00.000Z',
+      })),
+    }),
+  )
+}
+
 function writePolicy(policy: unknown): void {
   writeFileSync(process.env[GO_POLICY_ENV]!, typeof policy === 'string' ? policy : JSON.stringify(policy))
 }
@@ -90,7 +136,15 @@ beforeEach(async () => {
     beta: { url: 'http://beta.test', email: 'b@example.test', secret: 'pw' },
     'alpha-staging': { url: 'http://staging.test', email: 's@example.test', secret: 'pw' },
   })
-  writePolicy({ ownerPublicKey: VECTORS.owner.publicKey, ungated: ['alpha-staging'] })
+  writePolicy({ ungated: ['alpha-staging'] })
+  process.env[RELAY_URL_ENV] = 'https://relay.test'
+  process.env[REGISTRY_CACHE_ENV] = join(dir, 'approver-cache.json')
+  // Every target these tests write to, approved by the owner key.
+  writeRegistry([
+    { property: 'alpha', publicKey: VECTORS.owner.publicKey },
+    { property: 'alpha-staging', publicKey: VECTORS.owner.publicKey },
+    { property: 'beta', publicKey: VECTORS.owner.publicKey },
+  ])
 
   failImport = false
   editWhilePublishing = false
@@ -140,7 +194,16 @@ beforeEach(async () => {
 afterEach(() => {
   globalThis.fetch = realFetch
   disconnect()
-  for (const name of [GO_POLICY_ENV, GO_LEDGER_ENV, UPLOAD_DIR_ENV, TARGETS_ENV, DEFAULT_TARGET_ENV]) {
+  forgetApprovers()
+  for (const name of [
+    GO_POLICY_ENV,
+    GO_LEDGER_ENV,
+    UPLOAD_DIR_ENV,
+    TARGETS_ENV,
+    DEFAULT_TARGET_ENV,
+    RELAY_URL_ENV,
+    REGISTRY_CACHE_ENV,
+  ]) {
     delete process.env[name]
   }
   rmSync(dir, { recursive: true, force: true })
@@ -218,12 +281,11 @@ test('the Connector verifies the shared vectors exactly as the relay does', () =
   }
 })
 
-test('the approver is per property — a property key approves its own site and nothing else', async () => {
-  writePolicy({
-    ownerPublicKey: VECTORS.owner.publicKey,
-    targets: { beta: { ownerPublicKey: VECTORS.other.publicKey } },
-    ungated: ['alpha-staging'],
-  })
+test('the approver is per property — a property key approves its own site and nothing else (AC-B6.1)', async () => {
+  writeRegistry([
+    { property: 'alpha', publicKey: VECTORS.owner.publicKey },
+    { property: 'beta', publicKey: VECTORS.other.publicKey },
+  ])
   const { uploadId, sha256 } = upload()
 
   // beta's own approver signs for beta.
@@ -236,30 +298,79 @@ test('the approver is per property — a property key approves its own site and 
   expect(own.isError).toBeUndefined()
   expect(JSON.stringify(parse(own))).toContain(VECTORS.other.fingerprint)
 
-  // The platform's default key does NOT approve a property that named its own.
+  // alpha's approver does NOT approve beta, even though it approves a site.
   cmsCalls = []
-  const byDefaultKey = await call('connector_import_replace', {
+  const byAnotherKey = await call('connector_import_replace', {
     target: 'beta',
     confirm: 'REPLACE beta',
     uploadId,
     go: signGo({ target: 'beta', sha256 }, OWNER),
   })
-  expect(refusal(byDefaultKey)).toContain(VECTORS.other.fingerprint)
+  expect(refusal(byAnotherKey)).toContain(VECTORS.other.fingerprint)
   expect(writes()).toEqual([])
 
-  // A property with no entry of its own still uses the default approver.
+  // And the reverse: beta's key is refused on alpha. No identity spans two
+  // properties (AC-B6.3).
   cmsCalls = []
-  const fallback = await replaceAlpha({ uploadId, go: signGo({ sha256 }) })
-  expect(fallback.isError).toBeUndefined()
-  expect(JSON.stringify(parse(fallback))).toContain(VECTORS.owner.fingerprint)
+  const crossed = await replaceAlpha({ uploadId, go: signGo({ sha256 }, OTHER) })
+  expect(refusal(crossed)).toContain(VECTORS.owner.fingerprint)
+  expect(writes()).toEqual([])
 })
 
-test('a property whose own approver key is unusable refuses, and never falls back to the default key', async () => {
-  writePolicy({
-    ownerPublicKey: VECTORS.owner.publicKey,
-    targets: { beta: { ownerPublicKey: 'not-a-key' } },
-    ungated: ['alpha-staging'],
+// The behaviour this replaces was "a property with no entry of its own still
+// uses the default approver" — one platform key approving every customer's
+// site, which is what P1 forbids and AC-B6.3 fails on.
+test('a property with no registered approver is refused, never handed to another key (AC-B6.3)', async () => {
+  writeRegistry([{ property: 'beta', publicKey: VECTORS.other.publicKey }])
+  const { uploadId, sha256 } = upload()
+
+  for (const key of [OWNER, OTHER]) {
+    cmsCalls = []
+    const res = await replaceAlpha({ uploadId, go: signGo({ sha256 }, key) })
+    expect(refusal(res)).toContain('no approver is registered')
+    expect(writes()).toEqual([])
+  }
+})
+
+test('a business approver covers the properties it names, and no others (AC-B6.4)', async () => {
+  writeRegistry([
+    { property: 'acme-group', level: 'business', covers: ['alpha'], publicKey: VECTORS.other.publicKey },
+  ])
+  const { uploadId, sha256 } = upload()
+
+  const covered = await replaceAlpha({ uploadId, go: signGo({ sha256 }, OTHER) })
+  expect(covered.isError).toBeUndefined()
+  expect(JSON.stringify(parse(covered))).toContain(VECTORS.other.fingerprint)
+
+  // beta is not named by that registration, so the same key reaches nothing there.
+  cmsCalls = []
+  const notCovered = await call('connector_import_replace', {
+    target: 'beta',
+    confirm: 'REPLACE beta',
+    uploadId,
+    go: signGo({ target: 'beta', sha256 }, OTHER),
   })
+  expect(refusal(notCovered)).toContain('no approver is registered')
+  expect(writes()).toEqual([])
+})
+
+test('a registry too old to know about a rotation refuses, rather than trusting a stale key', async () => {
+  // Older than a GO can live, so it could be hiding a retirement.
+  writeRegistry(
+    [{ property: 'alpha', publicKey: VECTORS.owner.publicKey }],
+    new Date(Date.now() - 5 * 60 * 60_000).toISOString(),
+  )
+  const { uploadId, sha256 } = upload()
+  const res = await replaceAlpha({ uploadId, go: signGo({ sha256 }) })
+  expect(refusal(res)).toMatch(/could not be read and the local copy is/)
+  expect(writes()).toEqual([])
+})
+
+test('a property whose registered approver key is unusable refuses, and never falls back to another', async () => {
+  writeRegistry([
+    { property: 'alpha', publicKey: VECTORS.owner.publicKey },
+    { property: 'beta', publicKey: 'not-a-key' },
+  ])
   const { uploadId, sha256 } = upload()
 
   for (const key of [OTHER, OWNER]) {
@@ -269,7 +380,7 @@ test('a property whose own approver key is unusable refuses, and never falls bac
       uploadId,
       go: signGo({ target: 'beta', sha256 }, key),
     })
-    expect(refusal(r)).toContain('not a base64 raw 32-byte Ed25519 key for "beta"')
+    expect(refusal(r)).toContain('the approver registered for "beta" is not a usable Ed25519 public key')
   }
   expect(cmsCalls).toEqual([])
 })
@@ -535,18 +646,25 @@ test('two concurrent calls carrying one GO — exactly one imports', async () =>
   expect(cmsCalls.filter((c) => c === `POST ${IMPORT_PATH}`)).toHaveLength(1)
 })
 
-test('an ungated staging target needs no GO and keeps its original responses', async () => {
+// This test used to assert the opposite — that a staging target needed no GO.
+// "A staging project exempted from the approval gate proves nothing" (PRD 5.4):
+// the loop being rehearsed has to be the real one, and an exemption is a
+// mechanism that has to stay correct forever rather than be removed once.
+test('a staging target is gated exactly like a production one (R7)', async () => {
   const { uploadId } = upload()
-  const imported = await importReplace({ target: 'alpha-staging', confirm: 'REPLACE alpha-staging', uploadId })
-  expect(imported.isError).toBeUndefined()
-  expect(parse(imported).go).toBeUndefined()
 
-  const published = await publishSite({ target: 'alpha-staging' })
-  expect(parse(published)).toEqual({ publishedPages: 1 })
+  const withoutGo = await importReplace({ target: 'alpha-staging', confirm: 'REPLACE alpha-staging', uploadId })
+  expect(refusal(withoutGo)).toContain('needs an owner-signed GO')
+  expect(writes()).toEqual([])
 
-  const row = await call('connector_publish_row', { target: 'alpha-staging', rowId: 'news-1' })
-  expect(parse(row)).toEqual({ ok: true, call: `POST ${API}/data/rows/news-1/publish` })
-  expect(cmsCalls).toEqual([`POST ${PREVIEW_PATH}`, `POST ${IMPORT_PATH}`, `POST ${PUBLISH_PATH}`, `POST ${API}/data/rows/news-1/publish`])
+  cmsCalls = []
+  const publishWithoutGo = await publishSite({ target: 'alpha-staging' })
+  expect(refusal(publishWithoutGo)).toContain('needs an owner-signed GO')
+
+  cmsCalls = []
+  const rowWithoutGo = await call('connector_publish_row', { target: 'alpha-staging', rowId: 'news-1' })
+  expect(refusal(rowWithoutGo)).toContain('needs an owner-signed GO')
+  expect(writes()).toEqual([])
 })
 
 test('a dry run needs no GO, writes nothing, and says what the gate would decide', async () => {
@@ -558,4 +676,29 @@ test('a dry run needs no GO, writes nothing, and says what the gate would decide
   expect(body.preview.sha256).toBe(sha256)
   expect(body.go).toMatchObject({ required: true, wouldPass: false })
   expect(cmsCalls).toEqual([`POST ${PREVIEW_PATH}`])
+})
+
+/**
+ * The shared vectors, applied to THIS side's resolver (R10).
+ *
+ * The relay runs the identical block against its own. Two implementations that
+ * share no code is the point of R10, and pinning them to one artefact is what
+ * stops that from becoming two rules that merely used to match — a change made
+ * on one side and not the other fails here or there.
+ */
+test('the Connector resolves approvers exactly as the shared vectors say (R10)', async () => {
+  for (const c of VECTORS.resolution ?? []) {
+    forgetApprovers()
+    writeFileSync(
+      process.env[REGISTRY_CACHE_ENV]!,
+      JSON.stringify({ at: new Date().toISOString(), approvers: c.registry }),
+    )
+
+    const resolved = approverFromRegistry(c.registry, c.target)
+    expect({ case: c.name, ok: resolved.ok }).toEqual({ case: c.name, ok: c.expect.ok })
+    if (resolved.ok && c.expect.ok) {
+      expect({ case: c.name, fp: resolved.fingerprint }).toEqual({ case: c.name, fp: c.expect.fingerprint })
+      expect({ case: c.name, scope: resolved.scope }).toEqual({ case: c.name, scope: c.expect.scope })
+    }
+  }
 })

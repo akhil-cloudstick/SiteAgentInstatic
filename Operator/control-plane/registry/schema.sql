@@ -561,3 +561,73 @@ create unique index if not exists tenants_cf_project_unique
 create unique index if not exists tenants_custom_domain_unique
   on siteagent_control.tenants (lower(custom_domain))
   where custom_domain is not null and custom_domain <> '' and status <> 'removed';
+
+-- ---------------------------------------------------------------------------
+-- Phase 4 (R9) — the proof chain: a receipt per publish.
+--
+-- "Without this, 'it went live' is an assertion." A deploy was marked live
+-- because the deploy tool exited cleanly, and nothing had ever fetched the
+-- result. The `deploys` table beside this one records a time and a URL; it is
+-- also mutable by design (finishDeploy updates it, the address triggers rewrite
+-- it, and it is cascade-deleted with its project), so it cannot be a receipt.
+--
+-- This table is the receipt, and it is append-only: the row is written ONCE,
+-- after the deploy and its verification have both finished, and then never
+-- edited or deleted. A record that can be revised after the fact cannot settle
+-- an argument about what went live, which is the only reason to keep one.
+create table if not exists siteagent_control.deploy_receipts (
+  id                  bigserial primary key,
+  at                  timestamptz not null default now(),
+  tenant_slug         text not null,
+  -- WHAT went live: the hash of the exact site document that was baked, as the
+  -- CMS computed it at publish time.
+  content_hash        text,
+  published_pages     int,
+  -- WHO put it there: the Cloudflare project and the deployment the tool
+  -- reported, so the platform's record and the provider's can be reconciled.
+  cf_project          text,
+  deploy_url          text,
+  deploy_id           text,
+  -- WHETHER IT IS REALLY THERE: not the deploy tool's exit code, but the answer
+  -- from fetching the site afterwards. `verified` means routes were fetched and
+  -- their content matched; `unverified` means the check could not run — which is
+  -- deliberately NOT the same as `failed`.
+  verification        text not null default 'unverified'
+                      check (verification in ('verified', 'failed', 'unverified')),
+  verification_detail text,
+  routes_checked      int,
+  routes_failed       int,
+  -- WHAT IT REPLACED: the receipt of the generation before this one, so the
+  -- chain can be walked backwards, and where that generation's bundle is kept.
+  previous_receipt_id bigint,
+  known_good_path     text,
+  -- WHICH BUILD did it, so a bad release can be identified rather than guessed.
+  build               text,
+  business_id         bigint,
+  operator_id         bigint
+);
+create index if not exists deploy_receipts_tenant_at on siteagent_control.deploy_receipts (tenant_slug, at desc);
+create index if not exists deploy_receipts_at on siteagent_control.deploy_receipts (at desc);
+
+-- Addressed like every other project-keyed record, so a scoped read filters it
+-- with no new logic (R5).
+drop trigger if exists deploy_receipts_stamp_address on siteagent_control.deploy_receipts;
+create trigger deploy_receipts_stamp_address
+  before insert on siteagent_control.deploy_receipts
+  for each row execute function siteagent_control.stamp_slug_address();
+
+-- Append-only, enforced here rather than only by the code that writes it — the
+-- second layer is for whoever holds the database console. Mirrors the relay's
+-- own approach, which is the one store in this system that already had it.
+create or replace function siteagent_control.deploy_receipts_immutable() returns trigger
+language plpgsql as $$
+begin
+  raise exception 'a deploy receipt is immutable: it records what went live, and may not be % after the fact',
+    case tg_op when 'DELETE' then 'deleted' else 'edited' end;
+end $$;
+drop trigger if exists deploy_receipts_no_update on siteagent_control.deploy_receipts;
+create trigger deploy_receipts_no_update before update on siteagent_control.deploy_receipts
+  for each row execute function siteagent_control.deploy_receipts_immutable();
+drop trigger if exists deploy_receipts_no_delete on siteagent_control.deploy_receipts;
+create trigger deploy_receipts_no_delete before delete on siteagent_control.deploy_receipts
+  for each row execute function siteagent_control.deploy_receipts_immutable();

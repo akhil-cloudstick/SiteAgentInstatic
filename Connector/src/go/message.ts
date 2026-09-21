@@ -139,7 +139,7 @@ export const GO_INPUT_PROP = {
   description:
     'The owner-signed GO for exactly this call: {ticketId, action, target, sha256, contentDigest, ' +
     'expiresAt, nonce, signature}, as the relay returns it for the deploy-request (GET ' +
-    '/api/tickets/<id>/go). Required on every target the GO policy does not list as ungated. sha256 ' +
+    '/api/tickets/<id>/go). Required on every target, staging included. sha256 ' +
     'is the uploaded bundle for an import, the last import under GO for a site publish, and ' +
     'connector_rows_digest of the affected rows for a row action. contentDigest is the draft site ' +
     'hash (connector_site_digest) for a site publish and "-" otherwise. Single-use, and spent before ' +

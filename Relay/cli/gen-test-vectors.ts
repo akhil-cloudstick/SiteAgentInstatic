@@ -67,13 +67,33 @@ const rowFields: Omit<Go, 'signature'> = {
   nonce: 'bm9uY2UtdmVjdG9yLXJvdy0xLXB1Ymxpc2g',
 }
 
+const EFFECTIVE = '2026-09-14T00:00:00.000Z'
+
+type Key = { publicKeyB64: string; fingerprint: string }
+const project = (property: string, key: Key) => ({
+  property,
+  level: 'project' as const,
+  publicKey: key.publicKeyB64,
+  fingerprint: key.fingerprint,
+  effectiveFrom: EFFECTIVE,
+})
+const business = (property: string, key: Key, covers: string[]) => ({
+  property,
+  level: 'business' as const,
+  covers,
+  publicKey: key.publicKeyB64,
+  fingerprint: key.fingerprint,
+  effectiveFrom: EFFECTIVE,
+})
+
 const validImport = signed(importFields, owner.privateKey)
 const validPublish = signed(publishFields, owner.privateKey)
 const validRow = signed(rowFields, owner.privateKey)
 
 const vectors = {
   about:
-    'GO signature test vectors. Read by Connector/tests/goGate.test.ts and Relay/tests/go.test.ts so ' +
+    'GO signature AND approver-resolution test vectors. Read by Connector/tests/goGate.test.ts and ' +
+    'Relay/tests/go.test.ts so ' +
     'the two verifiers cannot drift. Keys are derived from the published seeds below and are TEST-ONLY. ' +
     'Regenerate with: cd Relay && bun cli/gen-test-vectors.ts',
   format:
@@ -99,6 +119,75 @@ const vectors = {
     { name: 'import GO with target changed', go: { ...validImport, target: 'global-nettech' }, valid: false },
     { name: 'import GO with expiry extended', go: { ...validImport, expiresAt: '2031-01-01T04:00:00.000Z' }, valid: false },
     { name: 'import GO signed by another key', go: signed(importFields, other.privateKey), valid: false },
+  ],
+  /**
+   * Who approves a property, pinned across both sides (R6 + R10).
+   *
+   * The signature cases above prove the two verifiers agree on what a valid
+   * signature is. They say nothing about WHOSE signature should have been
+   * required — and that is now the interesting half, because each side resolves
+   * an approver from the registry independently. Without these, the two
+   * resolvers could disagree about delegation or about an unregistered property
+   * while every signature case stayed green.
+   *
+   * `registry` is the live approver list exactly as the relay publishes it at
+   * /api/approvers. `expect` is the resolution both sides must reach.
+   */
+  resolution: [
+    {
+      name: "a property's own approver approves it",
+      registry: [project('sheeltron', owner)],
+      target: 'sheeltron',
+      expect: { ok: true, fingerprint: owner.fingerprint, scope: 'property' },
+    },
+    {
+      name: "another property's approver does not",
+      registry: [project('sheeltron', owner), project('global-nettech', other)],
+      target: 'global-nettech',
+      expect: { ok: true, fingerprint: other.fingerprint, scope: 'property' },
+    },
+    {
+      name: 'a property nobody registered is refused, never handed to another key',
+      registry: [project('global-nettech', other)],
+      target: 'sheeltron',
+      expect: { ok: false },
+    },
+    {
+      name: 'an empty registry approves nothing',
+      registry: [],
+      target: 'sheeltron',
+      expect: { ok: false },
+    },
+    {
+      name: 'a business approver covers a property its registration names',
+      registry: [business('acme-group', other, ['sheeltron'])],
+      target: 'sheeltron',
+      expect: { ok: true, fingerprint: other.fingerprint, scope: 'business' },
+    },
+    {
+      name: "a business approver does not reach a property it does not name",
+      registry: [business('acme-group', other, ['sheeltron'])],
+      target: 'global-nettech',
+      expect: { ok: false },
+    },
+    {
+      name: "a property's own approver wins over a business that also names it",
+      registry: [project('sheeltron', owner), business('acme-group', other, ['sheeltron'])],
+      target: 'sheeltron',
+      expect: { ok: true, fingerprint: owner.fingerprint, scope: 'property' },
+    },
+    {
+      name: 'a registered key that is unusable refuses, rather than falling back',
+      registry: [{ property: 'sheeltron', level: 'project', publicKey: 'not-a-key', fingerprint: '', effectiveFrom: EFFECTIVE }],
+      target: 'sheeltron',
+      expect: { ok: false },
+    },
+    {
+      name: 'a retired approver is simply absent, and its property is refused',
+      registry: [project('global-nettech', other)],
+      target: 'sheeltron',
+      expect: { ok: false },
+    },
   ],
 }
 

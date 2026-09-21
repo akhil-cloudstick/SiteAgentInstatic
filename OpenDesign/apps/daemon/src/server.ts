@@ -7841,11 +7841,49 @@ export async function startServer({
       // safety net for pages built before the templateRule compliance gate
       // existed, or hand-edited after an AI build reintroduced a violation.
       // Nothing non-compliant reaches Instatic through this door.
-      let files: Record<string, { base64: string; mimeType?: string }> = rawFiles;
+      // The verdict and the auto-fix come from one call, so they share a fate:
+      // if this throws there is no verdict, and a share that proceeds anyway is
+      // an UNCHECKED site going into somebody's live CMS while the response
+      // says success. That is what used to happen — `files` was pre-seeded with
+      // the raw input and the error was swallowed into a warning.
+      //
+      // "No check may fail open. A check that cannot run reports failure, never
+      // a zero-findings pass" (PRD principle P2).
+      let files: Record<string, { base64: string; mimeType?: string }>;
+      let report: Awaited<ReturnType<typeof normalizeSiteFiles>>['report'];
       try {
         const normalized = await normalizeSiteFiles(rawFiles);
         files = normalized.files;
-        const r = normalized.report;
+        report = normalized.report;
+      } catch (normErr) {
+        const why = normErr instanceof Error ? normErr.message : String(normErr);
+        console.error(`[share-to-cms] ${slug} compliance check could not run: ${why}`);
+        return sendApiError(
+          res,
+          503,
+          'CMS_CHECK_FAILED',
+          'The website check could not run, so this share was stopped. Nothing was sent to your CMS. ' +
+            `This is a fault in the checker, not in your design: ${why}`,
+        );
+      }
+
+      {
+        const r = report;
+        // A page nobody could judge is not a page that passed. Blocked with its
+        // own code, so "we checked and it breaks the rules" and "we could not
+        // check" can never be mistaken for one another — by a person or by a
+        // caller.
+        if (r.unchecked.length > 0) {
+          const detail = r.unchecked.map((u) => `${u.path}: ${u.problem}`).join(' | ');
+          console.error(`[share-to-cms] ${slug} ${r.unchecked.length} page(s) could not be checked: ${detail}`);
+          return sendApiError(
+            res,
+            503,
+            'CMS_CHECK_FAILED',
+            `${r.unchecked.length} page(s) could not be checked, so this share was stopped and nothing was ` +
+              `sent to your CMS: ${detail}`,
+          );
+        }
         if (r.fails > 0 || r.warns > 0 || r.droppedStylesheets.length > 0) {
           console.warn(
             `[share-to-cms] ${slug} normalized: ${r.fails} fail, ${r.warns} warn; ` +
@@ -7869,10 +7907,6 @@ export async function startServer({
             `This project violates the CMS output rule and can't be shared until fixed: ${detail}`,
           );
         }
-      } catch (normErr) {
-        console.warn(
-          `[share-to-cms] ${slug} normalize failed, pushing raw: ${normErr instanceof Error ? normErr.message : normErr}`,
-        );
       }
       // 1) open a MACHINE session on the tenant's Instatic, for this staging
       // call only (MMS Phase 1). It never reaches the browser.

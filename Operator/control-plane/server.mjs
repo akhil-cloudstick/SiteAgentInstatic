@@ -188,11 +188,17 @@ async function listOpenrouterModels() {
 
 // Reject categories whose model is KNOWN to lack tool-calling (routed chat
 // categories always send tools) — server-side enforcement (Codex R2-#1). Models
-// with unknown capability are allowed (the UI warns). If the catalogue can't be
-// loaded (no key / upstream down) we can't verify, so we don't block.
+// with unknown capability are allowed (the UI warns).
 // Also covers the MMS Design model, which needs tool-calling even more than the
 // CMS categories do: an OpenDesign run is one long tool loop, so a model without
 // tools produces a session that talks but never builds anything.
+//
+// When the catalogue cannot be loaded this REFUSES rather than waving the save
+// through (R8, AC-B8.3). It used to do the opposite, on the reasoning that an
+// unverifiable claim should not block — but that is precisely a check reporting
+// a pass because it could not run, which principle P2 forbids. Refusing costs a
+// settings save until the key or the upstream is back; allowing costs a project
+// whose design agent can talk and never build, discovered much later.
 async function enforceToolCapability({ aiCategories, designModel } = {}) {
   const needs = [];
   if (Array.isArray(aiCategories)) {
@@ -207,7 +213,12 @@ async function enforceToolCapability({ aiCategories, designModel } = {}) {
   }
   if (!needs.length) return;
   const models = await listOpenrouterModels();
-  if (!models.length) return;
+  if (!models.length) {
+    throw new Error(
+      'the model catalogue could not be read, so tool-calling support cannot be checked. '
+      + 'Add or fix the OpenRouter key and try again',
+    );
+  }
   const cap = new Map(models.map((m) => [m.id, m.toolCalling]));
   for (const n of needs) {
     if (cap.get(n.model) === false) {
@@ -600,7 +611,15 @@ const server = http.createServer(async (req, res) => {
     if (dm && method === 'POST') {
       const slug = verifyTenantToken(decodeURIComponent(dm[1]));
       if (!slug) return send(res, 401, { error: 'invalid tenant token' });
-      deployTenant(slug).catch((e) => console.error(`[deploy] ${slug} failed:`, e.message));
+      // The publish now says WHAT it published (R9). The call carried no body
+      // at all before, which is why a deploy record could name a time and a URL
+      // and nothing about the content. An older CMS sends nothing, and the
+      // receipt then records the absence rather than inventing a hash.
+      const published = await readJson(req).catch(() => ({}));
+      deployTenant(slug, {
+        publishedSiteHash: typeof published.siteHash === 'string' ? published.siteHash : null,
+        publishedPages: Number.isFinite(published.publishedPages) ? published.publishedPages : null,
+      }).catch((e) => console.error(`[deploy] ${slug} failed:`, e.message));
       return send(res, 202, { accepted: true, slug });
     }
 

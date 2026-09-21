@@ -24,6 +24,7 @@ import type { InstaticSession } from '../http/session'
 import { rowsDigest, type RowHashEntry } from '../hash/row'
 import { goMessage, parseGo, type Go, type GoAction } from './message'
 import { approverFor, loadGoPolicy } from './policy'
+import { approverFromRegistry, loadApprovers } from './registry'
 import { isSpent, lastSuccessfulImport, recordOutcome, trySpend } from './ledger'
 
 /**
@@ -44,9 +45,10 @@ export interface GoReceipt {
   ownerKeyFingerprint: string
 }
 
-export type GoPass =
-  | { ok: true; gated: false }
-  | { ok: true; gated: true; go: Go; ownerKeyFingerprint: string }
+// Every gated action carries a GO. There used to be a second shape here for a
+// target exempt from the gate; removing the exemption removed the shape, so the
+// type can no longer express "passed without an approval" (R7).
+export type GoPass = { ok: true; gated: true; go: Go; ownerKeyFingerprint: string }
 
 export type GoCheck = GoPass | { ok: false; reason: string }
 
@@ -115,16 +117,23 @@ export async function checkGo(
   if (!loaded.ok) return { ok: false, reason: loaded.reason }
   const { policy } = loaded
 
-  if (policy.ungated.includes(input.target)) return { ok: true, gated: false }
-
   const { action, binding } = input
-  // Whose signature approves THIS property: its own approver key when the
-  // policy names one, the default approver otherwise.
-  const approver = approverFor(policy, input.target)
+
+  // Whose signature approves THIS property, read from the registry the issuing
+  // side writes to (R6). Both ends resolving the same registry is the whole of
+  // NEW-4: two copies of a map that agree by habit are not one answer.
+  //
+  // A registry that cannot be read refuses, exactly as a missing policy file
+  // does. "Could not ask" and "nobody may approve this" are different
+  // sentences, and neither of them is "go ahead".
+  const registry = await loadApprovers(now)
+  if (!registry.ok) return { ok: false, reason: registry.reason }
+
+  const approver = approverFromRegistry(registry.approvers, input.target)
   if (!approver.ok) {
     return {
       ok: false,
-      reason: `"${input.target}" needs an owner-signed GO for "${action}", and the GO policy has ${approver.problem}.`,
+      reason: `"${input.target}" needs an owner-signed GO for "${action}", and ${approver.problem}.`,
     }
   }
   const fingerprint = approver.fingerprint
@@ -243,13 +252,12 @@ export type GoRun<T> = { ok: true; result: T; receipt?: GoReceipt } | { ok: fals
 /**
  * Spend the GO, run the site-changing call, record how it went.
  *
- * The call receives the verified GO (undefined on an ungated target) so a
+ * The call receives the verified GO so a
  * publish can hand its contentDigest to the CMS as the precondition. Expiry is
  * checked again because a dry run or a CMS read can sit between `checkGo` and
  * here, and the spend is atomic against a second call carrying the same GO.
  */
 export async function runUnderGo<T>(gate: GoPass, run: (go: Go | undefined) => Promise<T>): Promise<GoRun<T>> {
-  if (!gate.gated) return { ok: true, result: await run(undefined) }
   const { go } = gate
 
   if (Date.parse(go.expiresAt) <= Date.now()) {
@@ -281,7 +289,6 @@ export function goRefusal(reason: string): string {
 /** What the gate would decide, for a dry run that needs no GO of its own. */
 export function describeGo(gate: GoCheck): Record<string, unknown> {
   if (!gate.ok) return { required: true, wouldPass: false, reason: gate.reason }
-  if (!gate.gated) return { required: false, reason: 'This target is ungated (staging).' }
   return {
     required: true,
     wouldPass: true,
