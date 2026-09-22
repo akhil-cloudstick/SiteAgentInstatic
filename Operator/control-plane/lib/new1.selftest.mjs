@@ -25,7 +25,10 @@ function check(name, actual, expected) {
 
 const here = dirname(fileURLToPath(import.meta.url));
 const src = (rel) => readFileSync(resolve(here, rel), 'utf8');
-const live = { running: true, odRunning: false, published: true };
+// `studio` joined this in R16. Until then the view carried only `odRunning` —
+// "did we spawn it" — which is true from the instant spawn() returns and so
+// cannot tell a listening daemon from one three minutes into a boot.
+const live = { running: true, odRunning: false, published: true, studio: { state: 'starting', forMs: 4000 } };
 
 // --- NEW-1b: the listing ------------------------------------------------------
 const row = {
@@ -60,6 +63,12 @@ check('no secret value survives',
     .filter((v) => wire.includes(v)), []);
 check('a pending invite is still visible as a flag', view.invite_pending, true);
 check('live status is carried', [view.running, view.od_running, view.published], [true, false, true]);
+// R16: the studio's own state travels to the console, so a cold start can be
+// told from a stopped one instead of both reading as "Stopped".
+check('the studio state is carried', [view.studio.state, view.studio.forMs], ['starting', 4000]);
+// A view built without one must not claim the studio is fine.
+check('a missing studio state defaults to not-provisioned',
+  decorate(row, { running: true, odRunning: false, published: true }).studio.state, 'not-provisioned');
 check('an activated tenant has no pending invite',
   decorate({ ...row, hub_status: 'active' }, live).invite_pending, false);
 check('an expired invite is not pending',

@@ -20,6 +20,7 @@
     "test:brand": "node control-plane/lib/brand.selftest.mjs",
     "test:domains": "node control-plane/lib/domains.selftest.mjs",
     "test:verify": "node control-plane/deployer/verify.selftest.mjs",
+    "test:studio": "node control-plane/runtime/studioStatus.selftest.mjs",
     "test:hub-session": "node control-plane/hub/hubSession.selftest.mjs",
     "test": "npm run test:deployer && npm run test:allowlist && npm run test:login && npm run test:admin-auth && npm run test:new1 && npm run test:scope && npm run test:brand && npm run test:domains && npm run test:verify && npm run test:hub-session",
     "start": "node control-plane/server.mjs",

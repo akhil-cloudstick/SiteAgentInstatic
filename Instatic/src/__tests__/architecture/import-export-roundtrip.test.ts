@@ -30,6 +30,7 @@ import { createSqliteClient } from '../../../server/db/sqlite'
 import { runMigrations } from '../../../server/db/runMigrations'
 import { sqliteMigrations } from '../../../server/db/migrations-sqlite'
 import { mkdtemp, writeFile, rm } from 'node:fs/promises'
+import { listBackups, readBackup, restoreSiteBackup } from '../../../server/publish/siteBackup'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { strToU8, zipSync } from 'fflate'
@@ -442,6 +443,82 @@ describe('with strategies — handler-level roundtrip', () => {
       expect(extraRows).toEqual([])
       expect(allRows.length).toBe(sourceBundle.rows.length)
     })
+
+  // --- R15, AC-D15.1: a replace does not destroy published history ------------
+  //
+  // Before this, the replace path took no backup of any kind: it deleted every
+  // row and every custom table and imported over the top, and whatever had been
+  // published was simply gone. The one backup that existed anywhere in the
+  // repository was written by the clear-all script, had no reader, and omitted
+  // `data_row_versions` and `site_snapshots` — the published half.
+  describe('strategy: replace keeps the prior published state recoverable', () => {
+    let targetDb: DbClient
+    let backupsDir: string
+
+    beforeAll(async () => {
+      backupsDir = await mkdtemp(join(tmpdir(), 'replace-backup-'))
+      targetDb = createSqliteClient(':memory:')
+      await runMigrations(targetDb, sqliteMigrations)
+      const cookie = await seedRoundtripAuth(targetDb, 'target-backup@roundtrip.test')
+
+      // A published page: a row, a version, and the snapshot it renders against.
+      await targetDb`insert into data_rows (id, table_id, cells_json, slug, status)
+                     values ('old-page', 'pages', ${JSON.stringify({ title: 'The old site' })}, 'index', 'published')`
+      await targetDb`insert into site_snapshots (id, site_json, content_hash)
+                     values ('old-snap', ${JSON.stringify({ name: 'the old site' })}, 'old-hash')`
+      await targetDb`insert into data_row_versions (id, row_id, version_number, cells_json, slug, site_snapshot_id)
+                     values ('old-v1', 'old-page', 1, ${JSON.stringify({ title: 'The old site' })}, 'index', 'old-snap')`
+      await targetDb`update data_rows set active_version_id = 'old-v1' where id = 'old-page'`
+
+      const req = new Request('http://localhost/cms/api/cms/import?strategy=replace', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(sourceBundle),
+      })
+      req.headers.set('cookie', cookie)
+      const res = await handleImportRoute(req, targetDb, { uploadsDir: backupsDir })
+      expect(res!.status).toBe(200)
+    })
+
+    afterAll(async () => {
+      await rm(backupsDir, { recursive: true, force: true })
+      targetDb.close?.()
+    })
+
+    test('the replace really did destroy the old published page', async () => {
+      const rows = (await targetDb`select * from data_rows where id = 'old-page'`).rows
+      expect(rows.length).toBe(0)
+      // And it no longer leaves an orphaned snapshot behind, which nothing in
+      // this server used to delete.
+      const snaps = (await targetDb`select * from site_snapshots where id = 'old-snap'`).rows
+      expect(snaps.length).toBe(0)
+    })
+
+    test('a backup was taken before it did so', async () => {
+      const names = await listBackups(backupsDir)
+      expect(names.length).toBe(1)
+      expect(names[0]).toContain('replace-import')
+    })
+
+    test('and the prior published state comes back from it (AC-D15.1)', async () => {
+      const names = await listBackups(backupsDir)
+      const read = await readBackup(backupsDir, names[0]!)
+      expect(read.ok).toBe(true)
+      if (!read.ok) return
+
+      await restoreSiteBackup(targetDb, read.backup)
+
+      const rows = (await targetDb`select * from data_rows where id = 'old-page'`).rows
+      expect(rows.length).toBe(1)
+      // Published, not merely present: the pointer and the version behind it.
+      expect((rows[0] as Record<string, unknown>).active_version_id).toBe('old-v1')
+      const versions = (await targetDb`select * from data_row_versions where id = 'old-v1'`).rows
+      expect(versions.length).toBe(1)
+      expect((versions[0] as Record<string, unknown>).site_snapshot_id).toBe('old-snap')
+      const snaps = (await targetDb`select * from site_snapshots where id = 'old-snap'`).rows
+      expect(snaps.length).toBe(1)
+    })
+  })
   })
 
   describe('strategy: merge-add into empty DB', () => {

@@ -29,6 +29,14 @@ const inflight = new Map();
 const lastParams = new Map();
 const supervised = new Map();
 const stopping = new Set();
+// When the current start attempt began, per slug (epoch ms).
+//
+// The runtime knew whether a daemon was starting but never for how long, and
+// those are different questions: "starting" is reassuring for two minutes and
+// alarming after twenty. Without it the console can only ever say "starting",
+// which is how a wedged boot goes unnoticed for as long as somebody's patience
+// lasts. Cleared when the daemon answers or is deliberately stopped.
+const startedAt = new Map();
 
 // A cold daemon needs minutes on this host, so give one wait room to finish
 // instead of thrashing spawns. Callers poll, so this is a ceiling, not a stall.
@@ -61,6 +69,50 @@ export function markUnavailable(slug) {
 // Why the last start attempt failed, for the waiting page to show.
 export const startError = (slug) => supervised.get(slug)?.why ?? null;
 
+/**
+ * What to SAY about this tenant's studio, for an administrative view (R16).
+ *
+ * The console used to render a studio's state from `isRunning`, which is true
+ * the instant `spawn()` returns and stays true for the whole multi-minute boot —
+ * and in fact it rendered the CMS's state, not this one at all, so a design-only
+ * project read "Stopped" with a "Start" button forever. That is what sent people
+ * to reinstall something that was fine.
+ *
+ * Four states, because four things are genuinely true at different times:
+ *
+ *   not-provisioned — this project has no design daemon (no port). Not a fault.
+ *   ready           — the port has answered; it is usable now.
+ *   starting        — we spawned it and it has not answered yet. `since` says
+ *                     how long, because "starting" stops being reassuring.
+ *   failed          — it exited or could not start, and `why` says which.
+ *
+ * Reads only in-process state — no probing, no I/O. That is not an optimisation:
+ * probing each project on a listing once opened an owner session inside every
+ * one of them, which R5 forbids and `adminAuth.selftest.mjs` guards against.
+ */
+export function studioStatus(slug, odPort) {
+  if (!slug || !odPort) return { state: 'not-provisioned' };
+  if (ready.has(slug)) return { state: 'ready' };
+
+  const why = startError(slug);
+  const since = startedAt.get(slug) ?? null;
+  // Starting is claimed only while something is actually in flight. A slug with
+  // neither a live attempt nor a spawned process is not "coming up soon" — it is
+  // stopped, and saying otherwise would be the same lie in a new direction.
+  if (inflight.has(slug) || running.has(slug)) {
+    return {
+      state: 'starting',
+      ...(since ? { since: new Date(since).toISOString(), forMs: Date.now() - since } : {}),
+      // A previous attempt's reason is worth carrying: a daemon on its third
+      // restart is starting AND has been failing, and only saying the first
+      // hides the second.
+      ...(why ? { why } : {}),
+    };
+  }
+  if (why) return { state: 'failed', why };
+  return { state: 'stopped' };
+}
+
 // Guarantee this tenant's daemon is coming up, and report whether it is usable
 // NOW. Deliberately synchronous: the request path must never block on a boot.
 //
@@ -75,6 +127,12 @@ export function ensure(tenant) {
   if (ready.has(slug)) return { ready: true };
   if (inflight.has(slug)) return { ready: false, starting: true, error: startError(slug) };
 
+  // Stamped before the attempt, not inside it, so the clock covers the whole
+  // wait including the adopt-or-spawn decision. Kept if an earlier attempt is
+  // still counting: a restart mid-boot should not reset the age to zero and
+  // make a daemon that has been struggling for ten minutes look fresh.
+  if (!startedAt.has(slug)) startedAt.set(slug, Date.now());
+
   const job = (async () => {
     // ADOPT before spawning. The port may already be served by a daemon we
     // started that is still warming up, or by one orphaned when the control
@@ -87,6 +145,7 @@ export function ensure(tenant) {
     const ok = await waitPortOpen(odPort, START_TIMEOUT_MS);
     if (ok) {
       ready.add(slug);
+      startedAt.delete(slug);
       clearSupervision(slug);
     }
     return ok;
@@ -324,8 +383,9 @@ export function start(tenant) {
   // Watch it up. Boot resume and provisioning call start() directly, so without
   // this the first request after a restart would always meet an "unready" daemon
   // and show the waiting page even though it had been booting for minutes.
+  if (!startedAt.has(slug)) startedAt.set(slug, Date.now());
   waitPortOpen(odPort, START_TIMEOUT_MS).then((ok) => {
-    if (ok && running.has(slug)) { ready.add(slug); clearSupervision(slug); }
+    if (ok && running.has(slug)) { ready.add(slug); startedAt.delete(slug); clearSupervision(slug); }
   });
   return rec;
 }
@@ -506,6 +566,9 @@ export function stop(slug) {
   stopping.add(slug);
   clearSupervision(slug);
   ready.delete(slug);
+  // A deliberate stop ends the start clock. Leaving it running would have the
+  // console report a stopped studio as "starting for 40 minutes".
+  startedAt.delete(slug);
   const rec = running.get(slug);
   if (!rec) return false;
   for (const pid of [rec.pid, rec.webPid]) {

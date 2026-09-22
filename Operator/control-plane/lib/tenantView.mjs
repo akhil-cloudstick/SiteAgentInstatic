@@ -17,7 +17,7 @@ const SECRET_COLUMN = /(_enc$|password|secret|token)/;
  * @param {object} row a listTenants() row
  * @param {{ running: boolean, odRunning: boolean, published: boolean }} live
  */
-export function decorate(row, { running, odRunning, published }) {
+export function decorate(row, { running, odRunning, published, studio }) {
   const hubActivated = row.hub_status === 'active';
   const inviteExpired = !!row.invite_expires_at && new Date(row.invite_expires_at) <= new Date();
   const view = {
@@ -27,6 +27,11 @@ export function decorate(row, { running, odRunning, published }) {
     invite_pending: !hubActivated && !inviteExpired && !!row.has_invite,
     running,
     od_running: odRunning,
+    // The studio's honest state (R16): not-provisioned | starting | ready |
+    // failed | stopped, with `since`/`forMs` while starting and `why` when it
+    // failed. `od_running` is kept because it answers a different, narrower
+    // question — did we spawn a process — and the gateway still asks it.
+    studio: studio ?? { state: 'not-provisioned' },
     published,
     admin_url: row.port ? `http://127.0.0.1:${row.port}/cms` : null,
     // One shared OD web serves every tenant; the tenant is resolved from the hub

@@ -125,6 +125,22 @@ const stateOf = (t: any) =>
   t.status === 'failed' ? 'failed'
     : t.status === 'provisioning' ? 'provisioning'
       : t.running ? 'running' : 'stopped';
+
+// The design studio's own state (R16), which this page never showed. It used to
+// render `t.running` — the CMS runtime — for every project, so a design-only
+// project read "Stopped" with a "Start" button whatever the studio was doing,
+// including three minutes into a perfectly healthy boot. That is what sent
+// people to reinstall something that was fine.
+const studioOf = (t: any) => t.studio ?? { state: 'not-provisioned' };
+/** "4m 12s" — a starting studio is reassuring at two minutes and not at twenty. */
+const forHuman = (ms: number) => {
+  const s = Math.max(0, Math.round(ms / 1000));
+  return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${s % 60}s`;
+};
+const studioLabel = (s: any) =>
+  s.state === 'starting' && typeof s.forMs === 'number' ? `Starting · ${forHuman(s.forMs)}` : 'Starting';
+/** True while anything on the page is still moving, so the page knows to poll. */
+const anyStarting = tenants.some((t: any) => studioOf(t).state === 'starting');
 const liveUrl = (t: any) => (t.custom_domain ? `https://${t.custom_domain}` : t.pages_url || '');
 const fmtDate = (s: string | null) => (s ? new Date(s).toLocaleString() : '—');
 
@@ -187,6 +203,7 @@ const presetBusiness = Astro.url.searchParams.get('business') || (businesses.len
         <tbody>
           {tenants.map((t) => {
             const state = stateOf(t);
+            const studio = studioOf(t);
             const name = t.display_name || t.slug;
             const url = liveUrl(t);
             return (
@@ -212,6 +229,28 @@ const presetBusiness = Astro.url.searchParams.get('business') || (businesses.len
                   {state === 'stopped' && <StatusChip tone="warning" dot>Stopped</StatusChip>}
                   {state === 'provisioning' && <StatusChip tone="blue" dot>Setting up</StatusChip>}
                   {state === 'failed' && <StatusChip tone="danger" dot title={t.last_error || ''}>Failed</StatusChip>}
+                  {/*
+                    The studio, said separately (R16). It has its own lifecycle —
+                    minutes to boot, its own crashes — and folding it into the
+                    CMS chip is what made a healthy cold start read as "stopped".
+                    A project without one says nothing rather than inventing a
+                    state for something that does not exist.
+                  */}
+                  {studio.state === 'starting' && (
+                    <div style="margin-top:4px">
+                      <StatusChip tone="blue" dot title={studio.why || 'The design studio is starting.'}>
+                        {studioLabel(studio)}
+                      </StatusChip>
+                    </div>
+                  )}
+                  {studio.state === 'failed' && (
+                    <div style="margin-top:4px">
+                      <StatusChip tone="danger" dot title={studio.why || ''}>Studio failed</StatusChip>
+                    </div>
+                  )}
+                  {studio.state === 'stopped' && (
+                    <div style="margin-top:4px"><StatusChip tone="warning" dot>Studio stopped</StatusChip></div>
+                  )}
                   {!t.hub_activated && state !== 'failed' && (
                     <div class="mms-hint" style="margin-top:4px">{t.invite_pending ? 'Owner invite pending' : 'Owner not signed up'}</div>
                   )}
@@ -269,7 +308,13 @@ const presetBusiness = Astro.url.searchParams.get('business') || (businesses.len
                         <i class="fa-solid fa-link" aria-hidden="true"></i> <span class="mms-copy-label">Copy sign-in link</span>
                       </button>
                       <div class="mms-menu__sep"></div>
-                      {state === 'stopped' && (
+                      {/*
+                        Not offered while the studio is starting (R16). Inviting
+                        someone to "Start" a daemon that is already two minutes
+                        into a boot is the action that reads as "this is broken,
+                        do something" — and doing it achieves nothing.
+                      */}
+                      {state === 'stopped' && studio.state !== 'starting' && (
                         <form method="POST" data-busy={`Starting ${name}`}>
                           <input type="hidden" name="intent" value="start" />
                           <input type="hidden" name="slug" value={t.slug} />
@@ -332,6 +377,12 @@ const presetBusiness = Astro.url.searchParams.get('business') || (businesses.len
                       <dt>Business</dt><dd>{t.business_name || '—'}{t.operator_name ? ` · ${t.operator_name}` : ' · direct'}</dd>
                       <dt>Owner email</dt><dd>{t.owner_email || '—'}</dd>
                       <dt>Status</dt><dd>{state === 'running' ? 'Running' : state === 'stopped' ? 'Stopped' : state === 'provisioning' ? 'Setting up' : 'Failed'}</dd>
+                      <dt>Design studio</dt>
+                      <dd>{studio.state === 'ready' ? 'Running'
+                        : studio.state === 'starting' ? `${studioLabel(studio)}${studio.why ? ` — last attempt: ${studio.why}` : ''}`
+                          : studio.state === 'failed' ? `Failed — ${studio.why || 'no reason recorded'}`
+                            : studio.state === 'stopped' ? 'Stopped'
+                              : <span class="mms-muted">Not set up for this project</span>}</dd>
                       <dt>CMS (internal)</dt>
                       <dd>{t.running && t.admin_url ? (
                         <span class="mms-row"><span class="mms-mono">{t.admin_url}</span><button type="button" class="mms-iconbtn" data-copy={t.admin_url} aria-label="Copy CMS address"><i class="fa-solid fa-copy" aria-hidden="true"></i></button></span>
@@ -501,5 +552,14 @@ const presetBusiness = Astro.url.searchParams.get('business') || (businesses.len
     </Modal>
     <script is:inline>setTimeout(() => location.reload(), 2500);</script>
   )}
+  {/*
+    Poll while a studio is still coming up (R16). The page refreshed only during
+    provisioning, so a cold start never resolved on screen: the operator was
+    left looking at "Starting" until they reloaded by hand, which is exactly the
+    moment the old wording persuaded them to go and reinstall instead. Slower
+    than the tenant waiting page's 2s — this is a whole table, and nobody is
+    blocked on it.
+  */}
+  {!prov && anyStarting && <script is:inline>setTimeout(() => location.reload(), 10000);</script>}
   {!prov && <OnceLinkModal link={link} />}
 </ConsoleLayout>

@@ -108,6 +108,13 @@ function readJson(req) {
 const tenantView = (row) => decorate(row, {
   running: rt.isRunning(row.slug),
   odRunning: odrt.isRunning(row.slug),
+  // What to SAY about the studio, rather than merely whether we spawned it
+  // (R16). `isRunning` is true from the instant spawn() returns, so it cannot
+  // tell a daemon that is listening from one that is three minutes into a boot
+  // — and the console rendered neither of those, it rendered the CMS's state.
+  // In-process lookups only: probing each row on a listing would open an owner
+  // session inside every project, which R5 forbids.
+  studio: odrt.studioStatus(row.slug, row.od_port),
   published: hasBakedOutput(row.slug),
 });
 

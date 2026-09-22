@@ -72,6 +72,7 @@ import {
   serializeCollabAwareWrite,
   type RowWriteKind,
 } from '../../repositories/rowWriteEvents'
+import { captureSiteBackup, writeBackup } from '../../publish/siteBackup'
 
 // The four system table ids that are always seeded and never deleted.
 const SYSTEM_TABLE_IDS = new Set(['posts', 'pages', 'components', 'layouts'])
@@ -258,10 +259,49 @@ export async function handleImportRoute(
     }
 
   if (strategy === 'replace') {
+    // R15, AC-D15.1: capture the published state BEFORE destroying it.
+    //
+    // This path used to take no backup of any kind — it deleted every row and
+    // every custom table and imported over the top, and the prior published
+    // history was simply gone. The one backup that existed anywhere was written
+    // by the clear-all script, had no reader, and omitted `data_row_versions`
+    // and `site_snapshots` — exactly the published half.
+    //
+    // Outside the transaction deliberately: a backup that is rolled back with a
+    // failed import is no backup at all, and this has to survive the import
+    // succeeding as much as it failing.
+    let backupPath: string | null = null
+    if (options.uploadsDir) {
+      try {
+        backupPath = await writeBackup(options.uploadsDir, await captureSiteBackup(db, 'replace-import'))
+      } catch (err) {
+        // Loud, and it stops the import. A replace whose backup failed is the
+        // exact situation this requirement exists to prevent, so proceeding
+        // would be choosing the unrecoverable outcome on purpose.
+        return jsonResponse(
+          {
+            error:
+              'Could not back up the current site before replacing it, so the import was not run: ' +
+              (err instanceof Error ? err.message : String(err)),
+          },
+          { status: 500 },
+        )
+      }
+    }
+
     // Wipe-and-replace: delete all rows + custom tables, then reimport.
     await db.transaction(async (tx) => {
       // 1. Delete ALL data rows (covers all tables)
       await tx`delete from data_rows`
+
+      // 2a. And the published snapshots those rows' versions pointed at.
+      //
+      // Deleting `data_rows` cascades `data_row_versions`, but the versions'
+      // FK to `site_snapshots` is `on delete set null`, so the snapshots stay —
+      // orphaned, unreferenced and invisible. Nothing in this server ever
+      // deleted them; only the clear-all script did. A replace that leaves them
+      // is a replace that keeps growing the table it claims to have cleared.
+      await tx`delete from site_snapshots`
 
       // 2. Delete all non-system data tables
       //

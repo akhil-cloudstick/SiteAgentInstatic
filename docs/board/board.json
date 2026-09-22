@@ -545,16 +545,16 @@
         {
           "id": "R15",
           "title": "Safe replace, and a complete clear-all",
-          "status": "doing",
+          "status": "built",
           "dependsOn": [
             "R9"
           ],
-          "note": "The clear-all covers all four stores and snapshots first, but nothing reads that snapshot back and the replace path takes no snapshot at all.",
+          "note": "Built 2026-09-22. AC-D15.2 was already satisfied by the clear-all, which covers all four stores in the right order with the tenant stopped first. AC-D15.1 was unmet on BOTH halves and the board understated it: the replace path took no backup at all, and the one backup that existed — the clear-all's — had no reader anywhere in the repository AND omitted `data_row_versions` and `site_snapshots`, which is precisely the published state this requirement is about. It could not have satisfied the criterion even if something had read it. A replace now captures the published state before destroying it — rows, versions, snapshots, custom table definitions and redirects — and a restore writes it back in one transaction, in FK order, with the active-version pointer applied in a second pass because a single-pass insert cannot satisfy a cycle. A page comes back PUBLISHED, not merely present, which is the whole difference. The format carries a version and a checksum and the reader refuses anything it does not fully understand, including every backup written before today: half-applying one over a live site is worse than refusing it. A backup that fails stops the import, because a replace with no backup is the exact outcome the requirement exists to prevent. Three generations are kept, the number R9 already chose for known-good bundles. A replace also now clears the `site_snapshots` it used to orphan — nothing in the server had ever deleted them. NOT DONE, deliberately: a replace still leaves the baked `published/` files serving. The clear-all deletes them because it is a deliberate wipe; for an import, keeping the old pages up until the next publish is what avoids taking a live site down between the two steps. ALSO NOT DONE: the clear-all script still writes the old backup format, so its backups remain unrestorable. Its own criterion (AC-D15.2) does not depend on that, and it is named here rather than left to be rediscovered.",
           "subtasks": [
             {
               "id": "AC-D15.1",
               "text": "Prior published state recoverable after a replace",
-              "status": "todo",
+              "status": "built",
               "verified": "pending"
             },
             {
@@ -568,14 +568,14 @@
         {
           "id": "R16",
           "title": "Cold-start clarity",
-          "status": "doing",
+          "status": "built",
           "dependsOn": [],
-          "note": "The waiting page is correct; the administrative view collapses \"not up yet\" into \"not installed\".",
+          "note": "Built 2026-09-22, and the defect was worse than this note said. The console did not merely confuse \"not up yet\" with \"not installed\" — it had NO studio status at all. It rendered the CMS runtime for every project, so a design-only project read \"Stopped\" with a \"Start\" button permanently, whatever the studio was doing. Nor could the underlying check have helped: the one the listing called is true from the instant spawn() returns and stays true for the whole multi-minute boot. The honest predicate existed and was never called from the listing. The studio now reports four states that are genuinely different things — not provisioned, starting, ready, failed with its reason — and the console shows the studio separately from the CMS, because they have separate lifecycles and folding them together is what caused this. A start time is recorded, which nothing tracked before, so \"starting\" can be told from \"stuck\": the chip says how long. \"Start\" is no longer offered for a studio that is already starting, and the page keeps looking while anything is coming up — it used to refresh only during provisioning, so a cold start never resolved on screen. All of it reads in-process state and probes nothing: probing each project on a listing once opened an owner session inside every one, which R5 forbids and a self-test guards. ADJACENT, not fixed: the bridge-plugin chip has an identical bug, turning \"the CMS is unreachable\" into \"not installed\". It is not AC-D16.1 and was not bundled in.",
           "subtasks": [
             {
               "id": "AC-D16.1",
               "text": "A cold studio returns \"starting\", not something that reads as \"not installed\"",
-              "status": "todo",
+              "status": "built",
               "verified": "pending"
             }
           ]
