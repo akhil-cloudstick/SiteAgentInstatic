@@ -1,14 +1,27 @@
 # Phase 6 — Productionisation
 
-## Part 1 — Today (2026-09-22). Not for execution.
+## Part 1 — Status at end of 2026-09-22. Not for execution.
 
-- **Committed:** `5f5a874` — Phase 5 (R11, R12, R-SEO, R13) plus the Phase 4 registration gap, 46 files. `8b13886` — the approver registry's owner page.
-- **Built:** P0–P3; P4 R7–R10; P5 R11, R12, R-SEO.
-- **Awaiting owner:** P4 NEW-4 and R6; P5 R13. Nothing left on our side for any of them.
-- **The one blocker:** a single Cloudflare relay redeploy unblocks all three. The live relay predates the approver registry and answers `No such route` for it, so that work is committed here and does nothing in production. Message written and ready to send.
-- **5 bugs fixed, none of them on the board:** rule **ids** compared against rule **names**; routes predicted that the bake never writes; a relay outage marking a push *refused*; services that exited staying dead; the launcher reading credentials from the shell.
-- **Next:** Phase 6 — R15 and R16. Needs nothing from the owner.
-- **Pending after Phase 6:** security E2, E3, E4, E7, E8, E10; E9 in progress.
+**Phase 6 is DONE.** Phases 0 to 6 are now built. Only the security items remain.
+
+- **Committed today:** `5f5a874` Phase 5 + the Phase 4 registration gap · `8b13886` the approver owner page · `2563a7f` **Phase 6 (R15 + R16)** · `3e9a4c5` two real bug fixes · `73f215b` the React diagnosis.
+- **Built:** P0–P3 · P4 R7–R10 · P5 R11, R12, R-SEO · **P6 R15, R16**.
+- **Awaiting owner (3):** P4 NEW-4 and R6; P5 R13. Nothing left on our side.
+- **The one blocker:** a single Cloudflare relay redeploy unblocks all three. **Checked 2026-09-22 — NOT deployed yet:** still reports version `0.4.0` and answers `No such route` for the registry. The owner runs it from `S:\SiteAgentHub\Relay`, and `api/approvers` also needs its own Access Bypass policy.
+- **7 bugs fixed, none on the board:** rule **ids** compared against **names** · routes predicted that the bake never writes · a relay outage marking a push *refused* · services that exited staying dead · the launcher reading credentials from the shell · one corrupt style rule blanking the whole canvas · two import tests blaming the wrong code.
+- **Pending:** security E2, E3, E4, E7, E8, E10 (E9 in progress).
+
+## Part 1b — Pick up here tomorrow (2026-09-23)
+
+Three known failures remain. None blocks the relay redeploy — they are all in Instatic, and the relay is a separate worker.
+
+| # | What | What it needs |
+|---|---|---|
+| 1 | **~16 React DOM tests** (previewOverlay 13, settingsModal 3) | **A decision, not a fix.** OpenDesign is on React 18.3.1, Instatic on 19.2.5, and they share `@mms/shell`, so the shell is built by one React and rendered by the other. Diagnosed in full at the top of `Instatic/src/__tests__/setup.ts`. Two dead ends already tried and recorded there: the tsconfig `paths` alias (a real `node_modules` beats it) and a `Bun.plugin` onResolve hook (never called for bare specifiers). Do **not** stub the shell — they would pass while no longer testing the tree that ships. |
+| 2 | **1 publisher reset test** | **Your decision.** The test wants `body { min-height: 100% }`; the code omits it deliberately. Add it → sticky navs work down the page. Leave it → window scroll listeners keep working. It changes the CSS of *every published site*, so look at a live site first, then either make the code match the test or delete the test. |
+| 3 | **~65 architecture gates** | Mostly old debt — CSS tokens, vendored icons, Tailwind bans, module size. Safe to grind through. **Two must not be touched:** `auth.ts` and `DashboardPage.tsx` grew past their size caps and are being edited in other sessions right now. |
+
+Also open, both raised and neither started: making destructive import non-default (`?strategy=` absent currently means *replace*), and wiring `listKnownGood` to the new restore to close **E10**.
 
 ---
 
