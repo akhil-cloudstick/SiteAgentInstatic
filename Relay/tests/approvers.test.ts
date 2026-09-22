@@ -422,3 +422,94 @@ test('the registry is readable without a credential, and writable only with one'
   )
   expect(writeAttempt.status).toBe(405)
 })
+
+// --- The registry as a page the owner can use ---------------------------------
+//
+// The route was owner-only from the start, and the owner on this relay is a
+// browser identity — the role is matched on an email in an Access assertion, and
+// a service token can never hold it. So until this page existed the one party
+// permitted to register an approver had no way to do it that did not involve
+// lifting a token out of a browser session.
+
+const page = (r: Relay, actor: Actor) => r.call(actor, 'GET', '/approvers')
+
+test('the owner gets a form to register an approver; nobody else does', async () => {
+  const r = relay({ approvers: { sheeltron: VECTORS.owner.publicKey } })
+
+  const owner = await page(r, OWNER)
+  expect(owner.status).toBe(200)
+  expect(owner.text).toContain('Register an approver')
+  expect(owner.text).toContain('ap-submit')
+
+  for (const actor of [BUILDER, VALIDATOR]) {
+    const other = await page(r, actor)
+    expect(other.status).toBe(200)
+    expect(other.text).not.toContain('Register an approver')
+    expect(other.text).toContain('Only the owner can change this registry')
+  }
+})
+
+test('hiding the form is not the control — the write still refuses', async () => {
+  // The page decides what to draw and nothing else. A builder who skips the UI
+  // and posts directly meets exactly the same refusal.
+  const r = relay({ approvers: {} })
+  const res = await r.call(BUILDER, 'POST', '/api/approvers', {
+    property: 'greenkitchen',
+    level: 'project',
+    publicKey: VECTORS.owner.publicKey,
+  })
+  expect(res.status).toBe(403)
+  expect(await r.store.listApprovers()).toEqual([])
+})
+
+test('the page shows who approves what, and says plainly when nobody does', async () => {
+  const withOne = relay({ approvers: { sheeltron: VECTORS.owner.publicKey } })
+  const listed = await page(withOne, OWNER)
+  expect(listed.text).toContain('sheeltron')
+  expect(listed.text).toContain(VECTORS.owner.fingerprint)
+
+  const empty = await page(relay({ approvers: {} }), OWNER)
+  expect(empty.text).toContain('No approver is registered for anything')
+  // The consequence, not just the absence.
+  expect(empty.text).toContain('will refuse until one is')
+})
+
+test('a retired registration is shown as history, and labelled as authorising nothing', async () => {
+  const r = relay({ approvers: { sheeltron: VECTORS.owner.publicKey } })
+  await r.call(OWNER, 'POST', '/api/approvers', {
+    property: 'sheeltron',
+    level: 'business',
+    covers: ['greenkitchen'],
+    publicKey: VECTORS.other.publicKey,
+  })
+
+  const after = await page(r, OWNER)
+  expect(after.text).toContain('Retired registrations')
+  expect(after.text).toContain('None of these authorises anything now')
+  // The live row is the new one; the old key appears only under history.
+  expect(after.text).toContain('greenkitchen')
+})
+
+test('every value the page prints is escaped', async () => {
+  // Property names are validated on the way in, but the page must not depend on
+  // that: it renders whatever the store holds, and the store outlives today's
+  // validation rules.
+  const r = relay({ approvers: {} })
+  await r.store.registerApprover({
+    id: 'apr_x',
+    seq: 500,
+    property: '<script>alert(1)</script>',
+    level: 'project',
+    covers: null,
+    publicKey: VECTORS.owner.publicKey,
+    fingerprint: VECTORS.owner.fingerprint,
+    effectiveFrom: '2026-09-14T00:00:00.000Z',
+    retiredAt: null,
+    registeredBy: 'owner@example.test',
+    reason: null,
+    createdAt: '2026-09-14T00:00:00.000Z',
+  })
+  const res = await page(r, OWNER)
+  expect(res.text).not.toContain('<script>alert(1)</script>')
+  expect(res.text).toContain('&lt;script&gt;')
+})

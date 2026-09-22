@@ -34,7 +34,7 @@ import {
   verifyGoSignature,
 } from './go'
 import { findRule, initialState, setsAdjudicated } from './state'
-import { renderQueue, renderTicket, type Page } from './ui'
+import { renderApprovers, renderQueue, renderTicket, type Page } from './ui'
 import type { Actor, ArtefactMeta, Evidence, Message, MessageKind, Ticket, TransitionRecord } from './types'
 
 type Out = { status: number; body: unknown }
@@ -750,6 +750,19 @@ async function handleUi(path: string, actor: Actor, deps: Deps): Promise<Respons
   const ownerKeyFingerprint = await ownerFingerprint(deps)
   if (path === '/') {
     return htmlResponse(renderQueue({ actor, ownerKeyFingerprint, tickets: await deps.store.listTickets() }))
+  }
+  // The registry, where the owner can actually work on it. The write itself is
+  // still refused for anyone but the owner by `routeWrite` — this page only
+  // decides what to draw, and a page is never the control.
+  if (path === '/approvers') {
+    return htmlResponse(
+      renderApprovers({
+        actor,
+        ownerKeyFingerprint,
+        approvers: await deps.store.listApprovers(),
+        history: await deps.store.listApproverHistory(),
+      }),
+    )
   }
   const match = /^\/t\/([A-Za-z0-9-]+)$/.exec(path)
   const ticket = match ? await deps.store.getTicket(match[1]!) : null

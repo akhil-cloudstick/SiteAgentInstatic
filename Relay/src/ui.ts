@@ -12,7 +12,7 @@
  */
 
 import { simpleMovesFor } from './state'
-import type { Actor, GoRecord, Message, Ticket, TransitionRecord } from './types'
+import type { ApproverRecord, Actor, GoRecord, Message, Ticket, TransitionRecord } from './types'
 
 export interface Page {
   html: string
@@ -35,6 +35,9 @@ body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.5 system-ui,-appl
 a{color:var(--accent)}
 .top{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;padding:10px 16px;border-bottom:1px solid var(--line);background:var(--card)}
 .brand{font-weight:700;color:var(--fg);text-decoration:none}
+.nav{color:var(--muted);text-decoration:none;border-bottom:1px solid transparent}
+.nav:hover{color:var(--fg);border-bottom-color:var(--line)}
+input,select{width:100%;max-width:520px;padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg);font:inherit}
 .who{padding:0 8px;border:1px solid var(--line);border-radius:10px;color:var(--muted)}
 .key{margin-left:auto;color:var(--muted)}
 main{max-width:980px;margin:0 auto;padding:16px}
@@ -105,7 +108,70 @@ const MOVE_LABELS: Record<string, string> = {
   done: 'Decide: done',
 }
 
-function shell(title: string, content: string, ctx: PageContext, options: { script?: boolean; ticketId?: string } = {}): Page {
+/**
+ * The approver page's own script.
+ *
+ * Separate from SCRIPT because that one is ticket-scoped — it reads a ticket id
+ * off the body and posts under `/api/tickets/<id>`. This page has no ticket.
+ */
+const APPROVER_SCRIPT = `
+const result = document.getElementById('action-result');
+async function send(path, body, method) {
+  result.textContent = 'Sending...';
+  try {
+    const res = await fetch(path, {
+      method: method || 'POST',
+      headers: { 'content-type': 'application/json', 'idempotency-key': crypto.randomUUID() },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok) { result.textContent = 'Done. Reloading...'; setTimeout(() => location.reload(), 600); }
+    else { result.textContent = data.error || ('HTTP ' + res.status); }
+  } catch (err) { result.textContent = 'Network error: ' + err.message; }
+}
+const level = document.getElementById('ap-level');
+const coversField = document.getElementById('ap-covers');
+function syncCovers() {
+  // A project-level approver takes no covers, and the route refuses one that
+  // carries them. Hiding the field is how the form says so before it is sent.
+  if (!level || !coversField) return;
+  coversField.style.display = level.value === 'business' ? '' : 'none';
+}
+if (level) { level.addEventListener('change', syncCovers); syncCovers(); }
+const submit = document.getElementById('ap-submit');
+if (submit) submit.addEventListener('click', () => {
+  const property = document.getElementById('ap-property').value.trim();
+  const publicKey = document.getElementById('ap-key').value.trim();
+  const reason = document.getElementById('ap-reason').value.trim();
+  const chosen = level.value;
+  if (!property) { result.textContent = 'Name the property.'; return; }
+  if (!publicKey) { result.textContent = 'Paste the approver public key.'; return; }
+  const body = { property: property, level: chosen, publicKey: publicKey };
+  if (reason) body.reason = reason;
+  if (chosen === 'business') {
+    body.covers = coversField.value.split(',').map((s) => s.trim()).filter(Boolean);
+    if (body.covers.length === 0) { result.textContent = 'A business approver must name what it covers.'; return; }
+  }
+  send('/api/approvers', body);
+});
+document.querySelectorAll('button.retire').forEach((button) => {
+  button.addEventListener('click', () => {
+    const p = button.dataset.property;
+    // Said plainly, because it is the whole effect of the action and the page
+    // should not be the only place it is obvious.
+    if (confirm('Retire the approver for ' + p + '?\\n\\nEvery gated action on it will refuse until a new one is registered.')) {
+      send('/api/approvers/' + encodeURIComponent(p) + '/retire', {});
+    }
+  });
+});
+`
+
+function shell(
+  title: string,
+  content: string,
+  ctx: PageContext,
+  options: { script?: boolean; ticketId?: string; approverForm?: boolean } = {},
+): Page {
   const nonce = crypto.randomUUID().replace(/-/g, '')
   const key = ctx.ownerKeyFingerprint
     ? `GO enforced · owner key <code>${esc(ctx.ownerKeyFingerprint)}</code>`
@@ -115,9 +181,12 @@ function shell(title: string, content: string, ctx: PageContext, options: { scri
     '<meta name="viewport" content="width=device-width,initial-scale=1">' +
     `<title>${esc(title)} · Deploy Relay</title><style nonce="${nonce}">${CSS}</style></head>` +
     `<body${options.ticketId ? ` data-ticket="${esc(options.ticketId)}"` : ''}>` +
-    `<header class="top"><a class="brand" href="/">Deploy Relay</a><span class="who">${esc(ctx.actor.role)}</span>` +
+    `<header class="top"><a class="brand" href="/">Deploy Relay</a>` +
+    '<a class="nav" href="/approvers">Approvers</a>' +
+    `<span class="who">${esc(ctx.actor.role)}</span>` +
     `<span class="key">${key}</span></header><main>${content}</main>` +
     (options.script ? `<script nonce="${nonce}">${SCRIPT}</script>` : '') +
+    (options.approverForm ? `<script nonce="${nonce}">${APPROVER_SCRIPT}</script>` : '') +
     '</body></html>'
   return { html, nonce }
 }
@@ -280,4 +349,102 @@ export function renderTicket(
     history
 
   return shell(t.id, content, ctx, { script: interactive, ticketId: t.id })
+}
+
+/**
+ * The approver registry, as a page the owner can actually use.
+ *
+ * The registration route is owner-only, and the owner here is a BROWSER
+ * identity: the role is matched on the email in a Cloudflare Access assertion,
+ * and a service token can never hold it. So the one party permitted to register
+ * an approver had no practical way to call the route — they would have had to
+ * lift an Access token out of a browser session to use curl. The route existed
+ * without the surface its only permitted caller could reach it through.
+ *
+ * It sits beside the queue, which is where the owner already comes to record a
+ * GO, rather than in the operator console: that console's administrator is a
+ * different identity from this relay's owner and could not act as them.
+ *
+ * Everyone may READ this page. Only the owner sees the forms — and the server
+ * refuses the write regardless of what the page renders, because a hidden
+ * button is a courtesy and not a control.
+ */
+export function renderApprovers(
+  ctx: PageContext & { approvers: ApproverRecord[]; history: ApproverRecord[] },
+): Page {
+  const isOwner = ctx.actor.role === 'owner'
+
+  const liveRows = ctx.approvers
+    .map((a) => {
+      const covers = a.level === 'business' ? (a.covers ?? []).join(', ') || '<span class="meta">nothing yet</span>' : '—'
+      const retire = isOwner
+        ? `<button type="button" class="retire" data-property="${esc(a.property)}">Retire</button>`
+        : ''
+      return (
+        `<tr><td><code>${esc(a.property)}</code></td><td>${esc(a.level)}</td><td>${covers}</td>` +
+        `<td><code>${esc(a.fingerprint)}</code></td><td class="meta">${esc(a.effectiveFrom)}</td><td>${retire}</td></tr>`
+      )
+    })
+    .join('')
+
+  const live =
+    ctx.approvers.length > 0
+      ? '<div class="wrap"><table><thead><tr><th>Property</th><th>Level</th><th>Covers</th>' +
+        `<th>Key fingerprint</th><th>Since</th><th></th></tr></thead><tbody>${liveRows}</tbody></table></div>`
+      : '<p class="stalled">No approver is registered for anything. Every gated action on every ' +
+        'property will refuse until one is. That is the intended failure, not a fault — there is no ' +
+        'platform-wide key that would otherwise cover them.</p>'
+
+  // History is shown because a retired registration is what explains an old
+  // receipt. It authorises nothing and says so.
+  const retired = ctx.history.filter((a) => a.retiredAt !== null)
+  const historyRows = retired
+    .map(
+      (a) =>
+        `<tr><td><code>${esc(a.property)}</code></td><td><code>${esc(a.fingerprint)}</code></td>` +
+        `<td class="meta">${esc(a.effectiveFrom)}</td><td class="meta">${esc(a.retiredAt ?? '')}</td></tr>`,
+    )
+    .join('')
+  const history =
+    retired.length > 0
+      ? '<details class="card"><summary>Retired registrations (' + retired.length + ')</summary>' +
+        '<p class="meta">Kept so an old approval can still be explained. None of these authorises anything now.</p>' +
+        '<div class="wrap"><table><thead><tr><th>Property</th><th>Key fingerprint</th><th>From</th>' +
+        `<th>Retired</th></tr></thead><tbody>${historyRows}</tbody></table></div></details>`
+      : ''
+
+  const form = isOwner
+    ? '<section class="card"><h2>Register an approver</h2>' +
+      '<p class="meta">Registering the same property again IS the rotation: the previous key is ' +
+      'retired in the same transaction and stops being accepted immediately. One key may not cover ' +
+      'two properties.</p>' +
+      '<p><label for="ap-property">Property</label></p>' +
+      '<input id="ap-property" spellcheck="false" placeholder="green-kitchen">' +
+      '<p><label for="ap-level">Level</label></p>' +
+      '<select id="ap-level"><option value="project">project — approves exactly this property</option>' +
+      '<option value="business">business — approves the properties it names below</option></select>' +
+      '<p><label for="ap-covers">Covers</label> <span class="meta">business only; comma separated. ' +
+      'Delegation is explicit — a business approver never reaches a property it does not name.</span></p>' +
+      '<input id="ap-covers" spellcheck="false" placeholder="green-kitchen, sheeltron">' +
+      '<p><label for="ap-key">Public key</label> <span class="meta">base64, from ' +
+      '<code>bun cli/sign-go.ts keygen</code> on the approver\'s own machine. The private half never ' +
+      'leaves it.</span></p>' +
+      '<input id="ap-key" spellcheck="false" placeholder="IbuwxxkoUKlL6...">' +
+      '<p><label for="ap-reason">Reason</label> <span class="meta">optional; kept on the record.</span></p>' +
+      '<input id="ap-reason" spellcheck="false" placeholder="quarterly rotation">' +
+      '<div class="actions"><button type="button" id="ap-submit" class="primary">Register</button></div>' +
+      '</section>'
+    : '<p class="meta">Only the owner can change this registry.</p>'
+
+  const content =
+    '<h1>Approvers</h1>' +
+    '<p class="meta">Who may approve what. Both ends read this one registry — the side that issues ' +
+    'an approval and the side that checks it — so there is one answer rather than two that agree by ' +
+    'habit.</p>' +
+    '<p id="action-result" class="meta"></p>' +
+    live +
+    history +
+    form
+
+  return shell('Approvers', content, ctx, { approverForm: true })
 }
