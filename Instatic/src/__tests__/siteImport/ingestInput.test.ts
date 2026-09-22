@@ -65,19 +65,41 @@ describe('ingestInput — File[]', () => {
     expect(result.files['style.css']).toBeDefined()
   })
 
+  // Both of these used to assert the path BEFORE `stripTopLevelFolder` runs, on
+  // a fixture of one file inside one folder — which is exactly the shape that
+  // stripping exists to flatten, so a shared wrapper was removed and the
+  // expectation could never match. The behaviours themselves were correct all
+  // along; the fixtures hid that by tripping a second, deliberate rule.
   it('normalises backslashes in file names to forward slashes', async () => {
-    // webkitRelativePath sometimes uses backslashes on Windows
-    const file = new File([txt('<html>')], 'sub\\page.html')
-    Object.defineProperty(file, 'webkitRelativePath', { value: 'sub\\page.html' })
-    const result = await ingestInput([file])
-    expect(result.files['sub/page.html']).toBeDefined()
+    // webkitRelativePath sometimes uses backslashes on Windows.
+    // Two different top-level folders, so there is no shared root to strip and
+    // the separator conversion is what the assertion actually measures.
+    const a = new File([txt('<html>')], 'a\\page.html')
+    Object.defineProperty(a, 'webkitRelativePath', { value: 'a\\page.html' })
+    const b = new File([txt('<html>')], 'b\\page.html')
+    Object.defineProperty(b, 'webkitRelativePath', { value: 'b\\page.html' })
+
+    const result = await ingestInput([a, b])
+    expect(result.files['a/page.html']).toBeDefined()
+    expect(result.files['b/page.html']).toBeDefined()
+    // No key retains a backslash.
+    expect(Object.keys(result.files).some((k) => k.includes('\\'))).toBe(false)
   })
 
   it('prefers webkitRelativePath over name for folder uploads', async () => {
-    const file = new File([txt('<html>')], 'page.html')
-    Object.defineProperty(file, 'webkitRelativePath', { value: 'site/pages/page.html' })
-    const result = await ingestInput([file])
-    expect(result.files['site/pages/page.html']).toBeDefined()
+    // Both files carry a flat `name` and a nested `webkitRelativePath`. If the
+    // name were used the keys would be flat; the surviving subdirectory is the
+    // proof that the relative path won. The shared `site/` wrapper is stripped,
+    // which is the documented behaviour of a folder upload.
+    const page = new File([txt('<html>')], 'page.html')
+    Object.defineProperty(page, 'webkitRelativePath', { value: 'site/pages/page.html' })
+    const style = new File([txt('.a{}')], 'style.css', { type: 'text/css' })
+    Object.defineProperty(style, 'webkitRelativePath', { value: 'site/assets/style.css' })
+
+    const result = await ingestInput([page, style])
+    expect(result.files['pages/page.html']).toBeDefined()
+    expect(result.files['assets/style.css']).toBeDefined()
+    // The flat name is not what was used.
     expect(result.files['page.html']).toBeUndefined()
   })
 

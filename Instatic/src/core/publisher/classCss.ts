@@ -158,6 +158,13 @@ function bagToDeclarations(
   priorities: CSSDeclarationPriorityBag = {},
 ): Array<[string, string, boolean]> {
   const decls: Array<[string, string, boolean]> = []
+  // A persisted rule can carry a `styles` that is not an object at all — a bad
+  // import, a plugin write, data from an older shape. `Object.entries(null)`
+  // throws, and because every rule is serialised through here, one corrupt rule
+  // took the whole stylesheet with it and blanked the canvas. Degrade to empty:
+  // the site loses one rule's styling instead of all of it.
+  if (!bag || typeof bag !== 'object') return decls
+
   // Track which prefixes have already been emitted as a collapsed shorthand
   // so we skip the remaining three side properties for that prefix.
   const collapsedPrefixes = new Set<SideShorthandPrefix>()
