@@ -10,6 +10,29 @@
  */
 import { GlobalWindow } from 'happy-dom'
 
+// KNOWN FAILURE, diagnosed and deliberately not patched here.
+//
+// Every test that renders a tree containing `@mms/shell` fails with "A React
+// Element from an older version of React was rendered". The cause is not this
+// file and not the tests: the shared shell lives under OpenDesign, whose
+// `node_modules/react` is 18.3.1, while this package renders with 19.2.5. The
+// shell's components are built by one React and handed to the other's DOM
+// renderer, which refuses them. A plain `<div>` renders fine; a shell `<Button>`
+// does not — that is the whole of it.
+//
+// The tsconfig `paths` entry above was written to prevent this and its comment
+// still claims the shell "has no node_modules above it". That stopped being true
+// when OpenDesign grew its own, and a real node_modules beats a tsconfig path
+// for a bare specifier. A `Bun.plugin` onResolve hook does not help either: Bun
+// never calls it for bare node_modules specifiers, so the interception silently
+// does nothing.
+//
+// The real fix is to put the monorepo on one React, which is a decision about
+// two products — OpenDesign's chrome is coupled to its own version — and not
+// something a test setup should force. Left failing and visible rather than
+// papered over with a stub, which would make these tests pass while no longer
+// testing the component tree that actually ships.
+
 // happy-dom auto-fetches and parses every `<link rel="stylesheet">` inserted
 // into the document — including the Google Fonts CSS that
 // `loadFontPreview()` injects from `src/core/fonts/preview.ts`. The fetched
