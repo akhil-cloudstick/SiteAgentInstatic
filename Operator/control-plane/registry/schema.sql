@@ -55,7 +55,13 @@ alter table siteagent_control.tenants add column if not exists display_name text
 alter table siteagent_control.tenants add column if not exists tier text not null default 'advanced';
 -- Per-tenant OpenDesign daemon (its own OD_DATA_DIR + port, spawned by the control-plane).
 alter table siteagent_control.tenants add column if not exists od_port   int;
-alter table siteagent_control.tenants add column if not exists od_status text not null default 'stopped';  -- stopped|running|failed
+-- stopped|starting|running|failed. Written ONCE at provisioning and never
+-- updated after, so it records how that one attempt went and nothing since. It
+-- is not the live state and must not be read as one: ask `studioStatus()` in
+-- runtime/odRuntime.mjs, which knows whether the daemon is actually answering.
+-- It said 'failed' for four live projects for months, because provisioning gave
+-- the daemon 90 seconds to boot when it needs minutes.
+alter table siteagent_control.tenants add column if not exists od_status text not null default 'stopped';
 -- Per-tenant OpenDesign web (Next.js dev) port — the tenant browses here.
 alter table siteagent_control.tenants add column if not exists od_web_port int;
 

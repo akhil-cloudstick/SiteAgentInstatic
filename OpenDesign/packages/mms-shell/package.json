@@ -11,8 +11,9 @@
     "./styles/fontawesome.css": "./src/styles/fontawesome/fontawesome-solid.css",
     "./*": "./src/*"
   },
+  "_peerNote": "Ranges, not pins. This library is consumed as source by products on different React majors — OpenDesign is on 18.3.1, Instatic on 19.2.5 — so pinning one product's exact version contradicts what this package is for. Widening the range does NOT by itself make both work at runtime: a bare `react` import inside this package still resolves by walking up to OpenDesign's node_modules, which is why Instatic's DOM tests fail. That needs the monorepo on one React; see docs/plans/phase-6-plan.md.",
   "peerDependencies": {
-    "react": "18.3.1",
-    "react-dom": "18.3.1"
+    "react": "^18.0.0 || ^19.0.0",
+    "react-dom": "^18.0.0 || ^19.0.0"
   }
 }

@@ -280,9 +280,23 @@ async function runProvisionSaga({ slug, schema, role, dbPassword, secretKey, por
         instaticUrl: advanced ? `http://127.0.0.1:${port}` : undefined,
         mediaKeys: await operatorMediaKeys(),
       });
-      const odHealthy = await odrt.waitHealthy(odPort, 90000);
-      await tenants.updateTenant(slug, { od_status: odHealthy ? 'running' : 'failed' });
+      // 90 seconds was shorter than this daemon's own boot time.
+      //
+      // It registers hundreds of bundled plugins off a network share before it
+      // binds, which is why the runtime allows five minutes for exactly the same
+      // wait (`START_TIMEOUT_MS`). Provisioning gave it ninety seconds and then
+      // recorded `failed` — so a daemon that was starting normally, and that came
+      // up a minute later, was stamped as broken forever. Four of five live
+      // projects carried that stamp while their studios were running fine.
+      //
+      // Not up YET is not the same as failed, so a timeout no longer claims it
+      // is: the runtime supervises the daemon and keeps bringing it up, and the
+      // console reads the live state rather than this column (R16).
+      const odHealthy = await odrt.waitHealthy(odPort, odrt.START_TIMEOUT_MS);
+      await tenants.updateTenant(slug, { od_status: odHealthy ? 'running' : 'starting' });
     } catch (e) {
+      // A throw here IS a failure — the daemon could not be spawned at all,
+      // which is different from it being slow.
       console.error(`[provisioner] OpenDesign start for ${slug} failed (non-fatal):`, e.message);
       await tenants.updateTenant(slug, { od_status: 'failed' });
     }

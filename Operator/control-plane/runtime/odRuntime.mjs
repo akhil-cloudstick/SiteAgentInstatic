@@ -40,7 +40,7 @@ const startedAt = new Map();
 
 // A cold daemon needs minutes on this host, so give one wait room to finish
 // instead of thrashing spawns. Callers poll, so this is a ceiling, not a stall.
-const START_TIMEOUT_MS = Number(process.env.OD_START_TIMEOUT_MS || 300_000);
+export const START_TIMEOUT_MS = Number(process.env.OD_START_TIMEOUT_MS || 300_000);
 const WEB_START_TIMEOUT_MS = Number(process.env.OD_WEB_START_TIMEOUT_MS || 180_000);
 // Backoff for UNREQUESTED restarts (a daemon that died on its own). A
 // request-driven ensure() is never gated by this: someone is waiting on a page.
