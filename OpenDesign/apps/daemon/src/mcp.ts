@@ -2411,16 +2411,38 @@ async function createProject(
   if (typeof args.skill === 'string' && args.skill.length > 0) {
     body.skillId = args.skill;
   }
-  // Send the workspace pair so the daemon binds the project to the
-  // workspace immediately. If workspace authority fails (e.g. the cached
-  // membership went stale between refreshes), retry headerless once — a
-  // headerless create is always legal and the project is lazy-adopted on
-  // the next workspace list.
+  // Send the workspace pair so the daemon binds the project to the workspace
+  // immediately.
+  //
+  // There used to be a headerless retry here for any error whose text contained
+  // `WORKSPACE_`, justified by one narrow case: a membership cache that went
+  // stale between refreshes. The match was indiscriminate, and the vocabulary it
+  // matched is mostly explicit refusals — WORKSPACE_ACCESS_DENIED,
+  // WORKSPACE_LOCKED, WORKSPACE_PROJECT_PERMISSION_DENIED and nine more ending
+  // in _DENIED. So "you may not create in this workspace" was answered by
+  // sending the same request again WITH THE AUTHORITY HEADERS REMOVED, and
+  // reporting success. The project was created unbound, the caller saw `ok`, and
+  // nothing recorded that a denial had been overruled.
+  //
+  // A check that cannot pass must not be retried with the check taken off. Only
+  // a genuinely UNAVAILABLE authority is retried now — the case where nobody has
+  // decided anything yet — and a refusal is a refusal.
+  const RETRYABLE = ['WORKSPACE_AUTHORITY_UNAVAILABLE', 'WORKSPACE_PROJECT_OWNERSHIP_UNAVAILABLE'];
   try {
     return ok(await postJson<JsonObject>(`${baseUrl}/api/projects`, body, headers ?? {}));
   } catch (err) {
-    if (!headers || !String(err).includes('WORKSPACE_')) throw err;
-    return ok(await postJson<JsonObject>(`${baseUrl}/api/projects`, body));
+    const text = String(err);
+    if (!headers || !RETRYABLE.some((code) => text.includes(code))) throw err;
+    // Said in the result rather than passed off as an ordinary create: the
+    // project exists but is NOT bound to the workspace that was asked for.
+    const project = await postJson<JsonObject>(`${baseUrl}/api/projects`, body);
+    return ok({
+      ...project,
+      workspaceBound: false,
+      workspaceNote:
+        'Workspace authority was unavailable, so this project was created unbound and will be ' +
+        'adopted on the next workspace list. It is NOT bound to the requested workspace yet.',
+    });
   }
 }
 
