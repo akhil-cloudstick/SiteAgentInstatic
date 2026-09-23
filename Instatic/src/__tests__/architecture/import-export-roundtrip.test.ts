@@ -451,6 +451,71 @@ describe('with strategies — handler-level roundtrip', () => {
   // published was simply gone. The one backup that existed anywhere in the
   // repository was written by the clear-all script, had no reader, and omitted
   // `data_row_versions` and `site_snapshots` — the published half.
+
+  // A backup that cannot be written must STOP the replace (R15).
+  //
+  // The guard existed and did not guard. `serializeCollabAwareWrite<T>` returns
+  // the callback's value, and the call site discarded it — so the 500 built
+  // inside the callback was thrown away, the handler carried on, wrote every
+  // media file, and answered 200 {ok:true}. An operator was told the import had
+  // succeeded when nothing had been imported and no backup existed.
+  //
+  // Asserted on the RESPONSE and on the side effects, because the original bug
+  // produced a perfectly reasonable-looking response while doing the wrong thing.
+  describe('strategy: replace refuses when the backup cannot be written', () => {
+    let targetDb: DbClient
+    let cookie: string
+    let backupsDir: string
+    let res: Response
+
+    beforeAll(async () => {
+      // A FILE where the backup directory must be, so creating it fails.
+      backupsDir = await mkdtemp(join(tmpdir(), 'replace-nobackup-'))
+      await writeFile(join(backupsDir, 'backups'), 'not a directory', 'utf8')
+
+      targetDb = createSqliteClient(':memory:')
+      await runMigrations(targetDb, sqliteMigrations)
+      cookie = await seedRoundtripAuth(targetDb, 'target-nobackup@roundtrip.test')
+      await targetDb`insert into data_rows (id, table_id, cells_json, slug, status)
+                     values ('keep-me', 'pages', ${JSON.stringify({ title: 'Still here' })}, 'index', 'published')`
+
+      // The same bundle every other replace test uses — it already carries
+      // media, which is the point: the original bug wrote all of it after
+      // discarding the refusal.
+      const req = new Request('http://localhost/cms/api/cms/import?strategy=replace', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(sourceBundle),
+      })
+      req.headers.set('cookie', cookie)
+      res = (await handleImportRoute(req, targetDb, { uploadsDir: backupsDir }))!
+    })
+
+    afterAll(async () => {
+      await rm(backupsDir, { recursive: true, force: true })
+      targetDb.close?.()
+    })
+
+    test('answers an error, not a cheerful 200', () => {
+      expect(res.status).toBe(500)
+    })
+
+    test('and says the import was not run', async () => {
+      const body = (await res.clone().json()) as { error?: string }
+      expect(body.error).toContain('back up')
+    })
+
+    test('the existing site is untouched', async () => {
+      const rows = (await targetDb`select * from data_rows where id = 'keep-me'`).rows
+      expect(rows.length).toBe(1)
+    })
+
+    test('and no media was written for an import that did not happen', async () => {
+      // The original bug wrote every media file AFTER the refusal it discarded.
+      const assets = (await targetDb`select * from media_assets`).rows
+      expect(assets.length).toBe(0)
+    })
+  })
   describe('strategy: replace keeps the prior published state recoverable', () => {
     let targetDb: DbClient
     let backupsDir: string

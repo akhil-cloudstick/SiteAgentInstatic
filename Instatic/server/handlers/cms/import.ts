@@ -239,7 +239,13 @@ export async function handleImportRoute(
   // DB transaction
   // ---------------------------------------------------------------------------
 
-  await serializeCollabAwareWrite(async () => {
+  // `serializeCollabAwareWrite<T>` RETURNS the callback's value, and a `return`
+  // inside the callback returns from the callback — not from this handler. A
+  // refusal raised in there and not carried out here is constructed, discarded,
+  // and followed by the rest of the handler running as though nothing happened.
+  // That is what happened to the pre-replace backup guard below: it built a 500,
+  // dropped it, wrote every media file, and answered 200 {ok:true}.
+  const refusal = await serializeCollabAwareWrite<Response | undefined>(async () => {
     const affectedCollabRows = new Map(
       ['pages', 'components', 'layouts'].map((tableId) => [tableId, new Set<string>()]),
     )
@@ -542,7 +548,13 @@ export async function handleImportRoute(
         if (ids.size > 0) notifyRowWrite({ tableId, rowIds: [...ids], kind: eventKind })
       }
     }
+    return undefined
   })
+
+  // Carried out of the callback, so a refusal actually refuses: nothing below
+  // this line runs, and in particular no media is written for an import that
+  // did not happen.
+  if (refusal) return refusal
 
   // ---------------------------------------------------------------------------
   // Media — outside the DB transaction (filesystem writes)
