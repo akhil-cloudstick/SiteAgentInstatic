@@ -100,7 +100,7 @@ export interface CollabRelay {
 
 export function createCollabRelay(
   db: DbClient,
-  opts: { persistDebounceMs?: number } = {},
+  opts: { persistDebounceMs?: number; uploadsDir?: string } = {},
 ): CollabRelay {
   const persistDebounceMs = opts.persistDebounceMs ?? 800
   const entries = new Map<string, RelayEntry>()
@@ -126,7 +126,7 @@ export function createCollabRelay(
     schedulePersist: (docId) => schedulePersist(docId),
     openDoc: async (docId) => { await openDoc(docId) },
     invalidationVersion: (docId) => invalidationVersions.get(docId) ?? 0,
-  })
+  }, { uploadsDir: opts.uploadsDir })
 
   function activateInvalidations(docIds: readonly string[]): Map<string, number> {
     const versions = new Map<string, number>()

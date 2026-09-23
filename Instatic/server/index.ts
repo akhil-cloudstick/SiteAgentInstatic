@@ -35,7 +35,7 @@ startConversationPurgeTick(db)
 // Real-time co-editing: the relay owns live Y documents, their persistence,
 // and the reset protocol for out-of-relay writes. The socket layer speaks
 // the multiplexed y-protocols wire (see server/collab/socket.ts).
-const collabRelay = createCollabRelay(db)
+const collabRelay = createCollabRelay(db, { uploadsDir: config.uploadsDir })
 const collabSocket = createCollabSocketLayer(collabRelay)
 
 /**

@@ -67,3 +67,24 @@ export function setPluginWorkerDbClient(db: DbClient): void {
 export function getDbForApi(): DbClient | null {
   return dbForApi
 }
+
+/**
+ * Uploads root for api-call handlers, set at plugin activation.
+ *
+ * Module-level for the same reason `dbForApi` is: `dispatchApiCall` calls every
+ * handler with the fixed `(msg, entry, db)` signature, so a handler that needs
+ * the uploads root has no parameter to receive it through. Both values are set
+ * together in `activateInstalledServerPlugins`.
+ *
+ * Null when plugins were never activated (the activation helper returns early
+ * without an uploads dir), so callers treat the prune as best-effort.
+ */
+let uploadsDirForApi: string | null = null
+
+export function setPluginWorkerUploadsDir(uploadsDir: string): void {
+  uploadsDirForApi = uploadsDir
+}
+
+export function getUploadsDirForApi(): string | null {
+  return uploadsDirForApi
+}

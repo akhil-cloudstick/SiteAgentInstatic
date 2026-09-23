@@ -38,6 +38,7 @@ import { getDraftSite, saveDraftSite } from '../repositories/site'
 import { getCollabDocumentState } from '../repositories/collabDocuments'
 import { serializeCollabAwareWrite } from '../repositories/rowWriteEvents'
 import { bumpPublishVersionSerialized } from '../publish/publishState'
+import { removeDataRowArtefact } from '../publish/publishRow'
 
 const KIND_TABLE: Record<Exclude<CollabDocKind, 'site'>, string> = {
   page: 'pages',
@@ -81,6 +82,12 @@ export interface RelayPersistence {
 export function createRelayPersistence(
   db: DbClient,
   hooks: RelayPersistenceHooks,
+  /**
+   * `uploadsDir` is the uploads root the baked Layer-A files live under. When
+   * absent (tests, and any caller that has no uploads root) the roster sweep
+   * still soft-deletes and bumps the publish version, it just cannot prune.
+   */
+  opts: { uploadsDir?: string } = {},
 ): RelayPersistence {
   // Last roster set the site-doc persist actually swept, so shell-field-only
   // persists skip the three full-table scans. Reset when the site doc resets.
@@ -213,6 +220,7 @@ export function createRelayPersistence(
     protectedDocIds: ReadonlySet<string> = new Set(),
   ): Promise<void> {
     let deletedPublished = false
+    const deletedPublishedRows: { id: string; slug: string }[] = []
     for (const [kind, table, ids] of [
       ['page', 'pages', rosters.pages],
       ['component', 'components', rosters.components],
@@ -233,10 +241,37 @@ export function createRelayPersistence(
           protectedDocIds.has(rowDocId)
         ) continue
         const deleted = await softDeleteDataRow(db, row.id, null, { collabInternal: true })
-        if (deleted?.status === 'published') deletedPublished = true
+        if (deleted?.status === 'published') {
+          deletedPublished = true
+          // Captured here because this is the only moment the slug is known:
+          // after the sweep the row is soft-deleted and there is no way back to
+          // the address its baked file sits at.
+          deletedPublishedRows.push({ id: row.id, slug: row.slug })
+        }
       }
     }
-    if (deletedPublished) await bumpPublishVersionSerialized()
+    if (deletedPublished) {
+      await bumpPublishVersionSerialized()
+      // The version bump only clears the in-memory render cache. Layer A reads
+      // the baked file from disk BEFORE any database query, so without this a
+      // page deleted in the editor keeps being served from its file until the
+      // next full publish (ISS-039).
+      //
+      // This is the path that fires on an ordinary editor delete: removing a
+      // page from the site document drops it from the roster, and this sweep is
+      // what soft-deletes the row.
+      //
+      // Best-effort, like the CMS row handlers: the delete is already durable,
+      // so a disk error must not fail the persist.
+      if (opts.uploadsDir) {
+        const uploadsDir = opts.uploadsDir
+        for (const page of deletedPublishedRows) {
+          await removeDataRowArtefact(db, uploadsDir, page.id, page.slug).catch((err) => {
+            console.error('[publish:row] failed to remove artefact for swept row', page.id, err)
+          })
+        }
+      }
+    }
   }
 
   async function persistDerivedJson(

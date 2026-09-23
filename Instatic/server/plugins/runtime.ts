@@ -50,7 +50,7 @@ import { jsonResponse } from '../http'
 import { hookBus } from '@core/plugins/hookBus'
 import { requireAuthenticatedUser, requireCapability } from '../auth/authz'
 import { clearPluginCrashCounter, setCrashRecoveryHandler } from './host/crashRecovery'
-import { setPluginWorkerDbClient } from './host/registry'
+import { setPluginWorkerDbClient, setPluginWorkerUploadsDir } from './host/registry'
 import {
   findPluginRouteAccess,
   loadPluginInWorker,
@@ -379,6 +379,7 @@ export async function activateInstalledServerPlugins(
   // worker-initiated `cms.storage.*` round-trip lands. Idempotent; safe to
   // call on every boot.
   setPluginWorkerDbClient(db)
+  setPluginWorkerUploadsDir(uploadsDir)
   registerCrashRecoveryHandler(db, uploadsDir)
 
   // Reset existing in-process state so a re-bind (from `bun --watch`

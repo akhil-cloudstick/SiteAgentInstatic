@@ -29,6 +29,7 @@ import {
   getDataTable,
   createDataTable,
   listDataRowsWithFilter,
+  fieldTypesOf,
   getDataRow,
   getDataRowMany,
   getDataRowBySlug,
@@ -43,12 +44,12 @@ import {
   updateDataRowTable,
   scheduleDataRowPublish,
 } from '../../../repositories/data'
-import { publishDataRow } from '../../../publish/publishRow'
+import { publishDataRow, removeDataRowArtefact } from '../../../publish/publishRow'
 import { republishAllPages } from '../../../publish/republish'
 import { bumpPublishVersionSerialized } from '../../../publish/publishState'
 import { applyContentEntryCellsFilter } from '../../../publish/contentEvents'
 import type { DbClient } from '../../../db/client'
-import { assertContentTableAccess } from '../registry'
+import { assertContentTableAccess, getUploadsDirForApi } from '../registry'
 import { buildContentTableIdLookup, pluginContentFieldsToDataFields } from '../contentFieldMapping'
 import {
   buildTableSlugLookup,
@@ -197,7 +198,14 @@ export async function handleContentEntriesList(
   const [tableSlug, options] = msg.args
   assertContentTableAccess(entry, tableSlug, 'read')
   const table = await resolveTableBySlug(db, tableSlug)
-  const result = await listDataRowsWithFilter(db, table.id, options)
+  // The table is already resolved, so its declared field types come free —
+  // that is what lets `orderBy` sort a number field numerically without this
+  // becoming a third query. Placed after the spread so a plugin cannot supply
+  // its own types.
+  const result = await listDataRowsWithFilter(db, table.id, {
+    ...options,
+    fieldTypes: fieldTypesOf(table.fields),
+  })
   replyApiOk(msg.pluginId, msg.correlationId, {
     entries: result.rows.map((r) => rowToEntry(r, tableSlug)),
     totalCount: result.totalCount,
@@ -295,6 +303,34 @@ export async function handleContentEntriesUpdate(
   replyApiOk(msg.pluginId, msg.correlationId, rowToEntry(updated, tableSlug))
 }
 
+/**
+ * Remove a deleted row's baked Layer-A artefact.
+ *
+ * Bumping the publish version alone is not enough: that clears the in-memory
+ * render cache (Layer B), but Layer A reads the baked file from disk BEFORE any
+ * database query, so a page deleted through the plugin API keeps being served
+ * from its file until the next full publish (ISS-039). The two CMS row handlers
+ * already do this; these two did not.
+ *
+ * The slug must come from the row as it was read BEFORE the delete — afterwards
+ * there is no way back to the address its file sits at.
+ *
+ * Best-effort and post-delete, matching those handlers: the delete is already
+ * durable, so a disk error must not turn it into a failed api-call. Removing a
+ * file that is already gone is a documented no-op.
+ */
+async function pruneDeletedRowArtefact(
+  db: DbClient,
+  rowId: string,
+  slug: string,
+): Promise<void> {
+  const uploadsDir = getUploadsDirForApi()
+  if (!uploadsDir) return
+  await removeDataRowArtefact(db, uploadsDir, rowId, slug).catch((err) => {
+    console.error('[publish:row] failed to remove artefact for deleted entry', rowId, err)
+  })
+}
+
 export async function handleContentEntriesDelete(
   msg: ApiCallFor<'cms.content.entries.delete'>,
   entry: HostPluginRecord,
@@ -309,8 +345,12 @@ export async function handleContentEntriesDelete(
   }
   const deleted = await softDeleteDataRow(db, entryId)
   if (deleted) {
-    // A published row's route is retracted — invalidate the render cache.
-    if (deleted.status === 'published') await bumpPublishVersionSerialized()
+    // A published row's route is retracted — invalidate the render cache AND
+    // remove the baked file, which the cache bump does not touch.
+    if (deleted.status === 'published') {
+      await bumpPublishVersionSerialized()
+      await pruneDeletedRowArtefact(db, entryId, existing.slug)
+    }
     await emitEntryDeleted(tableSlug, entryId, { kind: 'plugin', pluginId: msg.pluginId })
   }
   replyApiOk(msg.pluginId, msg.correlationId, undefined)
@@ -459,8 +499,19 @@ export async function handleContentEntriesDeleteMany(
     }
   }
   const result = await softDeleteDataRowMany(db, ids, null)
-  // Published rows' routes were retracted — one cache invalidation per batch.
-  if (result.publishedDeleted > 0) await bumpPublishVersionSerialized()
+  // Published rows' routes were retracted — one cache invalidation per batch,
+  // then each baked file, which the cache bump does not touch.
+  //
+  // Which rows were published is read from `rowsById` — the state BEFORE the
+  // delete — because the bulk helper returns only counts, and after the delete
+  // the slug each file is addressed by is no longer reachable from the row.
+  if (result.publishedDeleted > 0) {
+    await bumpPublishVersionSerialized()
+    for (const id of ids) {
+      const row = rowsById.get(id)
+      if (row?.status === 'published') await pruneDeletedRowArtefact(db, id, row.slug)
+    }
+  }
   const actor: PluginActor = { kind: 'plugin', pluginId: msg.pluginId }
   for (const id of ids) {
     await emitEntryDeleted(tableSlug, id, actor)
