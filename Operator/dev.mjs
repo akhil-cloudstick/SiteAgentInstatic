@@ -24,6 +24,12 @@ try {
   if (typeof process.loadEnvFile === 'function' && existsSync(envFile)) process.loadEnvFile(envFile);
 } catch { /* the file is optional; a missing one is not a reason to refuse to start */ }
 
+// The control plane's resolved platform config. Imported HERE, after the .env
+// load above and not as a hoisted static import, because `env.mjs` reads
+// `process.env` at module scope — the rule this block's own comment states.
+// Read only to hand the console the public origin the gateway serves on (E7).
+const { config: cpConfig } = await import('./control-plane/lib/env.mjs');
+
 const CYAN   = '\x1b[36m';
 const MAGENTA= '\x1b[35m';
 const YELLOW = '\x1b[33m';
@@ -218,7 +224,16 @@ const services = [
     cmd: consoleDev ? 'npm --prefix ui run dev' : 'npm --prefix ui run start',
     // The built server takes its address from the environment; the dev server
     // takes it from astro.config.mjs. Same address either way.
-    env: consoleDev ? {} : { HOST: '127.0.0.1', PORT: '3000' },
+    //
+    // GATEWAY_ORIGIN is passed explicitly so the console's CSRF gate (E7)
+    // compares against the SAME origin the control plane serves on. Both
+    // resolve it from `control-plane/lib/env.mjs`, which applies the default
+    // when the variable is unset — without forwarding it here the console would
+    // see `undefined`, and a request through the proxy would be refused.
+    env: {
+      ...(consoleDev ? {} : { HOST: '127.0.0.1', PORT: '3000' }),
+      GATEWAY_ORIGIN: cpConfig.gatewayOrigin,
+    },
   },
   { label: 'board        ', color: YELLOW,  cmd: 'node ../.serve/server.cjs' },
   ...(connectorReady

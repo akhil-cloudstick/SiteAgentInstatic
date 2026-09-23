@@ -22,10 +22,12 @@
     "test:verify": "node control-plane/deployer/verify.selftest.mjs",
     "test:studio": "node control-plane/runtime/studioStatus.selftest.mjs",
     "test:hub-session": "node control-plane/hub/hubSession.selftest.mjs",
-    "test": "npm run test:deployer && npm run test:allowlist && npm run test:login && npm run test:admin-auth && npm run test:new1 && npm run test:scope && npm run test:brand && npm run test:domains && npm run test:verify && npm run test:hub-session",
+    "test": "npm run test:deployer && npm run test:allowlist && npm run test:login && npm run test:admin-auth && npm run test:new1 && npm run test:scope && npm run test:brand && npm run test:domains && npm run test:verify && npm run test:studio && npm run test:hub-session && npm run test:console-origin && npm run test:rollback",
     "start": "node control-plane/server.mjs",
     "console:dev": "npm --prefix ui run dev",
-    "console:build": "npm --prefix ui run build"
+    "console:build": "npm --prefix ui run build",
+    "test:console-origin": "node ui/src/lib/cp.selftest.mjs",
+    "test:rollback": "node control-plane/deployer/rollback.selftest.mjs"
   },
   "dependencies": {
     "pg": "^8.22.0"

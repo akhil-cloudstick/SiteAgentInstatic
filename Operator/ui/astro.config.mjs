@@ -20,13 +20,18 @@ export default defineConfig({
   // and form action resolve under that prefix so nothing 404s. Local access is
   // then http://127.0.0.1:3000/operator.
   base: '/operator',
-  // Astro's CSRF origin check compares a POST's Origin against the request host.
-  // Behind the Tailscale funnel the public Origin (…ts.net:8443) differs from the
-  // proxied host, so every form POST was rejected with "Cross-site POST form
-  // submissions are forbidden". Disabled so the funnel-exposed console works.
-  // Cross-site POSTs are refused another way since R14: the admin session cookie
-  // is SameSite=Strict, so a forged form arrives signed out and the middleware
-  // sends it to sign-in. (A full CSRF review is security item E7.)
+  // Astro's own CSRF check stays off, and deliberately: it compares a POST's
+  // Origin against the request HOST, and the gateway rewrites Host to
+  // 127.0.0.1:3000 (`control-plane/gateway/proxy.mjs`), so behind the funnel it
+  // rejected every form POST with "Cross-site POST form submissions are
+  // forbidden". Re-enabling it would reintroduce exactly that.
+  //
+  // The check now lives in `src/middleware.ts` via `consoleOriginAllowed`,
+  // which compares against the CONFIGURED public origin instead of the host —
+  // the same approach Instatic uses. That is a real server-side refusal; the
+  // previous note here claimed SameSite=Strict covered it, which is not true on
+  // this deployment, where the console shares one origin with every tenant
+  // surface the gateway serves. (Security item E7.)
   security: { checkOrigin: false },
   vite: {
     resolve: {

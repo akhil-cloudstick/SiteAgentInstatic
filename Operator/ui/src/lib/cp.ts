@@ -34,6 +34,86 @@ export function sessionCookieOptions(request: Request, maxAge: number) {
   return { path: cookiePath(), httpOnly: true, sameSite: 'strict' as const, secure: secureCookie(request), maxAge };
 }
 
+// ---------------------------------------------------------------------------
+// CSRF (security item E7)
+// ---------------------------------------------------------------------------
+
+/**
+ * Origins allowed to make a state-changing request to the console when it is
+ * reached directly rather than through the gateway.
+ */
+const LOOPBACK_ORIGINS = new Set([
+  'http://127.0.0.1:3000',
+  'http://localhost:3000',
+]);
+
+const stripSlash = (value: string): string => value.replace(/\/+$/, '');
+
+/**
+ * The public origin this console is served on, or null when it is unknown.
+ *
+ * `dev.mjs` passes the control plane's own resolved `config.gatewayOrigin`, so
+ * both sides agree on one value instead of each applying its own default. Null
+ * here means nobody told us, and a request arriving through the proxy is then
+ * refused rather than guessed at.
+ */
+export function expectedConsoleOrigin(): string | null {
+  const raw = process.env.GATEWAY_ORIGIN;
+  return raw && raw.trim() ? stripSlash(raw.trim()) : null;
+}
+
+/**
+ * May this state-changing request proceed? (E7)
+ *
+ * The console previously had NO server-side origin check at all —
+ * `astro.config.mjs` set `security: { checkOrigin: false }` because Astro's
+ * built-in check compares Origin against the request Host, and the gateway
+ * rewrites Host to `127.0.0.1:3000` (`gateway/proxy.mjs`), so every funnel POST
+ * was rejected. The defence was left to `SameSite=Strict` on `sa_admin`.
+ *
+ * That is not sufficient here, and the reason is specific to this deployment:
+ * the console, the CMS and the design studio are all served from ONE origin by
+ * the gateway. `SameSite` distinguishes sites, not paths — so a script running
+ * on any tenant page the gateway serves is same-site *and* same-origin with
+ * this console, and `Path=/operator` limits which requests carry the cookie,
+ * not which pages may send them. The exposed handlers include act-as, remove
+ * and expose.
+ *
+ * So: compare against a CONFIGURED origin rather than the request host, which
+ * is the same fix Instatic already uses (`server/auth/security.ts`).
+ *
+ * `Sec-Fetch-Site` is consulted first because it is the browser's own
+ * statement about the caller and cannot be set by page script. A browser that
+ * says the request is cross-site is refused whatever Origin claims. It is also
+ * what covers the no-Origin case rather than refusing outright: Safari has
+ * historically omitted Origin on same-origin form POSTs, and the console is
+ * reached by browsers only — the browser never calls the control plane
+ * directly, so there is no server-to-server caller to accommodate.
+ *
+ * P2: unknown configuration refuses. A proxied request with no configured
+ * origin is not waved through.
+ */
+export function consoleOriginAllowed(request: Request): boolean {
+  const fetchSite = request.headers.get('sec-fetch-site');
+  // 'none' is a user-initiated navigation (typed URL, bookmark); same-origin is
+  // this console's own pages. Anything else the browser labels is refused.
+  if (fetchSite && fetchSite !== 'same-origin' && fetchSite !== 'none') return false;
+
+  const origin = request.headers.get('origin');
+  const viaGateway = Boolean(request.headers.get('x-forwarded-host'));
+
+  if (origin) {
+    const expected = viaGateway
+      ? [expectedConsoleOrigin()].filter((v): v is string => v !== null)
+      : [...LOOPBACK_ORIGINS];
+    return expected.includes(stripSlash(origin));
+  }
+
+  // No Origin header. Accept only when the browser positively stated the
+  // request came from this same origin.
+  return fetchSite === 'same-origin';
+}
+
 /**
  * Where to go after signing in. Only a path inside this console — never a full
  * URL, never `//host` — so the login page cannot become an open redirect.

@@ -10,5 +10,9 @@ const signOut: APIRoute = ({ cookies, redirect }) => {
   return redirect(`${basePath()}login`, 303);
 };
 
-export const GET = signOut;
+// POST only. The `GET` export that used to sit here was unused — the shell
+// signs out through a hidden `method="POST"` form (ConsoleShell.tsx) — and a
+// state-changing GET is reachable from a cross-site `<img src=".../logout">`,
+// which would sign an administrator out without their asking. The middleware's
+// origin gate covers the POST.
 export const POST = signOut;

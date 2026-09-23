@@ -4,11 +4,28 @@
 // down) sends the browser to sign in. The control plane checks the session
 // again on every call, so this is the front door, not the only lock.
 import { defineMiddleware } from 'astro:middleware';
-import { basePath, cpLoad, safeNext } from './lib/cp';
+import { basePath, consoleOriginAllowed, cpLoad, safeNext } from './lib/cp';
+
+const STATE_CHANGING = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
 export const onRequest = defineMiddleware(async (ctx, next) => {
   const base = basePath();
   const path = ctx.url.pathname;
+
+  // E7: refuse a cross-origin state change before anything else looks at the
+  // session. Gated here rather than per page for the same reason the admin
+  // check is — nine handlers carry state-changing intents (act-as, remove and
+  // expose among them) and any one of them could forget.
+  //
+  // Ahead of the auth lookup deliberately: a forged request must be refused on
+  // its origin, not answered with a redirect to sign-in that reveals whether a
+  // session existed. It also means the refusal costs no control-plane call.
+  if (STATE_CHANGING.has(ctx.request.method) && !consoleOriginAllowed(ctx.request)) {
+    return new Response('Forbidden: invalid origin', {
+      status: 403,
+      headers: { 'content-type': 'text/plain; charset=utf-8' },
+    });
+  }
   // Signing in, signing out, and an invited administrator setting a password
   // are the only pages reachable without a session.
   if (path === `${base}login` || path === `${base}logout` || path === `${base}accept`) return next();
