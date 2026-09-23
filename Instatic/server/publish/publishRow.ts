@@ -29,6 +29,7 @@ import { getLatestPublishedSiteSnapshot } from '../repositories/publish'
 import { snapshotForEntryRoute } from './entryTemplateSnapshot'
 import { renderPublishedDataRowTemplate } from './publicRenderer'
 import { applyPublishedHtmlPipeline } from './publishedHtmlPipeline'
+import { applyRoutePolicy } from '@core/publisher'
 import { removeArtefactInPlace, updateArtefactInPlace } from './staticArtefact'
 import { bumpPublishVersion, getPublishVersion, withPublishLock } from './publishState'
 import { runPublishFlush } from './publishFlush'
@@ -111,18 +112,35 @@ async function writeDataRowArtefact(
   const tableInfo = await getRowTableRouteInfo(db, publishedRow.id)
   if (!tableInfo) return
 
+  // Resolve the full template chain for this row's table (everywhere layout +
+  // entry template). No chain → no entry route to bake.
+  //
+  // Loaded BEFORE the stale-artefact removal below, because the site's
+  // trailing-slash policy decides which FILE a route maps to, and removing the
+  // wrong one leaves the old URL serving old content.
+  const siteSnapshot = await getLatestPublishedSiteSnapshot(db)
+  if (!siteSnapshot) return
+
+  // The site's URL shape, applied here exactly as the full bake applies it.
+  //
+  // This path used to skip `applyRoutePolicy` while `bakeDataRows.ts` applied
+  // it, so the two publishers disagreed about where a row lives. On a site with
+  // `trailingSlash: true` a full publish bakes `posts/hello/index.html` and this
+  // one wrote `posts/hello.html` — a different file. The canonical URL kept
+  // serving the pre-edit HTML indefinitely, because Layer A is read off disk
+  // before any database query. Renaming a slug or unpublishing a row was worse:
+  // the removal deleted a filename that did not exist, so the old page stayed
+  // live and the redirect was never reached.
+  const routed = (routeBase: string, slug: string): string =>
+    applyRoutePolicy(publicDataPath(routeBase, slug), siteSnapshot.site.settings.trailingSlash)
+
   // Remove old artefact when the slug changed (old URL is now stale).
   if (previousRoute && previousRouteChanged(previousRoute, publishedRow.slug)) {
-    const oldPath = publicDataPath(previousRoute.routeBase, previousRoute.slug)
+    const oldPath = routed(previousRoute.routeBase, previousRoute.slug)
     await removeArtefactInPlace(uploadsDir, oldPath).catch((err) => {
       console.error('[publish:row] failed to remove stale artefact at', oldPath, err)
     })
   }
-
-  // Resolve the full template chain for this row's table (everywhere layout +
-  // entry template). No chain → no entry route to bake.
-  const siteSnapshot = await getLatestPublishedSiteSnapshot(db)
-  if (!siteSnapshot) return
 
   const chain = resolveTemplateChain(siteSnapshot.site, { kind: 'entry', tableSlug: tableInfo.tableSlug })
   if (chain.length === 0) return
@@ -131,7 +149,7 @@ async function writeDataRowArtefact(
   const publishedDataRow = await getPublishedDataRowByRoute(db, tableInfo.tableRouteBase, publishedRow.slug)
   if (!publishedDataRow) return
 
-  const newPath = publicDataPath(tableInfo.tableRouteBase, publishedRow.slug)
+  const newPath = routed(tableInfo.tableRouteBase, publishedRow.slug)
   const syntheticUrl = new URL(`http://localhost${newPath}`)
   // Runtime assets come from this table's entry template, not from the
   // arbitrary page the site-wide snapshot happens to name.
@@ -164,5 +182,23 @@ export async function removeDataRowArtefact(
 ): Promise<void> {
   const routeBase = await getRowTableRouteBase(db, rowId)
   if (routeBase === null) return
-  await removeArtefactInPlace(uploadsDir, publicDataPath(routeBase, slug))
+
+  // Both shapes, deliberately.
+  //
+  // This is the retraction path — a row leaving public visibility — and the one
+  // place where deleting too little is far worse than deleting too much: a file
+  // left behind keeps serving content that has been unpublished. The site's
+  // policy decides which of the two names the bake wrote, but a site whose
+  // policy CHANGED since the last full publish has files under the old shape
+  // too, and this used to remove neither on a trailing-slash site. Removing a
+  // name that does not exist is a documented no-op, so asking for both costs
+  // nothing and closes the gap ISS-039 is about.
+  const snapshot = await getLatestPublishedSiteSnapshot(db)
+  const bare = publicDataPath(routeBase, slug)
+  for (const path of new Set([
+    applyRoutePolicy(bare, snapshot?.site.settings.trailingSlash),
+    applyRoutePolicy(bare, !snapshot?.site.settings.trailingSlash),
+  ])) {
+    await removeArtefactInPlace(uploadsDir, path)
+  }
 }
