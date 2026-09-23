@@ -52,13 +52,13 @@
   <h1>MMSBUILD delivery board</h1>
   <p class="meta">
     Modules are the phases of <code>docs/prd/mmsbuild-prd.md</code>, tasks are its requirements, subtasks its acceptance criteria — ids unchanged.<br>
-    Generated 2026-09-22 13:09 UTC from commit <code>8b13886</code>.
+    Generated 2026-09-23 15:20 UTC from commit <code>1853c3e</code>.
   </p>
   <div class="legend">
     <p><strong>Build</strong> is ours: <span class="chip todo">Not started</span> <span class="chip doing">In progress</span> <span class="chip built">Built</span> <span class="chip awaiting-owner">Awaiting owner</span> <span class="chip blocked">Blocked</span></p>
     <p><strong>Acceptance run</strong> is yours, and we never set it: <span class="chip v-pending">Not yet verified</span> <span class="chip v-pass">Verified</span> <span class="chip v-fail">Failed</span></p>
     <p>Modules are the PRD's phases, tasks are its requirements, subtasks are its acceptance criteria. Ids match the PRD exactly, so an acceptance run maps to this board line for line. `status` is ours — what is built. `verified` belongs to the acceptance run and is never set by us.</p>
-    <p>Totals — tasks: <span class="chip todo">6 not started</span> <span class="chip doing">1 in progress</span> <span class="chip built">21 built</span> <span class="chip awaiting-owner">3 awaiting owner</span> &nbsp;·&nbsp; acceptance criteria: <span class="chip todo">6 not started</span> <span class="chip doing">1 in progress</span> <span class="chip built">42 built</span> <span class="chip awaiting-owner">7 awaiting owner</span></p>
+    <p>Totals — tasks: <span class="chip todo">1 not started</span> <span class="chip doing">6 in progress</span> <span class="chip built">21 built</span> <span class="chip awaiting-owner">3 awaiting owner</span> &nbsp;·&nbsp; acceptance criteria: <span class="chip todo">1 not started</span> <span class="chip doing">6 in progress</span> <span class="chip built">42 built</span> <span class="chip awaiting-owner">7 awaiting owner</span></p>
   </div>
   <section class="module">
     <h2><span class="id">P0</span> Phase 0 — Close the surface</h2>
@@ -307,7 +307,7 @@
         <span class="chip awaiting-owner">Awaiting owner</span>
         <span class="counts"><span class="chip awaiting-owner">1 awaiting owner</span></span>
       </summary>
-      <p class="depends">Depends on R1</p><p class="note">Completed 2026-09-21: c865d10 gave both ends the same RULE over two separate configs — a file committed to git on one side, a Worker variable on the other, kept in step by a human comparing fingerprints. The PRD asks for something narrower: &quot;the registry is the only place this mapping lives, and both ends read the same registry&quot;. That registry now exists, in the relay’s database: append-only, one live approver per property enforced by a partial unique index, with triggers refusing any edit or delete. The checking side reads it through a public endpoint — every field is a public key — and caches it, refreshed every few minutes and REFUSED once older than a GO can live, so a short relay outage changes nothing while a retired key can never outlive its own approvals. NOT LIVE YET. The relay on Cloudflare still runs a build from before the approver registry — asked for the registry it answers &quot;No such route&quot; — so this is written and committed but does nothing in production. Redeploying the relay is the owner's to run (it needs a Cloudflare login we do not have), and it also needs the D1 migration applied and a second Access Bypass policy for /api/approvers, without which that route returns a login page instead of the registry. Status stays blocked until the owner confirms the deploy and it has been checked. SECOND CORRECTION, 2026-09-21: this is not only waiting on the deploy — there is build work left here. The registration door is an owner-only HTTP route, and the owner on this relay is a BROWSER identity: the role is matched on the email in a Cloudflare Access assertion, and a service token can never hold it. So the one party permitted to register an approver has no practical way to call the route — they would have to extract an Access token from a browser session to use curl. The route was built without the surface its only permitted caller can reach it through. It belongs on the relay's own owner page, beside the button where they already record a GO, and NOT in the operator console: that console's administrator is a different identity from this relay's owner, so it could not act as them even if it offered to. RESOLVED HERE 2026-09-21: the registry now has a page on the relay itself, beside the queue where the owner already records a GO — register, rotate (registering the same property again IS the rotation) and retire, plus the live registry and the retired rows that explain old approvals. That was the missing half: the route was owner-only and the owner is a browser identity, so the only permitted caller had no way to reach it. Hiding the form is not the control and is tested as such — a builder who skips the page and posts directly still gets 403. Nothing further is needed from us. What remains is the relay redeploy, which needs a Cloudflare login only the owner holds.</p>
+      <p class="depends">Depends on R1</p><p class="note">Completed 2026-09-21: c865d10 gave both ends the same RULE over two separate configs — a file committed to git on one side, a Worker variable on the other, kept in step by a human comparing fingerprints. The PRD asks for something narrower: &quot;the registry is the only place this mapping lives, and both ends read the same registry&quot;. That registry now exists, in the relay’s database: append-only, one live approver per property enforced by a partial unique index, with triggers refusing any edit or delete. The checking side reads it through a public endpoint — every field is a public key — and caches it, refreshed every few minutes and REFUSED once older than a GO can live, so a short relay outage changes nothing while a retired key can never outlive its own approvals. NOT LIVE YET. The relay on Cloudflare still runs a build from before the approver registry — asked for the registry it answers &quot;No such route&quot; — so this is written and committed but does nothing in production. Redeploying the relay is the owner's to run (it needs a Cloudflare login we do not have), and it also needs the D1 migration applied and a second Access Bypass policy for /api/approvers, without which that route returns a login page instead of the registry. Status stays blocked until the owner confirms the deploy and it has been checked. SECOND CORRECTION, 2026-09-21: this is not only waiting on the deploy — there is build work left here. The registration door is an owner-only HTTP route, and the owner on this relay is a BROWSER identity: the role is matched on the email in a Cloudflare Access assertion, and a service token can never hold it. So the one party permitted to register an approver has no practical way to call the route — they would have to extract an Access token from a browser session to use curl. The route was built without the surface its only permitted caller can reach it through. It belongs on the relay's own owner page, beside the button where they already record a GO, and NOT in the operator console: that console's administrator is a different identity from this relay's owner, so it could not act as them even if it offered to. RESOLVED HERE 2026-09-21: the registry now has a page on the relay itself, beside the queue where the owner already records a GO — register, rotate (registering the same property again IS the rotation) and retire, plus the live registry and the retired rows that explain old approvals. That was the missing half: the route was owner-only and the owner is a browser identity, so the only permitted caller had no way to reach it. Hiding the form is not the control and is tested as such — a builder who skips the page and posts directly still gets 403. Nothing further is needed from us. What remains is the relay redeploy, which needs a Cloudflare login only the owner holds. CHECKED AGAIN 2026-09-23: we can no longer read the live build from outside at all — Cloudflare Access now returns a login redirect on every route including the version one, which was readable on 2026-09-22. So the &quot;answers No such route&quot; observation above is the last one we were able to make, not a current reading. The owner has been told what the deploy needs (redeploy, the D1 migration, and an Access Bypass policy for /api/approvers) and this stays waiting on them until they confirm and we have checked.</p>
       <table>
         <thead><tr><th>Acceptance</th><th>Pass means</th><th>Build</th><th>Acceptance run</th></tr></thead>
         <tbody>
@@ -327,7 +327,7 @@
         <span class="chip awaiting-owner">Awaiting owner</span>
         <span class="counts"><span class="chip awaiting-owner">4 awaiting owner</span></span>
       </summary>
-      <p class="depends">Depends on R1, NEW-4</p><p class="note">Built 2026-09-21: registration writes one row with an effective-from stamp, and the append-only table is itself the audit record. Rotation retires the old row and inserts the new one in a single batch, so a property is never left with two live identities or none by accident, and the retired identity stops being accepted immediately rather than at the next restart — with history kept so an old receipt can still be explained. Revocation without a replacement leaves the property refusing everything. Delegation is explicit: a business-level approver reaches only the properties its registration names, never what a hierarchy implies. And the fallback is gone: a property with no registered approver is refused rather than handed to the platform-wide key that, until this change, approved every site on the estate — &quot;a fallback that widens scope on error is a master key by another name&quot;. CORRECTION, 2026-09-21: this note previously read as though registration were a first-class operation from the start. It was not. The store methods and the read endpoint shipped in Phase 4, but there was no write route, so registering an approver still meant a developer running wrangler d1 by hand against the production database — one of the thirteen developer actions R13 exists to remove, and one that blocked a new project at step zero, since a project with no approver refuses every gated action. The owner-only write door (POST /api/approvers, POST /api/approvers/&lt;property&gt;/retire) landed in Phase 5, with registration, rotation and revocation each covered by a test that goes through the route rather than calling the store directly — which is how it looked finished while it was not. NOT LIVE YET. The relay on Cloudflare still runs a build from before the approver registry — asked for the registry it answers &quot;No such route&quot; — so this is written and committed but does nothing in production. Redeploying the relay is the owner's to run (it needs a Cloudflare login we do not have), and it also needs the D1 migration applied and a second Access Bypass policy for /api/approvers, without which that route returns a login page instead of the registry. Status stays blocked until the owner confirms the deploy and it has been checked. SECOND CORRECTION, 2026-09-21: this is not only waiting on the deploy — there is build work left here. The registration door is an owner-only HTTP route, and the owner on this relay is a BROWSER identity: the role is matched on the email in a Cloudflare Access assertion, and a service token can never hold it. So the one party permitted to register an approver has no practical way to call the route — they would have to extract an Access token from a browser session to use curl. The route was built without the surface its only permitted caller can reach it through. It belongs on the relay's own owner page, beside the button where they already record a GO, and NOT in the operator console: that console's administrator is a different identity from this relay's owner, so it could not act as them even if it offered to. RESOLVED HERE 2026-09-21: the registry now has a page on the relay itself, beside the queue where the owner already records a GO — register, rotate (registering the same property again IS the rotation) and retire, plus the live registry and the retired rows that explain old approvals. That was the missing half: the route was owner-only and the owner is a browser identity, so the only permitted caller had no way to reach it. Hiding the form is not the control and is tested as such — a builder who skips the page and posts directly still gets 403. Nothing further is needed from us. What remains is the relay redeploy, which needs a Cloudflare login only the owner holds.</p>
+      <p class="depends">Depends on R1, NEW-4</p><p class="note">Built 2026-09-21: registration writes one row with an effective-from stamp, and the append-only table is itself the audit record. Rotation retires the old row and inserts the new one in a single batch, so a property is never left with two live identities or none by accident, and the retired identity stops being accepted immediately rather than at the next restart — with history kept so an old receipt can still be explained. Revocation without a replacement leaves the property refusing everything. Delegation is explicit: a business-level approver reaches only the properties its registration names, never what a hierarchy implies. And the fallback is gone: a property with no registered approver is refused rather than handed to the platform-wide key that, until this change, approved every site on the estate — &quot;a fallback that widens scope on error is a master key by another name&quot;. CORRECTION, 2026-09-21: this note previously read as though registration were a first-class operation from the start. It was not. The store methods and the read endpoint shipped in Phase 4, but there was no write route, so registering an approver still meant a developer running wrangler d1 by hand against the production database — one of the thirteen developer actions R13 exists to remove, and one that blocked a new project at step zero, since a project with no approver refuses every gated action. The owner-only write door (POST /api/approvers, POST /api/approvers/&lt;property&gt;/retire) landed in Phase 5, with registration, rotation and revocation each covered by a test that goes through the route rather than calling the store directly — which is how it looked finished while it was not. NOT LIVE YET. The relay on Cloudflare still runs a build from before the approver registry — asked for the registry it answers &quot;No such route&quot; — so this is written and committed but does nothing in production. Redeploying the relay is the owner's to run (it needs a Cloudflare login we do not have), and it also needs the D1 migration applied and a second Access Bypass policy for /api/approvers, without which that route returns a login page instead of the registry. Status stays blocked until the owner confirms the deploy and it has been checked. SECOND CORRECTION, 2026-09-21: this is not only waiting on the deploy — there is build work left here. The registration door is an owner-only HTTP route, and the owner on this relay is a BROWSER identity: the role is matched on the email in a Cloudflare Access assertion, and a service token can never hold it. So the one party permitted to register an approver has no practical way to call the route — they would have to extract an Access token from a browser session to use curl. The route was built without the surface its only permitted caller can reach it through. It belongs on the relay's own owner page, beside the button where they already record a GO, and NOT in the operator console: that console's administrator is a different identity from this relay's owner, so it could not act as them even if it offered to. RESOLVED HERE 2026-09-21: the registry now has a page on the relay itself, beside the queue where the owner already records a GO — register, rotate (registering the same property again IS the rotation) and retire, plus the live registry and the retired rows that explain old approvals. That was the missing half: the route was owner-only and the owner is a browser identity, so the only permitted caller had no way to reach it. Hiding the form is not the control and is tested as such — a builder who skips the page and posts directly still gets 403. Nothing further is needed from us. What remains is the relay redeploy, which needs a Cloudflare login only the owner holds. CHECKED AGAIN 2026-09-23: we can no longer read the live build from outside at all — Cloudflare Access now returns a login redirect on every route including the version one, which was readable on 2026-09-22. So the &quot;answers No such route&quot; observation above is the last one we were able to make, not a current reading. The owner has been told what the deploy needs (redeploy, the D1 migration, and an Access Bypass policy for /api/approvers) and this stays waiting on them until they confirm and we have checked.</p>
       <table>
         <thead><tr><th>Acceptance</th><th>Pass means</th><th>Build</th><th>Acceptance run</th></tr></thead>
         <tbody>
@@ -667,8 +667,8 @@
   </section>
   <section class="module">
     <h2><span class="id">E</span> Security acceptance — the locked ten</h2>
-    <p class="summary">Run by someone other than the builder, on a throwaway or staging project, never on a live site. Five have no control at all today.</p>
-    <p class="counts"><span class="chip todo">6 not started</span> <span class="chip doing">1 in progress</span> <span class="chip built">3 built</span></p>
+    <p class="summary">Run by someone other than the builder, on a throwaway or staging project, never on a live site. CORRECTED 2026-09-23: this used to say five have no control at all. That was wrong for E2, E7 and E8 — each already had real, enforced, server-side controls. Checking that claim turned up six genuine defects, which are now fixed; what is mostly outstanding is PROOF, not mechanism.</p>
+    <p class="counts"><span class="chip todo">1 not started</span> <span class="chip doing">6 in progress</span> <span class="chip built">3 built</span></p>
     <details class="task" open>
       <summary>
         <span class="id">E1</span>
@@ -689,41 +689,41 @@
         </tbody>
       </table>
     </details>
-    <details class="task" >
+    <details class="task" open>
       <summary>
         <span class="id">E2</span>
         <span class="task-title">Network and tool allowlists enforced</span>
-        <span class="chip todo">Not started</span>
-        <span class="counts"><span class="chip todo">1 not started</span></span>
+        <span class="chip doing">In progress</span>
+        <span class="counts"><span class="chip doing">1 in progress</span></span>
       </summary>
-      <p class="note">No test and no control today — net-new.</p>
+      <p class="note">NOTE CORRECTED 2026-09-23 — &quot;no test and no control&quot; was false. Four enforced, fail-closed allowlists already existed: per-run tool endpoints (tool-tokens.ts, 403 on an undeclared endpoint), connector tool names (service.ts, re-checked at execution), CMS capability-gated tools (capabilityGate.ts, re-checked at dispatch) and the browser network guard (browser-network-policy.ts), which also already had a test. THREE REAL GAPS FOUND AND FIXED: the reasoning-egress policy was supplied by the CALLER, so an omitted field meant unrestricted — it is now server-owned and a caller may only narrow it; the AI gateway forwarded any upstream path verbatim, so a tenant chose which endpoint the operator's key paid for — now allowlisted; and a body declaring JSON that failed to parse was forwarded UNPINNED, skipping model enforcement — now refused. Also pinned: the connector allowlist grew itself from provider-supplied tool names and descriptions; that widening is now opt-in and off by default. STILL OPEN: OD_SANDBOX_MODE is set nowhere outside the test suite, so the import-containment control is fully implemented, covered by ten test files, and has never once executed in production. Enabling it changes every tenant daemon's runtime and is deliberately last. Acceptance runbook not written.</p>
       <table>
         <thead><tr><th>Acceptance</th><th>Pass means</th><th>Build</th><th>Acceptance run</th></tr></thead>
         <tbody>
         <tr>
           <td class="id">E2</td>
-          <td>New test needed</td>
-          <td><span class="chip todo">Not started</span></td>
+          <td>Controls exist and three fail-opens are fixed; sandbox mode not yet enabled; runbook outstanding</td>
+          <td><span class="chip doing">In progress</span></td>
           <td><span class="chip v-pending">Not yet verified</span></td>
         </tr>
         </tbody>
       </table>
     </details>
-    <details class="task" >
+    <details class="task" open>
       <summary>
         <span class="id">E3</span>
         <span class="task-title">Prompt-injection attempts rejected</span>
-        <span class="chip todo">Not started</span>
-        <span class="counts"><span class="chip todo">1 not started</span></span>
+        <span class="chip doing">In progress</span>
+        <span class="counts"><span class="chip doing">1 in progress</span></span>
       </summary>
-      <p class="note">No test and no control today — net-new.</p>
+      <p class="note">PARTLY BUILT 2026-09-23. The board said &quot;no test and no control&quot; — true, and the injection surface turned out to be concrete rather than theoretical. The content agent interpolated CMS row values RAW into the SYSTEM prompt (title, every field value, collection slugs), and the content scope skipped the snapshot validation the site scope does — a bare cast over the untrusted HTTP body. &quot;The tenant wrote that row&quot; is not generally true: rows arrive from third-party HTML imports, from the Connector (one bearer token, whole tool surface) and from caller-chosen media filenames, which content_list_media handed straight to the model. DONE: the snapshot is now validated; stored content is fenced and marked as data wherever it reaches a prompt, with the value unable to close its own fence; and the rule explaining the fence sits in the static prefix ahead of any value. 8 tests. STILL OPEN, and it is the half that matters for acceptance: there is NO SERVER-SIDE REFUSAL yet. Fencing is a mitigation — it makes injection harder and does not make it impossible — whereas the PRD requires that &quot;refused&quot; means the server refuses. The refusal belongs at the two places untrusted text reaches an agent that can act: the compliance correction loop (page text becomes a user-role prompt to a child process with shell access) and the Share-to-CMS gate. Acceptance runbook not written.</p>
       <table>
         <thead><tr><th>Acceptance</th><th>Pass means</th><th>Build</th><th>Acceptance run</th></tr></thead>
         <tbody>
         <tr>
           <td class="id">E3</td>
-          <td>New test needed</td>
-          <td><span class="chip todo">Not started</span></td>
+          <td>Snapshot validated and untrusted text fenced; the server-side refusal and the runbook are outstanding</td>
+          <td><span class="chip doing">In progress</span></td>
           <td><span class="chip v-pending">Not yet verified</span></td>
         </tr>
         </tbody>
@@ -736,13 +736,13 @@
         <span class="chip todo">Not started</span>
         <span class="counts"><span class="chip todo">1 not started</span></span>
       </summary>
-      <p class="note">No spend cap exists. An accepted omission until now; to become a real control.</p>
+      <p class="note">DEFERRED 2026-09-23, pending an answer from the owner. No spend cap exists. The PRD gives E4 no requirement number, no acceptance criterion and no phase — it says only that no cap exists and that this has been an accepted omission. Building one means inventing the limit, its scope and its behaviour, so three questions have been sent: what the limit is and per what; what happens when it is reached; and who may raise it. Nothing is built until those are answered.</p>
       <table>
         <thead><tr><th>Acceptance</th><th>Pass means</th><th>Build</th><th>Acceptance run</th></tr></thead>
         <tbody>
         <tr>
           <td class="id">E4</td>
-          <td>New test and a real spend cap needed</td>
+          <td>Deferred — the requirements document defines no spend cap to build against</td>
           <td><span class="chip todo">Not started</span></td>
           <td><span class="chip v-pending">Not yet verified</span></td>
         </tr>
@@ -789,41 +789,41 @@
         </tbody>
       </table>
     </details>
-    <details class="task" >
+    <details class="task" open>
       <summary>
         <span class="id">E7</span>
         <span class="task-title">CSRF and secure-cookie behaviour</span>
-        <span class="chip todo">Not started</span>
-        <span class="counts"><span class="chip todo">1 not started</span></span>
+        <span class="chip doing">In progress</span>
+        <span class="counts"><span class="chip doing">1 in progress</span></span>
       </summary>
-      <p class="note">No test and no control today — net-new.</p>
+      <p class="note">NOTE CORRECTED 2026-09-23 — &quot;no control&quot; was false for the CMS and true for the console. Instatic already refused cross-origin state changes on every mutating surface and set correct cookie flags. The OPERATOR CONSOLE had no server-side origin check at all: astro.config.mjs set checkOrigin:false because Astro compares Origin against the request Host and the gateway rewrites Host, so every funnel POST was rejected. The defence was left to SameSite=Strict, which on this deployment protects nothing: the console, the CMS and the studio are served from ONE origin, so a script on any tenant page is same-origin with the console, and Path=/operator limits which requests carry the cookie, not which pages may send them. Exposed handlers included act-as, remove and expose. FIXED: a middleware gate comparing against the CONFIGURED origin (the same approach Instatic uses), with Sec-Fetch-Site consulted first and unknown configuration refusing; the unused state-changing GET /logout removed. 13-check self-test added. STILL OPEN: the CMS-side tests all run UNAUTHENTICATED, so none yet satisfies the PRD's &quot;re-tested with valid credentials&quot;; and originAllowed returns true when Origin is absent. Acceptance runbook not written.</p>
       <table>
         <thead><tr><th>Acceptance</th><th>Pass means</th><th>Build</th><th>Acceptance run</th></tr></thead>
         <tbody>
         <tr>
           <td class="id">E7</td>
-          <td>New test needed</td>
-          <td><span class="chip todo">Not started</span></td>
+          <td>Console gate built + self-test; credentialed CMS tests and the no-Origin case outstanding</td>
+          <td><span class="chip doing">In progress</span></td>
           <td><span class="chip v-pending">Not yet verified</span></td>
         </tr>
         </tbody>
       </table>
     </details>
-    <details class="task" >
+    <details class="task" open>
       <summary>
         <span class="id">E8</span>
         <span class="task-title">Unsafe HTML and script input neutralised</span>
-        <span class="chip todo">Not started</span>
-        <span class="counts"><span class="chip todo">1 not started</span></span>
+        <span class="chip doing">In progress</span>
+        <span class="counts"><span class="chip doing">1 in progress</span></span>
       </summary>
-      <p class="note">No test and no control today — net-new.</p>
+      <p class="note">NOTE CORRECTED 2026-09-23 — &quot;no test and no control&quot; was false. Sanitisation is layered and already tested: write-time on every persisted tree (validate.ts), render-time dispatched on the DECLARED schema type with escape-by-default for anything unknown (escapeProps.ts), SVG bytes on upload and import, and inert Content-Disposition on served uploads. ONE REAL DEFECT FOUND AND FIXED: sanitizeRichtext FAILED OPEN — with no DOMPurify runtime it returned regex-stripped text that reads as clean, while its sibling sanitizeSvg twelve lines below refused. escapeProps passes richtext through UNESCAPED on the strength of that answer. Not theoretical: the runtime is module-level state set by a boot side effect, and this deployment runs from a network drive where Bun has been observed loading a module twice. It now refuses, and the CMS will not start without a working sanitiser. The test that pinned the old behaviour was inverted. STILL OPEN: no end-to-end test walks a hostile string from an anonymous ingress through to served bytes. Acceptance runbook not written.</p>
       <table>
         <thead><tr><th>Acceptance</th><th>Pass means</th><th>Build</th><th>Acceptance run</th></tr></thead>
         <tbody>
         <tr>
           <td class="id">E8</td>
-          <td>New test needed</td>
-          <td><span class="chip todo">Not started</span></td>
+          <td>Fail-open fixed + boot assertion; end-to-end chain test and runbook outstanding</td>
+          <td><span class="chip doing">In progress</span></td>
           <td><span class="chip v-pending">Not yet verified</span></td>
         </tr>
         </tbody>
@@ -836,34 +836,34 @@
         <span class="chip doing">In progress</span>
         <span class="counts"><span class="chip doing">1 in progress</span></span>
       </summary>
-      <p class="depends">Depends on R9</p><p class="note">Covered by AC-B9.4; the approval store is already append-only.</p>
+      <p class="depends">Depends on R9</p><p class="note">Covered by AC-B9.4; the approval store and the receipt store are both append-only by their own triggers. GAP FOUND 2026-09-23: listReceipts had ZERO callers anywhere, so there was no way to read a receipt outside psql — a validator could not even name one to attempt tampering with it. A read-only GET /api/tenants/&lt;slug&gt;/receipts route now exists (no edit or delete route, deliberately: immutability is the store's job, not the absence of a route). STILL OPEN: nothing exercises the triggers. There is no DB-backed test in the repo, and all 72 relay tests use an in-memory store, so the relay's append-only SQL has never been run. Both need a live database and must FAIL rather than skip when one is absent.</p>
       <table>
         <thead><tr><th>Acceptance</th><th>Pass means</th><th>Build</th><th>Acceptance run</th></tr></thead>
         <tbody>
         <tr>
           <td class="id">E9</td>
-          <td>Covered by AC-B9.4</td>
+          <td>Append-only by trigger; reader routed; trigger tests against a real database outstanding</td>
           <td><span class="chip doing">In progress</span></td>
           <td><span class="chip v-pending">Not yet verified</span></td>
         </tr>
         </tbody>
       </table>
     </details>
-    <details class="task" >
+    <details class="task" open>
       <summary>
         <span class="id">E10</span>
         <span class="task-title">Failed deployment and rollback exercised</span>
-        <span class="chip todo">Not started</span>
-        <span class="counts"><span class="chip todo">1 not started</span></span>
+        <span class="chip doing">In progress</span>
+        <span class="counts"><span class="chip doing">1 in progress</span></span>
       </summary>
-      <p class="depends">Depends on R9</p><p class="note">Covered by AC-B9.3 plus a rollback receipt; no rollback exists today.</p>
+      <p class="depends">Depends on R9</p><p class="note">BUILT 2026-09-23, with a correction to the earlier plan: wiring listKnownGood to restoreSiteBackup is not possible — one returns a directory of baked HTML for the CDN, the other takes a database client and a JSON row-dump for the CMS. A rollback is a RE-DEPLOY of retained bytes. A REAL DEFECT WAS FOUND FIRST: a bundle that FAILED verification was still filed as known-good, because retain ran above the line computing whether the site was live — with three generations kept, three bad deploys evicted every good one, so the ring a rollback reads from could be emptied by exactly the failure it exists to recover from. Only a verified bundle is now retained (unverified does not qualify: the check could not run). A failed deploy also wrote NO receipt at all — the one event this class exists to exercise left nothing in the append-only store; it does now. Added: rollbackTenant (listKnownGood's first caller ever), POST /rollback and GET /known-good, two receipt columns (kind, restored_from_receipt_id) since the PRD names a &quot;rollback receipt&quot; and defines no fields for one, and an 18-check self-test. NOT blocked by the relay: the GO gate is in the Connector, not the CMS publish path. STILL OPEN: acceptance runbook; and the CMS database still holds the content that was published, so a rollback restores what the SITE SERVES, not what the next publish would push — that is the R15 gap (restoreSiteBackup has no caller).</p>
       <table>
         <thead><tr><th>Acceptance</th><th>Pass means</th><th>Build</th><th>Acceptance run</th></tr></thead>
         <tbody>
         <tr>
           <td class="id">E10</td>
-          <td>Covered by AC-B9.3, plus a rollback receipt</td>
-          <td><span class="chip todo">Not started</span></td>
+          <td>Rollback, receipts and the known-good ring built + tested; acceptance runbook outstanding</td>
+          <td><span class="chip doing">In progress</span></td>
           <td><span class="chip v-pending">Not yet verified</span></td>
         </tr>
         </tbody>
