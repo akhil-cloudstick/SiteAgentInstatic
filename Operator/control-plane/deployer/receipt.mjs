@@ -99,7 +99,7 @@ export async function retainKnownGood(slug, dir) {
   return target;
 }
 
-/** The generations kept for a project, newest first, with their sizes. */
+/** The generations kept for a project, newest first, each with when it was kept. */
 export async function listKnownGood(slug) {
   const root = keepDir(slug);
   if (!existsSync(root)) return [];
@@ -127,8 +127,9 @@ export async function recordReceipt(entry) {
       `insert into siteagent_control.deploy_receipts
          (tenant_slug, content_hash, published_pages, cf_project, deploy_url, deploy_id,
           verification, verification_detail, routes_checked, routes_failed,
-          previous_receipt_id, known_good_path, build)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+          previous_receipt_id, known_good_path, build,
+          kind, restored_from_receipt_id)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
        returning id`,
       [
         entry.tenantSlug,
@@ -144,6 +145,9 @@ export async function recordReceipt(entry) {
         previous.rows[0]?.id ?? null,
         entry.knownGoodPath ?? null,
         entry.build ?? BUILD_REVISION,
+        // Defaults to a publish, so every existing caller is unchanged.
+        entry.kind ?? 'publish',
+        entry.restoredFromReceiptId ?? null,
       ],
     );
     return rows[0]?.id ?? null;

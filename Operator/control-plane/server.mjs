@@ -10,7 +10,9 @@ import { migrate } from './registry/db.mjs';
 import { getSettings, saveSettings, getSecrets, getDefaultGuidance, saveDefaultGuidance } from './registry/settings.mjs';
 import * as tenantsRepo from './registry/tenants.mjs';
 import { provisionTenant, deprovisionTenant, startTenant, resumeAll, editTenant, repairTenantCf, pointTestFunnel } from './provisioner/provision.mjs';
-import { deployTenant, hasBakedOutput } from './deployer/deploy.mjs';
+import { deployTenant, hasBakedOutput, rollbackTenant } from './deployer/deploy.mjs';
+// The proof chain's readers. Both had no caller anywhere until these routes.
+import { listReceipts, listKnownGood } from './deployer/receipt.mjs';
 import { handleGateway } from './ai-gateway/gateway.mjs';
 import { verifyTenantToken, verifyForTenant, decrypt } from './lib/crypto.mjs';
 import {
@@ -571,7 +573,7 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { agent });
     }
 
-    const m = path.match(/^\/api\/tenants\/([a-z0-9-]+)(?:\/(start|deploy|update|repair|expose))?$/);
+    const m = path.match(/^\/api\/tenants\/([a-z0-9-]+)(?:\/(start|deploy|update|repair|expose|receipts|known-good|rollback))?$/);
     if (m) {
       // A project outside the administrator's scope does not exist, for reads
       // and changes alike (AC-A1.2).
@@ -583,8 +585,43 @@ const server = http.createServer(async (req, res) => {
         const deleteCf = new URL(req.url, 'http://x').searchParams.get('cf') === '1';
         return send(res, 200, await deprovisionTenant(slug, { deleteCf }));
       }
+      // The proof chain, readable at last (R9 / security items E9, E10).
+      //
+      // R9 built receipts and retained known-good bundles, and `listReceipts`
+      // and `listKnownGood` have had ZERO callers since — the table could be
+      // written and never read outside psql. That makes AC-B9.1 ("every named
+      // field present") untestable by anyone without database access, and E9
+      // impossible to start: a validator cannot attempt to tamper with a
+      // receipt it has no way to name.
+      //
+      // Read-only, deliberately. There is no edit or delete route here and
+      // there must not be: immutability is enforced by the store's own triggers
+      // (PRD §5.2), and the absence of a route is not the control.
+      if (action === 'receipts' && method === 'GET') {
+        const limit = Number(new URL(req.url, 'http://x').searchParams.get('limit')) || 50;
+        return send(res, 200, { receipts: await listReceipts(scope, slug, limit) });
+      }
+      if (action === 'known-good' && method === 'GET') {
+        return send(res, 200, { generations: await listKnownGood(slug) });
+      }
       if (action === 'start' && method === 'POST') return send(res, 200, await startTenant(slug));
       if (action === 'deploy' && method === 'POST') return send(res, 200, await deployTenant(slug));
+      // Put a retained, verified bundle back on the live site (E10).
+      //
+      // Not behind `requireOpenWork`: like `deploy`, this re-publishes bytes the
+      // platform already holds and opens nobody's content. Recorded, because it
+      // changes what the public sees.
+      if (action === 'rollback' && method === 'POST') {
+        const body = await readJson(req).catch(() => ({}));
+        const out = await rollbackTenant(slug, { to: body?.to ?? null });
+        recordAdminAction({
+          admin,
+          action: 'tenant.rollback',
+          tenantSlug: slug,
+          detail: { to: body?.to ?? null, restoredFrom: out.restoredFrom ?? null, ok: out.ok },
+        });
+        return send(res, 200, out);
+      }
       if (action === 'update' && method === 'POST') return send(res, 200, await editTenant(slug, await readJson(req)));
       if (action === 'repair' && method === 'POST') return send(res, 200, await repairTenantCf(slug));
       if (action === 'expose' && method === 'POST') {

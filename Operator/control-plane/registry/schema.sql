@@ -615,6 +615,32 @@ create table if not exists siteagent_control.deploy_receipts (
 create index if not exists deploy_receipts_tenant_at on siteagent_control.deploy_receipts (tenant_slug, at desc);
 create index if not exists deploy_receipts_at on siteagent_control.deploy_receipts (at desc);
 
+-- WAS THIS A ROLLBACK? (security class E10)
+--
+-- The PRD names "a rollback receipt" (E-table, mmsbuild-prd.md:466) and defines
+-- no fields for one; AC-B9.1 enumerates a PUBLISH receipt's fields only. These
+-- two columns are the minimum the existing shape cannot already express, and
+-- nothing else is added: a rollback reuses `known_good_path` (the bundle that
+-- went live), `previous_receipt_id` (the chain, unchanged) and a FRESHLY
+-- measured `verification` — never one copied from the receipt being restored,
+-- because a rollback that did not actually restore the site must read `failed`.
+--
+-- `restored_from_receipt_id` is deliberately separate from `previous_receipt_id`:
+-- one says which generation was put back, the other says what came immediately
+-- before in time. Merging them would lose the provenance.
+--
+-- Defaulted so every receipt written before this is honestly labelled: they were
+-- all publishes.
+alter table siteagent_control.deploy_receipts
+  add column if not exists kind text not null default 'publish';
+alter table siteagent_control.deploy_receipts
+  add column if not exists restored_from_receipt_id bigint;
+
+do $$ begin
+  alter table siteagent_control.deploy_receipts
+    add constraint deploy_receipts_kind_check check (kind in ('publish', 'rollback'));
+exception when duplicate_object then null; end $$;
+
 -- Addressed like every other project-keyed record, so a scoped read filters it
 -- with no new logic (R5).
 drop trigger if exists deploy_receipts_stamp_address on siteagent_control.deploy_receipts;

@@ -1,11 +1,18 @@
 // Publish Deployer — ships a tenant's baked static site to Cloudflare Pages via wrangler.
 // Instatic bakes fully-static pages to <uploads>/published/current/ at publish time.
 import { spawn } from 'node:child_process';
-import { existsSync, mkdirSync, writeFileSync, readFileSync, realpathSync, statSync, rmSync, readdirSync } from 'node:fs';
+import { existsSync, mkdirSync, writeFileSync, readFileSync, realpathSync, statSync, rmSync, readdirSync, cpSync } from 'node:fs';
 import { resolve } from 'node:path';
 import * as tenants from '../registry/tenants.mjs';
 import { verifyDeployedSite } from './verify.mjs';
-import { recordReceipt, retainKnownGood, deploymentIdFrom, BUILD_REVISION } from './receipt.mjs';
+import {
+  recordReceipt,
+  retainKnownGood,
+  deploymentIdFrom,
+  BUILD_REVISION,
+  listKnownGood,
+  listReceipts,
+} from './receipt.mjs';
 import { getSecrets } from '../registry/settings.mjs';
 import * as rt from '../runtime/tenantRuntime.mjs';
 import config from '../lib/env.mjs';
@@ -512,15 +519,31 @@ export async function deployTenant(
       failed: 0,
     }));
 
+    const live = verdict.verification !== 'failed';
+
     // Keep what was actually UPLOADED — after the root files were written into
     // the slot, not the CMS's bake before them — so the retained bundle is the
     // thing that went live and can reconstruct it (AC-B9.3).
-    const keptAt = await retainKnownGood(slug, dir).catch((err) => {
-      console.warn(`[deploy] ${slug} could not retain the bundle: ${err.message}`);
-      return null;
-    });
-
-    const live = verdict.verification !== 'failed';
+    //
+    // Only when it VERIFIED. This used to run unconditionally, above the line
+    // that computes `live`, so a bundle the verifier had just proven was not
+    // being served was still filed as "known-good" — and with three
+    // generations kept, three bad deploys in a row evicted every genuinely good
+    // one. The ring a rollback reads from could be emptied by exactly the
+    // failure a rollback exists to recover from.
+    //
+    // `unverified` does not qualify either: it means the check could not run,
+    // and calling a bundle good because nobody could look is the fail-open
+    // principle P2 forbids. The cost is deliberate and worth stating — a
+    // project whose verification can never run (no public address, nothing
+    // baked) retains nothing and has nothing to roll back to. That is the
+    // correct answer to "is this known to be good?", and it is loud.
+    const keptAt = shouldRetainBundle(verdict.verification)
+      ? await retainKnownGood(slug, dir).catch((err) => {
+          console.warn(`[deploy] ${slug} could not retain the bundle: ${err.message}`);
+          return null;
+        })
+      : null;
     await tenants.finishDeploy(deploy.id, live ? 'live' : 'failed', url, live ? null : verdict.detail);
     await tenants.updateTenant(slug, {
       pages_url: url,
@@ -553,5 +576,233 @@ export async function deployTenant(
   // silent — it only logged to the console, so a failed live publish looked fine).
   await tenants.finishDeploy(deploy.id, 'failed', null, out.slice(-1200));
   await tenants.updateTenant(slug, { last_error: `Publish→CF: ${out.slice(-400) || `wrangler exited ${code}`}` });
+
+  // A failed deploy gets a receipt too.
+  //
+  // This path used to return here, so the ONE event the proof chain most needs
+  // to record — a push that did not go live — left only the mutable `deploys`
+  // row behind, and nothing in the append-only store. "Failed deployment
+  // exercised" (E10) had no evidence artefact at all.
+  //
+  // Best-effort, matching the success path: `recordReceipt` already logs loudly
+  // and does not throw, and a bookkeeping failure must not change what the
+  // caller is told about the deploy itself.
+  await recordReceipt({
+    tenantSlug: slug,
+    contentHash: publishedSiteHash ?? null,
+    publishedPages: publishedPages ?? null,
+    cfProject: project,
+    deployUrl: null,
+    deployId: deploymentIdFrom(out),
+    verification: 'failed',
+    verificationDetail: out.slice(-1200) || `wrangler exited ${code}`,
+    routesChecked: 0,
+    routesFailed: 0,
+    knownGoodPath: null,
+    build: BUILD_REVISION,
+  });
+
   return { ok: false, error: out.slice(-600) || `wrangler exited ${code}` };
+}
+
+/**
+ * Put a previously-retained, verified bundle back on the live site (E10).
+ *
+ * `listKnownGood` had no caller anywhere until this function: R9 retained three
+ * generations per project and nothing could read one back, so "failed
+ * deployment and rollback exercised" had no mechanism at all.
+ *
+ * This is a RE-DEPLOY of retained bytes, not a database restore. An earlier
+ * plan note suggested wiring `listKnownGood` to `restoreSiteBackup`; they are
+ * different layers — one is a directory of baked HTML for the CDN, the other a
+ * JSON row-dump for the CMS — and they are not interchangeable. See the note at
+ * the end of this docblock for the half this does NOT cover.
+ *
+ * Deliberate choices the PRD does not make, each recorded where it is made:
+ *  - the retained bundle is COPIED and never mutated, so it stays byte-identical
+ *    for a later rollback and for comparison;
+ *  - today's robots policy is applied to that copy, so rolling back does not
+ *    silently re-open a site to crawlers that was taken out of the index since;
+ *  - a rollback does NOT retain a new generation — recovering must not evict the
+ *    oldest good bundle as a side effect;
+ *  - an unknown `to` is refused rather than quietly falling back to the newest.
+ *
+ * NOT COVERED, and named so it is not mistaken for done: this restores what the
+ * SITE SERVES. The CMS database still holds the content that was published, so
+ * the next publish will push it again. Closing that needs an operable caller for
+ * `restoreSiteBackup`, which is the R15 gap.
+ */
+/**
+ * Does a verdict qualify a bundle as known-good? (AC-B9.3)
+ *
+ * Only `verified`. `failed` is obvious; `unverified` is the one worth stating —
+ * it means the check could not RUN, and filing a bundle as good because nobody
+ * could look is the fail-open shape P2 forbids.
+ *
+ * Exported as its own function so the rule is testable without a database or a
+ * Cloudflare account, which is what the rest of this path needs.
+ */
+export function shouldRetainBundle(verification) {
+  return verification === 'verified';
+}
+
+/**
+ * Which retained generation to roll back to.
+ *
+ * `to` absent picks the newest. `to` given must MATCH — an unknown value is
+ * refused rather than silently falling back to the newest, because a rollback
+ * that quietly restored a different generation than the one asked for is the
+ * worst outcome available here.
+ *
+ * Returns `{ ok: true, target }` or `{ ok: false, reason }`.
+ */
+export function selectKnownGood(kept, to = null) {
+  if (!Array.isArray(kept) || kept.length === 0) {
+    return {
+      ok: false,
+      reason: 'No retained bundle. Only a deploy that verified is kept, so there is nothing known-good to roll back to.',
+    };
+  }
+  if (!to) return { ok: true, target: kept[0] };
+  const target = kept.find((k) => k.at === to);
+  return target
+    ? { ok: true, target }
+    : { ok: false, reason: `No retained bundle at "${to}". Available: ${kept.map((k) => k.at).join(', ')}` };
+}
+
+export async function rollbackTenant(slug, { to = null } = {}, deps = {}) {
+  const {
+    run = runWrangler,
+    verify = verifyDeployedSite,
+    record = recordReceipt,
+    kept: keptFn = listKnownGood,
+    receipts: receiptsFn = listReceipts,
+  } = deps;
+
+  const row = await tenants.getTenant(slug);
+  if (!row) throw new Error(`Unknown tenant: ${slug}`);
+
+  // No fallback to the bundle that is already live: there is nothing to roll
+  // back TO, and saying so is the correct answer rather than re-pushing the
+  // state somebody is trying to get away from.
+  const choice = selectKnownGood(await keptFn(slug), to);
+  if (!choice.ok) throw new Error(`${slug}: ${choice.reason}`);
+  const target = choice.target;
+
+  // Same refusal a deploy makes. A rollback onto a custom domain with indexing
+  // off would publish `Disallow: /` to a production site for the same reason.
+  if (row.custom_domain && row.search_indexing !== true) {
+    const message =
+      `Refusing to roll ${slug} back to ${row.custom_domain} with search indexing OFF — ` +
+      'the site would publish with robots.txt "Disallow: /" and X-Robots-Tag noindex.';
+    await tenants.recordDeploy(row.id, 'failed', null, message);
+    throw new Error(message);
+  }
+
+  const secrets = await getSecrets();
+  if (!secrets.cloudflareToken || !secrets.cloudflareAccountId) {
+    throw new Error('Set the Cloudflare API token + account id in Settings before rolling back.');
+  }
+
+  const project = row.cf_project || `siteagent-${slug}`;
+  const env = {
+    ...process.env,
+    CLOUDFLARE_API_TOKEN: secrets.cloudflareToken,
+    CLOUDFLARE_ACCOUNT_ID: secrets.cloudflareAccountId,
+  };
+
+  // Stage a copy. The retained directory is evidence and must survive this.
+  const staging = resolve(publishedDir(slug), `rollback-${Date.now()}`);
+  rmSync(staging, { recursive: true, force: true });
+  cpSync(target.path, staging, { recursive: true });
+  try {
+    writeRootFiles(staging, row);
+  } catch (e) {
+    console.error(`[rollback] root files for ${slug} could not be written:`, e.message);
+  }
+
+  const deploy = await tenants.recordDeploy(row.id, 'uploading', null, null);
+  const { code, out } = await run(
+    ['pages', 'deploy', staging, `--project-name=${project}`, '--branch=main', '--commit-dirty=true'], env);
+
+  if (!deploySucceeded(code, out)) {
+    await tenants.finishDeploy(deploy.id, 'failed', null, out.slice(-1200));
+    await record({
+      tenantSlug: slug, kind: 'rollback', cfProject: project, deployUrl: null,
+      deployId: deploymentIdFrom(out), verification: 'failed',
+      verificationDetail: out.slice(-1200) || `wrangler exited ${code}`,
+      knownGoodPath: target.path, build: BUILD_REVISION,
+    });
+    rmSync(staging, { recursive: true, force: true });
+    return { ok: false, error: out.slice(-600) || `wrangler exited ${code}`, restoredFrom: target.at };
+  }
+
+  const url = row.custom_domain ? `https://${row.custom_domain}` : canonicalPagesUrl(project);
+
+  // Measured fresh against what is now serving — never copied from the receipt
+  // being restored. A rollback that did not actually restore the site has to be
+  // able to say so; that is what makes this receipt evidence and not a claim.
+  const verdict = await verify(url, staging, bakedUrlPaths(staging)).catch((err) => ({
+    verification: 'unverified',
+    detail: `the check could not run: ${err instanceof Error ? err.message : String(err)}`,
+    checked: 0,
+    failed: 0,
+  }));
+
+  // The receipt whose bundle this was, so the rollback names what it restored.
+  // An orphaned bundle (kept, but its receipt aged out) is possible and is
+  // recorded as null rather than invented.
+  let restoredFromReceiptId = null;
+  let contentHash = null;
+  let publishedPages = null;
+  try {
+    const priors = await receiptsFn({ level: 'platform' }, slug, 200);
+    const match = priors.find((r) => r.known_good_path === target.path);
+    if (match) {
+      restoredFromReceiptId = match.id;
+      contentHash = match.content_hash ?? null;
+      publishedPages = match.published_pages ?? null;
+    }
+  } catch (err) {
+    console.warn(`[rollback] ${slug} could not resolve the restored receipt: ${err.message}`);
+  }
+
+  const live = verdict.verification !== 'failed';
+  await tenants.finishDeploy(deploy.id, live ? 'live' : 'failed', url, live ? null : verdict.detail);
+  await tenants.updateTenant(slug, {
+    pages_url: url,
+    cf_project: project,
+    last_error: live ? null : `Rolled back, but the site is not serving it: ${verdict.detail}`,
+  });
+
+  const receiptId = await record({
+    tenantSlug: slug,
+    kind: 'rollback',
+    restoredFromReceiptId,
+    contentHash,
+    publishedPages,
+    cfProject: project,
+    deployUrl: url,
+    deployId: deploymentIdFrom(out),
+    verification: verdict.verification,
+    verificationDetail: verdict.detail,
+    routesChecked: verdict.checked,
+    routesFailed: verdict.failed,
+    // The generation that went live. NOT retained again — see the docblock.
+    knownGoodPath: target.path,
+    build: BUILD_REVISION,
+  });
+
+  rmSync(staging, { recursive: true, force: true });
+
+  return {
+    ok: live,
+    url,
+    verification: verdict.verification,
+    restoredFrom: target.at,
+    restoredFromReceiptId,
+    // A rollback whose proof failed to write must not read as a clean success.
+    receipt: receiptId ?? 'NOT WRITTEN',
+    ...(live ? {} : { error: verdict.detail }),
+  };
 }
