@@ -120,10 +120,17 @@ describe('DataCanvas — row creation', () => {
       fields: [{ type: 'text', id: 'name', label: 'Name', required: true }],
       primaryFieldId: 'name',
     })
-    renderCanvas(table, [makeRow({ tableId: table.id, cells: { name: 'Campaign' } })])
-
+    // Row creation, as DataCanvas actually surfaces it: the empty-state CTA.
+    // The always-visible toolbar button lives in DataWorkbenchHeader — a
+    // SIBLING this component never renders — so asserting it here was checking
+    // a control that had moved out, not one that had been lost. (DataPage wires
+    // it via `onCreateRow`; there is no dead end for the user.)
+    renderCanvas(table, [])
     expect(screen.getByRole('button', { name: /add row/i })).toBeDefined()
+    cleanup()
 
+    // Duplicate row IS DataCanvas's own, and needs a row to act on.
+    renderCanvas(table, [makeRow({ tableId: table.id, cells: { name: 'Campaign' } })])
     fireEvent.contextMenu(screen.getByText('Campaign').closest('[role="row"]')!, { clientX: 100, clientY: 100 })
     expect(screen.getByRole('menuitem', { name: /duplicate row/i })).toBeDefined()
   })

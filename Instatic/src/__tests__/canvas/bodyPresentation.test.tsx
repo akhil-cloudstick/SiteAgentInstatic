@@ -167,9 +167,21 @@ describe('canvas iframe body presentation', () => {
       expect(frameDocument.body.style.backgroundImage).toBe(
         'linear-gradient(rgb(12, 18, 24), rgb(24, 36, 48))',
       )
-      expect(frameDocument.body.style.height).toBe('auto')
-      expect(frameDocument.body.style.minHeight).toBe('800px')
-      expect(frameDocument.body.style.overflow).toBe('hidden')
+      // Sizing belongs to the FRAME, never to the authored body.
+      //
+      // These four used to assert the pan/zoom canvas's grow-to-content clamp
+      // (`height: auto; min-height: 800px`). The multi-breakpoint canvas is now
+      // Responsive Review, where each frame is its own scroll viewport — and
+      // that clamp is exactly what stopped those frames scrolling, since a
+      // browser will not chain scroll out of an iframe to its embedder. So the
+      // frame clears the sizing instead of clamping it.
+      //
+      // What still matters, and is what these now pin, is that the AUTHORED
+      // values above (height 40px, min-height 10px, overflow scroll/auto) never
+      // reach the design frame — `CANVAS_BODY_RESET_PROPERTIES` drops them.
+      expect(frameDocument.body.style.height).toBe('')
+      expect(frameDocument.body.style.minHeight).toBe('')
+      expect(frameDocument.body.style.overflow).toBe('')
       expect(frameDocument.body.style.overflowX).toBe('')
       expect(frameDocument.body.id).toBe('site-body')
       expect(frameDocument.body.getAttribute('role')).toBe('document')
@@ -192,9 +204,11 @@ describe('canvas iframe body presentation', () => {
 
     await waitFor(() => {
       expect(frameDocument.body.style.backgroundColor).toBe('rgb(30, 42, 54)')
-      expect(frameDocument.body.style.height).toBe('auto')
-      expect(frameDocument.body.style.minHeight).toBe('800px')
-      expect(frameDocument.body.style.overflow).toBe('hidden')
+      // Authored sizing is still refused after a live edit — the point of the
+      // re-assert is that editing the body cannot smuggle it in later either.
+      expect(frameDocument.body.style.height).toBe('')
+      expect(frameDocument.body.style.minHeight).toBe('')
+      expect(frameDocument.body.style.overflow).toBe('')
       expect(frameDocument.body.style.overflowY).toBe('')
       expect(frameDocument.body.hasAttribute('id')).toBe(false)
       expect(frameDocument.body.getAttribute('dir')).toBe('rtl')

@@ -483,9 +483,15 @@ describe('SettingsModal — Guideline #225 focus return (source enforcement)', (
 // 12 — Section ID alignment — SettingsButton + store default (source enforcement)
 // ---------------------------------------------------------------------------
 
-describe('SettingsButton + settingsSlice — section ID alignment (source enforcement)', () => {
-  const btnSrc = readFileSync(
-    new URL('../../admin/pages/site/toolbar/SettingsButton.tsx', import.meta.url),
+describe('settings entry point + settingsSlice — section ID alignment (source enforcement)', () => {
+  // The entry point used to be `site/toolbar/SettingsButton.tsx`. The MMS
+  // re-skin moved settings into the shared Product Hub header, that file was
+  // deleted, and this read kept naming it — so the whole describe block threw
+  // ENOENT and the alignment it guards stopped being checked at all. Pointed at
+  // the real opener; the assertion itself is unchanged, because what it pins
+  // (the dispatched id must be a valid section) is still exactly the risk.
+  const openerSrc = readFileSync(
+    new URL('../../admin/shared/ProductHubHeader/ProductHubHeader.tsx', import.meta.url),
     'utf-8',
   )
 
@@ -494,10 +500,10 @@ describe('SettingsButton + settingsSlice — section ID alignment (source enforc
     'utf-8',
   )
 
-  it('SettingsButton dispatches a valid section ID', () => {
+  it('the settings opener dispatches a valid section ID', () => {
     // 'general' is the first NAV_ITEMS entry after Pages/Viewports/Conditions
     // were moved to their dedicated controls.
-    expect(btnSrc).toContain("openSettings('general')")
+    expect(openerSrc).toContain("openSettings('general')")
   })
 
   it('settingsSlice activeSection default is a valid section ID', () => {

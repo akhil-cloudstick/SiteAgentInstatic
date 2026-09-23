@@ -174,8 +174,12 @@ describe('Data table step-up flow', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: 'New table' }))
     const dialog = await screen.findByRole('dialog', { name: 'New table' })
-    fireEvent.change(within(dialog).getByLabelText('Name'), { target: { value: 'custom table' } })
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Create' }))
+    // The field is labelled 'Table name' (exact-matching 'Name' stopped
+    // matching when it was renamed).
+    fireEvent.change(within(dialog).getByLabelText('Table name'), {
+      target: { value: 'custom table' },
+    })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Create table' }))
 
     expect(await screen.findByTestId('step-up-dialog')).toBeTruthy()
     expect(screen.queryByText('step_up_required')).toBeNull()

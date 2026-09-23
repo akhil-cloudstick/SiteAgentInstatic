@@ -68,7 +68,13 @@ interface DataGridProps {
   missingEntryTemplate?: boolean
   /** Click on a row — typically opens the inspector. */
   onSelectRow: (rowId: string | null) => void
-  /** Create a new row. Omit to hide the "Add row" toolbar button + empty-state CTA. */
+  /**
+   * Create a new row. Omit to hide the empty-state "Add row" CTA.
+   *
+   * Empty state only — the always-visible control is DataWorkbenchHeader's
+   * `onCreateRow`. This used to say "toolbar button + empty-state CTA", which
+   * stopped being true when the button moved out to that header.
+   */
   onAddRow?: () => Promise<void> | void
   /** Delete a row by id. Omit to hide per-row + bulk delete. */
   onDeleteRow?: (rowId: string) => void

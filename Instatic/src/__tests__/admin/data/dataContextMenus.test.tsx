@@ -257,7 +257,11 @@ describe('Data table context menu', () => {
       />,
     )
 
-    expect(screen.getByText('data').closest('[data-accent]')?.getAttribute('data-accent')).toBe('d')
+    // A user-created table carries no kind badge — the approved screen prints
+    // one only for the built-in tables. (This line used to assert a per-kind
+    // accent letter; the re-skin replaced those accents with a single muted tag,
+    // so it was asserting a design that no longer exists.)
+    expect(screen.queryByText('data')).toBeNull()
 
     fireEvent.contextMenu(screen.getByRole('option', { name: /products/i }), {
       clientX: 60,
@@ -275,7 +279,17 @@ describe('Data table context menu', () => {
     expect(onDeleteTable).toHaveBeenCalledWith(customTable)
   })
 
-  it('assigns a distinct stable accent to every table kind', () => {
+  /**
+   * Replaces an older test that asserted a distinct `data-accent` letter per
+   * table kind. The re-skin removed per-kind accents entirely — `.kindTag` is
+   * now one muted style, and the only `data-accent` left is on the panel rail —
+   * so that test was pinning a design the approved screen no longer has.
+   *
+   * What the approved screen DOES specify is kept here: the badge marks the
+   * built-in tables, a user's own table goes unbadged, and `postType` reads
+   * differently depending on which it is.
+   */
+  it('badges the built-in tables only, and names a custom post type differently', () => {
     render(
       <DataSidebar
         tables={[
@@ -300,11 +314,46 @@ describe('Data table context menu', () => {
       />,
     )
 
-    const badgeAccents = ['page', 'post-type', 'component', 'data'].map(
-      (label) => screen.getByText(label).closest('[data-accent]')?.getAttribute('data-accent'),
+    // Built-in tables are badged with their kind.
+    for (const kind of ['page', 'post-type', 'component']) {
+      expect(screen.getByText(kind)).toBeTruthy()
+    }
+    // The user's own table is not.
+    expect(screen.queryByText('data')).toBeNull()
+  })
+
+  it('names a user-created post type "custom post type"', () => {
+    render(
+      <DataSidebar
+        tables={[
+          makeListItem({ id: 'table-posts', kind: 'postType', pluralLabel: 'Posts' }),
+          makeListItem({
+            id: 'table-recipes',
+            kind: 'postType',
+            pluralLabel: 'Recipes',
+            system: false,
+          }),
+        ]}
+        loading={false}
+        error={null}
+        selectedTableId={null}
+        onSelectTable={() => {}}
+        onCreateTable={() => {}}
+        onOpenExport={() => {}}
+        onOpenImport={() => {}}
+        onOpenTableSettings={() => {}}
+        onDeleteTable={() => {}}
+        canCreateTable
+        canManage
+        canExport
+        canImport
+      />,
     )
-    expect(badgeAccents).toEqual(['a', 'b', 'c', 'd'])
-    expect(new Set(badgeAccents).size).toBe(badgeAccents.length)
+
+    // The shipped one reads 'post-type'; the user's own is unbadged, because
+    // the badge is reserved for built-ins.
+    expect(screen.getByText('post-type')).toBeTruthy()
+    expect(screen.queryByText('custom post type')).toBeNull()
   })
 
   it('disables deleting protected system tables', () => {

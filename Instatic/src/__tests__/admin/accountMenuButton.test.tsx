@@ -88,21 +88,32 @@ describe('AccountMenuButton', () => {
   beforeEach(() => {
     // Replace location.assign with a stub so the redirect on sign-out doesn't
     // attempt to navigate the test runner away.
-    Object.defineProperty(window, 'location', {
-      configurable: true,
-      writable: true,
-      value: { ...originalLocation, assign: mock(() => {}) },
-    })
+    //
+    // BOTH bindings, deliberately. `setup.ts` copies `location` onto globalThis
+    // BY VALUE, so `globalThis.location` and `window.location` are two separate
+    // references to the same original object — redefining only `window.location`
+    // left `signOutEverywhere` calling the real `globalThis.location.assign`
+    // while the assertion watched a stub nothing ever touched.
+    const stub = { ...originalLocation, assign: mock(() => {}) }
+    for (const target of [window, globalThis]) {
+      Object.defineProperty(target, 'location', {
+        configurable: true,
+        writable: true,
+        value: stub,
+      })
+    }
   })
 
   afterEach(() => {
     cleanup()
     globalThis.fetch = originalFetch
-    Object.defineProperty(window, 'location', {
-      configurable: true,
-      writable: true,
-      value: originalLocation,
-    })
+    for (const target of [window, globalThis]) {
+      Object.defineProperty(target, 'location', {
+        configurable: true,
+        writable: true,
+        value: originalLocation,
+      })
+    }
   })
 
   it('uses up to two initials from the display name', () => {
