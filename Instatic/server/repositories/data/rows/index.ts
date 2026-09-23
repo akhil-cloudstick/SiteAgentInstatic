@@ -31,7 +31,7 @@ export {
 export { searchDataRows } from './search'
 
 
-export { listDataRowsWithFilter } from './filter'
+export { listDataRowsWithFilter, fieldTypesOf } from './filter'
 
 
 export {

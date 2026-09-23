@@ -45,6 +45,29 @@ interface ListDataRowsFilterOptions {
    * hundred rows showed "100 rows" above an empty grid.
    */
   ownerUserId?: string | null
+  /**
+   * Declared types of the table's fields, by field key — used to order numeric
+   * cells numerically.
+   *
+   * Supplied by the caller rather than read here, because every caller has
+   * already resolved the table (and therefore its `fields`) before calling.
+   * Looking it up again would be a third query, and `filter.test.ts` pins this
+   * function at exactly two.
+   *
+   * Optional: without it, ordering falls back to the text form it has always
+   * used, so a caller that does not have the schema to hand is unchanged.
+   */
+  fieldTypes?: Readonly<Record<string, string>>
+}
+
+/** Build the `fieldTypes` option from a table's declared fields. */
+export function fieldTypesOf(
+  fields: ReadonlyArray<{ key: string; type: string }> | undefined,
+): Record<string, string> | undefined {
+  if (!fields || fields.length === 0) return undefined
+  const types: Record<string, string> = {}
+  for (const field of fields) types[field.key] = field.type
+  return types
 }
 
 interface ListDataRowsWithFilterResult {
@@ -78,7 +101,15 @@ export async function listDataRowsWithFilter(
   tableId: string,
   options: ListDataRowsFilterOptions = {},
 ): Promise<ListDataRowsWithFilterResult> {
-  const { filter, orderBy, status = 'any', limit = 100, offset = 0, ownerUserId = null } = options
+  const {
+    filter,
+    orderBy,
+    status = 'any',
+    limit = 100,
+    offset = 0,
+    ownerUserId = null,
+    fieldTypes,
+  } = options
 
   const params: unknown[] = [tableId]
   let paramIdx = 1
@@ -172,15 +203,24 @@ export async function listDataRowsWithFilter(
       if (!FIELD_KEY_RE.test(key)) {
         throw new Error(`[content] invalid orderBy field name: ${JSON.stringify(key)}`)
       }
-      // KNOWN AND NOT FIXED HERE: ordering by a numeric cell still differs
-      // between the dialects — Postgres sorts '10' before '9', SQLite sorts 9
-      // before 10. The comparison operators above could be corrected because the
-      // caller's bound value declares the intent; an `order by` carries no value
-      // to inspect, so getting it right means reading the field's declared type
-      // out of `data_tables.fields_json`. That is a third query, and
-      // `filter.test.ts` pins this function at exactly two. Left as it is rather
-      // than guessed at, and written down rather than left to be rediscovered.
-      const fragment = jsonField('cells_json', key, db.dialect).sql
+      // A numeric cell is ordered numerically.
+      //
+      // Postgres `->>` yields text and SQLite `json_extract` yields the JSON
+      // value's own type, so without the cast the same `orderBy` gives
+      // `'10', '100', '9'` on one and `9, 10, 100` on the other.
+      //
+      // Unlike the comparison operators above, an `order by` carries no bound
+      // value whose JS type declares the intent — so the field's DECLARED type
+      // settles it. The caller passes it in (see `fieldTypes`); it has already
+      // resolved the table, so this costs no extra query and the two-query
+      // contract `filter.test.ts` pins still holds.
+      //
+      // Unknown or non-numeric fields keep the text form, which is correct for
+      // them and is what every caller without a schema still gets.
+      const fragment =
+        fieldTypes?.[key] === 'number'
+          ? jsonFieldNumeric('cells_json', key, db.dialect).sql
+          : jsonField('cells_json', key, db.dialect).sql
       parts.push(`${fragment} ${normalizedDir}`)
     }
     orderBySql = parts.join(', ')

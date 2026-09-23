@@ -121,6 +121,77 @@ describe('listDataRowsWithFilter', () => {
     expect(rows.map((r) => r.id)).toEqual(['alpha', 'beta', 'gamma', 'delta'])
   })
 
+  it('orders a declared number field numerically, not as text', async () => {
+    // 9 vs 10 vs 100 is the whole point: compared as TEXT, '10' and '100' both
+    // sort before '9'. Postgres `->>` yields text, so without the declared type
+    // this ordering was wrong there while looking right under SQLite.
+    const numDb = await freshDb()
+    for (const [id, price] of [['cheap', 9], ['mid', 10], ['dear', 100]] as const) {
+      await numDb`
+        insert into data_rows (id, table_id, cells_json, slug, status, author_user_id)
+        values (${id}, ${'posts'}, ${{ title: id, price }}, ${id}, ${'published'}, ${USER_ID})
+      `
+    }
+
+    const typed = await listDataRowsWithFilter(numDb, 'posts', {
+      orderBy: { price: 'asc' },
+      fieldTypes: { price: 'number' },
+    })
+    expect(typed.rows.map((r) => r.id)).toEqual(['cheap', 'mid', 'dear'])
+
+    const descending = await listDataRowsWithFilter(numDb, 'posts', {
+      orderBy: { price: 'desc' },
+      fieldTypes: { price: 'number' },
+    })
+    expect(descending.rows.map((r) => r.id)).toEqual(['dear', 'mid', 'cheap'])
+  })
+
+  it('emits a numeric cast in the ORDER BY only for declared number fields', async () => {
+    // The assertion that actually pins the fix. The ordering test above passes
+    // on SQLite either way — `json_extract` already yields a native number
+    // there, which is exactly why the Postgres bug went unnoticed. What changed
+    // is the SQL, so the SQL is what gets checked.
+    const captured: string[] = []
+    const spy = ((strings: TemplateStringsArray, ...values: unknown[]) =>
+      db(strings, ...values)) as DbClient
+    spy.unsafe = (sql: string, params?: unknown[]) => {
+      captured.push(sql)
+      return db.unsafe(sql, params)
+    }
+    spy.transaction = (cb) => db.transaction(cb)
+    const spied = Object.assign(spy, { dialect: db.dialect })
+
+    await listDataRowsWithFilter(spied, 'posts', {
+      orderBy: { price: 'asc' },
+      fieldTypes: { price: 'number' },
+    })
+    expect(captured.some((sql) => /order by\s+cast\(/i.test(sql))).toBe(true)
+
+    // A text field must NOT be cast — casting it would error on Postgres.
+    captured.length = 0
+    await listDataRowsWithFilter(spied, 'posts', {
+      orderBy: { title: 'asc' },
+      fieldTypes: { title: 'text' },
+    })
+    expect(captured.some((sql) => /order by\s+cast\(/i.test(sql))).toBe(false)
+
+    // And an unknown field falls back to the text form rather than guessing.
+    captured.length = 0
+    await listDataRowsWithFilter(spied, 'posts', { orderBy: { price: 'asc' } })
+    expect(captured.some((sql) => /order by\s+cast\(/i.test(sql))).toBe(false)
+  })
+
+  it('keeps the two-query budget when field types are supplied', async () => {
+    // The declared types come from the caller, which has already resolved the
+    // table — so ordering numerically must not cost a third round-trip.
+    const counted = countingDb(db)
+    await listDataRowsWithFilter(counted.db, 'posts', {
+      orderBy: { price: 'asc' },
+      fieldTypes: { price: 'number' },
+    })
+    expect(counted.counts.unsafe).toBe(2)
+  })
+
   it('issues a bounded number of queries that does NOT scale with row count', async () => {
     // Small dataset.
     const small = countingDb(db)

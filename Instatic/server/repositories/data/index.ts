@@ -34,6 +34,7 @@ export {
   listDataRowSeqs,
   listChangedDataRowRefsSince,
   listDataRowsWithFilter,
+  fieldTypesOf,
   searchDataRows,
   getDataRow,
   getDataRowMany,
