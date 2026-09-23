@@ -98,7 +98,7 @@ export async function handleCmsRequest(
     ?? (await handleSiteRoutes(req, db))
     // The transactional whole-document save — must run before the pages/
     // components/layouts GET handlers only for tidiness; paths are distinct.
-    ?? (await handleSiteDocumentRoutes(req, db))
+    ?? (await handleSiteDocumentRoutes(req, db, options))
     ?? (await handlePagesRoutes(req, db))
     ?? (await handleComponentsRoutes(req, db))
     ?? (await handleLayoutsRoutes(req, db))

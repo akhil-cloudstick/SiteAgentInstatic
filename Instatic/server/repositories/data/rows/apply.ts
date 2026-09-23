@@ -71,6 +71,16 @@ export interface ApplyDataRowChangesInput {
 export interface ApplyDataRowChangesResult {
   /** True when any soft-deleted row was published (caller bumps the publish version AFTER commit). */
   deletedPublished: boolean
+  /**
+   * The published rows this call soft-deleted, by id and slug.
+   *
+   * Carried out because bumping the publish version only clears the in-memory
+   * render cache. The baked file on disk is read BEFORE any database query, so a
+   * deleted page keeps being served from it until the next full publish unless
+   * somebody removes it — and to remove it you need the slug, which is gone from
+   * the row by the time the caller could look it up.
+   */
+  deletedPublishedRows: { id: string; slug: string }[]
 }
 
 /** Stamp the sync seq on a row. Deliberately no `deleted_at` filter — soft-deleted rows are stamped too. */
@@ -92,6 +102,7 @@ export async function applyDataRowChangesInTx(
   { tableId, writes, deleteIds, actorUserId, seq }: ApplyDataRowChangesInput,
 ): Promise<ApplyDataRowChangesResult> {
   let deletedPublished = false
+  const deletedPublishedRows: { id: string; slug: string }[] = []
 
   const existing = await listDataRowIdSlugs(tx, tableId)
   const existingSlugById = new Map(existing.map((r) => [r.id, r.slug]))
@@ -107,7 +118,13 @@ export async function applyDataRowChangesInTx(
     const deleted = await softDeleteDataRow(tx, rowId, actorUserId, { collabInternal: true })
     if (!deleted) continue
     await stampDataRowSeq(tx, rowId, seq)
-    if (deleted.status === 'published') deletedPublished = true
+    if (deleted.status === 'published') {
+      deletedPublished = true
+      // The slug is captured HERE because it is the only moment it is known:
+      // after the transaction the row is soft-deleted and the caller has no way
+      // back to the address its baked file sits at.
+      deletedPublishedRows.push({ id: rowId, slug: existingSlugById.get(rowId) ?? deleted.slug })
+    }
   }
 
   // 2. Write rows. Slug-changing updates park on '' (exempt from the unique
@@ -151,7 +168,7 @@ export async function applyDataRowChangesInTx(
     await updateDataRowSlug(tx, write.id, write.slug)
   }
 
-  return { deletedPublished }
+  return { deletedPublished, deletedPublishedRows }
 }
 
 /**

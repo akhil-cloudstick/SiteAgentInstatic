@@ -87,8 +87,9 @@ import {
 import { badRequest, jsonResponse, methodNotAllowed, readValidatedBody } from '../../http'
 import { Value } from '@sinclair/typebox/value'
 import { bumpPublishVersionSerialized } from '../../publish/publishState'
+import { removeDataRowArtefact } from '../../publish/publishRow'
 import { Type, type Static } from '@core/utils/typeboxHelpers'
-import { CMS_API_PREFIX } from './shared'
+import { CMS_API_PREFIX, type CmsHandlerOptions } from './shared'
 import { ForbiddenSiteChangeError, validateSiteWriteDiff } from '../../writePolicy/siteDiff'
 import { validatePageWriteDiff } from '../../writePolicy/pageDiff'
 
@@ -220,7 +221,11 @@ async function describeInvalidBody(probe: Request): Promise<string> {
   return `Invalid request body (${detail}${errors.length > 1 ? ` +${errors.length - 1} more` : ''})`
 }
 
-export async function handleSiteDocumentRoutes(req: Request, db: DbClient): Promise<Response | null> {
+export async function handleSiteDocumentRoutes(
+  req: Request,
+  db: DbClient,
+  options: CmsHandlerOptions = {},
+): Promise<Response | null> {
   const url = new URL(req.url)
   if (url.pathname !== `${CMS_API_PREFIX}/site-document`) return null
   if (req.method !== 'PUT') return methodNotAllowed()
@@ -395,6 +400,7 @@ export async function handleSiteDocumentRoutes(req: Request, db: DbClient): Prom
 
     let seq = 0
     let deletedPublishedPage = false
+    let deletedPublishedPages: { id: string; slug: string }[] = []
     await serializeCollabAwareWrite(async () => {
       await db.transaction(async (tx) => {
       // Allocate FIRST: the counter-row UPDATE takes a row lock, so two
@@ -461,6 +467,7 @@ export async function handleSiteDocumentRoutes(req: Request, db: DbClient): Prom
           actorUserId: user.id, seq,
         })
         deletedPublishedPage = pagesResult.deletedPublished
+        deletedPublishedPages = pagesResult.deletedPublishedRows
       }
       })
 
@@ -486,6 +493,25 @@ export async function handleSiteDocumentRoutes(req: Request, db: DbClient): Prom
     // need that lane, so acquiring the locks in the opposite order could
     // deadlock. The database transaction and sync invalidations are complete.
     if (deletedPublishedPage) await bumpPublishVersionSerialized()
+
+    // Remove the baked files too. Bumping the publish version only clears the
+    // in-memory render cache (Layer B); the static file on disk (Layer A) is
+    // read BEFORE any database query, so a page deleted here carried on being
+    // served from it until somebody ran a full publish. The row-delete endpoint
+    // and the status-change endpoint have always pruned — this path, which is
+    // how the editor deletes a page, never did.
+    //
+    // Best-effort and after the commit, matching the two handlers that already
+    // do it: a disk error must not fail a save that is already durable, and the
+    // next full publish rebuilds the slot regardless.
+    if (options.uploadsDir && deletedPublishedPages.length > 0) {
+      const uploadsDir = options.uploadsDir
+      for (const page of deletedPublishedPages) {
+        await removeDataRowArtefact(db, uploadsDir, page.id, page.slug).catch((err) => {
+          console.error('[publish:row] failed to remove artefact for deleted page', page.id, err)
+        })
+      }
+    }
 
     return jsonResponse({ ok: true, seq })
   } catch (err) {
