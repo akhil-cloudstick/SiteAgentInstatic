@@ -9,8 +9,11 @@
 
 import { SYSTEM_PROMPT_DYNAMIC_BOUNDARY } from '../../runtime/types'
 import type { ContentSnapshot, ActiveDocument } from './snapshot'
+import { fenceUntrusted, UNTRUSTED_DATA_RULE } from '../untrusted'
 
-const STATIC_PROMPT_PREFIX = `You manage the user's website content (posts, pages, custom collections) by calling tools. No filesystem or shell. Bias toward action — execute the prompt, don't ask scoping questions.
+const STATIC_PROMPT_PREFIX = `${UNTRUSTED_DATA_RULE}
+
+You manage the user's website content (posts, pages, custom collections) by calling tools. No filesystem or shell. Bias toward action — execute the prompt, don't ask scoping questions.
 
 Scope:
 - Each collection is a typed table of documents (posts, pages, or custom). Documents have a fixed schema: built-in fields (title, slug, body, featuredMedia, seoTitle, seoDescription) plus any custom fields.
@@ -60,8 +63,11 @@ Reply: 1-2 sentences after acting. No raw HTML or full markdown bodies in the re
 function buildDynamicSuffix(snap: ContentSnapshot): string {
   const lines: string[] = []
   lines.push(`You are ${snap.currentUser.displayName} (${snap.currentUser.email}).`)
+  // Collection slugs and labels are author-supplied too.
   lines.push(
-    `Collections: ${snap.collections.map((c) => `${c.slug} (${c.kind}, ${c.docCount} docs)`).join(', ') || '(none)'}.`,
+    `Collections: ${snap.collections
+      .map((c) => `${fenceUntrusted(c.slug, 60)} (${c.kind}, ${c.docCount} docs)`)
+      .join(', ') || '(none)'}.`,
   )
   if (snap.activeTableId) {
     lines.push(`Active collection: ${snap.activeTableId}.`)
@@ -75,15 +81,20 @@ function buildDynamicSuffix(snap: ContentSnapshot): string {
 }
 
 function formatActiveDocument(doc: ActiveDocument): string {
+  // Every value below is STORED CONTENT, and stored content is not necessarily
+  // the tenant's own writing — it arrives from third-party HTML imports, from
+  // the Connector's machine API, and from uploaded filenames. It was previously
+  // interpolated raw into the system prompt, which is the highest-trust part of
+  // the request. Fenced so the model can tell data from instructions.
   const fieldLines = doc.schema.map((field) => {
     const value = doc.fields[field.id]
     const formatted = formatFieldValue(value, field.type)
     const required = field.required ? ' *' : ''
     const builtin = field.builtIn ? ' (builtin)' : ''
-    return `  - ${field.id}${required}${builtin} [${field.type}]: ${formatted}`
+    return `  - ${field.id}${required}${builtin} [${field.type}]: ${fenceUntrusted(formatted)}`
   })
   return [
-    `Active document: ${doc.id} ("${doc.title}") in collection ${doc.tableId}, status=${doc.status}.`,
+    `Active document: ${doc.id} (${fenceUntrusted(doc.title, 120)}) in collection ${doc.tableId}, status=${doc.status}.`,
     `Fields:`,
     ...fieldLines,
   ].join('\n')

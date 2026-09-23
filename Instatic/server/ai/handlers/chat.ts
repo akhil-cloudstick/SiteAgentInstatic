@@ -68,6 +68,7 @@ import {
 } from '../tools/site'
 import {
   buildContentSystemPrompt,
+  ContentSnapshotSchema,
   type ContentSnapshot,
 } from '../tools/content'
 import {
@@ -616,7 +617,20 @@ function buildScopePrompt(scope: ToolScope, snapshot: unknown): string[] {
     return buildSiteSystemPrompt(result.value)
   }
   if (scope === 'content') {
-    return buildContentSystemPrompt((snapshot ?? emptyContentSnapshot()) as ContentSnapshot)
+    if (snapshot === undefined || snapshot === null) {
+      return buildContentSystemPrompt(emptyContentSnapshot())
+    }
+    // Validated for the same reason the site branch above is, and it was the
+    // one that needed it more: this snapshot's values are interpolated into the
+    // SYSTEM prompt — collection labels, the active document's title, its field
+    // values — which is the highest-trust position in the request. It used to
+    // be a bare `as ContentSnapshot` cast over the untyped HTTP body.
+    const result = safeParseValue(ContentSnapshotSchema, snapshot)
+    if (!result.ok) {
+      console.error('[ai/chat] invalid content snapshot, using empty fallback:', result.errors)
+      return buildContentSystemPrompt(emptyContentSnapshot())
+    }
+    return buildContentSystemPrompt(result.value as ContentSnapshot)
   }
   // Other scopes don't have system prompts yet. The driver gets a minimal
   // prompt so the conversation isn't completely contextless.

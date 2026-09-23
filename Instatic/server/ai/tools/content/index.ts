@@ -20,3 +20,4 @@ export const contentTools: AiTool[] = [
 
 export { buildContentSystemPrompt } from './systemPrompt'
 export type { ContentSnapshot } from './snapshot'
+export { ContentSnapshotSchema } from './snapshot'

@@ -14,6 +14,7 @@
 import { Type, type Static } from '@core/utils/typeboxHelpers'
 import type { CoreCapability } from '@core/capabilities'
 import type { AiTool } from '../types'
+import { fenceUntrusted } from '../untrusted'
 import {
   getDataRow,
   listDataAuthorOptions,
@@ -356,10 +357,14 @@ const listMediaTool: AiTool = {
       total: filtered.length,
       media: filtered.slice(0, limit).map((m) => ({
         id: m.id,
-        filename: m.filename,
+        // `filename` and `altText` are caller-chosen strings — the upload tool
+        // takes both verbatim and the extension is ignored for storage, so the
+        // name is a display string an uploader picked. Fenced so a filename
+        // written as an instruction reaches the model as data.
+        filename: fenceUntrusted(m.filename, 160),
         publicPath: m.publicPath,
         mimeType: m.mimeType,
-        altText: m.altText,
+        altText: m.altText == null ? m.altText : fenceUntrusted(m.altText, 160),
         width: m.width,
         height: m.height,
       })),
