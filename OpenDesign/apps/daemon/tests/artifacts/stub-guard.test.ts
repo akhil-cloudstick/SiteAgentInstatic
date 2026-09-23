@@ -430,3 +430,97 @@ describe('ArtifactRegressionError', () => {
     expect(err.priorName).toBe('dashboard.html');
   });
 });
+
+describe('a scan that cannot run is not a clean bill of health', () => {
+  // The guard answers "is this write about to replace something bigger?" by
+  // listing the directory. When that listing fails it used to return an empty
+  // array, and an empty array is the FIRST thing `classifyArtifactStubGuard`
+  // treats as `pass` — so an unreadable directory full of real work reported
+  // exactly the same as a fresh empty one, and a placeholder could overwrite a
+  // finished document unchallenged.
+
+  it('still treats a directory that does not exist as genuinely empty', async () => {
+    // ENOENT is the ordinary case — a first write into a folder that is not
+    // there yet really does have no priors to protect. It must stay cheap.
+    const priors = await findPriorArtifactSiblings('/nonexistent/od/scan/missing', 'dashboard');
+    expect(priors).toEqual([]);
+  });
+
+  it('refuses to answer when the path cannot be listed at all', async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), 'od-stub-scan-'));
+    try {
+      // A FILE where a directory is expected: readdir fails with ENOTDIR, which
+      // is "I could not look", not "there is nothing here".
+      const notADir = path.join(dir, 'a-file.html');
+      await writeFile(notADir, '<html>real work</html>', 'utf8');
+      await expect(findPriorArtifactSiblings(notADir, 'report')).rejects.toThrow(
+        /Could not scan/,
+      );
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('reports the failure rather than passing, and stays at the guard\'s own strictness', async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), 'od-stub-scan-'));
+    try {
+      const notADir = path.join(dir, 'a-file.html');
+      await writeFile(notADir, '<html>real work</html>', 'utf8');
+
+      // Default mode is `warn`. A transient filesystem error must not become an
+      // outage by refusing every write, so the guard warns rather than rejects.
+      const warned = await evaluateArtifactStubGuard({
+        scanDir: notADir,
+        identifier: 'report',
+        newSize: 10,
+        config: { ...DEFAULT_ARTIFACT_STUB_GUARD_CONFIG, mode: 'warn' },
+      });
+      expect(warned.outcome).toBe('warn');
+      expect(warned.scanFailed?.scanDir).toBe(notADir);
+      // Crucially NOT a pass, which is what it used to be.
+      expect(warned.outcome).not.toBe('pass');
+
+      // An operator who asked for `reject` gets a refusal: they have said they
+      // would rather fail a write than risk replacing something unseen.
+      const rejected = await evaluateArtifactStubGuard({
+        scanDir: notADir,
+        identifier: 'report',
+        newSize: 10,
+        config: { ...DEFAULT_ARTIFACT_STUB_GUARD_CONFIG, mode: 'reject' },
+      });
+      expect(rejected.outcome).toBe('reject');
+      expect(rejected.scanFailed).toBeTruthy();
+
+      // `off` means off, even here.
+      const disabled = await evaluateArtifactStubGuard({
+        scanDir: notADir,
+        identifier: 'report',
+        newSize: 10,
+        config: { ...DEFAULT_ARTIFACT_STUB_GUARD_CONFIG, mode: 'off' },
+      });
+      expect(disabled.outcome).toBe('pass');
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('carries no fabricated prior sizes, because it never saw one', async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), 'od-stub-scan-'));
+    try {
+      const notADir = path.join(dir, 'a-file.html');
+      await writeFile(notADir, '<html>real work</html>', 'utf8');
+      const result = await evaluateArtifactStubGuard({
+        scanDir: notADir,
+        identifier: 'report',
+        newSize: 10,
+        config: { ...DEFAULT_ARTIFACT_STUB_GUARD_CONFIG, mode: 'warn' },
+      });
+      // The warning shape demands priorSize/priorName; inventing them would be
+      // the guard asserting something it does not know.
+      expect(result.warning).toBeUndefined();
+      expect(result.scanFailed?.reason).toBeTruthy();
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+});

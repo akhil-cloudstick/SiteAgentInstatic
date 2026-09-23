@@ -45,6 +45,33 @@ export interface EvaluateArtifactStubGuardInput {
 export interface EvaluateArtifactStubGuardResult {
   outcome: 'pass' | 'warn' | 'reject';
   warning?: ArtifactStubGuardWarning;
+  /**
+   * Set when the guard could not read the directory it needed to inspect.
+   *
+   * Its own channel rather than a `warning`, because `ArtifactStubGuardWarning`
+   * requires a `priorSize` and a `priorName` — and the whole point of this state
+   * is that we do not know what the priors were. Reusing that shape would mean
+   * inventing the two numbers the caller most needs to trust.
+   */
+  scanFailed?: { scanDir: string; reason: string };
+}
+
+/**
+ * The prior-artifact scan could not be performed.
+ *
+ * Distinct from "there are no priors", which is an ordinary and common answer
+ * (a first write into a fresh directory). This one means the question went
+ * unanswered, and a guard that cannot see must not report a clean result.
+ */
+export class ArtifactPriorScanFailedError extends Error {
+  readonly code = 'ARTIFACT_PRIOR_SCAN_FAILED' as const;
+  readonly reason: string;
+  constructor(scanDir: string, cause: unknown) {
+    const reason = cause instanceof Error ? cause.message : String(cause);
+    super(`Could not scan ${scanDir} for prior artifacts: ${reason}`);
+    this.name = 'ArtifactPriorScanFailedError';
+    this.reason = reason;
+  }
 }
 
 export class ArtifactRegressionError extends Error {
@@ -187,8 +214,19 @@ export async function findPriorArtifactSiblings(
   let entries: Dirent[];
   try {
     entries = await readdir(scanDir, { withFileTypes: true });
-  } catch {
-    return [];
+  } catch (err) {
+    // "Nothing is here" and "I could not look" are different answers, and this
+    // used to give the same one for both. An empty result means `pass` at the
+    // top of `classifyArtifactStubGuard`, so an unreadable directory turned the
+    // overwrite guard into a no-op and a placeholder could replace a real
+    // document unchallenged.
+    //
+    // ENOENT genuinely is empty — a first write into a directory that does not
+    // exist yet has no priors to protect, and that is the common case. Anything
+    // else (EACCES, EMFILE, EIO on a directory that DOES exist and may be full
+    // of work) is a failure to determine, and is reported as one.
+    if ((err as NodeJS.ErrnoException)?.code === 'ENOENT') return [];
+    throw new ArtifactPriorScanFailedError(scanDir, err);
   }
   const results: PriorArtifactSibling[] = [];
   for (const entry of entries) {
@@ -299,6 +337,20 @@ export async function evaluateArtifactStubGuard(
 ): Promise<EvaluateArtifactStubGuardResult> {
   if (input.config.mode === 'off') return { outcome: 'pass' };
   if (input.identifier.length === 0) return { outcome: 'pass' };
-  const priors = await findPriorArtifactSiblings(input.scanDir, input.identifier);
+  let priors: PriorArtifactSibling[];
+  try {
+    priors = await findPriorArtifactSiblings(input.scanDir, input.identifier);
+  } catch (err) {
+    if (!(err instanceof ArtifactPriorScanFailedError)) throw err;
+    // A scan that could not run is not evidence of safety. It is reported at
+    // the guard's own strictness and no higher: the default mode is `warn`, so
+    // refusing every write because a directory was briefly unreadable would be
+    // stricter than the guard is when it CAN see, and would turn a transient
+    // filesystem error into an outage.
+    return {
+      outcome: input.config.mode === 'reject' ? 'reject' : 'warn',
+      scanFailed: { scanDir: input.scanDir, reason: err.reason },
+    };
+  }
   return classifyArtifactStubGuard(priors, input.identifier, input.newSize, input.config);
 }

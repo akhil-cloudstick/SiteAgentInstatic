@@ -28,6 +28,7 @@ import {
   assertArtifactPublicationAllowed,
   isPublicationGuardedArtifactKind,
 } from './artifacts/publication-guard.js';
+import { ArtifactManifestInvalidError } from './artifacts/create.js';
 import { normalizeArtifactRuntimeImports } from './artifacts/runtime-compat.js';
 import { isIgnoredProjectDirName } from './project-ignored-dirs.js';
 import {
@@ -889,7 +890,22 @@ export async function writeProjectFile(
   let validatedManifest = null;
   if (artifactManifest && typeof artifactManifest === 'object') {
     const validated = validateArtifactManifestInput(artifactManifest, safeName);
-    if (validated.ok && validated.value) {
+    // A manifest that fails validation REFUSES the write.
+    //
+    // It used to fall through: the failed result was discarded, the publication
+    // guard and the stub-regression guard below were both skipped, the file was
+    // written, and the caller got a 200. So the one input that should have been
+    // treated with most suspicion was the one that bypassed every check — and it
+    // also left no sidecar behind, which then degraded the NEXT write's
+    // identifier lookup.
+    //
+    // `resolveCreateArtifactManifest` in ./artifacts/create.ts throws on exactly
+    // this condition; the asymmetry between the two was the bug, not a policy.
+    // The route layer already maps this error by code to a 400.
+    if (!validated.ok) {
+      throw new ArtifactManifestInvalidError(validated.error);
+    }
+    if (validated.value) {
       validatedManifest = validated.value;
       // Publication guard: HTML/deck artifacts that still contain template
       // placeholders (e.g. pitch-deck `Name to confirm`, `$X.XM`) must not
@@ -924,6 +940,23 @@ export async function writeProjectFile(
               `newSize=${guard.warning.newSize} priorSize=${guard.warning.priorSize} ` +
               `priorName=${guard.warning.priorName} project=${projectId}`,
           );
+        }
+        // The guard could not read the directory it needed. Said out loud in
+        // both directions — every `warning` branch above and below is gated on
+        // `guard.warning`, which this state deliberately does not carry, so
+        // without this it would pass through completely silently.
+        if (guard.scanFailed) {
+          console.warn(
+            `[stub-guard] ${guard.outcome} could not scan ${guard.scanFailed.scanDir} ` +
+              `(${guard.scanFailed.reason}) identifier=${identifier} project=${projectId}`,
+          );
+          if (guard.outcome === 'reject') {
+            throw new ArtifactRegressionError(
+              `Could not check ${identifier} against prior artifacts: ${guard.scanFailed.reason}. ` +
+                'Refusing the write rather than overwriting what could not be inspected.',
+              { identifier, newSize: Buffer.byteLength(body), priorSize: 0, priorName: '' },
+            );
+          }
         }
         if (guard.outcome === 'reject' && guard.warning) {
           throw new ArtifactRegressionError(guard.warning.message, {

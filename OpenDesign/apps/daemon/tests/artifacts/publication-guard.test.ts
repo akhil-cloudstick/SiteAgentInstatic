@@ -27,7 +27,7 @@ const htmlManifest = {
 };
 
 const markdownManifest = {
-  kind: 'markdown',
+  kind: 'markdown-document',
   renderer: 'markdown',
   title: 'Notes',
   exports: ['md'],
