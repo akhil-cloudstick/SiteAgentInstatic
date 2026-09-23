@@ -37,6 +37,23 @@ interface NewTableDialogProps {
   variant?: 'table' | 'collection'
 }
 
+/**
+ * Wording per variant.
+ *
+ * `variant` was declared on the props and then never read, so Content's "New
+ * collection" button opened a dialog headed "New table", asking for a "Table
+ * name", with a "Create table" button. The prop existed precisely to prevent
+ * that; this is what it was supposed to drive.
+ */
+const VARIANT_COPY = {
+  table: { title: 'New table', submit: 'Create table', nameLabel: 'Table name' },
+  collection: {
+    title: 'New collection',
+    submit: 'Create collection',
+    nameLabel: 'Collection name',
+  },
+} as const
+
 /** The reference's two kinds, in its wording. */
 const KIND_OPTIONS: ReadonlyArray<{ value: DataTableKind; label: string }> = [
   { value: 'data', label: 'Plain data' },
@@ -112,7 +129,9 @@ export function NewTableDialog({
   onClose,
   onCreate,
   tables,
+  variant = 'table',
 }: NewTableDialogProps): ReactElement {
+  const copy = VARIANT_COPY[variant]
   const [name, setName] = useState('')
   const [kind, setKind] = useState<DataTableKind>('data')
   const [fieldLabel, setFieldLabel] = useState('')
@@ -156,13 +175,13 @@ export function NewTableDialog({
     <Dialog
       open={open}
       onClose={onClose}
-      title="New table"
+      title={copy.title}
       size="sm"
       footer={(
         <>
           <Button variant="ghost" onClick={onClose} disabled={saving}>Cancel</Button>
           <Button variant="primary" onClick={() => { void handleCreate() }} disabled={!canCreate}>
-            Create table
+            {copy.submit}
           </Button>
         </>
       )}
@@ -174,7 +193,7 @@ export function NewTableDialog({
       </p>
 
       <div className={styles.fieldControl}>
-        <label className={styles.label} htmlFor="new-table-name">Table name</label>
+        <label className={styles.label} htmlFor="new-table-name">{copy.nameLabel}</label>
         <Input
           id="new-table-name"
           autoFocus

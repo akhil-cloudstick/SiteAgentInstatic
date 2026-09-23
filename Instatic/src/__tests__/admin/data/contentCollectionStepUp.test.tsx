@@ -192,9 +192,15 @@ describe('Content collection step-up flow', () => {
     expect(() => getContentBridgeHandle()).not.toThrow()
 
     fireEvent.click(await screen.findByRole('button', { name: 'New collection' }))
+    // Collection wording throughout — the dialog is NewTableDialog with
+    // `variant="collection"`. That prop used to be ignored, so this opened
+    // headed "New table" with a "Create table" button; the component now reads
+    // it, which is what this asserts.
     const dialog = await screen.findByRole('dialog', { name: 'New collection' })
-    fireEvent.change(within(dialog).getByLabelText('Name'), { target: { value: 'Products' } })
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Create' }))
+    fireEvent.change(within(dialog).getByLabelText('Collection name'), {
+      target: { value: 'Products' },
+    })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Create collection' }))
 
     // The raw error code must never reach the UI — the step-up dialog opens instead.
     expect(await screen.findByTestId('step-up-dialog')).toBeTruthy()
