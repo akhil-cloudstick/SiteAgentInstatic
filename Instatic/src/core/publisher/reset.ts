@@ -68,6 +68,23 @@ export const PUBLISHER_RESET_CSS = [
     ' -moz-osx-font-smoothing: grayscale;' +
     ' }',
 
+  // `min-height`, restored — and deliberately NOT `height`.
+  //
+  // Without a floor on the body box, `position: sticky` inside it has nothing to
+  // stick within: a sticky nav or sidebar comes unstuck after roughly one screen
+  // of scroll. This line was added for exactly that reason and was removed by the
+  // upstream 0.0.7 → 0.0.14 merge, which replaced it with the "natural height"
+  // approach above. `resetLineHeight.test.ts` has been failing ever since, which
+  // is the whole value of having written it down as a test.
+  //
+  // The half that is NOT coming back is `:where(html) { height: 100% }`. The
+  // comment above is right that constraining both roots makes an authored
+  // `overflow-x: hidden` turn <body> into a viewport-height scroll container and
+  // hides page scrolling from window-level listeners. `min-height` on body alone
+  // sets a floor without capping anything, so the body still grows with its
+  // content and both concerns hold at once.
+  ':where(body) { min-height: 100%; }',
+
   // Media defaults — block-level + responsive by default, so images don't
   // overflow their containers and don't sit on a baseline by accident.
   // `height: auto` is critical: the publisher emits `width` and `height`

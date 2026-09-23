@@ -22,13 +22,13 @@ export const GLOBALS_CSS = join(SRC_ROOT, 'styles/globals.css')
 /** Shared base layer: `:root`, the dark block, the two-row shell geometry. */
 export const SHARED_TOKENS_CSS = join(
   SRC_ROOT,
-  '../../../OpenDesign/packages/mms-shell/src/styles/tokens.css',
+  '../../OpenDesign/packages/mms-shell/src/styles/tokens.css',
 )
 
 /** Shared self-hosted font faces. */
 export const SHARED_FONTS_CSS = join(
   SRC_ROOT,
-  '../../../OpenDesign/packages/mms-shell/src/styles/fonts.css',
+  '../../OpenDesign/packages/mms-shell/src/styles/fonts.css',
 )
 
 /** Every file that may legitimately declare a token, newest layer last. */
