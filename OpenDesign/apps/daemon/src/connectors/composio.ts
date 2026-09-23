@@ -9,6 +9,26 @@ import { COMPOSIO_CURATION_OVERLAY } from './composio-curation.js';
 import { getComposioToolkitMetadata } from './composio-descriptions.js';
 import { ConnectorServiceError, type ConnectorCredentialMaterial } from './service.js';
 
+/**
+ * Opt-in for growing a connector's execution allowlist from provider metadata.
+ *
+ * Off by default (security item E2). See the note at the `autoAllowedLiveToolNames`
+ * call site for what the risk actually is; in short, the classifier that decides
+ * eligibility reads provider-supplied strings, so leaving it on means the remote
+ * side influences which tools are executable.
+ *
+ * Any other value — unset, empty, "false", "0" — means off. A flag that widens
+ * permissions only ever does so when it is switched on unambiguously.
+ */
+export const CONNECTOR_AUTO_ALLOW_ENV = 'OD_CONNECTOR_AUTO_ALLOW_LIVE_TOOLS';
+
+export function connectorAutoAllowEnabled(
+  env: Record<string, string | undefined> = process.env,
+): boolean {
+  const raw = env[CONNECTOR_AUTO_ALLOW_ENV];
+  return typeof raw === 'string' && ['1', 'true', 'yes', 'on'].includes(raw.trim().toLowerCase());
+}
+
 const DEFAULT_COMPOSIO_BASE_URL = 'https://backend.composio.dev';
 const DEFAULT_COMPOSIO_TIMEOUT_MS = 30_000;
 const DEFAULT_COMPOSIO_USER_ID = 'open-design-local-user';
@@ -1068,9 +1088,26 @@ export class ComposioConnectorProvider {
       ...staticDefinition.tools.map((tool) => mergeToolDefinition(tool, liveToolsByName.get(tool.name))),
       ...liveTools.filter((tool) => !staticToolNames.has(tool.name)),
     ];
-    const autoAllowedLiveToolNames = liveTools
-      .filter((tool) => tool.refreshEligible)
-      .map((tool) => tool.name);
+    // Auto-allowing live tools widens an EXECUTION allowlist using strings the
+    // remote provider supplies.
+    //
+    // `refreshEligible` resolves through `isRefreshEligibleConnectorToolSafety`
+    // → `classifyConnectorToolSafety`, which decides by regex-matching the
+    // tool's name, required scopes and description — all provider-controlled,
+    // for a tool the static catalog never listed. Two things keep that from
+    // being a hole and both must stay: the classifier defaults to
+    // `write`/`confirm` ("Tool safety could not be proven read-only"), and
+    // `ConnectorService.execute` re-derives safety at call time.
+    //
+    // The residual risk is narrow and real: a genuinely write-capable tool whose
+    // name and description READ as a read is auto-added and passes the execution
+    // re-check too, because both consult the same provider strings. The
+    // mitigation is defence-in-depth against the classifier, not independent of
+    // it — so the widening is now opt-in and off by default, leaving the static
+    // catalog as the trustworthy baseline it was designed to be.
+    const autoAllowedLiveToolNames = connectorAutoAllowEnabled()
+      ? liveTools.filter((tool) => tool.refreshEligible).map((tool) => tool.name)
+      : [];
     const allowedToolNames = [...new Set([...staticDefinition.allowedToolNames, ...autoAllowedLiveToolNames])];
     // `curatedToolNames` mirrors the static catalog ONLY — it
     // intentionally never picks up `autoAllowedLiveToolNames`. It

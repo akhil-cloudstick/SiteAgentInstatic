@@ -52,12 +52,70 @@ function isReasoningPolicy(value: unknown): value is Partial<ReasoningExecutionP
   return Boolean(value && typeof value === 'object' && !Array.isArray(value));
 }
 
-function policyMode(policy: unknown): ReasoningExecutionMode | 'invalid' {
-  if (policy === undefined) return 'enabled';
+export const REASONING_EGRESS_POLICY_ENV = 'OD_REASONING_EGRESS_POLICY';
+
+/**
+ * The policy the SERVER imposes, read from its own environment.
+ *
+ * This exists because the policy used to arrive entirely in the request body
+ * (`routes/chat.ts`, `import-export-routes.ts` pass `body.reasoningExecution`),
+ * and an omitted field meant `'enabled'` — so a caller that simply left it out
+ * was unrestricted. A restriction the caller chooses is not a restriction; the
+ * PRD is explicit that "refused" means the *server* refuses.
+ *
+ * Unset means no server-imposed policy, which leaves the previous behaviour
+ * intact for deployments that never configured one. That is deliberate: this
+ * change closes the "caller can widen" hole without silently switching egress
+ * off for every existing install. A malformed value is NOT treated as unset —
+ * it refuses, because a policy nobody can parse is not a policy.
+ */
+export function serverReasoningEgressPolicy(
+  env: Record<string, string | undefined> = process.env,
+): Partial<ReasoningExecutionPolicy> | 'invalid' | null {
+  const raw = env[REASONING_EGRESS_POLICY_ENV];
+  if (typeof raw !== 'string' || !raw.trim()) return null;
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return isReasoningPolicy(parsed) ? parsed : 'invalid';
+  } catch {
+    return 'invalid';
+  }
+}
+
+/** Rank of a mode's strictness — the stricter of two policies wins. */
+const MODE_RANK: Record<ReasoningExecutionMode, number> = {
+  enabled: 0,
+  allowlist: 1,
+  disabled: 2,
+};
+
+function rawMode(policy: unknown): ReasoningExecutionMode | 'invalid' | 'absent' {
+  if (policy === undefined || policy === null) return 'absent';
   if (!isReasoningPolicy(policy)) return 'invalid';
+  if (policy.mode === undefined) return 'absent';
   return policy.mode === 'enabled' || policy.mode === 'disabled' || policy.mode === 'allowlist'
     ? policy.mode
     : 'invalid';
+}
+
+/**
+ * Effective mode = the STRICTER of the server's and the caller's.
+ *
+ * The caller may narrow its own egress and may not widen it. With no server
+ * policy configured the caller's own value still applies exactly as before, and
+ * an absent caller policy under a configured server policy takes the server's
+ * — which is the case that used to read as `'enabled'`.
+ */
+function policyMode(policy: unknown, serverPolicy?: unknown): ReasoningExecutionMode | 'invalid' {
+  const caller = rawMode(policy);
+  if (caller === 'invalid') return 'invalid';
+
+  const server = rawMode(serverPolicy);
+  if (server === 'invalid') return 'invalid';
+
+  if (server === 'absent') return caller === 'absent' ? 'enabled' : caller;
+  if (caller === 'absent') return server;
+  return MODE_RANK[caller] >= MODE_RANK[server] ? caller : server;
 }
 
 export function normalizeReasoningBaseUrl(value: string): string | null {
@@ -149,25 +207,51 @@ function allowedModelSet(policy: Partial<ReasoningExecutionPolicy>, provider: st
   );
 }
 
-export function authorizeReasoningEgress(args: ReasoningEgressRequest): ReasoningEgressDenial | null {
-  const mode = policyMode(args.policy);
+/** Everything in `caller` that `server` also permits. Empty server set = no server limit. */
+function intersect(callerSet: Set<string>, serverSet: Set<string>): Set<string> {
+  if (serverSet.size === 0) return callerSet;
+  if (callerSet.size === 0) return serverSet;
+  return new Set([...callerSet].filter((value) => serverSet.has(value)));
+}
+
+export function authorizeReasoningEgress(
+  args: ReasoningEgressRequest,
+  serverPolicyInput: Partial<ReasoningExecutionPolicy> | 'invalid' | null = serverReasoningEgressPolicy(),
+): ReasoningEgressDenial | null {
+  // A server policy that cannot be parsed refuses outright. A configuration
+  // nobody can read is not permission to proceed (principle P2).
+  if (serverPolicyInput === 'invalid') return invalidPolicyDenial(args);
+
+  const mode = policyMode(args.policy, serverPolicyInput ?? undefined);
   if (mode === 'enabled') return null;
   if (mode === 'invalid') return invalidPolicyDenial(args);
   if (mode === 'disabled') return disabledDenial(args);
 
   const policy = isReasoningPolicy(args.policy) ? args.policy : {};
+  const serverPolicy = serverPolicyInput ?? {};
+
+  // Either side may deny a route kind; only both together may permit one.
   if (routeIsDeniedByFlag(policy, args.routeKind)) return allowlistDenial(args);
+  if (routeIsDeniedByFlag(serverPolicy, args.routeKind)) return allowlistDenial(args);
+
+  // The effective allowlists are the INTERSECTION, so a caller can narrow what
+  // the server permits and can never add to it.
+  const baseUrls = intersect(allowedBaseUrlSet(policy), allowedBaseUrlSet(serverPolicy));
+  const models = intersect(
+    allowedModelSet(policy, args.provider),
+    allowedModelSet(serverPolicy, args.provider),
+  );
 
   const normalizedBaseUrl = args.resolvedBaseUrl
     ? normalizeReasoningBaseUrl(args.resolvedBaseUrl)
     : null;
-  if (!normalizedBaseUrl || !allowedBaseUrlSet(policy).has(normalizedBaseUrl)) {
+  if (!normalizedBaseUrl || !baseUrls.has(normalizedBaseUrl)) {
     return allowlistDenial(args);
   }
 
   if (
     args.model !== undefined
-    && !allowedModelSet(policy, args.provider).has(normalizeReasoningModelId(args.provider, args.model))
+    && !models.has(normalizeReasoningModelId(args.provider, args.model))
   ) {
     return allowlistDenial(args);
   }
