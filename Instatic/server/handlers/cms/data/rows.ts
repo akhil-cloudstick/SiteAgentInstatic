@@ -36,6 +36,7 @@ import {
   updateDataRowTable,
 } from '../../../repositories/data'
 import { publishDataRow, removeDataRowArtefact } from '../../../publish/publishRow'
+import { getRowTableRouteBase } from '../../../repositories/data/publish'
 import { runPublishFlush } from '../../../publish/publishFlush'
 import { findUserById } from '../../../repositories/users'
 import { slugForTable } from '@core/data/cells'
@@ -376,6 +377,7 @@ async function handleRowTable(
   req: Request,
   db: DbClient,
   params: RouteParams,
+  options: CmsHandlerOptions,
 ): Promise<Response> {
   const rowId = params.id
   // Cross-collection move = structurally distinct from cell-level editing.
@@ -392,8 +394,31 @@ async function handleRowTable(
   const currentRow = await loadRowForAccess(db, rowId, user, canEditDataRow)
   if (currentRow instanceof Response) return currentRow
 
+  // A move changes the row's route base, so its public URL changes — and the
+  // artefact baked at the OLD address stays on disk. Layer A is read before any
+  // database query, so that address kept serving the page at its old location
+  // while the database said it lived somewhere else. The sibling handlers here
+  // (delete, status change) have always pruned; this one never did.
+  //
+  // The old route base is read BEFORE the move and the file is removed AFTER it
+  // succeeds. Neither half is optional. Resolving the base afterwards returns
+  // the NEW table's, which would delete the page that should exist and keep the
+  // one that should not; removing the file beforehand would retract a live page
+  // that then stayed put, because a move can still fail on a slug conflict.
+  const previousRouteBase =
+    options.uploadsDir && currentRow.status === 'published'
+      ? await getRowTableRouteBase(db, rowId)
+      : null
+
   const result = await updateDataRowTable(db, rowId, body.tableId, user.id)
   if (result.ok) {
+    if (options.uploadsDir && previousRouteBase !== null) {
+      await removeDataRowArtefact(db, options.uploadsDir, rowId, currentRow.slug, previousRouteBase).catch(
+        (err) => {
+          console.error('[publish:row] failed to remove artefact for moved row', rowId, err)
+        },
+      )
+    }
     await recordRowAuditEvent(db, user, req, 'data.row.move', result.row)
     return jsonResponse({ row: result.row })
   }

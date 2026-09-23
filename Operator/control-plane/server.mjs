@@ -684,10 +684,50 @@ const sweepGrants = async () => {
       });
     }
     if (ended.length) console.log(`[act-as] ended ${ended.length} expired grant(s)`);
+    sweepFailures = 0;
   } catch (e) {
-    console.error('[act-as] expiry sweep failed:', e.message);
+    // This sweep is the ONLY thing that invalidates an expired grant — it is the
+    // statement that sets `status='removed', password_hash=null`. The products
+    // hold their own sessions, so a grant whose row survives is still an account
+    // they honour. A swallowed failure here does not delay an expiry; it cancels
+    // one, and an hour-scoped staff credential stays live for as long as the
+    // fault lasts.
+    //
+    // One failure is a blip — the next tick is five minutes away and almost
+    // always fixes it — so it stays a log line. A run of them is a stuck sweep,
+    // and that goes into the audit record, which is the durable, operator-visible
+    // place and is already append-only.
+    sweepFailures += 1;
+    console.error(`[act-as] expiry sweep failed (${sweepFailures} in a row):`, e.message);
+    if (sweepFailures === SWEEP_ALERT_AFTER) {
+      recordAdminAction({
+        admin: { id: null, email: 'control-plane', scope_level: 'platform' },
+        action: 'act_as.sweep.failing',
+        targetType: 'platform',
+        targetId: 'act-as-sweep',
+        ok: false,
+        error: e.message,
+        detail: {
+          consecutiveFailures: sweepFailures,
+          since: new Date(Date.now() - sweepFailures * 5 * 60_000).toISOString(),
+          consequence:
+            'Expired act-as grants are NOT being revoked. Any staff impersonation that has ' +
+            'passed its expiry is still a working account on the tenant until this succeeds.',
+        },
+      });
+    }
   }
 };
+/** Consecutive sweep failures. Reset on the first success. */
+let sweepFailures = 0;
+/**
+ * How many in a row before it is worth waking somebody.
+ *
+ * Three ticks is fifteen minutes — long enough that a restart or a brief
+ * database blip has passed, short enough that a grant meant to last an hour has
+ * not outlived its window by much.
+ */
+const SWEEP_ALERT_AFTER = 3;
 await sweepGrants();
 setInterval(sweepGrants, 5 * 60_000).unref();
 server.listen(config.controlPlanePort, '127.0.0.1', async () => {

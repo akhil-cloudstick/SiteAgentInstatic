@@ -179,8 +179,18 @@ export async function removeDataRowArtefact(
   uploadsDir: string,
   rowId: string,
   slug: string,
+  /**
+   * The route base to retract, when it is no longer the row's current one.
+   *
+   * A cross-collection move is the case: by the time the artefact is removed,
+   * the row already belongs to the new table, so resolving the base from the
+   * row would name the NEW path — deleting the page that should exist and
+   * leaving the stale one serving. The caller reads the old base before the
+   * move and passes it here.
+   */
+  routeBaseOverride?: string,
 ): Promise<void> {
-  const routeBase = await getRowTableRouteBase(db, rowId)
+  const routeBase = routeBaseOverride ?? (await getRowTableRouteBase(db, rowId))
   if (routeBase === null) return
 
   // Both shapes, deliberately.
