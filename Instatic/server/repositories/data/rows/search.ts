@@ -65,6 +65,14 @@ export async function searchDataRows(
   visibility: SearchDataRowsVisibility = {},
 ): Promise<DataRowSearchResult[]> {
   const likePattern = `%${query.toLowerCase()}%`
+  // Ownership belongs in the WHERE, not after the LIMIT.
+  //
+  // This used to take the newest `limit` rows across every author and then drop
+  // the ones the caller does not own, so an own-scope user asking for 25 results
+  // could get none — not because they have no matches, but because 25 of
+  // somebody else's were newer. The predicate is unchanged (author wins, a row
+  // with no author falls back to its creator); only where it runs has moved.
+  const owner = visibility.ownerUserId ?? null
   const { rows } = await db<DataRowSearchRow>`
     select data_rows.id,
            data_rows.table_id,
@@ -80,30 +88,19 @@ export async function searchDataRows(
     where data_rows.deleted_at is null
       and data_tables.deleted_at is null
       and lower(data_rows.slug) like ${likePattern}
+      and (${owner} is null
+           or data_rows.author_user_id = ${owner}
+           or (data_rows.author_user_id is null and data_rows.created_by_user_id = ${owner}))
     order by data_rows.updated_at desc
     limit ${limit}
   `
-  const results = rows.map((r) => ({
-    row: r,
-    result: {
-      id: r.id,
-      tableId: r.table_id,
-      tableSlug: r.table_slug,
-      tableName: r.table_name,
-      slug: r.slug,
-      status: r.status,
-      updatedAt: isoDate(r.updated_at),
-    },
+  return rows.map((r) => ({
+    id: r.id,
+    tableId: r.table_id,
+    tableSlug: r.table_slug,
+    tableName: r.table_name,
+    slug: r.slug,
+    status: r.status,
+    updatedAt: isoDate(r.updated_at),
   }))
-  if (visibility.ownerUserId) {
-    const ownerUserId = visibility.ownerUserId
-    return results
-      .filter(({ row }) => {
-        if (row.author_user_id === ownerUserId) return true
-        if (row.author_user_id === null) return row.created_by_user_id === ownerUserId
-        return false
-      })
-      .map(({ result }) => result)
-  }
-  return results.map(({ result }) => result)
 }

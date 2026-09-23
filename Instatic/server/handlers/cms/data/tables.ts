@@ -373,15 +373,22 @@ async function handleTableRows(
     const offset = Math.max(Number.isFinite(rawOffset) ? rawOffset : 0, 0)
     const summaryOnly = url.searchParams.get('fields') === 'summary'
 
-    // `listDataRowsWithFilter` applies the page in SQL; the visibility scope is
-    // still applied here because that helper filters by table, not by owner.
-    const { rows, totalCount } = await listDataRowsWithFilter(db, tableId, { limit, offset })
-    const visible = visibility.ownerUserId
-      ? rows.filter((row) => row.authorUserId === visibility.ownerUserId)
-      : rows
+    // Ownership goes to SQL with the page, rather than being applied to the page
+    // after it comes back. Filtering afterwards cut an own-scope user's rows out
+    // of one page of everybody's — so they saw fewer than they asked for, often
+    // none, under a `totalCount` describing the whole table. Owning five of a
+    // hundred rows rendered "100 rows" above an empty grid, and the five were
+    // reachable only by guessing the offset they happened to fall in.
+    //
+    // It also fixes the count for free: the helper's COUNT shares this WHERE.
+    const { rows, totalCount } = await listDataRowsWithFilter(db, tableId, {
+      limit,
+      offset,
+      ownerUserId: visibility.ownerUserId ?? null,
+    })
 
     return jsonResponse({
-      rows: summaryOnly ? visible.map(toRowSummary) : visible,
+      rows: summaryOnly ? rows.map(toRowSummary) : rows,
       totalCount,
       limit,
       offset,

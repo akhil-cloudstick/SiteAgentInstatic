@@ -10,7 +10,7 @@
 import type { DbClient } from '../../../db/client'
 import type { DataRow } from '@core/data/schemas'
 import type { StorageFilterOperator, StorageFilterValue } from '@core/plugin-sdk/storageSchemas'
-import { jsonField } from '../../../db/jsonExtract'
+import { jsonField, jsonFieldNumeric } from '../../../db/jsonExtract'
 import { placeholder, selectHydratedDataRows } from './mapper'
 
 /**
@@ -32,6 +32,19 @@ interface ListDataRowsFilterOptions {
   status?: 'any' | 'draft' | 'published' | 'scheduled'
   limit?: number
   offset?: number
+  /**
+   * Restrict to rows this user owns. Applied in SQL, not afterwards.
+   *
+   * Its own field rather than a `filter` entry, because `filter` addresses
+   * `cells_json` keys and this addresses columns on the row itself.
+   *
+   * The caller used to page in SQL and then filter by owner in JavaScript,
+   * which meant an own-scope user was handed whatever survived from one page of
+   * everyone's rows: usually fewer than they asked for, often none at all, and
+   * always beside a `totalCount` describing the whole table. Owning five of a
+   * hundred rows showed "100 rows" above an empty grid.
+   */
+  ownerUserId?: string | null
 }
 
 interface ListDataRowsWithFilterResult {
@@ -65,7 +78,7 @@ export async function listDataRowsWithFilter(
   tableId: string,
   options: ListDataRowsFilterOptions = {},
 ): Promise<ListDataRowsWithFilterResult> {
-  const { filter, orderBy, status = 'any', limit = 100, offset = 0 } = options
+  const { filter, orderBy, status = 'any', limit = 100, offset = 0, ownerUserId = null } = options
 
   const params: unknown[] = [tableId]
   let paramIdx = 1
@@ -81,6 +94,23 @@ export async function listDataRowsWithFilter(
     whereSql += ` and data_rows.status = ${addParam(status)}`
   }
 
+  // Ownership, in the WHERE rather than after the page is cut.
+  //
+  // Placed before `countParamCount` is taken below, so the count query picks it
+  // up too and `totalCount` describes what this user can actually see rather
+  // than the whole table.
+  //
+  // The predicate matches `isOwnedByUser` exactly — author wins, and a row with
+  // no author falls back to its creator. Two bindings rather than one because
+  // the placeholder helper is positional.
+  if (ownerUserId) {
+    const byAuthor = addParam(ownerUserId)
+    const byCreator = addParam(ownerUserId)
+    whereSql +=
+      ` and (data_rows.author_user_id = ${byAuthor}` +
+      ` or (data_rows.author_user_id is null and data_rows.created_by_user_id = ${byCreator}))`
+  }
+
   if (filter) {
     for (const [key, value] of Object.entries(filter)) {
       if (!FIELD_KEY_RE.test(key)) {
@@ -92,12 +122,27 @@ export async function listDataRowsWithFilter(
         whereSql += ` and ${fragment} = ${addParam(value)}`
       } else {
         const op = value as StorageFilterOperator
+        // An ordered comparison against a NUMBER is compared as a number.
+        //
+        // Postgres `->>` yields text, SQLite `json_extract` yields the JSON
+        // value's own type — so `{ price: { gt: 100 } }` compared numerically on
+        // one and lexicographically on the other, where `'9' > '100'` is true.
+        // Since every test runs SQLite, the dialect that was wrong was the one
+        // nothing exercised. The caller's own value settles the intent: a JS
+        // number means a numeric comparison was asked for.
+        //
+        // `eq`/`ne`/`in` stay on the text form. Equality is the one case where
+        // both dialects already agree for the values that matter, and casting
+        // there would turn a perfectly good `{ status: 'draft' }` into an error
+        // on Postgres.
+        const ordered = (v: unknown): string =>
+          typeof v === 'number' ? jsonFieldNumeric('cells_json', key, db.dialect).sql : fragment
         if (op.eq !== undefined) whereSql += ` and ${fragment} = ${addParam(op.eq)}`
         if (op.ne !== undefined) whereSql += ` and ${fragment} != ${addParam(op.ne)}`
-        if (op.gt !== undefined) whereSql += ` and ${fragment} > ${addParam(op.gt)}`
-        if (op.gte !== undefined) whereSql += ` and ${fragment} >= ${addParam(op.gte)}`
-        if (op.lt !== undefined) whereSql += ` and ${fragment} < ${addParam(op.lt)}`
-        if (op.lte !== undefined) whereSql += ` and ${fragment} <= ${addParam(op.lte)}`
+        if (op.gt !== undefined) whereSql += ` and ${ordered(op.gt)} > ${addParam(op.gt)}`
+        if (op.gte !== undefined) whereSql += ` and ${ordered(op.gte)} >= ${addParam(op.gte)}`
+        if (op.lt !== undefined) whereSql += ` and ${ordered(op.lt)} < ${addParam(op.lt)}`
+        if (op.lte !== undefined) whereSql += ` and ${ordered(op.lte)} <= ${addParam(op.lte)}`
         if (op.in !== undefined) {
           if (op.in.length === 0) {
             whereSql += ` and 1=0`
@@ -127,6 +172,14 @@ export async function listDataRowsWithFilter(
       if (!FIELD_KEY_RE.test(key)) {
         throw new Error(`[content] invalid orderBy field name: ${JSON.stringify(key)}`)
       }
+      // KNOWN AND NOT FIXED HERE: ordering by a numeric cell still differs
+      // between the dialects — Postgres sorts '10' before '9', SQLite sorts 9
+      // before 10. The comparison operators above could be corrected because the
+      // caller's bound value declares the intent; an `order by` carries no value
+      // to inspect, so getting it right means reading the field's declared type
+      // out of `data_tables.fields_json`. That is a third query, and
+      // `filter.test.ts` pins this function at exactly two. Left as it is rather
+      // than guessed at, and written down rather than left to be rediscovered.
       const fragment = jsonField('cells_json', key, db.dialect).sql
       parts.push(`${fragment} ${normalizedDir}`)
     }

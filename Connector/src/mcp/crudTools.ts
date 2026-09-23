@@ -55,6 +55,24 @@ const fail = (message: string): ToolResult => ({
  * promised a page the site does not have.
  */
 function withRouteCheck(result: ToolResult, predicted: string[]): ToolResult {
+  /**
+   * Say the check did not run, rather than omitting it.
+   *
+   * All three ways out of this function used to return the publish result
+   * untouched, so a caller reading "no `missing` routes" as "the routes agree"
+   * read a check that never happened as a check that passed. The verification is
+   * the point of AC-C11.3; silence is the one answer it must not give.
+   */
+  const notChecked = (why: string): ToolResult => {
+    const first = result.content[0]
+    if (!first || first.type !== 'text') return result
+    try {
+      return ok({ ...(JSON.parse(first.text) as Record<string, unknown>), routeCheck: { checked: false, why } })
+    } catch {
+      return result
+    }
+  }
+
   const first = result.content[0]
   if (!first || first.type !== 'text') return result
   try {
@@ -62,7 +80,12 @@ function withRouteCheck(result: ToolResult, predicted: string[]): ToolResult {
     // `runGated` wraps a gated result as { result, go, connector }.
     const body = (parsed.result ?? parsed) as Record<string, unknown>
     const baked = Array.isArray(body.bakedRoutes) ? (body.bakedRoutes as unknown[]).map(String) : null
-    if (!baked) return result
+    if (!baked) {
+      return notChecked(
+        'The publish did not report which routes it baked, so the predicted routes could not be ' +
+          'compared against what actually landed. This is not a clean result — it is no result.',
+      )
+    }
     const bakedSet = new Set(baked)
     const predictedSet = new Set(predicted)
     return ok({
@@ -77,8 +100,12 @@ function withRouteCheck(result: ToolResult, predicted: string[]): ToolResult {
         unexpected: baked.filter((b) => !predictedSet.has(b)),
       },
     })
-  } catch {
-    return result
+  } catch (err) {
+    return notChecked(
+      `The publish response could not be read, so the route check did not run: ${
+        err instanceof Error ? err.message : String(err)
+      }`,
+    )
   }
 }
 

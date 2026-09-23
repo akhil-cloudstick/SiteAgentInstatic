@@ -64,12 +64,26 @@ function configuredSandboxImportRoots(
   return roots;
 }
 
-function canonicalizePathForContainment(value: string): string {
+/**
+ * The real path, or `null` when it cannot be established.
+ *
+ * Canonicalisation is the entire mechanism by which a symlink out of an allowed
+ * root is caught, so falling back to the lexical path on failure — which this
+ * used to do — decided containment by string comparison, which is exactly what
+ * canonicalising exists to prevent. A candidate whose real location is unknown
+ * is not judged contained.
+ *
+ * ENOENT is separated because a path that does not exist has no symlink to
+ * traverse and nothing to hide: it is safe to compare lexically, and refusing it
+ * would break the ordinary case of naming a directory before creating it.
+ */
+function canonicalizePathForContainment(value: string): string | null {
   const resolved = path.normalize(value);
   try {
     return fs.realpathSync.native(resolved);
-  } catch {
-    return resolved;
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException)?.code === 'ENOENT') return resolved;
+    return null;
   }
 }
 
@@ -81,7 +95,12 @@ function isPathInsideDir(root: string, candidate: string): boolean {
 export function sandboxImportAllowedRoots(
   env: Record<string, string | undefined> = process.env,
 ): string[] {
-  return configuredSandboxImportRoots(env).map(canonicalizePathForContainment);
+  // A root that cannot be canonicalised is dropped rather than kept in its
+  // lexical form. Keeping it would let anything under its literal spelling
+  // match, which is the permission it was never verified to grant.
+  return configuredSandboxImportRoots(env)
+    .map(canonicalizePathForContainment)
+    .filter((root): root is string => root !== null);
 }
 
 export function isSandboxImportedProjectRootAllowed(
@@ -90,6 +109,11 @@ export function isSandboxImportedProjectRootAllowed(
 ): boolean {
   if (!isSandboxModeEnabled(env)) return true;
   const candidate = canonicalizePathForContainment(projectRoot);
+  // Unknown real location: not allowed. Sandbox mode is on precisely because
+  // somebody decided this daemon should only reach named directories, and
+  // "I could not tell where this points" is not evidence that it points inside
+  // one of them.
+  if (candidate === null) return false;
   return sandboxImportAllowedRoots(env).some((root) => isPathInsideDir(root, candidate));
 }
 

@@ -67,6 +67,29 @@ export function jsonField(column: string, field: string, dialect: Dialect): Json
   return Object.freeze({ __brand: 'JsonFieldExpr', sql } as const)
 }
 
+/**
+ * The same extraction, compared as a NUMBER on both dialects.
+ *
+ * `jsonField` is not type-normalised, whatever the header of this file says.
+ * Postgres `->>` always yields text; SQLite `json_extract` yields the JSON
+ * value's native type. So a numeric cell filtered with `{ price: { gt: 100 } }`
+ * compares numerically on SQLite and lexicographically on Postgres — where
+ * `'9' > '100'` is true. Every test runs SQLite, so the dialect that is wrong is
+ * the one nobody tests.
+ *
+ * `cast(… as numeric)` is ANSI and understood by both. It is deliberately NOT
+ * the default: casting a text cell to numeric is an error on Postgres, so this
+ * is used only where the caller's own bound value is a number and a numeric
+ * comparison is unambiguously what was asked for.
+ *
+ * Both dialects are given the same spelling so there is one behaviour to reason
+ * about rather than two that happen to agree on the cases anyone tried.
+ */
+export function jsonFieldNumeric(column: string, field: string, dialect: Dialect): JsonFieldExpr {
+  const base = jsonField(column, field, dialect)
+  return Object.freeze({ __brand: 'JsonFieldExpr', sql: `cast(${base.sql} as numeric)` } as const)
+}
+
 // DbClient is imported as a type so that downstream code can write
 // convenience wrappers that accept a DbClient and read its .dialect.
 // The import is type-only and erased at runtime; it does not create a
