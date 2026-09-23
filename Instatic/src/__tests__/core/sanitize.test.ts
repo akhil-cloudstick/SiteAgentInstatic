@@ -173,19 +173,38 @@ describe('sanitizeRichtext() with PLAIN_TEXT_CONFIG', () => {
 })
 
 describe('sanitizeRichtext() in server runtime', () => {
-  it('imports without DOM globals and removes executable content', () => {
+  // This test previously asserted that importing WITHOUT a runtime still
+  // "removed executable content" — i.e. it pinned the regex fallback and read
+  // its output as a pass. That is the fail-open P2 forbids: the caller cannot
+  // tell a real sanitiser from a tag stripper, and `escapeProps` passes
+  // richtext through UNESCAPED on the strength of that answer. The behaviour
+  // it guarded is now a refusal, so the assertion is inverted.
+  it('refuses rather than returning stripped text when no runtime is installed', () => {
     const result = Bun.spawnSync({
       cmd: [
         process.execPath,
         '-e',
         `
-          const { sanitizeRichtext } = await import('./src/core/sanitize.ts')
-          const sanitized = sanitizeRichtext('<script>alert(1)</script><p>Safe</p>')
-          if (sanitized.includes('<script') || sanitized.includes('alert(1)')) {
-            throw new Error('unsafe fallback: ' + sanitized)
+          const { sanitizeRichtext, richtextSanitizerReady } = await import('./src/core/sanitize.ts')
+          if (richtextSanitizerReady()) {
+            throw new Error('expected no runtime in a bare subprocess')
           }
-          if (!sanitized.includes('Safe')) {
-            throw new Error('lost safe text: ' + sanitized)
+          let threw = false
+          try {
+            sanitizeRichtext('<script>alert(1)</script><p>Safe</p>')
+          } catch {
+            threw = true
+          }
+          if (!threw) {
+            throw new Error('sanitizeRichtext returned a value with no runtime installed')
+          }
+
+          // The asymmetry that WAS the bug: sanitizeSvg already refused while
+          // richtext quietly stripped. Pinned in the same subprocess so a later
+          // refactor cannot align the two the wrong way round.
+          const { sanitizeSvg } = await import('./src/core/sanitize.ts')
+          if (sanitizeSvg('<svg><script>alert(1)</script></svg>') !== '') {
+            throw new Error('sanitizeSvg stopped refusing without a runtime')
           }
         `,
       ],

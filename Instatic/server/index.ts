@@ -7,6 +7,31 @@ import { applySecurityHeaders } from './securityHeaders'
 import { startConversationPurgeTick } from './ai/boot'
 
 await import('./richtextSanitizer')
+
+// Refuse to serve without a working richtext sanitiser.
+//
+// The import above installs one as a side effect, but "the side effect ran" and
+// "the instance that will serve requests can see it" are different claims: this
+// repo runs from a network drive where Bun has been observed loading a module
+// twice (Operator/pending.md), which would leave the request-time copy holding
+// null while boot looked fine. `sanitizeRichtext` now throws in that state
+// rather than returning regex-stripped text that reads as sanitised — so
+// without this check the failure would surface as 500s on every richtext write
+// instead of a refusal to start.
+//
+// Checked through the same resolution path the sanitiser uses, not by reading
+// the flag it sets. A CMS that cannot sanitise must not serve.
+{
+  const { richtextSanitizerReady } = await import('@core/sanitize')
+  if (!richtextSanitizerReady()) {
+    console.error(
+      '[boot] richtext sanitiser is not installed — refusing to start. ' +
+        'Publishing unsanitised richtext is not an acceptable degraded mode.',
+    )
+    process.exit(1)
+  }
+}
+
 const { handleServerRequest } = await import('./router')
 const { activateInstalledServerPlugins } = await import('./plugins/runtime')
 const { mediaStorageRegistry } = await import('@core/plugins/mediaStorageRegistry')

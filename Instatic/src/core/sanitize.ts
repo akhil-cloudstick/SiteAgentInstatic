@@ -62,6 +62,24 @@ export function configureRichtextSanitizer(purifier: DOMPurifyRuntime | null): v
   activeDOMPurify = purifier ? installLinkHook(purifier) : null
 }
 
+/**
+ * Is a real sanitiser runtime resolvable from HERE, in this module instance?
+ *
+ * Deliberately calls `getDOMPurify()` rather than reading `activeDOMPurify`,
+ * because the failure this guards against is the module being loaded twice: a
+ * boot-time `configureRichtextSanitizer` can succeed against one instance while
+ * the instance serving requests still holds `null`. Asking the same question
+ * `sanitizeRichtext` asks, through the same resolution path, is the only answer
+ * worth having.
+ *
+ * `server/index.ts` calls this at boot and refuses to start when it is false —
+ * a CMS that cannot sanitise must not serve.
+ */
+export function richtextSanitizerReady(): boolean {
+  const purifier = getDOMPurify()
+  return Boolean(purifier && typeof purifier.sanitize === 'function')
+}
+
 function getDOMPurify(): DOMPurifyRuntime | null {
   const direct = activeDOMPurify ?? importedDOMPurify
   if (typeof direct.sanitize === 'function') {
@@ -180,12 +198,35 @@ export function sanitizeRichtext(
 
   // DOMPurify requires a live DOM-backed runtime. The browser has one
   // naturally; the Bun server installs an explicit runtime in
-  // `server/richtextSanitizer.ts`. One-off scripts that do neither get the
-  // conservative plain-text fallback.
+  // `server/richtextSanitizer.ts`.
+  //
+  // No runtime: REFUSE. This used to fall back to `stripHtmlFallback` and
+  // return the result, which is the shape principle P2 forbids — a check that
+  // could not run handing back a value that looks sanitised. Its sibling
+  // `sanitizeSvg` twelve lines below has always refused for exactly this
+  // reason; the two disagreeing was the bug.
+  //
+  // The regex stripper is not a substitute for DOMPurify. It removes tags, so
+  // the result reads as clean, while the caller believes a real sanitiser ran —
+  // and `escapeProps` then passes richtext through UNESCAPED on that belief.
+  //
+  // This is reachable in production, not theoretical: `activeDOMPurify` is
+  // module-level state set by a boot-time side effect, and this repo runs from
+  // a network drive where Bun has been observed loading a module twice
+  // (Operator/pending.md), so the request-time copy can see `null` while boot
+  // succeeded. `server/index.ts` now refuses to start unless the runtime is
+  // installed, which makes this branch unreachable there — and loud if it ever
+  // is not.
+  //
+  // The old comment claimed one-off scripts relied on the fallback. Checked:
+  // the plugin CLI never reaches this function, and no other caller runs
+  // without a DOM.
   const purifier = getDOMPurify()
   if (!purifier || typeof purifier.sanitize !== 'function') {
-    const stripped = stripHtmlFallback(str)
-    return config._plainText ? stripped.trim() : stripped
+    throw new Error(
+      'Richtext sanitiser unavailable: no DOMPurify runtime is installed. ' +
+        'Refusing to return partially-stripped markup that would be treated as sanitised.',
+    )
   }
 
   const sanitized = String(purifier.sanitize(str, config))
