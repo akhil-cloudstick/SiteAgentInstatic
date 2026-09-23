@@ -28,6 +28,31 @@ import { verifyTenantToken } from '../lib/crypto.mjs';
 
 const OPENROUTER = 'https://openrouter.ai/api';
 
+/**
+ * Upstream paths this gateway will proxy (security item E2).
+ *
+ * `rest` is whatever followed the signed token in the request path, and it was
+ * forwarded to OpenRouter verbatim — so a tenant could pick which endpoint the
+ * OPERATOR'S key was spent on. These three are what the clients actually use,
+ * read from the code rather than guessed:
+ *
+ *   /v1/responses         — the answer call (openrouter driver, `${base}/responses`)
+ *   /v1/models            — the catalogue fetch (`listModels`, `${base}/models`)
+ *   /v1/chat/completions  — the classifier's cheap category pick
+ *
+ * MMS Design calls `/ai/<token>/design/v1/...`, and `/design` is stripped before
+ * this check, so both products land on the same three.
+ *
+ * A refusal is logged with the path that was asked for, so an endpoint this list
+ * has missed shows up as a named 403 in the operator's terminal rather than as a
+ * silent failure somewhere downstream.
+ */
+const UPSTREAM_ALLOWED = new Set([
+  '/v1/responses',
+  '/v1/models',
+  '/v1/chat/completions',
+]);
+
 function readRawBody(req) {
   return new Promise((resolve, reject) => {
     const chunks = [];
@@ -131,7 +156,18 @@ export async function handleGateway(req, res, pathAfterAi) {
         }
       }
     } catch {
-      // Non-JSON body — forward unchanged.
+      // A body that CLAIMS to be JSON and will not parse is blocked, not
+      // forwarded.
+      //
+      // This used to fall through to "forward unchanged", which meant the one
+      // thing this gateway exists to guarantee — that a tenant call runs on the
+      // operator's model — was skipped for any body the parser choked on. The
+      // branch twelve lines above already refuses when no model can be resolved,
+      // for exactly this reason; forwarding an unpinnable body was the same
+      // failure wearing a different hat.
+      console.log(`[ai-gateway] ${slug} · ${product}: ✗ BLOCKED — body declared JSON but did not parse`);
+      res.writeHead(400, { 'Content-Type': 'text/plain' });
+      return res.end('Malformed JSON body');
     }
   }
 
@@ -156,6 +192,18 @@ export async function handleGateway(req, res, pathAfterAi) {
         : categorySlug ? `category "${categorySlug}"` : 'default category';
       console.log(`[ai-gateway] ${slug} · cms: ✦ USING MODEL: ${resolvedModel || '(tenant model)'}  — routed to ${route}`);
     }
+  }
+
+  // Only these upstream paths (security item E2).
+  //
+  // `rest` is whatever followed the token in the request path and was forwarded
+  // verbatim, so the tenant chose which OpenRouter endpoint the operator's key
+  // was spent on. The key is the operator's and the allowlist is the operator's
+  // too: an endpoint nobody put on this list is refused rather than proxied.
+  if (!UPSTREAM_ALLOWED.has(rest)) {
+    console.log(`[ai-gateway] ${slug} · ${product}: ✗ BLOCKED — upstream path not allowed: ${rest}`);
+    res.writeHead(403, { 'Content-Type': 'text/plain' });
+    return res.end('Upstream path not allowed');
   }
 
   let upstream;
