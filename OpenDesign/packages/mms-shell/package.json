@@ -11,7 +11,7 @@
     "./styles/fontawesome.css": "./src/styles/fontawesome/fontawesome-solid.css",
     "./*": "./src/*"
   },
-  "_peerNote": "Ranges, not pins. This library is consumed as source by products on different React majors — OpenDesign is on 18.3.1, Instatic on 19.2.5 — so pinning one product's exact version contradicts what this package is for. Widening the range does NOT by itself make both work at runtime: a bare `react` import inside this package still resolves by walking up to OpenDesign's node_modules, which is why Instatic's DOM tests fail. That needs the monorepo on one React; see docs/plans/phase-6-plan.md.",
+  "_peerNote": "Ranges, not pins. This library is consumed as source by every MMS product, so pinning one product's exact version contradicts what this package is for. Both products now sit on React 19.2.5 (OpenDesign was moved off 18.3.1 on 2026-09-23). Aligning the VERSION was necessary but is NOT sufficient for `bun test`: a bare `react` import inside this package still resolves by walking up into OpenDesign's node_modules, so Instatic's tests load a SECOND React module instance. React's hook dispatcher is module-level state, so Instatic's react-dom sets it on Instatic's copy while this package's hooks read OpenDesign's copy and get null — surfacing as \"Invalid hook call\", where it used to surface as \"an older version of React\". One React instance for the whole monorepo is what actually closes it; see docs/plans/phase-6-plan.md.",
   "peerDependencies": {
     "react": "^18.0.0 || ^19.0.0",
     "react-dom": "^18.0.0 || ^19.0.0"
