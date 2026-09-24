@@ -11,5 +11,13 @@
  *
  * 0.5.0 — the approver registry (R6): per-property resolution with no platform
  * fallback, and the owner-only registration door.
+ *
+ * 0.5.1 — the registry's public read moves to `/api/health/approvers`, under the
+ * one prefix that is already bypassed. `/api/approvers` still answers a GET so
+ * nothing breaks on deploy, but it must NOT be given a Bypass of its own: an
+ * Access application covers everything beneath its path, so that policy would
+ * also cover the POST register/rotate/retire routes and strip the assertion
+ * header the owner is identified by — locking the only permitted registrar out
+ * of their own door. Caught by the owner testing the live relay before deploying.
  */
-export const RELAY_VERSION = '0.5.0'
+export const RELAY_VERSION = '0.5.1'

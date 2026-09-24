@@ -23,6 +23,25 @@ import type { ApproverRecord } from './types'
 export const APPROVERS_PATH = '/api/approvers'
 export const APPROVER_RETIRE = /^\/api\/approvers\/([^/]+)\/retire$/
 
+/**
+ * The path the checking side actually reads, and the one to publish.
+ *
+ * `/api/approvers` answers a GET too and still does — but it cannot be the
+ * PUBLISHED read, because Cloudflare Access sits in front of the relay and its
+ * applications match a path AND EVERYTHING BENEATH IT. A Bypass policy on
+ * `api/approvers` (which is what DEPLOY.md used to instruct) therefore also
+ * covers `POST /api/approvers` and `POST /api/approvers/<property>/retire`, and
+ * a Bypass stops Cloudflare adding the `cf-access-jwt-assertion` header. The
+ * owner is a BROWSER identity matched on that header's email, so the one party
+ * permitted to register an approver would be refused at their own door. The
+ * owner caught this by testing the live relay before deploying.
+ *
+ * Underneath `/api/health`, which already has its Bypass, that conflict cannot
+ * arise: nothing is written under `/api/health`, so opening the whole subtree
+ * opens only reads. No second Access policy is needed.
+ */
+export const APPROVERS_PUBLIC_PATH = '/api/health/approvers'
+
 const HEADERS = {
   'content-type': 'application/json; charset=utf-8',
   // The checking side caches this and refuses when its copy goes stale, so a

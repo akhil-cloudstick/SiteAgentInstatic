@@ -110,9 +110,36 @@ function writeDiskCache(body: CachedRegistry): void {
   }
 }
 
+/**
+ * Where the registry is read from, and why it is not `/api/approvers`.
+ *
+ * Cloudflare Access sits in front of the relay, and an Access application covers
+ * its path AND EVERYTHING BENEATH IT. Bypassing `api/approvers` so this
+ * credential-less read can work would therefore also bypass
+ * `POST /api/approvers` and `.../retire` — and a Bypass stops Cloudflare adding
+ * the assertion header that identifies the owner, who is the only party allowed
+ * to register an approver. The owner found that by testing the live relay.
+ *
+ * `/api/health` already has the one Bypass the relay needs, and nothing is
+ * written beneath it, so the registry's public read lives there instead.
+ *
+ * The old path is tried second, so a Connector talking to a relay that has not
+ * been updated yet still resolves approvers rather than refusing every gated
+ * action. Remove the fallback once the relay reports 0.5.1 or later.
+ */
+const REGISTRY_PATHS = ['/api/health/approvers', '/api/approvers'] as const
+
 async function fetchRegistry(base: string): Promise<CachedRegistry | null> {
+  for (const path of REGISTRY_PATHS) {
+    const body = await fetchRegistryAt(`${base}${path}`)
+    if (body) return body
+  }
+  return null
+}
+
+async function fetchRegistryAt(url: string): Promise<CachedRegistry | null> {
   try {
-    const res = await fetch(`${base}/api/approvers`, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) })
+    const res = await fetch(url, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) })
     if (!res.ok) return null
     const body = (await res.json()) as CachedRegistry
     return body && Array.isArray(body.approvers) ? body : null

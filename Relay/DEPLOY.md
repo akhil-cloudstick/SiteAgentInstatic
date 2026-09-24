@@ -23,11 +23,22 @@ Run every command in PowerShell from `S:\SiteAgentHub\Relay`.
 
 ## Part 1 — check and deploy
 
-**1. Check the code (optional).**
+**1. Check the code. Not optional — a mismatch means stop.**
 ```
+npm run sums:check
 bun test
 ```
-Expect `37 pass, 0 fail`. `SHA256SUMS.txt` in this folder lists the hash of every file as we left it.
+
+`sums:check` verifies this folder against `SHA256SUMS.txt`, the manifest of every file as we left
+it, and changes nothing. It must end `ok: N/N files match`. Anything else — `CHANGED`,
+`MISSING FROM MANIFEST`, `GONE FROM FOLDER` — means the folder is not what was handed over: **do
+not deploy, report it back**. It exits non-zero so it can gate a script.
+
+This step used to be marked optional and named no command, and the manifest twice went stale
+because nothing in the release path regenerated it. `npm run sums` writes it; that is the builder's
+job before handover, and `sums:check` is yours before deploying.
+
+`bun test` should end `0 fail`.
 
 **2. Log in to your Cloudflare account.** A browser page opens; approve it.
 ```
@@ -83,16 +94,28 @@ step 8:
 - **Policy 2, action Service Auth:** include **Service Token** — `relay-validator` and `relay-builder`.
 - **Overview:** copy the **Application Audience (AUD) Tag**.
 
-**11. Open only the two public reads.** Zero Trust → **Access** → **Applications** → **Add an
+**11. Open the one public read.** Zero Trust → **Access** → **Applications** → **Add an
 application** → **Self-hosted**. Domain: your `deploy-relay.<your-subdomain>.workers.dev`, path
 `api/health`. One policy, action **Bypass**, include **Everyone**. Every other address keeps the
 login.
 
-Then repeat it for path **`api/approvers`**. That route publishes the approver registry, and the
-side that CHECKS approvals reads it holding no relay credential — every field in it is a public key,
-which is why it answers before identity in the Worker. Without its own Bypass policy Access
-redirects it to a login page and the checking side cannot read the registry at all, while the code
-and the README both say it needs none. Two applications, two Bypass policies; nothing else opens.
+**One application, one Bypass policy. Do NOT add a second one for `api/approvers`.**
+
+This step used to say to add one, and that was wrong in a way worth spelling out, because it would
+have broken the deploy in a way that is hard to diagnose. An Access application matches its path
+**and everything beneath it**. A Bypass on `api/approvers` therefore also covers
+`POST /api/approvers` and `POST /api/approvers/<property>/retire` — and a Bypass stops Cloudflare
+adding the `Cf-Access-Jwt-Assertion` header. The relay reads the owner's identity from that header
+and from nowhere else (no cookie fallback), and the owner is the only party permitted to register an
+approver. So that second policy would have left the registry readable by everyone and writable by
+nobody, including the one person it is for.
+
+The registry's public read is therefore served at **`api/health/approvers`**, underneath the prefix
+this one Bypass already covers. Nothing is written beneath `api/health`, so opening that subtree
+opens only reads: a POST there falls through to the login like any other route.
+
+`GET /api/approvers` still answers as well, for a checker that has not been updated — but it is not
+the published path and must not be given a policy of its own.
 
 ## Part 3 — configure and redeploy
 
@@ -121,13 +144,25 @@ while `/api/health` reported the same number on both sides. So check a route ins
 
 ```
 curl -s https://deploy-relay.<your-subdomain>.workers.dev/api/health
-curl -s https://deploy-relay.<your-subdomain>.workers.dev/api/approvers
+curl -s https://deploy-relay.<your-subdomain>.workers.dev/api/health/approvers
 ```
 
-The first must report the `version` you just deployed. The second must return JSON with an
-`approvers` array — **not** `{"error":"No such route."}` (the build predates the registry, step 13
-did not take) and **not** an HTML login page (step 11's second Bypass policy is missing). Run both
-from a machine with no relay credential: that is the position the side checking approvals is in.
+The first must report the `version` you just deployed, and its `approverRegistry` field names the
+second URL. The second must return JSON with an `approvers` array — **not**
+`{"error":"No such route."}` (the build predates the registry, step 13 did not take) and **not** an
+HTML login page (the step 11 Bypass is missing, or was put on the wrong path). Run both from a
+machine with no relay credential: that is the position the side checking approvals is in.
+
+Then check the door that must STILL be closed:
+
+```
+curl -s -o /dev/null -w "%{http_code}\n" -X POST https://deploy-relay.<your-subdomain>.workers.dev/api/approvers
+```
+
+This must be `403`, not `405` and not `200`. A `405` would mean the Bypass was put on
+`api/approvers` after all and the write route is now reachable without an identity — which is
+exactly the failure step 11 describes, and it leaves the registry writable by anyone who can reach
+the URL.
 
 **14. Optional notifier.** To receive a webhook when tickets change or the validator stalls:
 ```

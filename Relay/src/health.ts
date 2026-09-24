@@ -7,17 +7,22 @@
  * nothing but configuration — no store, no tickets, no identities — which is
  * what makes it safe to leave open.
  *
- * Cloudflare Access sits in front of the whole relay, so this one path needs
- * its own Access application with a Bypass policy (README, "Deploy").
+ * Cloudflare Access sits in front of the whole relay, so this path needs its own
+ * Access application with a Bypass policy (README, "Deploy"). That policy covers
+ * everything BENEATH `/api/health` as well, which is deliberate and is why the
+ * approver registry's public read lives at `/api/health/approvers`: nothing is
+ * written under this prefix, so opening the subtree opens only reads. It is the
+ * ONLY Bypass the relay needs.
  *
  * `live` is true when Access and roles are configured and the relay holds a
  * real 32-byte Ed25519 owner key. It deliberately does NOT claim that any given
- * property can be approved: that depends on the approver registry, which this
- * route does not read because health must never touch storage. `/api/approvers`
- * answers that question, and needs no login either.
+ * property can be approved: that depends on the approver registry, which THIS
+ * route does not read — `/api/health` itself touches no storage, which is what
+ * makes it a cheap liveness check. Its sibling `/api/health/approvers` does read
+ * the registry, and answers that question.
  */
 
-import { APPROVERS_PATH } from './approvers'
+import { APPROVERS_PUBLIC_PATH } from './approvers'
 import { readConfig, type Env } from './config'
 import { base64ToBytes, keyFingerprint } from './go'
 import { RELAY_VERSION } from './version'
@@ -62,7 +67,12 @@ export async function health(request: Request, env: Env): Promise<Response> {
     // approvals, which is the exact failure R6 exists to remove. The registry
     // route needs no credential either, so nothing is lost by sending a reader
     // one step further to the answer that is true.
-    approverRegistry: APPROVERS_PATH,
+    //
+    // Names the path under this same bypassed prefix, not /api/approvers: that
+    // one answers a GET as well, but publishing it would invite a Bypass policy
+    // on it, and such a policy also covers its POST routes and locks the owner
+    // out of registering. See APPROVERS_PUBLIC_PATH.
+    approverRegistry: APPROVERS_PUBLIC_PATH,
   }
   return new Response(request.method === 'HEAD' ? null : JSON.stringify(body), { status: 200, headers: HEADERS })
 }

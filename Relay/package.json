@@ -7,6 +7,8 @@
   "scripts": {
     "test": "bun test",
     "vectors": "bun cli/gen-test-vectors.ts",
+    "sums": "bun cli/gen-sha256sums.ts",
+    "sums:check": "bun cli/gen-sha256sums.ts --check",
     "migrate": "npx wrangler d1 migrations apply deploy-relay --remote",
     "deploy": "npx wrangler deploy"
   }

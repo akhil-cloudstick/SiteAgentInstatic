@@ -72,7 +72,8 @@ response; same key + different body is `409`.
 | `GET` | `/api/tickets/<id>/go` | anyone, while `go_granted` or `executing` |
 | `GET` | `/api/export.jsonl` | anyone |
 | `GET` | `/api/whoami` | anyone |
-| `GET` | `/api/health` | **no login** — returns only `{live, version, ownerKeyFingerprint}` |
+| `GET` | `/api/health` | **no login** — returns only `{live, version, ownerKeyFingerprint, approverRegistry}` |
+| `GET` | `/api/health/approvers` | **no login** — the approver registry; every field is a public key |
 
 `live` is true only when Access and the roles are configured and an owner key is set. A status page
 can poll `/api/health` and alert when `ownerKeyFingerprint` stops matching the owner's own record.
@@ -92,8 +93,14 @@ The full step-by-step guide, with every dashboard click, is **`DEPLOY.md`**. In 
    - copy the application's **AUD tag**.
 
    Then a **second** self-hosted application for the same domain with path `api/health`, policy
-   action **Bypass**, include **Everyone**. That is the only path without a login; the Worker itself
-   answers nothing else without a valid Access assertion.
+   action **Bypass**, include **Everyone**. That prefix is the only one without a login — it covers
+   `/api/health` and `/api/health/approvers`, and nothing beneath it writes. The Worker answers
+   nothing else without a valid Access assertion.
+
+   **Do not add a Bypass for `api/approvers`.** An Access application covers everything beneath its
+   path, so that policy would also cover `POST /api/approvers` and `.../retire` and strip the
+   assertion header the owner is identified by — leaving the registry readable by everyone and
+   writable by nobody. See DEPLOY.md step 11.
 5. Fill `[vars]` in `wrangler.toml`: `ACCESS_TEAM_DOMAIN`, `ACCESS_AUD`, `ROLE_OWNER_EMAIL`,
    `ROLE_BUILDER_EMAILS`, `ROLE_VALIDATOR_TOKEN_ID`, `PUBLIC_URL`, and `OWNER_PUBLIC_KEY` once the
    owner sends it. Optionally `ROLE_BUILDER_TOKEN_IDS`: service token IDs that act as the builder,
@@ -142,8 +149,11 @@ that is the intended outcome, and the response says so.
 One key may not be registered for two properties, and two business approvers may not both cover one
 property; both are refused at registration.
 
-`GET /api/approvers` needs no login (every field is a public key) and is what the Connector reads,
-so the two sides cannot drift.
+`GET /api/health/approvers` needs no login (every field is a public key) and is what the Connector
+reads, so the two sides cannot drift. It sits under `/api/health` because that is the one path with
+a Cloudflare Access Bypass, and an Access application covers everything beneath its path — a Bypass
+on `/api/approvers` would also cover the POST register/rotate/retire routes and strip the header the
+owner is identified by. `GET /api/approvers` still answers, for a checker that has not been updated.
 
 ## Tests (from `S:\SiteAgentHub\Relay`)
 

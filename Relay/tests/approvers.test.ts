@@ -197,7 +197,12 @@ test('health points at the registry rather than publishing a second copy of it',
   const body = (await res.json()) as Record<string, unknown>
   expect(body.live).toBe(true)
   expect(body.ownerKeyFingerprint).toBe(VECTORS.owner.fingerprint)
-  expect(body.approverRegistry).toBe('/api/approvers')
+  // Points at the path that reads WITHOUT a login. `/api/approvers` answers a
+  // GET too, but publishing it would invite a Bypass policy on it — and an
+  // Access application covers everything beneath its path, so that policy would
+  // also cover the POST register/rotate/retire routes and strip the header the
+  // owner is identified by.
+  expect(body.approverRegistry).toBe('/api/health/approvers')
   // The field that could disagree with the registry is gone, not merely empty.
   expect('approvers' in body).toBe(false)
 })
