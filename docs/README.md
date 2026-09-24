@@ -3,8 +3,9 @@
 Every **cross-product / monorepo-level** document lives here, grouped by subject.
 Product-internal docs stay inside their product (see [Where else docs live](#where-else-docs-live)).
 
-| Folder | What's in it |
+| File / folder | What's in it |
 |---|---|
+| [`mmsbuild-platform-handbook.md`](./mmsbuild-platform-handbook.md) | **The presentable overview** — the goal, the Super Admin → Operator → Client → Project hierarchy, the full workflow with every stopping condition, and a detailed where-we-are-vs-the-goal comparison. No code, no file names. |
 | [`current-state/`](#current-state) | **Start here** — how the whole platform works today, in plain language, with diagrams |
 | [`prd/`](#prd) | Where the platform is going — the target architecture and the requirements, each with its acceptance test |
 | [`platform/`](#platform) | MMSBUILD product vision, the client's plan, scale & tenancy |
