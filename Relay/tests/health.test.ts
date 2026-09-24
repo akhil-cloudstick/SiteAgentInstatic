@@ -98,3 +98,17 @@ test('the registry reads without a login, under the prefix that is already bypas
   // bypass: the bypassed subtree cannot be used to write, whoever asks.
   expect((await get('/api/health/approvers', env, 'POST')).status).toBe(403)
 })
+
+test('package.json and RELAY_VERSION agree', async () => {
+  // The owner asked for these two to "never disagree again" after finding
+  // package.json on 0.2.0 while the relay reported 0.5.1.
+  //
+  // A one-time edit would not have answered that — they drifted because nothing
+  // compared them. This is the comparison. `RELAY_VERSION` is the number the
+  // deployed Worker reports at /api/health and is therefore the one that
+  // matters; package.json follows it.
+  const pkg = JSON.parse(await Bun.file(new URL('../package.json', import.meta.url)).text()) as {
+    version: string
+  }
+  expect({ packageJson: pkg.version }).toEqual({ packageJson: RELAY_VERSION })
+})

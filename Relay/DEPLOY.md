@@ -159,10 +159,17 @@ Then check the door that must STILL be closed:
 curl -s -o /dev/null -w "%{http_code}\n" -X POST https://deploy-relay.<your-subdomain>.workers.dev/api/approvers
 ```
 
-This must be `403`, not `405` and not `200`. A `405` would mean the Bypass was put on
-`api/approvers` after all and the write route is now reachable without an identity — which is
-exactly the failure step 11 describes, and it leaves the registry writable by anyone who can reach
-the URL.
+This must be **`302`** — Cloudflare Access redirecting an anonymous caller to the login, before the
+request ever reaches the Worker. That is the correct, closed state.
+
+**A `403` here is the alarm, not the pass.** `403` means the request got PAST Access and reached the
+Worker, which then refused it for having no assertion header — and the only way it gets past Access
+is if `api/approvers` has a Bypass policy on it. That is the failure step 11 describes: the registry
+becomes readable by everyone and writable by nobody, including the owner, whose browser identity
+lives in the very header the Bypass strips.
+
+(An earlier version of this step had these two the wrong way round and told you `403` was the pass.
+It was corrected after testing the live relay: closed really does answer `302`.)
 
 **14. Optional notifier.** To receive a webhook when tickets change or the validator stalls:
 ```
