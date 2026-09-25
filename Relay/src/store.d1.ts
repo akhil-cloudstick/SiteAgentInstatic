@@ -23,6 +23,7 @@ import type {
   Message,
   MessageKind,
   Role,
+  TestPropertyRecord,
   Ticket,
   TicketType,
   TransitionActor,
@@ -195,6 +196,30 @@ interface ApproverRow {
   registered_by: string
   reason: string | null
   created_at: string
+}
+
+interface TestPropertyRow {
+  id: string
+  seq: number
+  property: string
+  designated: number
+  at: string
+  by_subject: string
+  reason: string | null
+  created_at: string
+}
+
+function testPropertyFromRow(r: TestPropertyRow): TestPropertyRecord {
+  return {
+    id: r.id,
+    seq: r.seq,
+    property: r.property,
+    designated: r.designated === 1,
+    at: r.at,
+    by: r.by_subject,
+    reason: r.reason,
+    createdAt: r.created_at,
+  }
 }
 
 function approverFromRow(r: ApproverRow): ApproverRecord {
@@ -455,6 +480,52 @@ export class D1Store implements Store {
     const result = await this.db
       .prepare('UPDATE approvers SET retired_at = ? WHERE property = ? AND retired_at IS NULL')
       .bind(at, property)
+      .run()
+    return result.meta.changes === 1
+  }
+
+  // ---- test properties ---------------------------------------------------
+  //
+  // Strictly append-only: a designation and its removal are both rows, and the
+  // highest seq for a property is the one in force. That is why the read below
+  // is a correlated MAX(seq) rather than a flag lookup, and why there is no
+  // UPDATE anywhere in this block.
+
+  async listTestProperties(): Promise<string[]> {
+    const { results } = await this.db
+      .prepare(
+        `SELECT property FROM test_properties t
+          WHERE designated = 1
+            AND seq = (SELECT MAX(seq) FROM test_properties x WHERE x.property = t.property)
+          ORDER BY property`,
+      )
+      .all<{ property: string }>()
+    return (results ?? []).map((r) => r.property)
+  }
+
+  async listTestPropertyHistory(): Promise<TestPropertyRecord[]> {
+    const { results } = await this.db
+      .prepare('SELECT * FROM test_properties ORDER BY seq DESC')
+      .all<TestPropertyRow>()
+    return (results ?? []).map(testPropertyFromRow)
+  }
+
+  async recordTestProperty(record: TestPropertyRecord): Promise<boolean> {
+    const result = await this.db
+      .prepare(
+        `INSERT INTO test_properties (id, seq, property, designated, at, by_subject, reason, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .bind(
+        record.id,
+        record.seq,
+        record.property,
+        record.designated ? 1 : 0,
+        record.at,
+        record.by,
+        record.reason,
+        record.createdAt,
+      )
       .run()
     return result.meta.changes === 1
   }

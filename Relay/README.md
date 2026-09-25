@@ -68,12 +68,14 @@ response; same key + different body is `409`.
 | `GET` | `/api/tickets`, `/api/tickets/<id>` | anyone |
 | `POST` | `/api/tickets/<id>/messages` `{kind, body?, evidence?, replyTo?, artefacts?}` | anyone; `evidence` and `reported-instruction` validator only |
 | `POST` | `/api/tickets/<id>/transition` `{to, evidenceMessageId?, deployId?}` | per `src/state.ts` |
-| `POST` | `/api/tickets/<id>/go` `{go}` | owner |
+| `POST` | `/api/tickets/<id>/go` `{go}` | owner; validator on a designated test property |
+| `POST` | `/api/test-properties` `{property, reason?}` | owner |
+| `POST` | `/api/test-properties/<property>/remove` | owner |
 | `GET` | `/api/tickets/<id>/go` | anyone, while `go_granted` or `executing` |
 | `GET` | `/api/export.jsonl` | anyone |
 | `GET` | `/api/whoami` | anyone |
 | `GET` | `/api/health` | **no login** — returns only `{live, version, ownerKeyFingerprint, approverRegistry}` |
-| `GET` | `/api/health/approvers` | **no login** — the approver registry; every field is a public key |
+| `GET` | `/api/health/approvers` | **no login** — the approver registry and `testProperties`; every field is a public key or a property name |
 
 `live` is true only when Access and the roles are configured and an owner key is set. A status page
 can poll `/api/health` and alert when `ownerKeyFingerprint` stops matching the owner's own record.

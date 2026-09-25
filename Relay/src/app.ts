@@ -16,7 +16,16 @@
  *     delete routes, and the D1 schema refuses them too.
  */
 
-import { APPROVER_RETIRE, APPROVERS_PATH, registerApprover, retireApprover } from './approvers'
+import {
+  APPROVER_RETIRE,
+  APPROVERS_PATH,
+  TEST_PROPERTIES_PATH,
+  TEST_PROPERTY_REMOVE,
+  designateTestProperty,
+  registerApprover,
+  removeTestProperty,
+  retireApprover,
+} from './approvers'
 import type { Deps } from './deps'
 import { toJsonl } from './export'
 import {
@@ -202,6 +211,23 @@ async function routeWrite(
     const body = readObject(bytes)
     if (!body) return refuse(400, 'The body must be a JSON object.')
     return registerApprover(body, deps.store, actor.subject, at)
+  }
+
+  // The test-property door. Owner-only for the same reason as the registry
+  // above, and it is worth stating plainly: designating a property decides who
+  // may submit its GO, so a validator able to designate could designate a LIVE
+  // property and then approve it. Both designating and removing are POSTs
+  // because both are appends.
+  if (path === TEST_PROPERTIES_PATH || TEST_PROPERTY_REMOVE.test(path)) {
+    if (actor.role !== 'owner') {
+      return refuse(403, 'Only the owner designates a test property: it decides who may submit a GO.')
+    }
+    const at = deps.now().toISOString()
+    const remove = TEST_PROPERTY_REMOVE.exec(path)
+    if (remove) return removeTestProperty(decodeURIComponent(remove[1]!), deps.store, actor.subject, at)
+    const body = readObject(bytes)
+    if (!body) return refuse(400, 'The body must be a JSON object.')
+    return designateTestProperty(body, deps.store, actor.subject, at)
   }
 
   const match = /^\/api\/tickets\/([^/]+)\/(messages|transition|go)$/.exec(path)
@@ -591,7 +617,26 @@ async function approverFor(
 }
 
 async function grantGo(ticket: Ticket, b: Record<string, unknown>, actor: Actor, deps: Deps): Promise<Out> {
-  if (actor.role !== 'owner') return refuse(403, 'Only the owner grants a GO.')
+  // Who may SUBMIT. The owner always; the validator only on a property the
+  // owner has designated a test property; the builder nowhere, ever.
+  //
+  // This widens submission and nothing else. The signature is still verified
+  // against the approver registered for this target, further down and
+  // unchanged — so a validator submitting on a test property still has to
+  // present a GO signed by that property's registered key.
+  if (actor.role !== 'owner') {
+    const target = ticket.target ?? ''
+    const onTestProperty =
+      actor.role === 'validator' && target !== '' && (await deps.store.listTestProperties()).includes(target)
+    if (!onTestProperty) {
+      return refuse(
+        403,
+        actor.role === 'validator'
+          ? `Only the owner grants a GO, except on a designated test property — and "${target}" is not one.`
+          : 'Only the owner grants a GO.',
+      )
+    }
+  }
   if (ticket.type !== 'deploy-request') return refuse(422, 'A GO is granted on a deploy-request.')
   if (ticket.state !== 'awaiting_go') {
     return refuse(409, `This deploy-request is ${ticket.state}; a GO is granted only while awaiting_go.`, {
@@ -761,6 +806,7 @@ async function handleUi(path: string, actor: Actor, deps: Deps): Promise<Respons
         ownerKeyFingerprint,
         approvers: await deps.store.listApprovers(),
         history: await deps.store.listApproverHistory(),
+        testProperties: await deps.store.listTestProperties(),
       }),
     )
   }
@@ -776,6 +822,7 @@ async function handleUi(path: string, actor: Actor, deps: Deps): Promise<Respons
       transitions: await deps.store.listTransitions(ticket.id),
       go: await deps.store.getGo(ticket.id),
       now: deps.now(),
+      isTestProperty: ticket.target ? (await deps.store.listTestProperties()).includes(ticket.target) : false,
     }),
   )
 }

@@ -19,5 +19,15 @@
  * also cover the POST register/rotate/retire routes and strip the assertion
  * header the owner is identified by — locking the only permitted registrar out
  * of their own door. Caught by the owner testing the live relay before deploying.
+ *
+ * 0.6.0 — test properties. A property the owner has designated a test property
+ * may have its GO submitted by the validator, so an acceptance run no longer
+ * needs the owner to paste every approval by hand. Deliberately narrow: the
+ * designation is an owner-only write, it is published in the registry read so it
+ * can be audited from outside, staging and live properties are unchanged, the
+ * builder gains nothing anywhere, and the signature is still verified against the
+ * property's registered approver — this widens who may SUBMIT and nothing else.
+ * The general rule client approvers will need ("any valid signature, any
+ * submitter") is not settled by this and was left open on purpose.
  */
-export const RELAY_VERSION = '0.5.1'
+export const RELAY_VERSION = '0.6.0'

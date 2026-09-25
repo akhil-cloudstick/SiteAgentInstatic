@@ -14,6 +14,7 @@ import type {
   GoRecord,
   IdempotencyRecord,
   Message,
+  TestPropertyRecord,
   Ticket,
   TransitionRecord,
 } from './types'
@@ -30,6 +31,7 @@ export class MemoryStore implements Store {
   private readonly flags: FlagRecord[] = []
   private readonly idempotency = new Map<string, IdempotencyRecord>()
   private readonly approvers: ApproverRecord[] = []
+  private readonly testProperties: TestPropertyRecord[] = []
 
 
   async nextSeq(): Promise<number> {
@@ -159,6 +161,32 @@ export class MemoryStore implements Store {
       }
     }
     return retired
+  }
+
+  // ---- test properties ---------------------------------------------------
+  // Mirrors the D1 store: append-only, newest row per property wins. Nothing
+  // here is ever mutated, which is why there is no retirement stamp to keep in
+  // step the way the approver block above has to.
+
+  async listTestProperties(): Promise<string[]> {
+    const newest = new Map<string, TestPropertyRecord>()
+    for (const r of this.testProperties) {
+      const seen = newest.get(r.property)
+      if (!seen || r.seq > seen.seq) newest.set(r.property, r)
+    }
+    return [...newest.values()]
+      .filter((r) => r.designated)
+      .map((r) => r.property)
+      .sort()
+  }
+
+  async listTestPropertyHistory(): Promise<TestPropertyRecord[]> {
+    return this.testProperties.map(clone).sort((a, b) => b.seq - a.seq)
+  }
+
+  async recordTestProperty(record: TestPropertyRecord): Promise<boolean> {
+    this.testProperties.push(clone(record))
+    return true
   }
 
   async getIdempotency(subject: string, key: string): Promise<IdempotencyRecord | null> {

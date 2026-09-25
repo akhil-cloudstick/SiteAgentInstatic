@@ -1,7 +1,7 @@
 {
   "name": "deploy-relay",
   "private": true,
-  "version": "0.5.1",
+  "version": "0.6.0",
   "description": "Ticket relay between builder, validator and owner. Owner-signed GOs, append-only history, JSONL export.",
   "type": "module",
   "scripts": {

@@ -42,6 +42,17 @@ export const APPROVER_RETIRE = /^\/api\/approvers\/([^/]+)\/retire$/
  */
 export const APPROVERS_PUBLIC_PATH = '/api/health/approvers'
 
+/**
+ * The test-property write door. Owner-only, for the same reason the approver
+ * door is: a validator who could designate a property could designate a LIVE
+ * one and then submit its GO, which hands over the whole control in one step.
+ *
+ * Designating and undesignating are both POSTs because both are appends — there
+ * is no DELETE here, and no UPDATE anywhere in the table.
+ */
+export const TEST_PROPERTIES_PATH = '/api/test-properties'
+export const TEST_PROPERTY_REMOVE = /^\/api\/test-properties\/([^/]+)\/remove$/
+
 const HEADERS = {
   'content-type': 'application/json; charset=utf-8',
   // The checking side caches this and refuses when its copy goes stale, so a
@@ -63,7 +74,7 @@ export async function approvers(request: Request, store: Store): Promise<Respons
   if (request.method !== 'GET' && request.method !== 'HEAD') {
     return new Response(JSON.stringify({ error: 'Use GET.' }), { status: 405, headers: HEADERS })
   }
-  const live = await store.listApprovers()
+  const [live, testProperties] = await Promise.all([store.listApprovers(), store.listTestProperties()])
   const body = {
     // Stamped so the reader can tell how old its copy is, and refuse to act on
     // one that has gone stale rather than honour a key that may since have been
@@ -77,6 +88,13 @@ export async function approvers(request: Request, store: Store): Promise<Respons
       fingerprint: a.fingerprint,
       effectiveFrom: a.effectiveFrom,
     })),
+    // Published deliberately, and as a sibling list rather than a field on each
+    // approver. Two reasons: this registry is keyed by APPROVER, and a
+    // business-level row's `property` is the business's own name rather than a
+    // deployable property; and a property can be designated before it has an
+    // approver at all. It is published so that who may submit a GO — not just
+    // whose signature counts — can be audited from outside.
+    testProperties,
   }
   return new Response(request.method === 'HEAD' ? null : JSON.stringify(body), { status: 200, headers: HEADERS })
 }
@@ -288,6 +306,105 @@ export async function retireApprover(property: string, store: Store, at: string)
             'properties it covered will refuse until one is registered.'
           : `"${property}" now has no approver, and every gated action on it will refuse until one is registered.`,
       ...(stranded.length > 0 ? { alsoWithoutApprover: stranded } : {}),
+    },
+  }
+}
+
+// --- Test properties ----------------------------------------------------------
+//
+// Which properties the validator may SUBMIT a GO for. The signature is checked
+// against the property's registered approver either way, in exactly the same
+// place as before — a designation widens who may submit and nothing else.
+//
+// No role check lives in this file, exactly as for registration above: the door
+// is guarded once, in app.ts, and a handler that also checked would be a second
+// copy of the rule to keep in step.
+
+/** Designate a property. Idempotent by nature: designating twice is two rows and one state. */
+export async function designateTestProperty(
+  body: Record<string, unknown>,
+  store: Store,
+  by: string,
+  at: string,
+): Promise<Out> {
+  const property = String(body.property ?? '').trim()
+  if (!PROPERTY.test(property)) {
+    return { status: 422, body: { error: 'A property is lowercase letters, digits and hyphens.' } }
+  }
+  const reason = typeof body.reason === 'string' && body.reason.trim() ? body.reason.trim().slice(0, 500) : null
+
+  const already = await store.listTestProperties()
+  if (already.includes(property)) {
+    return {
+      status: 200,
+      body: {
+        designated: { property, at, by },
+        effect: `"${property}" was already a test property; nothing changed.`,
+        testProperties: already,
+      },
+    }
+  }
+
+  const seq = await store.nextSeq()
+  const ok = await store.recordTestProperty({
+    id: `TP-${String(seq).padStart(6, '0')}`,
+    seq,
+    property,
+    designated: true,
+    at,
+    by,
+    reason,
+    createdAt: at,
+  })
+  if (!ok) return { status: 500, body: { error: 'The designation was not recorded.' } }
+
+  return {
+    status: 200,
+    body: {
+      designated: { property, at, by, ...(reason ? { reason } : {}) },
+      // The consequence in words, as the retire handler does — a status code
+      // does not tell the owner what they just widened.
+      effect:
+        `The validator may now submit a GO for "${property}". Its signature is still checked ` +
+        `against the approver registered for "${property}", and no other role gains anything.`,
+      testProperties: await store.listTestProperties(),
+    },
+  }
+}
+
+/** Remove a designation. The property goes back to owner-submit only. */
+export async function removeTestProperty(
+  property: string,
+  store: Store,
+  by: string,
+  at: string,
+): Promise<Out> {
+  if (!PROPERTY.test(property)) return { status: 404, body: { error: 'No such property.' } }
+
+  const already = await store.listTestProperties()
+  if (!already.includes(property)) {
+    return { status: 404, body: { error: `"${property}" is not a test property.` } }
+  }
+
+  const seq = await store.nextSeq()
+  const ok = await store.recordTestProperty({
+    id: `TP-${String(seq).padStart(6, '0')}`,
+    seq,
+    property,
+    designated: false,
+    at,
+    by,
+    reason: null,
+    createdAt: at,
+  })
+  if (!ok) return { status: 500, body: { error: 'The removal was not recorded.' } }
+
+  return {
+    status: 200,
+    body: {
+      removed: { property, at, by },
+      effect: `Only the owner may submit a GO for "${property}" again.`,
+      testProperties: await store.listTestProperties(),
     },
   }
 }

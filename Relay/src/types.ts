@@ -112,6 +112,27 @@ export interface GoRecord {
  * one, so the registry is both the current answer and the history that explains
  * an old receipt. A retired row authorises nothing.
  */
+/**
+ * A property designated as a test property, or that designation removed.
+ *
+ * Both are rows and the highest `seq` for a property is the one in force, so
+ * the table is append-only in the strict sense — nothing is ever updated, and
+ * the history of who allowed what stays readable. The designation is published,
+ * so that history is the thing that makes it auditable.
+ */
+export interface TestPropertyRecord {
+  id: string
+  seq: number
+  property: string
+  /** True designates; false removes the designation. */
+  designated: boolean
+  at: string
+  /** The owner who made the call — recorded rather than assumed. */
+  by: string
+  reason: string | null
+  createdAt: string
+}
+
 export interface ApproverRecord {
   id: string
   seq: number

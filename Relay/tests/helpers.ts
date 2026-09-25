@@ -69,6 +69,14 @@ export function relay(
     approvers?: Record<string, string>
     /** business name -> { key, covers } for delegated approvers. */
     delegated?: Record<string, { publicKey: string; covers: string[] }>
+    /**
+     * Properties designated test properties before the first call.
+     *
+     * No default, and that is the point: on an ordinary relay nothing is a test
+     * property, so every existing test keeps asserting the owner-only rule
+     * without knowing this option exists.
+     */
+    testProperties?: string[]
   } = {},
 ) {
   const store = new MemoryStore()
@@ -107,6 +115,18 @@ export function relay(
       createdAt: '2026-09-14T00:00:00.000Z',
     })
   }
+  for (const property of options.testProperties ?? []) {
+    void store.recordTestProperty({
+      id: `tp_${++approverSeq}`,
+      seq: approverSeq,
+      property,
+      designated: true,
+      at: '2026-09-14T00:00:00.000Z',
+      by: 'owner@example.test',
+      reason: 'test fixture',
+      createdAt: '2026-09-14T00:00:00.000Z',
+    })
+  }
   for (const [property, d] of Object.entries(options.delegated ?? {})) {
     void store.registerApprover({
       id: `apr_${++approverSeq}`,
@@ -123,6 +143,12 @@ export function relay(
       createdAt: '2026-09-14T00:00:00.000Z',
     })
   }
+
+  // The fixtures above allocated their ids from a counter of their own and never
+  // touched the store's global seq. That matters for test properties, which
+  // resolve by HIGHEST seq: without this, a designation written during a test
+  // could be numbered below a seeded one and silently lose to it.
+  for (let i = 0; i < approverSeq; i++) void store.nextSeq()
 
   let keys = 0
   async function call(
@@ -218,6 +244,22 @@ export function signGo(fields: Omit<Go, 'signature'>, key: KeyObject = OWNER_KEY
 
 export async function grant(r: Relay, ticket: Ticket, overrides: Partial<Omit<Go, 'signature'>> = {}) {
   return r.call(OWNER, 'POST', `/api/tickets/${ticket.id}/go`, { go: signGo(goFor(ticket, r.now(), overrides)) })
+}
+
+/**
+ * Grant as somebody other than the owner.
+ *
+ * Separate from `grant` rather than a parameter on it, so that the ordinary
+ * helper stays the owner's and a test that submits as anyone else has to say so
+ * in its own text.
+ */
+export async function grantAs(
+  r: Relay,
+  actor: Actor,
+  ticket: Ticket,
+  overrides: Partial<Omit<Go, 'signature'>> = {},
+) {
+  return r.call(actor, 'POST', `/api/tickets/${ticket.id}/go`, { go: signGo(goFor(ticket, r.now(), overrides)) })
 }
 
 export const move = (r: Relay, actor: Actor, ticket: Ticket, to: string, extra: Record<string, unknown> = {}) =>

@@ -154,6 +154,21 @@ if (submit) submit.addEventListener('click', () => {
   }
   send('/api/approvers', body);
 });
+document.querySelectorAll('button.test-toggle').forEach((button) => {
+  button.addEventListener('click', () => {
+    const p = button.dataset.property;
+    const on = button.dataset.designated === '1';
+    // The consequence in words. Designating decides who may SUBMIT a GO, which
+    // is not obvious from a button labelled "Designate".
+    const question = on
+      ? 'Remove the test-property designation from ' + p + '?\n\nOnly you will be able to submit a GO for it again.'
+      : 'Designate ' + p + ' a test property?\n\nThe validator will be able to submit a GO for it. The signature is still checked against the approver registered for ' + p + '.';
+    if (confirm(question)) {
+      if (on) send('/api/test-properties/' + encodeURIComponent(p) + '/remove', {});
+      else send('/api/test-properties', { property: p });
+    }
+  });
+});
 document.querySelectorAll('button.retire').forEach((button) => {
   button.addEventListener('click', () => {
     const p = button.dataset.property;
@@ -244,10 +259,28 @@ function messageCard(m: Message): string {
   )
 }
 
-function goPanel(ctx: PageContext & { ticket: Ticket; go: GoRecord | null; now: Date }, evidence: Message[]): string {
+/**
+ * Who the page should offer a GO screen to.
+ *
+ * One function so the panel and the ticket page cannot drift apart, and so the
+ * rule reads the same here as it does in `grantGo`. The builder is absent on
+ * purpose: it submits nowhere, designated or not.
+ */
+function maySubmitGo(role: Actor['role'], isTestProperty: boolean): boolean {
+  return role === 'owner' || (role === 'validator' && isTestProperty)
+}
+
+function goPanel(
+  ctx: PageContext & { ticket: Ticket; go: GoRecord | null; now: Date; isTestProperty: boolean },
+  evidence: Message[],
+): string {
   const { ticket: t, go } = ctx
 
-  if (ctx.actor.role === 'owner' && t.state === 'awaiting_go') {
+  // The owner always; the validator only on a designated test property. This
+  // has to move in step with grantGo's gate in app.ts, or a validator who is
+  // permitted to submit gets no screen to submit from — the same dead-control
+  // failure the note at the foot of this file describes for the registry page.
+  if (maySubmitGo(ctx.actor.role, ctx.isTestProperty) && t.state === 'awaiting_go') {
     const command =
       `bun cli/sign-go.ts sign --key <your key file> --ticket ${t.id} --action ${t.action} ` +
       `--target ${t.target} --sha256 ${t.sha256}` +
@@ -287,12 +320,15 @@ export function renderTicket(
     transitions: TransitionRecord[]
     go: GoRecord | null
     now: Date
+    /** Whether this ticket's target is a designated test property. */
+    isTestProperty: boolean
   },
 ): Page {
   const { ticket: t, actor } = ctx
   const evidence = ctx.messages.filter((m) => m.kind === 'evidence' && m.evidence)
   const moves = simpleMovesFor(t.type, t.state, actor.role).filter((r) => !(r.to === 'disputed' && t.adjudicated))
-  const goScreen = actor.role === 'owner' && t.type === 'deploy-request' && t.state === 'awaiting_go'
+  const goScreen =
+    maySubmitGo(actor.role, ctx.isTestProperty) && t.type === 'deploy-request' && t.state === 'awaiting_go'
 
   const facts =
     '<dl>' +
@@ -300,7 +336,9 @@ export function renderTicket(
     `<dt>State</dt><dd>${stateBadge(t)}</dd>` +
     `<dt>Opened</dt><dd>${esc(t.createdBy)} · ${esc(t.createdAt)}</dd>` +
     (t.type === 'deploy-request'
-      ? `<dt>Action</dt><dd>${esc(t.action)}</dd><dt>Target</dt><dd>${esc(t.target)}</dd>` +
+      ? `<dt>Action</dt><dd>${esc(t.action)}</dd><dt>Target</dt><dd>${esc(t.target)}${
+          ctx.isTestProperty ? ' <span class="badge">test property</span>' : ''
+        }</dd>` +
         `<dt>sha256</dt><dd>${t.sha256 ? (t.action === 'publish-row' || t.action?.startsWith('set-status') || t.action === 'delete' ? `<code>${esc(t.sha256)}</code> <span class="meta">rows digest</span>` : artefactLink(t.sha256)) : ''}</dd>` +
         (t.contentDigest ? `<dt>Draft site digest</dt><dd><code>${esc(t.contentDigest)}</code></dd>` : '') +
         (t.deployId ? `<dt>Deploy id</dt><dd><code>${esc(t.deployId)}</code></dd>` : '')
@@ -370,9 +408,10 @@ export function renderTicket(
  * button is a courtesy and not a control.
  */
 export function renderApprovers(
-  ctx: PageContext & { approvers: ApproverRecord[]; history: ApproverRecord[] },
+  ctx: PageContext & { approvers: ApproverRecord[]; history: ApproverRecord[]; testProperties: string[] },
 ): Page {
   const isOwner = ctx.actor.role === 'owner'
+  const isTest = (property: string): boolean => ctx.testProperties.includes(property)
 
   const liveRows = ctx.approvers
     .map((a) => {
@@ -380,9 +419,23 @@ export function renderApprovers(
       const retire = isOwner
         ? `<button type="button" class="retire" data-property="${esc(a.property)}">Retire</button>`
         : ''
+      // A business row's `property` is the business's own name, not something
+      // that gets deployed, so it is never offered a designation.
+      const designated = isTest(a.property)
+      const testCell =
+        a.level === 'business'
+          ? '<span class="meta">—</span>'
+          : (designated ? '<span class="badge">test</span> ' : '') +
+            (isOwner
+              ? `<button type="button" class="test-toggle" data-property="${esc(a.property)}" ` +
+                `data-designated="${designated ? '1' : '0'}">${designated ? 'Remove' : 'Designate'}</button>`
+              : designated
+                ? ''
+                : '<span class="meta">no</span>')
       return (
         `<tr><td><code>${esc(a.property)}</code></td><td>${esc(a.level)}</td><td>${covers}</td>` +
-        `<td><code>${esc(a.fingerprint)}</code></td><td class="meta">${esc(a.effectiveFrom)}</td><td>${retire}</td></tr>`
+        `<td><code>${esc(a.fingerprint)}</code></td><td class="meta">${esc(a.effectiveFrom)}</td>` +
+        `<td>${testCell}</td><td>${retire}</td></tr>`
       )
     })
     .join('')
@@ -390,7 +443,8 @@ export function renderApprovers(
   const live =
     ctx.approvers.length > 0
       ? '<div class="wrap"><table><thead><tr><th>Property</th><th>Level</th><th>Covers</th>' +
-        `<th>Key fingerprint</th><th>Since</th><th></th></tr></thead><tbody>${liveRows}</tbody></table></div>`
+        `<th>Key fingerprint</th><th>Since</th><th>Test property</th><th></th></tr></thead>` +
+        `<tbody>${liveRows}</tbody></table></div>`
       : '<p class="stalled">No approver is registered for anything. Every gated action on every ' +
         'property will refuse until one is. That is the intended failure, not a fault — there is no ' +
         'platform-wide key that would otherwise cover them.</p>'

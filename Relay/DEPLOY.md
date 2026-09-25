@@ -162,14 +162,38 @@ curl -s -o /dev/null -w "%{http_code}\n" -X POST https://deploy-relay.<your-subd
 This must be **`302`** — Cloudflare Access redirecting an anonymous caller to the login, before the
 request ever reaches the Worker. That is the correct, closed state.
 
-**A `403` here is the alarm, not the pass.** `403` means the request got PAST Access and reached the
-Worker, which then refused it for having no assertion header — and the only way it gets past Access
-is if `api/approvers` has a Bypass policy on it. That is the failure step 11 describes: the registry
-becomes readable by everyone and writable by nobody, including the owner, whose browser identity
-lives in the very header the Bypass strips.
+**On THIS call — the one with no credential — a `403` is the alarm, not the pass.** It means the
+request got PAST Access and reached the Worker, which then refused it for having no assertion header
+— and the only way it gets past Access is if `api/approvers` has a Bypass policy on it. That is the
+failure step 11 describes: the registry becomes readable by everyone and writable by nobody,
+including the owner, whose browser identity lives in the very header the Bypass strips.
 
-(An earlier version of this step had these two the wrong way round and told you `403` was the pass.
-It was corrected after testing the live relay: closed really does answer `302`.)
+**Sent WITH a credential, `403` is the correct answer and the one to want.** Repeat the same POST as
+the validator:
+
+```
+curl -s -o /dev/null -w "%{http_code}\n" -X POST -H "CF-Access-Client-Id: <relay-validator Client ID>" -H "CF-Access-Client-Secret: <relay-validator Client Secret>" https://deploy-relay.<your-subdomain>.workers.dev/api/approvers
+```
+
+Access lets this one through — the token is in the Service Auth policy from step 10 — and the Worker
+answers `403`, because registering an approver belongs to the owner alone. So the two `403`s mean
+opposite things: **without a credential it means the door is open; with one it means the lock
+works.** What separates them is only whether a credential was sent, which is why a result of "403"
+is not a finding on its own — always record which of the two calls produced it.
+
+A `302` on the credentialed call is a third answer and a different fault: it means Access is
+**rejecting the service token** rather than admitting it, so the token is not in the Service Auth
+policy from step 10, or its Client ID and Secret do not match. Nothing reached the Worker, so this
+says nothing about the registry door — fix the policy and run the pair again.
+
+| Call | `302` | `403` |
+|---|---|---|
+| No credential | correct, closed | **alarm** — `api/approvers` has a Bypass |
+| `relay-validator` token | Access is rejecting the token | correct, the lock works |
+
+(An earlier version of this step had the anonymous pair the wrong way round and told you `403` was
+the pass there. It was corrected after testing the live relay: with no credential, closed really
+does answer `302`.)
 
 **14. Optional notifier.** To receive a webhook when tickets change or the validator stalls:
 ```

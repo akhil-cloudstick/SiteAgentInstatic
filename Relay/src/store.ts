@@ -13,6 +13,7 @@ import type {
   GoRecord,
   IdempotencyRecord,
   Message,
+  TestPropertyRecord,
   Ticket,
   TransitionRecord,
 } from './types'
@@ -64,6 +65,19 @@ export interface Store {
   registerApprover(record: ApproverRecord): Promise<boolean>
   /** Retire without a replacement: the property is then left with no approver. */
   retireApprover(property: string, at: string): Promise<boolean>
+
+  /**
+   * The properties currently designated test properties, in name order.
+   *
+   * Derived from the newest row per property, because a designation and its
+   * removal are both rows. This is what widens who may submit a GO, and it is
+   * published in the registry read.
+   */
+  listTestProperties(): Promise<string[]>
+  /** Every designation and removal, newest first — the history behind the read. */
+  listTestPropertyHistory(): Promise<TestPropertyRecord[]>
+  /** Append a designation or a removal. Never updates; the newest row wins. */
+  recordTestProperty(record: TestPropertyRecord): Promise<boolean>
 
   getIdempotency(subject: string, key: string): Promise<IdempotencyRecord | null>
   putIdempotency(record: IdempotencyRecord): Promise<void>
