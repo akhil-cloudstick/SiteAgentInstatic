@@ -19,25 +19,64 @@
 
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { buildStampOf } from './stamp.mjs';
 
 const POLL_TIMEOUT_MS = 90_000;
 const POLL_INTERVAL_MS = 3_000;
 const REQUEST_TIMEOUT_MS = 10_000;
-/** Sampled rather than exhaustive: a 400-page site should not cost 400 fetches. */
-const MAX_ROUTES = 12;
+/**
+ * Check EVERY route on a site up to this size.
+ *
+ * It used to sample at most twelve routes whatever the site, which meant a
+ * partial upload that missed a route outside the sample passed. The validator
+ * asked the obvious question about it: an eighteen-route site is cheap to check
+ * completely, so why sample it at all. It is not, and now it isn't.
+ */
+const EXHAUSTIVE_UPTO = 60;
+
+/**
+ * Above that, sample — a 400-page site should not cost 400 fetches. Spread
+ * across the site's depth rather than down one branch, and the verdict says it
+ * sampled, so "verified" never quietly means "verified a fraction of it".
+ */
+const MAX_SAMPLED_ROUTES = 24;
 
 /**
  * A short, distinctive string from a baked page — enough to tell that page
  * apart from the host's fallback, and from every other page on the site.
  *
- * The <title> is the natural choice: every baked page has one, a fallback page
+ * The <title> was the original choice: every baked page has one, a fallback page
  * has a different one, and it survives the minification and asset rewriting a
  * host may do on the way out.
+ *
+ * It is now the FALLBACK, not the first choice, because of what it cannot see.
+ * A title is stable across builds by design, so an upload that silently does
+ * not land — leaving the previous version of the site live — matches every
+ * title and passes. `comparableOfBakedPage` below prefers the build stamp,
+ * which changes when the page changes.
  */
 export function fingerprintOfBakedPage(html) {
   const title = /<title[^>]*>([\s\S]{1,200}?)<\/title>/i.exec(html)?.[1];
   const cleaned = title?.replace(/\s+/g, ' ').trim();
   return cleaned && cleaned.length >= 3 ? cleaned : null;
+}
+
+/**
+ * What a route is recognised by, and how strong that recognition is.
+ *
+ * The build stamp is preferred: it is derived from the page's own bytes, so it
+ * changes when the page changes and catches a stale site that every title check
+ * would wave through. The title remains for a page with no <head> to stamp into.
+ *
+ * The two are NOT reported as the same thing — the verdict says how many routes
+ * were compared by stamp, because a run that fell back to titles is a weaker
+ * check and reading it as equally strong is how a gap gets re-introduced.
+ */
+export function comparableOfBakedPage(html) {
+  const stamp = buildStampOf(html);
+  if (stamp) return { kind: 'stamp', value: stamp };
+  const title = fingerprintOfBakedPage(html);
+  return title ? { kind: 'title', value: title } : null;
 }
 
 /** Map a route back to the file that was baked for it. */
@@ -76,25 +115,70 @@ export async function verifyDeployedSite(url, dir, routes, { now = Date.now, sle
     return { verification: 'unverified', detail: 'nothing was baked to check against', checked: 0, failed: 0 };
   }
 
-  // Home first — it is the one every host serves — then a spread of the rest,
-  // so a large site is sampled across its depth rather than down one branch.
+  // Home first — it is the one every host serves — then the rest.
   const ordered = [...routes].sort((a, b) => (a === '/' ? -1 : b === '/' ? 1 : 0));
-  const step = Math.max(1, Math.ceil(ordered.length / MAX_ROUTES));
-  const sample = ordered.filter((_, i) => i % step === 0).slice(0, MAX_ROUTES);
+  const sampled = ordered.length > EXHAUSTIVE_UPTO;
+  const step = sampled ? Math.max(1, Math.ceil(ordered.length / MAX_SAMPLED_ROUTES)) : 1;
+  const sample = sampled
+    ? ordered.filter((_, i) => i % step === 0).slice(0, MAX_SAMPLED_ROUTES)
+    : ordered;
+
+  // How many baked pages carry each title, across the WHOLE build rather than
+  // the sample. A title shared by two pages cannot tell them apart, so a
+  // fallback serving the wrong one would pass — the validator's second finding.
+  // Computed lazily, because after stamping almost nothing falls back to titles
+  // and reading every baked file off a network share is not free.
+  let titleCounts = null;
+  const titleIsUnique = (title) => {
+    if (titleCounts === null) {
+      titleCounts = new Map();
+      for (const route of ordered) {
+        try {
+          const t = fingerprintOfBakedPage(readFileSync(bakedFileFor(dir, route), 'utf8'));
+          if (t) titleCounts.set(t, (titleCounts.get(t) ?? 0) + 1);
+        } catch {
+          // Unreadable here means it simply does not contribute a title.
+        }
+      }
+    }
+    return (titleCounts.get(title) ?? 0) <= 1;
+  };
 
   const expected = new Map();
+  // Routes that exist but cannot be told apart from another page. Counted and
+  // named rather than skipped in silence: "could not check" must never read the
+  // same as "checked and fine".
+  const indistinguishable = [];
   for (const route of sample) {
     try {
       const html = readFileSync(bakedFileFor(dir, route), 'utf8');
-      const fingerprint = fingerprintOfBakedPage(html);
-      if (fingerprint) expected.set(route, fingerprint);
+      const comparable = comparableOfBakedPage(html);
+      if (!comparable) continue;
+      if (comparable.kind === 'title' && !titleIsUnique(comparable.value)) {
+        indistinguishable.push(route);
+        continue;
+      }
+      expected.set(route, comparable);
     } catch {
       // A route we cannot read locally cannot be compared; it is simply not
       // part of the sample rather than a failure of the site.
     }
   }
+
+  // Every route shares its title with another. Nothing here can be verified, and
+  // per P2 that is reported as "could not check", never as success.
+  if (expected.size === 0 && indistinguishable.length > 0) {
+    return {
+      verification: 'unverified',
+      detail:
+        `${indistinguishable.length} routes share their titles with other pages and carry no build ` +
+        'stamp, so none of them can be told apart from a fallback. Publish again to stamp them.',
+      checked: 0,
+      failed: 0,
+    };
+  }
   if (expected.size === 0) {
-    return { verification: 'unverified', detail: 'no baked page carried a comparable title', checked: 0, failed: 0 };
+    return { verification: 'unverified', detail: 'no baked page carried a build stamp or a comparable title', checked: 0, failed: 0 };
   }
 
   const base = url.replace(/\/$/, '');
@@ -113,16 +197,34 @@ export async function verifyDeployedSite(url, dir, routes, { now = Date.now, sle
 
   const mismatched = [];
   let checked = 0;
-  for (const [route, fingerprint] of expected) {
+  let byStamp = 0;
+  for (const [route, expect] of expected) {
     const res = await fetchText(`${base}${route}`);
     checked++;
     if (!res.ok) {
       mismatched.push(`${route}: answered ${res.status || 'nothing'}`);
       continue;
     }
+
+    if (expect.kind === 'stamp') {
+      byStamp++;
+      const live = buildStampOf(res.text);
+      if (live === expect.value) continue;
+      // The failure the stamp exists for: the route answers, and answers with a
+      // real page of the right shape — just not the one that was uploaded. Both
+      // messages name which, because "it did not land" and "it is an older
+      // build" send whoever reads the receipt to different places.
+      mismatched.push(
+        live === null
+          ? `${route}: served a page carrying no build stamp — an older build, or a host that strips meta tags`
+          : `${route}: served build ${live}, not the ${expect.value} that was uploaded`,
+      );
+      continue;
+    }
+
     // The test that a status code cannot pass: this route must serve ITS page,
     // not the host's fallback and not another page's.
-    if (!res.text.includes(fingerprint)) {
+    if (!res.text.includes(expect.value)) {
       mismatched.push(`${route}: served something other than its own page`);
     }
   }
@@ -136,5 +238,26 @@ export async function verifyDeployedSite(url, dir, routes, { now = Date.now, sle
       failed: mismatched.length,
     };
   }
-  return { verification: 'verified', detail: `${checked} routes served their own content`, checked, failed: 0 };
+  // How much, and how, both travel with the verdict. All-by-stamp over every
+  // route is the strong result; anything less says so on the receipt rather than
+  // looking identical to it.
+  const how =
+    byStamp === checked
+      ? 'by build stamp'
+      : `${byStamp} of ${checked} by build stamp, the rest by title only`;
+  const scope = sampled
+    ? `sampled ${checked} of ${ordered.length} routes`
+    : checked === ordered.length
+      ? `all ${checked} routes`
+      : `${checked} of ${ordered.length} routes`;
+  const caveat =
+    indistinguishable.length > 0
+      ? `; ${indistinguishable.length} could not be told apart (shared titles, no build stamp)`
+      : '';
+  return {
+    verification: 'verified',
+    detail: `${scope} served their own content (${how})${caveat}`,
+    checked,
+    failed: 0,
+  };
 }

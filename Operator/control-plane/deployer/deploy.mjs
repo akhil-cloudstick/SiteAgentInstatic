@@ -5,6 +5,7 @@ import { existsSync, mkdirSync, writeFileSync, readFileSync, realpathSync, statS
 import { resolve } from 'node:path';
 import * as tenants from '../registry/tenants.mjs';
 import { verifyDeployedSite } from './verify.mjs';
+import { stampBakedPages } from './stamp.mjs';
 import {
   recordReceipt,
   retainKnownGood,
@@ -501,6 +502,23 @@ export async function deployTenant(
     console.error(`[deploy] root files for ${slug} could not be written:`, e.message);
   }
 
+  // Stamp every page with a revision of its own, LAST — after the root files,
+  // so that what is stamped is exactly what ships. Without it the live check
+  // can only compare titles, and titles are identical across builds: an upload
+  // that silently does not land leaves the PREVIOUS site serving, every title
+  // matches, and the deploy is recorded as verified. Never fatal, for the same
+  // reason the root files are not — and a page that could not be stamped is
+  // reported by the verifier as checked the weaker way, not passed quietly.
+  try {
+    const { stamped, unstamped } = stampBakedPages(dir);
+    if (unstamped.length > 0) {
+      console.warn(`[deploy] ${slug}: ${unstamped.length} page(s) could not be build-stamped`);
+    }
+    console.log(`[deploy] ${slug}: build-stamped ${stamped} page(s)`);
+  } catch (e) {
+    console.error(`[deploy] pages for ${slug} could not be build-stamped:`, e.message);
+  }
+
   // Direct Upload the baked folder (resolved past the current -> slot symlink).
   const { code, out } = await runWrangler(
     ['pages', 'deploy', dir, `--project-name=${project}`, '--branch=main', '--commit-dirty=true'], env);
@@ -719,6 +737,23 @@ export async function rollbackTenant(slug, { to = null } = {}, deps = {}) {
     writeRootFiles(staging, row);
   } catch (e) {
     console.error(`[rollback] root files for ${slug} could not be written:`, e.message);
+  }
+
+  // Stamp every page with a revision of its own, LAST — after the root files,
+  // so that what is stamped is exactly what ships. Without it the live check
+  // can only compare titles, and titles are identical across builds: an upload
+  // that silently does not land leaves the PREVIOUS site serving, every title
+  // matches, and the deploy is recorded as verified. Never fatal, for the same
+  // reason the root files are not — and a page that could not be stamped is
+  // reported by the verifier as checked the weaker way, not passed quietly.
+  try {
+    const { stamped, unstamped } = stampBakedPages(staging);
+    if (unstamped.length > 0) {
+      console.warn(`[rollback] ${slug}: ${unstamped.length} page(s) could not be build-stamped`);
+    }
+    console.log(`[rollback] ${slug}: build-stamped ${stamped} page(s)`);
+  } catch (e) {
+    console.error(`[rollback] pages for ${slug} could not be build-stamped:`, e.message);
   }
 
   const deploy = await tenants.recordDeploy(row.id, 'uploading', null, null);
