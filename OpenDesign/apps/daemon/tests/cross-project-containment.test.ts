@@ -12,15 +12,28 @@
  * can open a path. What would constrain it is `isSandboxImportedProjectRootAllowed`,
  * which refuses a project root outside the roots the operator named.
  *
- * WHAT THIS TEST EXISTS TO RECORD: that control is wrapped in
- * `isSandboxModeEnabled(process.env)` (projects.ts), and `OD_SANDBOX_MODE` is set
- * NOWHERE outside the test suite — not in the control plane's daemon env, not in
- * any deploy config. So in production the check is skipped entirely.
+ * WHAT THIS TEST USED TO RECORD, and no longer does: that the control was
+ * wrapped in `isSandboxModeEnabled(process.env)` (projects.ts) while
+ * `OD_SANDBOX_MODE` was set NOWHERE outside the test suite — not in the control
+ * plane's daemon env, not in any deploy config — so in production the check was
+ * skipped entirely. A lock installed, tested, and never locked, which anybody
+ * auditing the ten passing sandbox test files would have read as locked.
  *
- * Both states are pinned below, deliberately. The "enabled" cases prove the
- * control is correct and worth switching on; the "disabled" case states plainly
- * what production does today, so nobody reads the ten passing sandbox test files
- * and concludes the containment is live. It is implemented, tested, and inert.
+ * It is now switched on. `Operator/control-plane/runtime/odRuntime.mjs` sets
+ * `OD_SANDBOX_MODE=1` and `OD_SANDBOX_IMPORT_ALLOWED_ROOTS` to
+ * `<this tenant's data dir>/projects` for every daemon it starts. Per tenant,
+ * deliberately: one shared root would re-open the very reach this closes, and an
+ * empty list would allow nothing at all.
+ *
+ * So the first case below now pins the CONTAINED behaviour as production's, and
+ * the old behaviour is kept at the foot of the file as the contrast — what the
+ * absence of that variable used to mean, so the cost of removing it again is
+ * written down rather than remembered.
+ *
+ * What this still does NOT cover, and must not be read as covering: the agent is
+ * an `opencode` child with shell access, and this control governs which project
+ * roots OD will SERVE, not what a process holding a shell can open. That gap is
+ * recorded in docs/known-gaps.md and needs OS-level separation.
  */
 import { describe, expect, it } from 'vitest';
 import { mkdtempSync, mkdirSync, rmSync } from 'node:fs';
@@ -44,21 +57,39 @@ function twoProjects() {
 }
 
 describe('one project reaching another project’s files', () => {
-  it('PRODUCTION TODAY: the containment is off, so a sibling project root is allowed', () => {
+  it('PRODUCTION TODAY: the containment is on, and a sibling project root is refused', () => {
     const { a, b, cleanup } = twoProjects();
     try {
-      // Exactly the environment the control plane builds for a tenant daemon:
-      // OD_SANDBOX_MODE is absent. Confirmed by searching the whole Operator
-      // tree — the variable appears in no source, env file or deploy config.
-      const productionEnv: Record<string, string | undefined> = {};
+      // Exactly the environment the control plane now builds for a tenant
+      // daemon: the mode on, and the allowed root derived from THIS tenant's own
+      // data dir. See odRuntime.mjs, where both are set together.
+      const productionEnv: Record<string, string | undefined> = {
+        [SANDBOX_MODE_ENV]: '1',
+        [SANDBOX_IMPORT_ALLOWED_ROOTS_ENV]: a,
+      };
 
-      expect(isSandboxModeEnabled(productionEnv)).toBe(false);
-
-      // With the mode off, the allow-check answers `true` for ANY path, because
-      // `projects.ts` never reaches it — the guard short-circuits first. Project
-      // B's root is "allowed" from project A's daemon.
-      expect(isSandboxImportedProjectRootAllowed(b, productionEnv)).toBe(true);
+      expect(isSandboxModeEnabled(productionEnv)).toBe(true);
       expect(isSandboxImportedProjectRootAllowed(a, productionEnv)).toBe(true);
+
+      // The assertion the whole class is about — and it is now production's
+      // behaviour rather than an aspiration.
+      expect(isSandboxImportedProjectRootAllowed(b, productionEnv)).toBe(false);
+    } finally {
+      cleanup();
+    }
+  });
+
+  it('THE CONTRAST: with the mode unset, every path is allowed — what this used to be', () => {
+    const { a, b, cleanup } = twoProjects();
+    try {
+      // Kept so the cost of removing OD_SANDBOX_MODE from the daemon env is
+      // written down. With the mode off the allow-check answers `true` for ANY
+      // path, because projects.ts short-circuits before reaching it: project B's
+      // root is "allowed" from project A's daemon, silently.
+      const unset: Record<string, string | undefined> = {};
+      expect(isSandboxModeEnabled(unset)).toBe(false);
+      expect(isSandboxImportedProjectRootAllowed(b, unset)).toBe(true);
+      expect(isSandboxImportedProjectRootAllowed(a, unset)).toBe(true);
     } finally {
       cleanup();
     }

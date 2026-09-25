@@ -10,6 +10,10 @@ import { migrate } from './registry/db.mjs';
 import { getSettings, saveSettings, getSecrets, getDefaultGuidance, saveDefaultGuidance } from './registry/settings.mjs';
 import * as tenantsRepo from './registry/tenants.mjs';
 import { provisionTenant, deprovisionTenant, startTenant, resumeAll, editTenant, repairTenantCf, pointTestFunnel } from './provisioner/provision.mjs';
+import { countPagesProjects } from './provisioner/provision.mjs';
+import { pagesCeilingNotice } from './lib/pagesCeiling.mjs';
+import { capAndSpend, setCap, spendByProject } from './registry/aiSpend.mjs';
+import { capDecision } from './lib/aiSpend.mjs';
 import { deployTenant, hasBakedOutput, rollbackTenant } from './deployer/deploy.mjs';
 // The proof chain's readers. Both had no caller anywhere until these routes.
 import { listReceipts, listKnownGood } from './deployer/receipt.mjs';
@@ -370,10 +374,27 @@ const server = http.createServer(async (req, res) => {
       // fetched with the operator's key. Empty until a key is saved.
       if (method === 'GET') return send(res, 200, { models: await listOpenrouterModels() });
     }
+    // What every project has spent this month. The answer to the question we
+    // could not answer before: nothing recorded a token, so per-project spend
+    // existed only on the provider's dashboard.
+    if (path === '/api/ai-spend' && method === 'GET') {
+      if (scope.level !== 'platform') return send(res, 403, { error: 'Platform owners only.' });
+      return send(res, 200, { spend: await spendByProject() });
+    }
     if (path === '/api/tenants') {
       if (method === 'GET') {
         const rows = await tenantsRepo.listTenants(scope);
-        return send(res, 200, { tenants: rows.map(tenantView) });
+        // The Pages ceiling travels with the listing so the console can warn
+        // before the wall rather than after it. A create that succeeds redirects
+        // immediately, so the warning cannot ride on the create response.
+        //
+        // Platform scope only, and not for tidiness: the limit is per Cloudflare
+        // ACCOUNT, while the listing is scope-filtered. Counting a business
+        // admin's own projects would report a fraction of the real number as if
+        // it were the whole, which is worse than saying nothing.
+        const pagesCeiling =
+          scope.level === 'platform' ? pagesCeilingNotice(await countPagesProjects()) : null;
+        return send(res, 200, { tenants: rows.map(tenantView), pagesCeiling });
       }
       if (method === 'POST') {
         const body = await readJson(req);
@@ -573,7 +594,7 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { agent });
     }
 
-    const m = path.match(/^\/api\/tenants\/([a-z0-9-]+)(?:\/(start|deploy|update|repair|expose|receipts|known-good|rollback))?$/);
+    const m = path.match(/^\/api\/tenants\/([a-z0-9-]+)(?:\/(start|deploy|update|repair|expose|receipts|known-good|rollback|ai-cap))?$/);
     if (m) {
       // A project outside the administrator's scope does not exist, for reads
       // and changes alike (AC-A1.2).
@@ -621,6 +642,39 @@ const server = http.createServer(async (req, res) => {
           detail: { to: body?.to ?? null, restoredFrom: out.restoredFrom ?? null, ok: out.ok },
         });
         return send(res, 200, out);
+      }
+      // The project's AI spending limit (E4).
+      //
+      // Reading it is available to anyone who can see the project — a client
+      // needs to know why their AI stopped. CHANGING it is the platform owner's
+      // alone during the pilots, and every change is audited, which is what the
+      // owner asked for: "only I can raise it, and every raise goes in the audit
+      // log". Operators get this within their own budget later; clients never.
+      if (action === 'ai-cap') {
+        if (method === 'GET') {
+          const state = await capAndSpend(slug).catch(() => ({ cap: null, spent: null, month: null }));
+          return send(res, 200, { ...state, decision: capDecision({ cap: state.cap, spent: state.spent }) });
+        }
+        if (method === 'POST') {
+          if (scope.level !== 'platform') {
+            return send(res, 403, {
+              error: 'Only the platform owner sets a project\'s AI spending limit.',
+            });
+          }
+          const body = await readJson(req).catch(() => ({}));
+          const { before, after } = await setCap(slug, body?.capUsd ?? null);
+          // The CHANGE, not the resulting state: "raised from 20 to 50" cannot be
+          // reconstructed after the write, so it is recorded at the moment it is
+          // known.
+          recordAdminAction({
+            admin,
+            action: after === null ? 'ai.cap.clear' : before === null ? 'ai.cap.set' : after > before ? 'ai.cap.raise' : 'ai.cap.lower',
+            tenantSlug: slug,
+            detail: { from: before, to: after },
+            ip,
+          });
+          return send(res, 200, { cap: after, previous: before });
+        }
       }
       if (action === 'update' && method === 'POST') return send(res, 200, await editTenant(slug, await readJson(req)));
       if (action === 'repair' && method === 'POST') return send(res, 200, await repairTenantCf(slug));

@@ -88,6 +88,7 @@ if (Astro.request.method === 'POST') {
 }
 
 let tenants: any[] = [];
+let pagesCeiling: { level: 'warn' | 'full'; count: number; message: string } | null = null;
 let businesses: any[] = [];
 try {
   // Both listings at once: the table and the Business filter don't wait on
@@ -97,6 +98,9 @@ try {
     cpLoad(Astro.cookies, '/api/businesses'),
   ]);
   if (list.ok) tenants = list.body.tenants || [];
+  // Only the platform scope is sent one, because only a platform admin can act
+  // on it — removing a project, or adding a second Cloudflare account.
+  if (list.ok) pagesCeiling = list.body.pagesCeiling ?? null;
   else error = error || list.body.error || `Could not list projects (${list.status})`;
   if (biz.ok) businesses = biz.body.businesses || [];
 } catch (e) {
@@ -169,6 +173,19 @@ const presetBusiness = Astro.url.searchParams.get('business') || (businesses.len
   </PageHeader>
 
   {error && <div class="mms-alert mms-alert--err" role="alert" style="margin-bottom:16px"><i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i><span>{error}</span></div>}
+  {pagesCeiling && (
+    <div
+      class={`mms-alert mms-alert--${pagesCeiling.level === 'full' ? 'err' : 'info'}`}
+      role={pagesCeiling.level === 'full' ? 'alert' : undefined}
+      style="margin-bottom:16px"
+    >
+      <i
+        class={`fa-solid ${pagesCeiling.level === 'full' ? 'fa-circle-exclamation' : 'fa-circle-info'}`}
+        aria-hidden="true"
+      ></i>
+      <span>{pagesCeiling.message}</span>
+    </div>
+  )}
   {businesses.length === 0 && !error && (
     <div class="mms-alert mms-alert--info" style="margin-bottom:16px">
       <i class="fa-solid fa-circle-info" aria-hidden="true"></i>

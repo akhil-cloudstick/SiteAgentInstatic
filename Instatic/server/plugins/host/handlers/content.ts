@@ -49,7 +49,7 @@ import { republishAllPages } from '../../../publish/republish'
 import { bumpPublishVersionSerialized } from '../../../publish/publishState'
 import { applyContentEntryCellsFilter } from '../../../publish/contentEvents'
 import type { DbClient } from '../../../db/client'
-import { assertContentTableAccess, getUploadsDirForApi } from '../registry'
+import { CONTENT_ACCESS_ALL, assertContentTableAccess, getUploadsDirForApi } from '../registry'
 import { buildContentTableIdLookup, pluginContentFieldsToDataFields } from '../contentFieldMapping'
 import {
   buildTableSlugLookup,
@@ -123,10 +123,15 @@ export async function handleContentTablesList(
   entry: HostPluginRecord,
   db: DbClient,
 ): Promise<void> {
-  const allowedSlugs = new Set((entry.manifest.contentAccess ?? []).map((e) => e.table))
+  // A manifest declaring "*" sees every table, including ones created after it
+  // was written. That is the whole point for a plugin whose job is to expose
+  // the operator's own content types rather than a fixed set it shipped with.
+  const access = entry.manifest.contentAccess ?? []
+  const allTables = access.some((e) => e.table === CONTENT_ACCESS_ALL)
+  const allowedSlugs = new Set(access.map((e) => e.table))
   const tables = await listDataTablesWithCounts(db)
   const summaries: ContentTableSummary[] = tables
-    .filter((t) => allowedSlugs.has(t.slug))
+    .filter((t) => allTables || allowedSlugs.has(t.slug))
     .map((t) => tableSummary(t, t.rowCount))
   replyApiOk(msg.pluginId, msg.correlationId, summaries)
 }
@@ -619,10 +624,12 @@ export async function handleContentSearch(
   db: DbClient,
 ): Promise<void> {
   const [query, limit] = msg.args
-  const allowedSlugs = new Set((entry.manifest.contentAccess ?? []).map((e) => e.table))
+  const searchAccess = entry.manifest.contentAccess ?? []
+  const searchesAll = searchAccess.some((e) => e.table === CONTENT_ACCESS_ALL)
+  const allowedSlugs = new Set(searchAccess.map((e) => e.table))
   const all = await searchDataRows(db, query, limit)
   const filtered = all
-    .filter((r) => allowedSlugs.has(r.tableSlug))
+    .filter((r) => searchesAll || allowedSlugs.has(r.tableSlug))
     .map((r) => ({
       id: r.id,
       tableSlug: r.tableSlug,

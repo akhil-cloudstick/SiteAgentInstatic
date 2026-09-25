@@ -23,6 +23,8 @@
 // Node built-ins only (http), mirroring the rest of the control-plane.
 import http from 'node:http';
 import config from '../lib/env.mjs';
+import { capAndSpend } from '../registry/aiSpend.mjs';
+import { capDecision } from '../lib/aiSpend.mjs';
 import { getTenant } from '../registry/tenants.mjs';
 import { getBusiness } from '../registry/org.mjs';
 import { readActiveProducts } from '../registry/settings.mjs';
@@ -94,7 +96,42 @@ async function hubContextFor(tenant, person) {
   const business = tenant?.business_id ? await getBusiness(tenant.business_id) : null;
   const products = await readActiveProducts();
   const brand = tenant ? await brandForTenant(tenant.slug) : PLATFORM_BRAND;
+
+  // The AI spending limit, so a project can be warned at 80% rather than
+  // discovering the stop at 100%. Sent here because this context is already
+  // injected into the served page for BOTH products, so neither can forget to
+  // show it — the same argument the acting banner is built on.
+  //
+  // Never fatal: a project that cannot be asked simply gets no notice, exactly
+  // as it does today. A spending limit nobody can read must not be the reason a
+  // page fails to load.
+  let aiSpend = null;
+  if (tenant?.slug) {
+    try {
+      const state = await capAndSpend(tenant.slug);
+      const decision = capDecision({ cap: state.cap, spent: state.spent });
+      // Only when there is something to say. A project with no limit — which is
+      // all of them until one is set — gets nothing, rather than a permanent
+      // "0% of no limit".
+      if (decision.level === 'warn' || decision.level === 'stopped') {
+        aiSpend = {
+          level: decision.level,
+          cap: decision.cap,
+          spent: decision.spent,
+          percent: Math.round(decision.fraction * 100),
+          month: state.month,
+        };
+      }
+    } catch {
+      // As above: no notice rather than no page.
+    }
+  }
+
   return {
+    // What the project has spent against its AI limit, or null when it has no
+    // limit or is comfortably inside it. The products render this; the rule
+    // about WHEN to warn is decided once, in capDecision.
+    aiSpend,
     // The Operator's mark and name, or null when this project sits directly
     // under the platform and wears MMSBUILD's (R5). The shared header reads
     // this; no product needs its own copy of the rule.

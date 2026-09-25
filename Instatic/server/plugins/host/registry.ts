@@ -39,13 +39,35 @@ export function assertHostPluginPermission(
  * permission but didn't list the table (or list the right mode) in its
  * manifest's `contentAccess[]` fails closed.
  */
+/**
+ * The table slug that means "every content table".
+ *
+ * `contentAccess` is a fixed list of table names, which works for a plugin that
+ * knows the tables it needs — and does not work at all for one whose job is to
+ * expose whatever tables the operator has created. A custom post type called
+ * "recipes" cannot be in a manifest written before it existed, so it was
+ * invisible: `cms_list_tables` simply did not return it, and an agent asking
+ * "what content is here" was told a subset and had no way to know.
+ *
+ * A wildcard is declared, never implied. A plugin gets this only by writing
+ * `{ "table": "*" }` in its own manifest, and the modes on that row still apply
+ * — so "*" with `["read"]` grants reading every table and writing none.
+ *
+ * It is also not the last word on what an agent can reach. The MCP gateway
+ * narrows per key on top of this (see mcp/permissions.mjs `tableAllowed`), so a
+ * key scoped to two tables still sees two tables through a plugin holding "*".
+ */
+export const CONTENT_ACCESS_ALL = '*'
+
 export function assertContentTableAccess(
   entry: HostPluginRecord,
   tableSlug: string,
   mode: ContentAccessMode,
 ): void {
   const access = entry.manifest.contentAccess ?? []
-  const found = access.find((row) => row.table === tableSlug)
+  const found =
+    access.find((row) => row.table === tableSlug) ??
+    access.find((row) => row.table === CONTENT_ACCESS_ALL)
   if (!found) {
     throw new Error(
       `Plugin "${entry.manifest.id}" does not have contentAccess declared for table "${tableSlug}"`,

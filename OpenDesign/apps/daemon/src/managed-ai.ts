@@ -28,6 +28,75 @@ import type { ByokChatProviderConfig } from '@open-design/contracts';
 import { BYOK_OPENCODE_AGENT_ID } from './runtimes/byok-opencode.js';
 
 /**
+ * Media generation does not go through the AI gateway.
+ *
+ * The operator's image, video, speech and search keys are injected into this
+ * daemon as environment variables, and those calls go straight from here to the
+ * provider. That is a deliberate design — it keeps large binary responses off
+ * the control plane — but it means a gateway-side spending cap cannot see a
+ * penny of that spend, and could not stop it either.
+ *
+ * So media is handled here instead, and the split is worth stating because the
+ * two halves are not equally complete:
+ *
+ *   * CAPPED — yes. `assertMediaSpendAllowed` asks the control plane before a
+ *     generation and refuses when the project has stopped. This is the half that
+ *     matters: at the limit, new media work stops like any other AI work.
+ *   * COUNTED — yes. Every generation is reported, so the ledger shows how much
+ *     media a project actually used.
+ *   * PRICED — no, not reliably. Image, video and speech providers do not return
+ *     a cost, and their pricing is per-model and per-parameter in ways this
+ *     daemon has no table for. So a media call is recorded with an UNKNOWN cost
+ *     rather than a guessed one, and the ledger reports how many such calls a
+ *     month holds. A month containing them has a total that is a floor, not a
+ *     figure — and anyone setting a cap from it should be told so rather than
+ *     left to assume.
+ */
+async function reportMediaSpendUrl(): Promise<string | null> {
+  const base = managedGatewayUrl();
+  if (!base || standaloneByokModel()) return null;
+  return `${base.replace(/\/v1\/?$/, '')}/media-spend`;
+}
+
+/**
+ * Refuse a media generation when the project has reached its limit.
+ *
+ * Throws, rather than returning a flag, because every caller of
+ * `generateMedia` already handles a thrown error by surfacing its message —
+ * so this reaches the tenant as the sentence written above rather than as a
+ * shape each call site has to remember to check.
+ */
+export async function assertMediaSpendAllowed(): Promise<void> {
+  const refusal = await managedSpendRefusal();
+  if (refusal) throw new ManagedAiLimitReachedError(refusal);
+}
+
+/**
+ * Record that a media generation happened. Fire-and-forget.
+ *
+ * A failed report understates the month, which means the cap errs towards
+ * allowing. That is the right way for a metering failure to fall: the
+ * alternative is refusing a tenant's work on the strength of a number we know is
+ * wrong.
+ */
+export function reportMediaSpend(detail: { surface: string; model: string; providerId?: string }): void {
+  void (async () => {
+    try {
+      const url = await reportMediaSpendUrl();
+      if (!url) return;
+      await fetch(url, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(detail),
+        signal: AbortSignal.timeout(4000),
+      });
+    } catch {
+      // Never the reason a generation that already succeeded reports failure.
+    }
+  })();
+}
+
+/**
  * Sent as the bearer token to the gateway. It is deliberately not a secret: the
  * gateway replaces it with the operator's real key. It exists only because
  * `buildOpenCodeByokProviderConfig` refuses an empty apiKey.
@@ -43,6 +112,28 @@ export const MANAGED_API_KEY_PLACEHOLDER = 'managed-by-operator';
  */
 export const MANAGED_AI_UNCONFIGURED_MESSAGE =
   "AI isn't set up for this workspace yet. Please contact your operator.";
+
+/**
+ * Shown to a tenant whose project has reached its AI limit for the month.
+ *
+ * Same rules as the message above: plain language, no status codes, no numbers
+ * the operator has not chosen to share. It says what still works, because "AI
+ * stopped" and "my website stopped" are the same sentence to somebody who did
+ * not build this, and only one of them is true.
+ */
+export const MANAGED_AI_LIMIT_MESSAGE =
+  "This workspace has reached its AI limit for this month. Editing, publishing and your live site "
+  + 'are unaffected. Please contact your operator to continue using AI.';
+
+/** Thrown when the project has reached its monthly AI spending limit. */
+export class ManagedAiLimitReachedError extends Error {
+  readonly code = 'MANAGED_AI_LIMIT_REACHED';
+
+  constructor(message: string = MANAGED_AI_LIMIT_MESSAGE) {
+    super(message);
+    this.name = 'ManagedAiLimitReachedError';
+  }
+}
 
 /** Thrown when managed mode is on but no model has been configured yet. */
 export class ManagedAiUnconfiguredError extends Error {
@@ -115,6 +206,38 @@ export function isManagedAi(): boolean {
 //   probe = .../ai/<token>/design/model
 function modelProbeUrl(base: string): string {
   return `${base.replace(/\/v1\/?$/, '')}/model`;
+}
+
+function spendProbeUrl(base: string): string {
+  return `${base.replace(/\/v1\/?$/, '')}/spend`;
+}
+
+/**
+ * Whether this project may start new AI work, asked of the control plane.
+ *
+ * Returns a message when it may not, and null when it may. Never throws, and
+ * ALLOWS when the probe cannot be answered — deliberately the opposite of the
+ * gateway's own rule, and the asymmetry is the point: the gateway is the
+ * enforcement and it fails closed on a capped project, so this pre-check only
+ * has to improve the message. If it failed closed too, a momentary blip between
+ * the daemon and the control plane would stop runs the gateway would happily
+ * have allowed, and it would do so with a message about spending limits that was
+ * not true.
+ */
+export async function managedSpendRefusal(): Promise<string | null> {
+  const base = managedGatewayUrl();
+  if (!base || standaloneByokModel()) return null;
+  try {
+    const resp = await fetch(spendProbeUrl(base), { signal: AbortSignal.timeout(4000) });
+    if (!resp.ok) return null;
+    const data = (await resp.json()) as { allow?: unknown };
+    // The gateway's own reason is written for the operator's terminal. The
+    // tenant gets this module's wording, which is the one reviewed for what a
+    // tenant should be told.
+    return data.allow === false ? MANAGED_AI_LIMIT_MESSAGE : null;
+  } catch {
+    return null;
+  }
 }
 
 // Short cache so a long agent loop doesn't re-probe on every turn, while an
@@ -199,6 +322,11 @@ export async function applyManagedRunAi<T extends Record<string, unknown>>(
   if (!isManagedAi()) return meta;
   const model = await getManagedModel();
   if (!model) throw new ManagedAiUnconfiguredError();
+  // Asked once per run, not per turn: this is the funnel every run passes
+  // through, so refusing here stops scheduled work and the CMS correction loop
+  // too, not just somebody pressing send.
+  const refusal = await managedSpendRefusal();
+  if (refusal) throw new ManagedAiLimitReachedError(refusal);
   return {
     ...meta,
     agentId: BYOK_OPENCODE_AGENT_ID,

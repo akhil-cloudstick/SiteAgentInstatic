@@ -323,6 +323,22 @@ export function start(tenant) {
     // AC-A2.3). Per project, so a project's studio can reach nothing but its
     // own. The platform publishes through MMS-CMS regardless (PRD §5.1).
     OD_USER_STATE_DIR: resolve(p.dataDir, 'user-state'),
+    // Containment (security class E2/E5). The daemon ships a control that
+    // refuses a project root outside the roots named here — it is correct, it
+    // has ten test files, and until now it was switched off, because
+    // OD_SANDBOX_MODE was set nowhere outside the test suite. A lock installed
+    // and never locked, which anyone auditing would have read as locked.
+    //
+    // The allowed root is PER TENANT and derived from this tenant's own data
+    // dir. A single shared root (…/siteagent-od) would re-open exactly the
+    // cross-tenant reach this closes, and an EMPTY list allows nothing at all,
+    // so both mistakes are worth naming: the value below is neither.
+    //
+    // '1' exactly. isSandboxModeEnabled throws on anything outside its accepted
+    // set, and it runs at daemon module load — so a typo here is a boot failure,
+    // not a quiet fallback to off. That is the right way round.
+    OD_SANDBOX_MODE: '1',
+    OD_SANDBOX_IMPORT_ALLOWED_ROOTS: resolve(p.dataDir, 'projects'),
     // Advanced tenants also get the website build rule OD must follow so their
     // pages import into Instatic cleanly. OD reads this file live (cached by
     // mtime), so editing it updates the enforced rule with no redeploy. Only

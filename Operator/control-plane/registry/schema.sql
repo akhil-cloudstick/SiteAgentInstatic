@@ -663,3 +663,86 @@ create trigger deploy_receipts_no_update before update on siteagent_control.depl
 drop trigger if exists deploy_receipts_no_delete on siteagent_control.deploy_receipts;
 create trigger deploy_receipts_no_delete before delete on siteagent_control.deploy_receipts
   for each row execute function siteagent_control.deploy_receipts_immutable();
+
+-- ---------------------------------------------------------------------------
+-- AI spending caps (security class E4).
+--
+-- The PRD records E4 as an accepted omission — "no spend cap exists today" — and
+-- that was exactly true: nothing here recorded a token, a call, or a cost.
+-- Per-project spend existed only on openrouter.ai, because the AI gateway tags
+-- every proxied call `X-Title: SiteAgent/<slug>/<product>`. Real, but not
+-- something the platform could read, reason about, or refuse on.
+--
+-- The owner's rules: per project, per calendar month, in the provider's own
+-- billing currency; warn at 80%, stop new AI work at 100%; never block editing,
+-- publishing or the live site; only the platform owner may raise a cap, and
+-- every raise is audited.
+--
+-- Two tables' worth of shape, in one column and one ledger:
+--
+--   * `tenants.ai_month_cap_usd` — the cap. NULL means no cap, which is every
+--     project until somebody sets one, and the state this ships in. A guessed
+--     number enforced on a client project is the one outcome the owner asked us
+--     to avoid, so nothing is enforced until there are real figures to set it
+--     from. The figures come from the ledger below.
+--   * `ai_spend` — one row per proxied model call that reported usage. The
+--     ledger the cap counts, and the answer to "what has a build actually cost".
+--
+-- `cost_usd` is NULLABLE and that is load-bearing. A call whose model has no
+-- published price, or which reported no usage, is recorded as unknown rather
+-- than as zero: a zero is indistinguishable from a free call, and a month of
+-- unpriced calls would read as a month of spending nothing — the most dangerous
+-- possible wrong answer for a cap to hold.
+alter table siteagent_control.tenants
+  add column if not exists ai_month_cap_usd numeric(12, 2);
+
+-- The platform default, for projects created from now on. Also NULL by default.
+alter table siteagent_control.settings
+  add column if not exists ai_month_cap_usd_default numeric(12, 2);
+
+create table if not exists siteagent_control.ai_spend (
+  id                bigserial primary key,
+  at                timestamptz not null default now(),
+  -- The cap's window, as 'YYYY-MM' in UTC. Stored rather than derived from `at`
+  -- so the month a call was billed to cannot move when a server's timezone does,
+  -- and so the cap's running total is one indexed equality test.
+  month             text not null,
+  tenant_slug       text not null,
+  -- cms | design. The split the X-Title header already makes on the provider's
+  -- side, kept here too so the two can be reconciled.
+  product           text not null,
+  model             text,
+  prompt_tokens     integer not null default 0,
+  completion_tokens integer not null default 0,
+  total_tokens      integer not null default 0,
+  cost_usd          numeric(12, 6),
+  -- The addressing rule: stamped by trigger from the project's Business, so a
+  -- query scoped to a Business can filter on the row itself.
+  business_id       bigint,
+  operator_id       bigint
+);
+
+-- The cap read: everything a project spent in one month. This is on the hot path
+-- of every model call, so it is the index that has to exist.
+create index if not exists ai_spend_tenant_month on siteagent_control.ai_spend (tenant_slug, month);
+create index if not exists ai_spend_at on siteagent_control.ai_spend (at desc);
+
+drop trigger if exists ai_spend_stamp_address on siteagent_control.ai_spend;
+create trigger ai_spend_stamp_address
+  before insert on siteagent_control.ai_spend
+  for each row execute function siteagent_control.stamp_slug_address();
+
+-- Append-only, for the same reason a deploy receipt is: it is evidence of what
+-- was spent, and a cap that can be made to fit by editing history is not a cap.
+create or replace function siteagent_control.ai_spend_immutable() returns trigger
+language plpgsql as $$
+begin
+  raise exception 'an AI spend row is immutable: it records what was spent, and may not be % after the fact',
+    case tg_op when 'DELETE' then 'deleted' else 'edited' end;
+end $$;
+drop trigger if exists ai_spend_no_update on siteagent_control.ai_spend;
+create trigger ai_spend_no_update before update on siteagent_control.ai_spend
+  for each row execute function siteagent_control.ai_spend_immutable();
+drop trigger if exists ai_spend_no_delete on siteagent_control.ai_spend;
+create trigger ai_spend_no_delete before delete on siteagent_control.ai_spend
+  for each row execute function siteagent_control.ai_spend_immutable();

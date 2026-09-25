@@ -37,6 +37,10 @@ const nameOf = new Map(projects.map((t: any) => [t.slug, t.display_name || t.slu
 // One line per action, in the words a person would use. An action with no entry
 // here still shows — under its own name — rather than silently not appearing.
 const WORDS: Record<string, string> = {
+  'ai.cap.set': 'Set a project AI spending limit',
+  'ai.cap.raise': 'Raised a project AI spending limit',
+  'ai.cap.lower': 'Lowered a project AI spending limit',
+  'ai.cap.clear': 'Removed a project AI spending limit',
   'act_as.enter': 'Opened a project as platform staff',
   'act_as.exit': 'Ended a platform-staff session',
   'act_as.expired': 'A platform-staff session expired',
@@ -61,7 +65,10 @@ const WORDS: Record<string, string> = {
 
 // The entries worth spotting from across the room: someone inside a customer's
 // work, a key that can read it, or a project put on a public address.
-const WATCH = new Set(['act_as.enter', 'act_as.exit', 'act_as.expired', 'agent.key.mint', 'tenant.expose', 'admin.login.failed']);
+// A raise is the one the owner asked to be able to see at a glance: it is the
+// change that lets a project spend more, and during the pilots only they can
+// make it.
+const WATCH = new Set(['act_as.enter', 'act_as.exit', 'act_as.expired', 'agent.key.mint', 'tenant.expose', 'admin.login.failed', 'ai.cap.raise', 'ai.cap.clear']);
 
 const when = (at: string) => {
   const d = new Date(at);

@@ -277,7 +277,15 @@ const manifestSchema = Type.Object({
   // at install time (`assertContentAccessCoherent` below).
   contentAccess: Type.Optional(Type.Array(
     Type.Object({
-      table: Type.String({ pattern: MANIFEST_SLUG_PATTERN.source, maxLength: 80 }),
+      // A slug, or '*' for every content table. The wildcard exists for a plugin
+      // whose job is to expose the tables the OPERATOR created: a custom post type
+      // cannot be named in a manifest written before it existed, and without this
+      // such tables were invisible rather than refused. It is always declared,
+      // never implied, and the `modes` on the row still bound what it grants.
+      table: Type.Union([
+        Type.Literal('*'),
+        Type.String({ pattern: MANIFEST_SLUG_PATTERN.source, maxLength: 80 }),
+      ]),
       modes: Type.Array(
         Type.Union([
           Type.Literal('read'),

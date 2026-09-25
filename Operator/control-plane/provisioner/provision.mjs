@@ -12,6 +12,7 @@ import { initTenantSite, attachTenantDomain, deleteTenantSite } from '../deploye
 import { encrypt, decrypt, genPassword, genSecretKeyHex } from '../lib/crypto.mjs';
 import { getSettings, getSecrets } from '../registry/settings.mjs';
 import config from '../lib/env.mjs';
+import { pagesCeilingNotice, tierUsesPagesSlot } from '../lib/pagesCeiling.mjs';
 
 // The operator's chosen model (from Settings) enables managed AI on each tenant:
 // when set, TenantRuntime wires the instance to this tenant's AI-Gateway URL and
@@ -79,6 +80,26 @@ async function assertDomainFree(column, value, exceptSlug = null) {
     { status: 409 },
   );
 }
+/**
+ * Refuse before anything is created, rather than half-create a project whose
+ * site can never be published. The arithmetic and the wording live in
+ * lib/pagesCeiling.mjs, because the console needs the same answer on page load
+ * and cannot get it from this path.
+ */
+export async function countPagesProjects() {
+  const { rows } = await query(
+    `select count(*)::int as n from siteagent_control.tenants
+      where cf_project is not null and status <> 'removed'`,
+  );
+  return Number(rows[0]?.n ?? 0);
+}
+
+async function assertPagesCeilingNotReached(tier) {
+  if (!tierUsesPagesSlot(tier)) return;
+  const notice = pagesCeilingNotice(await countPagesProjects());
+  if (notice?.level === 'full') throw Object.assign(new Error(notice.message), { status: 409 });
+}
+
 // schema/role identifiers derived from slug (hyphens -> underscores), validated.
 function names(slug) {
   const base = slug.replace(/-/g, '_');
@@ -159,6 +180,9 @@ export async function provisionTenant({ name, ownerEmail, cfProject, customDomai
   // project's domain must not be created at all (R4, AC-A2.3).
   await assertDomainFree('cf_project', cf_project, slug);
   await assertDomainFree('custom_domain', custom_domain, slug);
+  // Same place, same reason: refuse before the registry row exists, rather than
+  // half-create a project whose site can never be published.
+  await assertPagesCeilingNotReached(tier);
 
   // 0) registry row (synchronous, so the console shows the tenant immediately as
   //    'provisioning'). The heavy work then runs in the BACKGROUND — the POST

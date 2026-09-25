@@ -69,6 +69,7 @@ import {
   modelsForSurface,
 } from './models.js';
 import { assertAndFetchExternalAsset } from '../connectionTest.js';
+import { assertMediaSpendAllowed, reportMediaSpend } from '../managed-ai.js';
 import {
   resolveModelAlias,
   resolveProviderConfig,
@@ -363,6 +364,11 @@ export async function generateMedia(args: {
     workspaceId,
     onProviderRequestSettled,
   } = args;
+
+  // The spending cap, before any provider is called. Media does not pass
+  // through the AI gateway, so this is the only place it can be stopped — see
+  // the note in managed-ai.ts on what is capped, counted and priced here.
+  await assertMediaSpendAllowed();
 
   if (!projectRoot) throw new Error('projectRoot required');
   if (!projectsRoot) throw new Error('projectsRoot required');
@@ -829,6 +835,13 @@ export async function generateMedia(args: {
   const finalTarget = path.join(dir, finalOut);
   await writeFile(finalTarget, bytes);
   const st = await stat(finalTarget);
+  // Counted, not priced. A stub fallback did not reach a provider and did not
+  // cost anything, so it is not reported — recording it would inflate a figure
+  // whose whole purpose is to be trustworthy enough to set a cap from.
+  if (!usedStubFallback && !intentionalStub) {
+    reportMediaSpend({ surface, model, providerId });
+  }
+
   return {
     name: finalOut,
     size: st.size,

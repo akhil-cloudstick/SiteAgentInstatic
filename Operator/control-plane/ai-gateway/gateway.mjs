@@ -14,7 +14,10 @@
 // The gateway never trusts a raw `model` from the client; it maps a category
 // slug server-side. The resolved model is echoed back in x-instatic-resolved-model
 // for audit/cost on the tenant side.
-import { Readable } from 'node:stream';
+import { Readable, Transform } from 'node:stream';
+import { askForUsage, capDecision, costOf, createUsageScanner } from '../lib/aiSpend.mjs';
+import { pricesForModel } from '../lib/aiPrices.mjs';
+import { capAndSpend, recordSpend } from '../registry/aiSpend.mjs';
 import {
   getSecrets,
   readAiSettingsRaw,
@@ -111,6 +114,65 @@ export async function handleGateway(req, res, pathAfterAi) {
     return res.end(JSON.stringify(pub));
   }
 
+  // /spend — what this project has left of its AI limit this month.
+  //
+  // A probe, like /model and /config above: no upstream call, and the operator's
+  // key is never decrypted to answer it. It exists so the daemon can refuse to
+  // START a run that the gateway would only refuse partway through — the
+  // enforcement is the same either way, but a run that never starts is a far
+  // better thing for a tenant to be told about than one that dies mid-sentence.
+  //
+  // Carries no numbers the tenant cannot already infer and no model ids.
+  if (rest === '/spend' || rest === '/spend/') {
+    let state = null;
+    try {
+      state = await capAndSpend(slug);
+    } catch {
+      // Unreadable. capDecision decides what that means, and it is not the same
+      // answer for a capped project as for an uncapped one.
+      state = { cap: undefined, spent: null };
+    }
+    const decision = capDecision({ cap: state?.cap, spent: state?.spent });
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(
+      JSON.stringify({
+        allow: decision.allow,
+        level: decision.level,
+        reason: decision.reason,
+        percent: decision.fraction === null ? null : Math.round(decision.fraction * 100),
+      }),
+    );
+  }
+
+  // /media-spend — the daemon reporting an image, video or speech generation.
+  //
+  // Media never passes through this gateway: the operator's provider keys are
+  // injected into each daemon and those calls go straight out. So the daemon
+  // reports them here instead, which makes media COUNTED and (via the /spend
+  // probe above) CAPPED, but not priced — providers do not return a cost and
+  // there is no per-model table for them. The row is written with an unknown
+  // cost rather than a guessed one, and the ledger reports how many such calls
+  // a month holds.
+  if (rest === '/media-spend' && req.method === 'POST') {
+    const raw = await readRawBody(req).catch(() => null);
+    let detail = {};
+    try {
+      detail = raw ? JSON.parse(raw.toString('utf8')) : {};
+    } catch {
+      // A malformed report is not worth failing over; it is still a call that
+      // happened, and the surface/model are only labels.
+    }
+    recordSpend({
+      slug,
+      product: 'media',
+      model: typeof detail?.model === 'string' ? detail.model.slice(0, 200) : null,
+      usage: null,
+      costUsd: null,
+    });
+    res.writeHead(202, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify({ recorded: true }));
+  }
+
   const secrets = await getSecrets();
   if (!secrets.openrouterKey) { res.writeHead(503, { 'Content-Type': 'text/plain' }); return res.end('AI not configured'); }
 
@@ -139,6 +201,11 @@ export async function handleGateway(req, res, pathAfterAi) {
           // ALWAYS set the model on JSON chat bodies — even when the client
           // omitted `model` — so enforcement can't be bypassed (Codex #1).
           payload.model = resolvedModel;
+          // A streamed OpenAI-compatible response reports no usage unless it is
+          // asked to. Without this the ledger would be empty and the cap would
+          // have nothing to count. Free here, because the body is already being
+          // re-serialised to pin the model.
+          askForUsage(payload);
           body = Buffer.from(JSON.stringify(payload), 'utf8');
         } else if (payload.model && product !== 'design') {
           // Nothing configured operator-side: fall back to the tenant's own
@@ -206,6 +273,50 @@ export async function handleGateway(req, res, pathAfterAi) {
     return res.end('Upstream path not allowed');
   }
 
+  // --- the spending cap (E4) ---------------------------------------------
+  //
+  // Checked HERE, before the upstream request, and that position does two jobs
+  // the owner asked for without any extra machinery:
+  //
+  //   * "finish the reply in progress" — a turn whose upstream fetch has already
+  //     returned is committed and streams to its end. The cap stops the NEXT
+  //     turn, never one mid-sentence.
+  //   * "never block editing, publishing, or the live site" — only AI traffic
+  //     passes through this gateway at all, so a cap cannot reach the CMS, a
+  //     publish, or a deployed page even in principle.
+  //
+  // The classifier is exempt. It is a cheap non-agentic call that serves CMS
+  // editing, and editing is the thing that must keep working.
+  let spendState = null;
+  if (isModelCall && !classify) {
+    try {
+      spendState = await capAndSpend(slug);
+    } catch (e) {
+      // The read failed. `capDecision` decides what that means, and it is not
+      // the same answer for a capped project as for an uncapped one.
+      console.error(`[ai-gateway] ${slug}: could not read the spending ledger: ${e.message}`);
+      spendState = { cap: undefined, spent: null };
+    }
+    const decision = capDecision({ cap: spendState?.cap, spent: spendState?.spent });
+    if (!decision.allow) {
+      console.log(
+        `[ai-gateway] ${slug} · ${product}: ✗ BLOCKED — ${decision.level} ` +
+          `(spent ${decision.spent ?? '?'} of ${decision.cap ?? '?'})`,
+      );
+      // Plain language, no status codes and no model ids: the tenant cannot act
+      // on any of those, and the only useful action is to tell the operator.
+      // 402 rather than 429: a rate-limit status invites the agent's client to
+      // back off and retry, and a spending cap is not a thing retrying fixes.
+      res.writeHead(402, { 'Content-Type': 'text/plain' });
+      return res.end(decision.reason);
+    }
+    if (decision.level === 'warn') {
+      console.warn(
+        `[ai-gateway] ${slug} · ${product}: ⚠ ${Math.round(decision.fraction * 100)}% of the monthly AI limit`,
+      );
+    }
+  }
+
   let upstream;
   try {
     upstream = await fetch(`${OPENROUTER}${rest}`, {
@@ -230,7 +341,34 @@ export async function handleGateway(req, res, pathAfterAi) {
   if (resolvedModel) headers['x-instatic-resolved-model'] = resolvedModel;
   res.writeHead(upstream.status, headers);
   if (upstream.body) {
-    Readable.fromWeb(upstream.body).pipe(res); // streams SSE token-by-token
+    const source = Readable.fromWeb(upstream.body);
+
+    // Metered by TEEING, never by buffering. The agent loop depends on tokens
+    // arriving as they are produced, so the usage is read from the frames as
+    // they pass rather than by awaiting the whole body. A scanner that throws,
+    // or a stream that carries no usage at all, costs the tenant nothing.
+    if (isModelCall && upstream.ok) {
+      const scanner = createUsageScanner();
+      const meter = new Transform({
+        transform(chunk, _enc, done) {
+          scanner.push(chunk);
+          done(null, chunk);
+        },
+      });
+      meter.on('end', async () => {
+        const usage = scanner.result();
+        if (!usage) return;
+        try {
+          const prices = await pricesForModel(resolvedModel, secrets.openrouterKey);
+          recordSpend({ slug, product, model: resolvedModel, usage, costUsd: costOf(usage, prices) });
+        } catch (e) {
+          console.error(`[ai-gateway] ${slug}: could not record spend: ${e.message}`);
+        }
+      });
+      source.pipe(meter).pipe(res);
+    } else {
+      source.pipe(res); // streams SSE token-by-token
+    }
   } else {
     res.end();
   }

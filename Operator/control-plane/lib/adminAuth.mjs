@@ -80,6 +80,7 @@ const ADMIN_EXACT = new Set([
   '/api/admins',
   '/api/act-as',
   '/api/audit',
+  '/api/ai-spend',
 ]);
 const ADMIN_PREFIXES = ['/api/tenants/', '/api/mcp/', '/api/operators/', '/api/businesses/', '/api/admins/', '/api/act-as/'];
 

@@ -59,6 +59,7 @@ import {
 } from '../langfuse-trace.js';
 import {
   applyManagedRunAi,
+  ManagedAiLimitReachedError,
   ManagedAiUnconfiguredError,
   MANAGED_AI_UNCONFIGURED_MESSAGE,
 } from '../managed-ai.js';
@@ -410,6 +411,13 @@ async function applyManagedRunAiOr503<T extends Record<string, unknown>>(
   } catch (err) {
     if (err instanceof ManagedAiUnconfiguredError) {
       sendApiError(res, 503, 'AI_NOT_CONFIGURED', MANAGED_AI_UNCONFIGURED_MESSAGE);
+      return null;
+    }
+    if (err instanceof ManagedAiLimitReachedError) {
+      // 402 to match the gateway, which refuses the same thing one layer down.
+      // Not 429: a rate-limit status invites a client to back off and retry, and
+      // a spending limit is not a thing retrying fixes.
+      sendApiError(res, 402, 'AI_LIMIT_REACHED', err.message);
       return null;
     }
     throw err;
