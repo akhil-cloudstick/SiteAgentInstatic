@@ -36,7 +36,12 @@ import { dirname, resolve } from 'node:path'
 // The relay's address is already named once, for fetching artefacts by hash.
 // The registry lives on that same relay, so this reads the same setting rather
 // than inventing a second name for one address.
-import { RELAY_URL_ENV } from '../http/relay'
+// One definition of where the relay lives, shared with the artefact fetcher.
+// This module used to carry its own copy that read the environment variable and
+// nothing else, so the wrangler.toml default the other copy documents silently
+// did not apply here. That is how every gated import and publish came to refuse
+// for want of a setting nobody had been told to set.
+import { RELAY_URL_ENV, relayUrl } from '../http/relay'
 
 export { RELAY_URL_ENV }
 export const REGISTRY_CACHE_ENV = 'MMS_CONNECTOR_APPROVER_CACHE'
@@ -76,11 +81,6 @@ let memory: { fetchedAtMs: number; body: CachedRegistry } | null = null
 export function registryCachePath(): string {
   const configured = process.env[REGISTRY_CACHE_ENV]?.trim()
   return configured ? resolve(configured) : resolve(import.meta.dir, '../../.approver-cache.json')
-}
-
-function relayUrl(): string | null {
-  const raw = process.env[RELAY_URL_ENV]?.trim()
-  return raw ? raw.replace(/\/$/, '') : null
 }
 
 function readDiskCache(): { fetchedAtMs: number; body: CachedRegistry } | null {

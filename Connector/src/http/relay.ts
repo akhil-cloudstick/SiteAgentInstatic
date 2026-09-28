@@ -33,13 +33,42 @@ const PROJECT_ROOT = resolve(import.meta.dir, '..', '..', '..')
 
 export type RelayFetch = { ok: true; bytes: Uint8Array; relay: string } | { ok: false; reason: string }
 
-function relayUrl(): string | null {
+/**
+ * The relay address from `Relay/wrangler.toml`, or null.
+ *
+ * This used to be `require(...)` on the .toml, and it never once worked. This
+ * package is `"type": "module"`, where bare `require` is not defined, so every
+ * call threw a ReferenceError straight into a bare `catch` and returned null.
+ * The documented default was therefore a silent no-op, and the first anyone knew
+ * of it was an acceptance run where every gated import and publish refused for
+ * want of a setting nobody had been told to set.
+ *
+ * Read and parsed here instead, with no dependency and nothing to swallow.
+ *
+ * Only the TOP-LEVEL `[vars]` table is read. The same file carries
+ * `[env.test.vars]`, whose PUBLIC_URL is deliberately empty — taking that one
+ * would point the Connector at nothing while reporting itself configured, which
+ * is worse than the bug being fixed.
+ */
+export function publicUrlFromWrangler(text: string): string | null {
+  const head = text.search(/^[ \t]*\[vars\][ \t]*$/m)
+  if (head === -1) return null
+  const rest = text.slice(head + 1)
+  const next = rest.search(/^[ \t]*\[/m)
+  const section = next === -1 ? rest : rest.slice(0, next)
+  const found = /^[ \t]*PUBLIC_URL[ \t]*=[ \t]*["']([^"']*)["']/m.exec(section)
+  const url = found?.[1]?.trim()
+  return url ? url.replace(/\/+$/, '') : null
+}
+
+/** Where the relay lives: the environment first, then the checked-in config. */
+export function relayUrl(): string | null {
   const fromEnv = process.env[RELAY_URL_ENV]?.trim()
   if (fromEnv) return fromEnv.replace(/\/+$/, '')
+  const file = resolve(PROJECT_ROOT, 'Relay', 'wrangler.toml')
+  if (!existsSync(file)) return null
   try {
-    const wrangler = require(resolve(PROJECT_ROOT, 'Relay', 'wrangler.toml')) as { vars?: { PUBLIC_URL?: string } }
-    const url = wrangler.vars?.PUBLIC_URL?.trim()
-    return url ? url.replace(/\/+$/, '') : null
+    return publicUrlFromWrangler(readFileSync(file, 'utf8'))
   } catch {
     return null
   }

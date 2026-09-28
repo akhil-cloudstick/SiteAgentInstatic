@@ -62,7 +62,12 @@ export type FindingSeverity = 'block' | 'warn'
 
 export interface Finding {
   /** Stable across wordings, so a caller can gate on it without parsing prose. */
-  code: 'STYLE_RULES_MOSTLY_DROPPED' | 'ENTRY_ROWS_WITHOUT_TEMPLATE' | 'NO_PAGES'
+  code:
+    | 'STYLE_RULES_MOSTLY_DROPPED'
+    | 'CLASS_RULES_DROPPED'
+    | 'BUNDLE_SHAPE_INVALID'
+    | 'ENTRY_ROWS_WITHOUT_TEMPLATE'
+    | 'NO_PAGES'
   severity: FindingSeverity
   /** The same sentence `warnings` has always carried. */
   message: string
@@ -196,16 +201,62 @@ export function projectPublish(bundleValue: unknown): PublishProjection {
   const bundle = (bundleValue ?? {}) as BundleLike
   const site = bundle.site ?? {}
   const styleRules = site.styleRules ?? {}
-  const rows = bundle.rows ?? []
-  const tables = bundle.tables ?? []
+
+  // Fields this projection walks as lists.
+  //
+  // `?? []` only catches null and undefined, so a bundle supplying an object
+  // where a list belongs sailed past it and died in the walk with "{} is not
+  // iterable". That failed safe — the bundle did not pass — but a raw runtime
+  // message is not something a gate can read, and it leaves the caller unable to
+  // tell a malformed bundle from a broken tool. Both are refusals; only one is
+  // their fault, and the refusal should say which.
+  const malformed: string[] = []
+  const asList = <T>(value: unknown, name: string): T[] => {
+    if (value === undefined || value === null) return []
+    if (Array.isArray(value)) return value as T[]
+    malformed.push(name)
+    return []
+  }
+
+  const rows = asList<{ cells?: unknown; id?: unknown; tableSlug?: unknown; slug?: unknown; status?: unknown }>(
+    bundle.rows,
+    'rows',
+  ) as typeof bundle.rows extends undefined ? never[] : NonNullable<typeof bundle.rows>
+  const tables = asList(bundle.tables, 'tables') as NonNullable<typeof bundle.tables>
+  const files = asList(site.files, 'site.files') as NonNullable<typeof site.files>
+  const visualComponents = asList(site.visualComponents, 'site.visualComponents')
+
+  if (malformed.length > 0) {
+    return {
+      ok: false,
+      findings: [
+        {
+          code: 'BUNDLE_SHAPE_INVALID',
+          severity: 'block',
+          message:
+            `This bundle is malformed: ${malformed.join(', ')} must be a list. Nothing was checked, so ` +
+            'nothing here says whether the rest of it would publish.',
+          detail: { fields: malformed },
+        },
+      ],
+      styleRules: { inBundle: 0, surviving: 0, dropped: 0 },
+      droppedClasses: [],
+      keptForContentHtml: [],
+      keptForScripts: [],
+      routes: [],
+      entryTemplates: [],
+      scriptFiles: 0,
+      warnings: [`This bundle is malformed: ${malformed.join(', ')} must be a list.`],
+    }
+  }
   const trailingSlash = site.settings?.trailingSlash === true
 
   const pages = pagesOf(bundle)
   const contentClassNames = collectContentClassNames(rows.map((row) => row.cells))
-  const scriptClassNames = collectScriptClassNames(site.files ?? [])
+  const scriptClassNames = collectScriptClassNames(files)
   const usedIds = collectUsedStyleRuleIds({
     pages,
-    visualComponents: (site.visualComponents ?? []) as SiteDocument['visualComponents'],
+    visualComponents: visualComponents as SiteDocument['visualComponents'],
   })
 
   const surviving = treeShakeStyleRules(
@@ -325,6 +376,53 @@ export function projectPublish(bundleValue: unknown): PublishProjection {
       detail: { surviving: survivingCount, inBundle, droppedClasses: droppedClasses.slice(0, 50) },
     })
   }
+  // The same question asked of CLASS rules alone.
+  //
+  // The check above counts every rule in the bundle, so a small site can lose
+  // every class rule it has and still pass: two class rules dropped and one
+  // ambient rule surviving is 1 of 3, comfortably over a quarter, and nothing
+  // was reported although `droppedClasses` listed both. A page whose only two
+  // classes both lose their rules is completely unstyled.
+  //
+  // A SECOND check rather than a lower threshold on the first, because PRD 5.5
+  // warns specifically against recalibrating that one — it is set against a real
+  // incident at one end and a real recovery at the other, and moving it would
+  // judge both by a bundle that was fine.
+  //
+  // NONE surviving, not "most dropped", and the difference matters. Dropping
+  // unused class rules is what a tree-shake is FOR: a bundle carrying a design
+  // system of a hundred classes and using forty is correct, and any proportional
+  // threshold would refuse it. There is no such reading of zero. A bundle that
+  // defines class rules and keeps not one of them is broken however large it is,
+  // which is also the answer to whether there is a floor: there is none, because
+  // one dropped out of one is still every class rule in the bundle.
+  //
+  // It counts RULES, not the ids nodes reference, and that distinction is the
+  // whole point. The first attempt at this check asked which class rules the
+  // nodes used — `usedIds.has(rule.id)` — and never fired on the defect it was
+  // written for, because that defect IS ids that do not line up: the class rules
+  // are minted with ids no node references, so the set of "used class rules"
+  // came back empty and the check had nothing to judge. Anything keyed on ids
+  // is blind to a fault in the ids. There is no floor: one class rule dropped
+  // out of one is still every class rule in the bundle.
+  const classRules = all.filter((rule) => rule.kind === 'class')
+  const classSurviving = classRules.filter((rule) => survivingIds.has(rule.id))
+  if (classRules.length > 0 && classSurviving.length === 0) {
+    findings.push({
+      code: 'CLASS_RULES_DROPPED',
+      severity: 'block',
+      message:
+        `None of the ${classRules.length} class rules in this bundle survive the publish tree-shake. ` +
+        'Every node carrying a class would render with no styling of its own. This is what a bundle '
+        + 'whose class-rule ids are minted looks like — the rules are present and nothing references them.',
+      detail: {
+        survivingClasses: classSurviving.length,
+        classRules: classRules.length,
+        droppedClasses: droppedClasses.slice(0, 50),
+      },
+    })
+  }
+
   for (const entry of entryTemplates) {
     if (entry.rows > 0 && !entry.hasTemplate) {
       findings.push({
@@ -355,7 +453,7 @@ export function projectPublish(bundleValue: unknown): PublishProjection {
     keptForScripts: keptOnly(scriptClassNames),
     routes,
     entryTemplates,
-    scriptFiles: (site.files ?? []).filter((file) => file?.type === 'script').length,
+    scriptFiles: files.filter((file) => file?.type === 'script').length,
     warnings: findings.map((f) => f.message),
   }
 }
