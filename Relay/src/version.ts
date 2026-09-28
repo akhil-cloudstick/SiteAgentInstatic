@@ -29,5 +29,19 @@
  * property's registered approver — this widens who may SUBMIT and nothing else.
  * The general rule client approvers will need ("any valid signature, any
  * submitter") is not settled by this and was left open on purpose.
+ *
+ * 0.6.1 — the Approvers page could not run. Inside APPROVER_SCRIPT, which is a
+ * template literal, the two confirm messages added for test properties were
+ * written with `\n` where they needed `\\n`. TypeScript interpreted them and
+ * emitted REAL newlines into the browser's JavaScript, inside single-quoted
+ * strings — a SyntaxError, which kills the entire inline script. Register,
+ * Designate and Retire all stopped working together, on a page that looked
+ * completely normal, and 0.6.0 shipped that way.
+ *
+ * The suite was green throughout: it asserted what the routes answer and what
+ * the HTML contains, and never once asked whether the script the page ships can
+ * be parsed. `tests/inlineScripts.test.ts` now parses every inline script on
+ * every page, for both roles, and is itself proved against the broken source
+ * rather than assumed to work. No migration; no route or behaviour change.
  */
-export const RELAY_VERSION = '0.6.0'
+export const RELAY_VERSION = '0.6.1'

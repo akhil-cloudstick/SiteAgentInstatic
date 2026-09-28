@@ -161,8 +161,8 @@ document.querySelectorAll('button.test-toggle').forEach((button) => {
     // The consequence in words. Designating decides who may SUBMIT a GO, which
     // is not obvious from a button labelled "Designate".
     const question = on
-      ? 'Remove the test-property designation from ' + p + '?\n\nOnly you will be able to submit a GO for it again.'
-      : 'Designate ' + p + ' a test property?\n\nThe validator will be able to submit a GO for it. The signature is still checked against the approver registered for ' + p + '.';
+      ? 'Remove the test-property designation from ' + p + '?\\n\\nOnly you will be able to submit a GO for it again.'
+      : 'Designate ' + p + ' a test property?\\n\\nThe validator will be able to submit a GO for it. The signature is still checked against the approver registered for ' + p + '.';
     if (confirm(question)) {
       if (on) send('/api/test-properties/' + encodeURIComponent(p) + '/remove', {});
       else send('/api/test-properties', { property: p });
