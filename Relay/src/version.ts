@@ -43,5 +43,23 @@
  * be parsed. `tests/inlineScripts.test.ts` now parses every inline script on
  * every page, for both roles, and is itself proved against the broken source
  * rather than assumed to work. No migration; no route or behaviour change.
+ *
+ * 0.6.2 — NO behaviour change. The Worker is byte-identical in what it does; a
+ * deploy of this is optional and changes nothing that is serving.
+ *
+ * It exists because the folder gained a test and therefore a manifest line, and
+ * two different SHA256SUMS under one version number is the drift that caused
+ * the 0.4.0 incident: the checking side had been told 43/43 for 0.6.1, and
+ * leaving the folder reading 44/44 under that same version would have them
+ * chasing a mismatch that is not one. A version is cheaper than that confusion.
+ *
+ * The test is tests/migrationTriggers.test.ts, which runs the migrations
+ * verbatim against a real SQLite engine — the same one D1 is — and exercises
+ * the append-only triggers. Until now they had never been executed by anything:
+ * every other test uses the in-memory store, which enforces append-only in
+ * TypeScript, so the SQL that actually protects the deployed relay was
+ * unverified. A store that is append-only because the code is careful is a
+ * different guarantee from one the database refuses to break (security class
+ * E9).
  */
-export const RELAY_VERSION = '0.6.1'
+export const RELAY_VERSION = '0.6.2'
