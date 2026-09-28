@@ -612,7 +612,7 @@
           "subtasks": [
             {
               "id": "E2",
-              "text": "Controls exist and three fail-opens are fixed; sandbox mode not yet enabled; runbook outstanding",
+              "text": "Controls exist, three fail-opens fixed, folder confinement now enabled and confirmed live on every daemon; the agent's shell access across projects and the runbook are outstanding",
               "status": "doing",
               "verified": "pending"
             }
@@ -642,8 +642,8 @@
           "subtasks": [
             {
               "id": "E4",
-              "text": "Deferred — the requirements document defines no spend cap to build against",
-              "status": "todo",
+              "text": "Built to the owner's answers: per project per month, warn at 80%, stop at 100%, owner-only to raise, every change audited. Ships with no cap set on any project until there are real figures to set one from",
+              "status": "built",
               "verified": "pending"
             }
           ]

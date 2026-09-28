@@ -52,13 +52,13 @@
   <h1>MMSBUILD delivery board</h1>
   <p class="meta">
     Modules are the phases of <code>docs/prd/mmsbuild-prd.md</code>, tasks are its requirements, subtasks its acceptance criteria — ids unchanged.<br>
-    Generated 2026-09-25 10:43 UTC from commit <code>77cf3f2</code>.
+    Generated 2026-09-28 12:36 UTC from commit <code>e440941</code>.
   </p>
   <div class="legend">
     <p><strong>Build</strong> is ours: <span class="chip todo">Not started</span> <span class="chip doing">In progress</span> <span class="chip built">Built</span> <span class="chip awaiting-owner">Awaiting owner</span> <span class="chip blocked">Blocked</span></p>
     <p><strong>Acceptance run</strong> is yours, and we never set it: <span class="chip v-pending">Not yet verified</span> <span class="chip v-pass">Verified</span> <span class="chip v-fail">Failed</span></p>
     <p>Modules are the PRD's phases, tasks are its requirements, subtasks are its acceptance criteria. Ids match the PRD exactly, so an acceptance run maps to this board line for line. `status` is ours — what is built. `verified` belongs to the acceptance run and is never set by us.</p>
-    <p>Totals — tasks: <span class="chip doing">6 in progress</span> <span class="chip built">24 built</span> <span class="chip awaiting-owner">1 awaiting owner</span> &nbsp;·&nbsp; acceptance criteria: <span class="chip todo">1 not started</span> <span class="chip doing">6 in progress</span> <span class="chip built">47 built</span> <span class="chip awaiting-owner">2 awaiting owner</span></p>
+    <p>Totals — tasks: <span class="chip doing">6 in progress</span> <span class="chip built">24 built</span> <span class="chip awaiting-owner">1 awaiting owner</span> &nbsp;·&nbsp; acceptance criteria: <span class="chip doing">6 in progress</span> <span class="chip built">48 built</span> <span class="chip awaiting-owner">2 awaiting owner</span></p>
   </div>
   <section class="module">
     <h2><span class="id">P0</span> Phase 0 — Close the surface</h2>
@@ -702,7 +702,7 @@
         <tbody>
         <tr>
           <td class="id">E2</td>
-          <td>Controls exist and three fail-opens are fixed; sandbox mode not yet enabled; runbook outstanding</td>
+          <td>Controls exist, three fail-opens fixed, folder confinement now enabled and confirmed live on every daemon; the agent's shell access across projects and the runbook are outstanding</td>
           <td><span class="chip doing">In progress</span></td>
           <td><span class="chip v-pending">Not yet verified</span></td>
         </tr>
@@ -734,7 +734,7 @@
         <span class="id">E4</span>
         <span class="task-title">Spending limits enforced</span>
         <span class="chip built">Built</span>
-        <span class="counts"><span class="chip todo">1 not started</span></span>
+        <span class="counts"><span class="chip built">1 built</span></span>
       </summary>
       <p class="note">Built 2026-09-25, and shipped dormant. The PRD gave E4 no requirement number and no acceptance criterion — it recorded only that no cap existed and that this was an accepted omission — so the owner was asked what one should mean, and these are their answers. Per project, per calendar month in UTC, counted in the provider’s own billing currency. Warn at 80%, stop new AI work at 100%. Only the platform owner may set or raise a limit, and every change is written to the audit log as ai.cap.set / raise / lower / clear, recording the CHANGE rather than the resulting state. Two of the owner’s rules are met structurally rather than by machinery: editing, publishing and the live site can never be blocked, because only AI traffic passes through the gateway the cap runs in; and a reply already in progress finishes, because the check runs before the upstream request, so a turn that has started is never interrupted. Media generation does not pass through that gateway — the provider keys are injected into each project’s daemon and those calls go straight out — so it is capped and counted at the generation call instead. It is NOT priced: image, video and speech providers do not return a cost, so such a call is recorded with an unknown cost rather than a guessed one, and the ledger reports how many a month holds. A month containing them has a total that is a floor, not a figure. NO CAP IS SET ON ANY PROJECT. The owner asked that the limit be set from real numbers rather than guessed, and nothing recorded spend until now, so the mechanism is complete and enforcing nothing until there are figures to set it from. Month-to-date spend per project is readable in the console.</p>
       <table>
@@ -742,8 +742,8 @@
         <tbody>
         <tr>
           <td class="id">E4</td>
-          <td>Deferred — the requirements document defines no spend cap to build against</td>
-          <td><span class="chip todo">Not started</span></td>
+          <td>Built to the owner's answers: per project per month, warn at 80%, stop at 100%, owner-only to raise, every change audited. Ships with no cap set on any project until there are real figures to set one from</td>
+          <td><span class="chip built">Built</span></td>
           <td><span class="chip v-pending">Not yet verified</span></td>
         </tr>
         </tbody>
