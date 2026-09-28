@@ -1,0 +1,195 @@
+---
+// AI spend — what each project has spent this month, and the limit it stops at.
+//
+// The cap is enforced at the gateway and every call is written to a ledger, but
+// until this page existed there was nowhere to LOOK at either. The checking side
+// asked the plain question — "where can the owner see month-to-date spend per
+// project in the console?" — and the honest answer was nowhere. A limit whose
+// approach nobody can see is most of the way to not being a limit.
+//
+// Platform scope only, matching /api/ai-spend. The ledger is reported across the
+// whole estate; a business administrator shown a slice of it would be reading a
+// number that means something other than what it says.
+import ConsoleLayout from '../components/ConsoleLayout.astro';
+import PageHeader from '../components/PageHeader.astro';
+import EmptyState from '../components/EmptyState.astro';
+import { cpFetch } from '../lib/cp';
+import { cpGet, okJson } from '../lib/org';
+
+/** A JSON POST, shaped as the other console pages shape it. */
+const json = (body: unknown) => ({
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(body),
+});
+
+const scope = Astro.locals.admin?.scope ?? { level: 'platform' };
+const isPlatform = scope.level === 'platform';
+
+let error = '';
+let notice = '';
+
+// Setting a limit is the platform owner's alone during the pilots, and the
+// control plane refuses anyone else. Hiding the form is not the control — the
+// route is — but a form that only ever refuses is a dead control of its own.
+if (Astro.request.method === 'POST' && isPlatform) {
+  try {
+    const f = await Astro.request.formData();
+    const slug = String(f.get('slug') || '');
+    const raw = String(f.get('capUsd') || '').trim();
+    const out = await okJson(
+      await cpFetch(Astro.cookies, `/api/tenants/${encodeURIComponent(slug)}/ai-cap`,
+        json({ capUsd: raw === '' ? null : Number(raw) })),
+      'Could not set the limit',
+    );
+    notice = out.cap === null
+      ? `${slug} now has no AI limit, so it will not be stopped.`
+      : `${slug} is limited to ${out.cap} a month.`;
+  } catch (e) {
+    error = (e as Error).message;
+  }
+}
+
+let projects: any[] = [];
+let spend: any[] = [];
+try {
+  const [tenants, ledger] = await Promise.all([
+    cpGet(Astro.cookies, '/api/tenants', 'Could not list projects'),
+    isPlatform
+      ? cpGet(Astro.cookies, '/api/ai-spend', 'Could not read the spend ledger')
+      : Promise.resolve({ spend: [] }),
+  ]);
+  projects = tenants.tenants || [];
+  spend = ledger.spend || [];
+} catch (e) {
+  if (!error) error = (e as Error).message;
+}
+
+// The ledger is one row per project PER PRODUCT — cms, design and media are
+// recorded apart so they can be reconciled against the provider's own split.
+// The limit is per project, so they are summed and the split kept beside it.
+type Totals = { cost: number; calls: number; unpriced: number; byProduct: Record<string, number> };
+const totals = new Map<string, Totals>();
+for (const row of spend) {
+  const t = totals.get(row.tenantSlug) ?? { cost: 0, calls: 0, unpriced: 0, byProduct: {} };
+  t.cost += Number(row.costUsd ?? 0);
+  t.calls += Number(row.calls ?? 0);
+  t.unpriced += Number(row.unpricedCalls ?? 0);
+  t.byProduct[row.product] = (t.byProduct[row.product] ?? 0) + Number(row.costUsd ?? 0);
+  totals.set(row.tenantSlug, t);
+}
+
+const money = (n: number) => (n < 1 ? n.toFixed(4) : n.toFixed(2));
+const EMPTY: Totals = { cost: 0, calls: 0, unpriced: 0, byProduct: {} };
+
+const rows = projects
+  .map((t: any) => {
+    const used = totals.get(t.slug) ?? EMPTY;
+    const cap = t.ai_month_cap_usd === null || t.ai_month_cap_usd === undefined ? null : Number(t.ai_month_cap_usd);
+    return { t, used, cap, pct: cap && cap > 0 ? Math.round((used.cost / cap) * 100) : null };
+  })
+  .sort((a, b) => b.used.cost - a.used.cost);
+
+const anyUnpriced = rows.some((r) => r.used.unpriced > 0);
+const month = new Date().toISOString().slice(0, 7);
+---
+
+<ConsoleLayout title="AI spend" active="spend">
+  <PageHeader
+    eyebrow="Governance"
+    title="AI spend"
+    description={`What each project has spent on AI this month (${month}), and the limit it stops at.`}
+  />
+
+  {error && <div class="mms-alert mms-alert--err" role="alert" style="margin-bottom:16px">{error}</div>}
+  {notice && <div class="mms-alert mms-alert--ok" style="margin-bottom:16px">{notice}</div>}
+
+  {!isPlatform && (
+    <div class="mms-alert mms-alert--info" style="margin-bottom:16px">
+      <span>AI spend is reported across the whole platform, so only the platform owner sees it.</span>
+    </div>
+  )}
+
+  {anyUnpriced && (
+    <div class="mms-alert mms-alert--info" style="margin-bottom:16px">
+      <span>
+        Some calls have no published price — image, video and speech providers do not report a cost.
+        Those are counted but not charged, so a total below is a floor rather than a figure.
+      </span>
+    </div>
+  )}
+
+  {rows.length === 0 ? (
+    <EmptyState title="Nothing to show" description="No projects to report on yet." />
+  ) : (
+    <div class="mms-table-card">
+      <div class="mms-wrap">
+        <table class="mms-table">
+          <thead>
+            <tr>
+              <th>Project</th>
+              <th>Spent this month</th>
+              <th>Limit</th>
+              <th>Used</th>
+              <th>Calls</th>
+              {isPlatform && <th>Set a limit</th>}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map(({ t, used, cap, pct }) => (
+              <tr>
+                <td>
+                  <strong>{t.display_name || t.slug}</strong>
+                  <div class="mms-hint"><code>{t.slug}</code></div>
+                </td>
+                <td>
+                  {money(used.cost)}
+                  {Object.keys(used.byProduct).length > 0 && (
+                    <div class="mms-hint">
+                      {Object.entries(used.byProduct).map(([p, c]) => `${p} ${money(Number(c))}`).join(' · ')}
+                    </div>
+                  )}
+                </td>
+                <td>{cap === null ? <span class="mms-hint">no limit</span> : money(cap)}</td>
+                <td>
+                  {pct === null
+                    ? <span class="mms-hint">—</span>
+                    : <span class="mms-badge">{pct}%</span>}
+                </td>
+                <td>
+                  {used.calls}
+                  {used.unpriced > 0 && <div class="mms-hint">{used.unpriced} unpriced</div>}
+                </td>
+                {isPlatform && (
+                  <td>
+                    <form method="POST" style="display:flex;gap:6px;align-items:center">
+                      <input type="hidden" name="slug" value={t.slug} />
+                      <input
+                        class="mms-input"
+                        name="capUsd"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        style="max-width:110px"
+                        value={cap === null ? '' : String(cap)}
+                        placeholder="none"
+                        aria-label={`Monthly AI limit for ${t.slug}`}
+                      />
+                      <button type="submit" class="mms-btn mms-btn--secondary mms-btn--sm">Save</button>
+                    </form>
+                  </td>
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )}
+
+  <p class="mms-hint" style="margin-top:14px">
+    A project warns at 80% and stops new AI work at 100%. Editing, publishing and the live site are never
+    affected — the limit applies to AI only. Leave the field empty for no limit. Every change is recorded
+    on the Activity page.
+  </p>
+</ConsoleLayout>

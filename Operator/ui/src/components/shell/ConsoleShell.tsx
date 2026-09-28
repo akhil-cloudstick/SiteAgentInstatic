@@ -24,7 +24,7 @@ import {
 } from '@mms/shell'
 import styles from './ConsoleShell.module.css'
 
-export type ConsoleSection = 'org' | 'projects' | 'access' | 'mcp' | 'activity' | 'settings'
+export type ConsoleSection = 'org' | 'projects' | 'access' | 'mcp' | 'spend' | 'activity' | 'settings'
 export type ScopeLevel = 'platform' | 'operator' | 'business'
 
 export interface ConsoleShellProps {
@@ -101,6 +101,12 @@ export function ConsoleShell({ productName, base, active, admin, initialTheme, n
     { id: 'projects', label: 'Projects', icon: 'globe', href: `${base}projects`, active: active === 'projects' },
     { id: 'access', label: 'Access', icon: 'user-shield', href: `${base}access`, active: active === 'access' },
     { id: 'mcp', label: 'MCP Agents', icon: 'robot', href: `${base}mcp`, active: active === 'mcp' },
+    // Platform only, because the ledger is reported across the whole estate and
+    // the route that serves it refuses anyone else. A link that always led to a
+    // refusal would be a dead control.
+    ...(isPlatform
+      ? [{ id: 'spend', label: 'AI spend', icon: 'coins', href: `${base}spend`, active: active === 'spend' }]
+      : []),
     { id: 'activity', label: 'Activity', icon: 'clipboard-list', href: `${base}activity`, active: active === 'activity' },
     ...(isPlatform
       ? [{ id: 'settings', label: 'Settings', icon: 'gear', href: `${base}settings`, active: active === 'settings' }]
