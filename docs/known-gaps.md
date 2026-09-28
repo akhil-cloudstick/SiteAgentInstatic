@@ -177,14 +177,45 @@ without first establishing which of the two opencode does would risk taking down
 the whole estate to close a gap nobody has exploited. That is a worse trade than
 the gap.
 
-**What would settle it:** run opencode with the allowlist and WITHOUT the skip
-flag against a path outside the allowed root, and see whether it refuses or
-waits. If it refuses, this route closes the gap with a configuration change and
-no architecture decision. If it waits, the answer is route A with a native
-helper, and that needs its own plan.
+**Settled 2026-09-28, by reading rather than running — and the answer is not the
+one that was hoped for.**
 
-**Why still deferred.** The experiment above has not been run, and the fix must
-not be guessed at.
+Two things were established.
+
+First, headless opencode **auto-rejects** an unlisted external directory; it does
+not wait for a prompt. That is stated in our own daemon
+(`apps/daemon/src/mcp-config.ts:415`, whose comment records it as verified
+against opencode's own config source): the daemon grants `external_directory`
+for the project cwd precisely "so headless OpenCode runs do not auto-reject
+them". So the hang risk that made this route too dangerous to try does not exist
+for directories, and the fear that stopped us was misplaced.
+
+Second, and this is why it does not close the gap: that allowlist is **already
+scoped to the project's own directory**. `server.ts:11771` passes
+`allowedDirectories: [effectiveCwd, ...extraAllowedDirs]` — the project cwd and
+a few staged directories, nothing broader. The control is on, it is narrow, and
+the agent can still reach a sibling project.
+
+Which tells us what `external_directory` actually governs: opencode's own
+external-directory feature — the workspace it will serve — and not what a shell
+command can open. A `cat` of an absolute path is a bash invocation, not a
+directory grant, and bash is squarely inside what
+`--dangerously-skip-permissions` waives.
+
+**So the third route is narrower than it looked.** Constraining the agent's file
+reach means constraining BASH, which is what that flag waives wholesale. Removing
+it would put every bash command through opencode's permission path, and that is
+where the original hang concern genuinely applies — not to directories, but to
+commands, on every run, with nobody attached to answer.
+
+**Where that leaves the gap.** Route A (an OS account per daemon) and route B (a
+container per project) are unchanged and remain the honest answers. What has
+changed is that route C is no longer a cheap unknown waiting on an experiment: it
+is understood, and it does not do the job. Anyone picking this up should start at
+A or B rather than re-investigating the permission config.
+
+**Why still open.** Both remaining routes are architecture decisions rather than
+patches, and neither has been chosen.
 
 ---
 
