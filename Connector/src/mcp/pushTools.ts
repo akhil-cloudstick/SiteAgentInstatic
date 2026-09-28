@@ -36,6 +36,8 @@ import { CRUD_TOOLS } from './crudTools'
 import { IMPORT_TOOLS } from './importTools'
 import { openRelayDeployRequest, postRelayMessage, readRelayGo, readRelayTicket } from '../http/relay'
 import { resolveTarget } from '../http/config'
+import { requireSession } from '../http/store'
+import { stepUp } from '../http/admin'
 
 export const PUSH_DIR_ENV = 'MMS_CONNECTOR_PUSH_DIR'
 
@@ -123,6 +125,40 @@ function note(state: PushState, step: PushStep, text: string): void {
  */
 const stepKey = (state: PushState, step: string): string =>
   `push-${state.id}-${step}`.replace(/[^A-Za-z0-9._:-]/g, '-').slice(0, 128)
+
+/**
+ * Re-authenticate immediately before a write.
+ *
+ * The CMS requires a step-up for the two destructive operations — import and
+ * publish — and the push loop did not do it, so a run that had cleared every
+ * gate correctly, including an owner-signed GO, stopped at the import with
+ * `401 step_up_required` and wrote nothing. The gate was working; the loop was
+ * simply not carrying the credential the gate asks for.
+ *
+ * Done INSIDE the run, immediately before each write rather than once at the
+ * start, because a step-up is deliberately short-lived: a push waits on two
+ * human signatures, which take as long as they take, and an elevation taken
+ * before the first wait would have expired long before the publish. That is also
+ * why this is not a login — the session is already authenticated; this raises it
+ * for one operation and the rotated cookie replaces the current one.
+ *
+ * The credential comes from server configuration, never from arguments, exactly
+ * as it does in `connector_step_up`. No MFA code is passed: an account with MFA
+ * enabled cannot be stepped up without a person, which would put one back inside
+ * every push. Nothing provisions an account with MFA on — the column defaults to
+ * false — so this stays at zero developer actions unless somebody turns it on
+ * deliberately. If anyone ever does, this call fails and the run refuses with
+ * the reason, rather than the push appearing to hang.
+ */
+async function elevate(state: PushState, what: string): Promise<string | null> {
+  try {
+    const target = resolveTarget(state.target)
+    await stepUp(requireSession(target.name), target.secret)
+    return null
+  } catch (err) {
+    return `Could not re-authenticate before the ${what}: ${err instanceof Error ? err.message : String(err)}`
+  }
+}
 
 /** Run one of the Connector's own tools, so the loop passes every gate a person would. */
 async function runTool(name: string, args: Record<string, unknown>): Promise<{ ok: boolean; body: unknown }> {
@@ -223,6 +259,10 @@ export async function advancePush(state: PushState): Promise<PushState> {
         if (go.value === null) return savePush(state) // Still with the owner. Not an error.
         note(state, 'importing', 'The owner granted the import GO.')
         savePush(state)
+        // Immediately before the write, not before the wait for the GO.
+        const importElevation = await elevate(state, 'import')
+        if (importElevation) return refuse(state, importElevation)
+
         const run = await runTool('connector_import_replace', {
           target: state.target,
           confirm: `REPLACE ${state.target}`,
@@ -273,6 +313,9 @@ export async function advancePush(state: PushState): Promise<PushState> {
         if (go.value === null) return savePush(state)
         note(state, 'publishing', 'The owner granted the publish GO.')
         savePush(state)
+        const publishElevation = await elevate(state, 'publish')
+        if (publishElevation) return refuse(state, publishElevation)
+
         const run = await runTool('connector_publish_site', { target: state.target, go: go.value })
         if (!run.ok) return refuse(state, `The publish refused or failed: ${errorOf(run.body)}`)
         const body = run.body as { routeCheck?: unknown; result?: unknown }

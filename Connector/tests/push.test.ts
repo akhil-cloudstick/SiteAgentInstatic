@@ -49,6 +49,7 @@ let actions: { by: 'connector' | 'owner' | 'developer'; what: string }[] = []
 let tickets = new Map<string, { id: string; action: string; target: string; sha256: string; contentDigest?: string }>()
 let goByTicket = new Map<string, Go>()
 let ticketSeq = 0
+let steppedUp = false
 
 const hashOf = (s: string): string => createHash('sha256').update(s).digest('hex')
 
@@ -128,6 +129,12 @@ beforeEach(async () => {
   )
 
   actions = []
+  // The real CMS demands a step-up for its two destructive operations, and the
+  // fake here used to answer 200 to everything — which is precisely why a push
+  // loop that never stepped up passed every test and then failed on a live run
+  // with 401 step_up_required, having written nothing. The fake now refuses the
+  // same way the real one does.
+  steppedUp = false
   tickets = new Map()
   goByTicket = new Map()
   ticketSeq = 0
@@ -164,6 +171,28 @@ beforeEach(async () => {
       }
       return new Response(JSON.stringify({ error: 'unexpected relay call' }), { status: 400 })
     }
+
+    if (method === 'POST' && url.pathname.endsWith('/auth/step-up')) {
+      // The credential is the account's own, from configuration. The fake only
+      // cares that one was presented.
+      const body = JSON.parse(String(init?.body ?? '{}')) as { password?: string }
+      if (!body.password) return new Response(JSON.stringify({ error: 'password required' }), { status: 400 })
+      steppedUp = true
+      actions.push({ by: 'connector', what: 'stepped up' })
+      return new Response('{}', { status: 200, headers: { 'set-cookie': 'instatic_admin_session=t2; Path=/; HttpOnly' } })
+    }
+
+    // The two writes, each refusing an un-elevated session exactly as the CMS
+    // does. The elevation is spent by the write, so a second write needs a
+    // second step-up — which is what makes "elevate once at the start of the
+    // run" the wrong shape, given a push waits on two human signatures between
+    // them.
+    const isWrite =
+      method === 'POST' && (url.pathname.startsWith('/import') || url.pathname.endsWith('/cms/publish'))
+    if (isWrite && !steppedUp) {
+      return new Response(JSON.stringify({ error: 'step_up_required' }), { status: 401 })
+    }
+    if (isWrite) steppedUp = false
 
     if (url.pathname.endsWith('/login')) {
       return new Response('{}', { status: 200, headers: { 'set-cookie': 'instatic_admin_session=t; Path=/; HttpOnly' } })
