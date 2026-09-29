@@ -746,3 +746,83 @@ create trigger ai_spend_no_update before update on siteagent_control.ai_spend
 drop trigger if exists ai_spend_no_delete on siteagent_control.ai_spend;
 create trigger ai_spend_no_delete before delete on siteagent_control.ai_spend
   for each row execute function siteagent_control.ai_spend_immutable();
+-- ---------------------------------------------------------------------------
+-- The audit trail's own immutability (security class E9, gap 4).
+--
+-- `deploy_receipts` and `ai_spend` above have been append-only by trigger since
+-- they were written. These two had only address stamping — so the record of what
+-- went live was protected by the database, while the record of WHO ORDERED IT
+-- was editable by anyone holding the connection string. That is the wrong way
+-- round: `admin_audit` is the answer to "who did this", which is the question an
+-- audit trail exists to settle, and it covers the rollbacks and spend-cap raises
+-- the other two tables' protection is there to support.
+--
+-- Found by writing the E9 trigger tests and noticing the protected set was
+-- smaller than the class. Recorded as gap 4 in docs/known-gaps.md first, then
+-- closed here.
+--
+-- They take DIFFERENT shapes, and that is the whole difficulty of this change.
+-- ---------------------------------------------------------------------------
+
+-- admin_audit: unconditional, exactly like the receipts.
+--
+-- Safe because nothing in the repo ever updates or deletes a row in it —
+-- searched across Operator/ and Connector/, zero hits. An administrator action
+-- is a fact about the past; there is no legitimate reason to revise one.
+create or replace function siteagent_control.admin_audit_immutable() returns trigger
+language plpgsql as $$
+begin
+  raise exception 'an admin audit row is immutable: it records who did what, and may not be % after the fact',
+    case tg_op when 'DELETE' then 'deleted' else 'edited' end;
+end $$;
+drop trigger if exists admin_audit_no_update on siteagent_control.admin_audit;
+create trigger admin_audit_no_update before update on siteagent_control.admin_audit
+  for each row execute function siteagent_control.admin_audit_immutable();
+drop trigger if exists admin_audit_no_delete on siteagent_control.admin_audit;
+create trigger admin_audit_no_delete before delete on siteagent_control.admin_audit
+  for each row execute function siteagent_control.admin_audit_immutable();
+
+-- mcp_agent_audit: frozen EXCEPT its address columns.
+--
+-- The unconditional pattern cannot be used here and this is not a matter of
+-- taste: `propagate_tenant_address()` (above, ~line 350) rewrites `business_id`
+-- on every row of this table when a project moves to another Business, and the
+-- migration further down backfills the same column. An unconditional refusal
+-- would make re-addressing a project fail — the platform breaking, not an
+-- attacker.
+--
+-- So the guard freezes what the row MEANS — which agent key called which tool
+-- against which project, and whether it worked — and lets the two address
+-- columns move. Same shape as the relay's frozen-field triggers: a record whose
+-- state may be re-filed but whose content may not be rewritten.
+--
+-- `tenant_slug` is frozen deliberately, even though the stamping trigger's
+-- `update of tenant_slug` clause anticipates it moving. Nothing writes it, and
+-- an audit row whose subject can be reassigned proves nothing about the subject
+-- it originally named. If a real need for that appears, this refusal is where it
+-- will surface, which is the right place for it to surface.
+create or replace function siteagent_control.mcp_agent_audit_immutable() returns trigger
+language plpgsql as $$
+begin
+  if tg_op = 'DELETE' then
+    raise exception 'an MCP agent audit row is immutable: it records what an agent key did, and may not be deleted';
+  end if;
+  if new.id           is distinct from old.id
+     or new.tenant_slug is distinct from old.tenant_slug
+     or new.key_id      is distinct from old.key_id
+     or new.tool        is distinct from old.tool
+     or new.target      is distinct from old.target
+     or new.ok          is distinct from old.ok
+     or new.error       is distinct from old.error
+     or new.created_at  is distinct from old.created_at then
+    raise exception 'an MCP agent audit row is immutable: it records what an agent key did, and may not be edited (only its business_id/operator_id address may be restamped)';
+  end if;
+  return new;
+end $$;
+drop trigger if exists mcp_agent_audit_no_update on siteagent_control.mcp_agent_audit;
+create trigger mcp_agent_audit_no_update before update on siteagent_control.mcp_agent_audit
+  for each row execute function siteagent_control.mcp_agent_audit_immutable();
+drop trigger if exists mcp_agent_audit_no_delete on siteagent_control.mcp_agent_audit;
+create trigger mcp_agent_audit_no_delete before delete on siteagent_control.mcp_agent_audit
+  for each row execute function siteagent_control.mcp_agent_audit_immutable();
+
