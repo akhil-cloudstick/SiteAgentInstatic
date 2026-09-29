@@ -58,33 +58,55 @@ by someone before it can be applied:
 }
 ```
 
-**3. Allow that tag to reach the platform host, on 443, and nothing else.**
+**3. FIRST — remove or narrow any allow-all rule. Do this before the key is issued.**
+
+A Tailscale tailnet on the **default policy** carries this:
+
+```jsonc
+{ "action": "accept", "src": ["*"], "dst": ["*:*"] }
+```
+
+While that rule is present, **adding the `tag:validator` rule below restricts
+nothing at all.** The validator's machine would reach every device on the
+tailnet — the owner's desktop included — and the narrow rule would look like a
+control while granting none. Check for it, and for any equivalent in `grants`,
+and remove or narrow it first.
+
+Before removing it, write down what the existing devices actually need, and add
+those rules explicitly, so taking the blanket rule away breaks nothing. A tailnet
+that stops working is how an allow-all rule gets put back in a hurry.
+
+**4. Allow that tag to reach the platform host, on 443, and nothing else.**
 
 ```jsonc
 "acls": [
   {
     "action": "accept",
     "src":    ["tag:validator"],
-    "dst":    ["tag:platform:443"]
+    "dst":    ["<platform host tailnet IP>:443"]
   }
 ]
 ```
 
-This assumes the platform host carries `tag:platform`. If it does not, the
-destination can name the host directly instead — but a tag is better here for
-the same reason it is better on the source side: it survives the host being
-rebuilt or re-addressed.
+**Address the host by its tailnet IP, not by `tag:platform`.** Tagging an
+existing, user-owned production host **changes its ownership** in Tailscale's
+model, and can cut it out of the user-based rules that already govern it. The IP
+form touches the host not at all. (An earlier version of this runbook recommended
+the tag, for durability across a rebuild; that trade is not worth changing the
+ownership of a live host.)
 
 **What to check before telling the validator it is open.** From the validator's
-machine, once joined:
+machine, once joined — and the second check is the one that matters, so it names
+its targets rather than leaving them to judgement:
 
 - `https://<platform host>/operator` answers the sign-in page
-- any other tailnet host does not answer at all
+- **nothing else answers.** Test at least the owner's desktop and Zaiserver
+  (`100.74.27.45`), on ports **22, 445, 3389 and 443**. "No route" or a timeout is
+  the pass; anything that answers is a finding.
 - the platform host on any port other than 443 does not answer
 
-The middle one is the check that matters. A rule that opens the platform is only
-half of what was decided; the other half is that it opens nothing else, and that
-is the half worth testing.
+A rule that opens the platform is only half of what was decided; the other half is
+that it opens nothing else, and that is the half worth testing.
 
 ---
 

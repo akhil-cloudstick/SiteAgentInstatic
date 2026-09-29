@@ -56,9 +56,16 @@ const tally = (items, key, labels) =>
     .join(' ')
 
 function subtaskRow(sub) {
+  // The checking side's own words, shown beside their verdict. A `fail` whose
+  // reason lives only on the relay makes the board a pointer rather than a record,
+  // and the reason is the part a reader needs. Imported by
+  // `import-verdicts.mjs`; absent until they have run that criterion.
+  const evidence = sub.verifiedEvidence
+    ? `<p class="evidence">${escape(sub.verifiedEvidence)}${sub.verifiedAt ? ` <span class="at">${escape(sub.verifiedAt)}</span>` : ''}</p>`
+    : ''
   return `        <tr>
           <td class="id">${escape(sub.id)}</td>
-          <td>${escape(sub.text)}</td>
+          <td>${escape(sub.text)}${evidence}</td>
           <td><span class="chip ${sub.status}">${escape(STATUS_LABEL[sub.status] ?? sub.status)}</span></td>
           <td><span class="chip v-${sub.verified}">${escape(VERIFY_LABEL[sub.verified] ?? sub.verified)}</span></td>
         </tr>`

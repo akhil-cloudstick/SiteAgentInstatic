@@ -305,6 +305,190 @@ tenants serve from a prebuilt bundle. It is not live until that is rebuilt.
 
 ---
 
+---
+
+## 4. The control plane's audit log is editable; the two tables that are not, are the ones we test
+
+- [x] **Fixed and verified**
+
+> **Closed 2026-09-29, confirmed against the live database.** Both tables now
+> refuse tampering at the database, and the two took different shapes — which was
+> the whole difficulty.
+>
+> `admin_audit` is unconditional, like the receipts: nothing in the repo ever
+> updates or deletes a row in it (searched across `Operator/` and `Connector/`,
+> zero hits), so an administrator action is simply a fact about the past.
+>
+> `mcp_agent_audit` **could not** take that pattern, and an unconditional trigger
+> there would have broken the platform rather than an attacker:
+> `propagate_tenant_address()` (schema.sql:350) rewrites `business_id` on every
+> row of it when a project moves to another Business, and the migration at :409
+> backfills the same column. So it is frozen EXCEPT its two address columns —
+> which agent key called which tool against which project, and whether it worked,
+> are all immutable; the address may be restamped. `tenant_slug` is frozen
+> deliberately, even though the stamping trigger's `update of tenant_slug` clause
+> anticipates it moving, because an audit row whose subject can be reassigned
+> proves nothing about the subject it originally named.
+>
+> **Proof, on the running system:** `information_schema.triggers` reports all
+> eight immutability triggers live (was four). Editing and deleting a REAL
+> `admin_audit` row, a real `mcp_agent_audit` row and a real deploy receipt are
+> each refused with the trigger's own wording — every probe run inside a
+> transaction that was rolled back, so the live audit was never actually altered
+> even had a refusal failed to fire. Inserts still work on both tables, which the
+> platform depends on constantly. 47 existing rows (34 + 13) became immutable.
+>
+> **Checked before applying, not after:** nothing prunes these tables by age. The
+> only retention in the control plane is `receipt.mjs` pruning kept *bundles* on
+> disk, so no job starts failing.
+>
+> **Pinned from both sides in `triggers.selftest.mjs`** (30 checks, was 17), and
+> the positive case is driven through the REAL path rather than a hand-written
+> UPDATE: moving a project to another Business fires the propagation, and the
+> audit row must be re-addressed while its content stays frozen. Proven by two
+> reversals — removing the four new triggers fails 13 checks, and making
+> `mcp_agent_audit` unconditionally immutable fails the platform case
+> ("moving the project to another Business still works"). The second reversal is
+> the one worth having: it is the mistake a later reader is most likely to make.
+>
+> The test no longer merely *asserts* this gap — it tests the fix.
+
+**What it was.** Security class E9 is "audit tampering". Four record stores in the
+control plane matter to it, and only two of them were actually protected:
+
+| Table | What it holds | Protection |
+|---|---|---|
+| `deploy_receipts` | what went live, and whether it verified | **append-only, by trigger** |
+| `ai_spend` | what was spent, per project per month | **append-only, by trigger** |
+| `admin_audit` | **every administrator action** — including rollbacks, act-as entries, spend-cap raises | address stamping only |
+| `mcp_agent_audit` | every tool call an agent key made | address stamping only |
+
+The two with nothing are the two that matter most. `admin_audit` is the answer to
+"who did this", which is the question an audit trail exists to settle, and any
+role holding the database console can rewrite a row in it or delete it outright.
+The receipts are safe; the record of who ordered them is not.
+
+**How it was found.** By writing the E9 tests
+(`Operator/control-plane/registry/triggers.selftest.mjs`) and noticing that the
+protected set was smaller than the class. The gap is now **asserted rather than
+assumed** — that test ends with a check named `KNOWN GAP: admin_audit has no
+immutability trigger` which passes on `false`, so if someone adds the trigger the
+check fails and points here. The gap cannot quietly stop being true, and it
+cannot quietly stay true either.
+
+**Proof.** In `registry/schema.sql`, `deploy_receipts` and `ai_spend` each get an
+`_immutable()` function plus `_no_update` / `_no_delete` triggers (lines 653-665
+and 736-748). `admin_audit` gets one trigger, `admin_audit_stamp_address`
+(line 534), which fills in `business_id` / `operator_id` on insert.
+`mcp_agent_audit` likewise (line 333). Neither refuses anything.
+
+**Cost.** It does not open a new way in: writing to these tables still needs the
+admin database role, which is the control plane's own. What it costs is the
+guarantee — the difference between "this log is append-only because the code only
+ever inserts" and "this log is append-only because the database refuses", which
+is the entire distinction E9 draws. The first holds until someone with the
+connection string decides otherwise, including to cover their own tracks.
+
+**The fix, and why it is two different jobs.**
+
+`admin_audit` is the easy one and should be done first. Nothing in the repo ever
+updates or deletes a row in it — searched, and there are no hits — so the same
+unconditional pattern the receipts use applies verbatim:
+
+```sql
+create or replace function siteagent_control.admin_audit_immutable() returns trigger ...
+create trigger admin_audit_no_update before update on siteagent_control.admin_audit ...
+create trigger admin_audit_no_delete before delete on siteagent_control.admin_audit ...
+```
+
+`mcp_agent_audit` **cannot** take that pattern, and this is the part worth knowing
+before starting. Its rows are legitimately updated: `propagate_tenant_address()`
+(schema.sql:350) rewrites `business_id` on every row of it when a project moves to
+another Business, and the migration at line 409 backfills the same column. An
+unconditional refusal would break re-addressing a project. So that one needs a
+column-scoped guard — refuse any change except to `business_id` / `operator_id`,
+the shape the relay's frozen-field triggers already use — or the propagation has
+to be reworked to stop touching audit rows at all.
+
+Whichever way, the fix ends with those cases added to
+`triggers.selftest.mjs`, including the positive one: re-addressing a project must
+still work afterwards. A trigger that is too strict here fails the platform rather
+than an attacker.
+
+**Why deferred.** It was found inside a task whose scope was *testing* what
+exists, and closing it there would have meant shipping an untested schema change
+and a test written against it in the same breath — which is how a control gets
+believed without being proved. It is small, it is understood, and it wants its own
+change.
+
+---
+
+## 5. The push robot signs in as a real person on one project, so MFA cannot be turned on for them
+
+- [ ] **Fixed and verified**
+
+**What it is.** The automated push authenticates to each project's CMS before it
+writes. Which account it uses is decided by one line — `connector_email ||
+owner_email` (`Operator/dev.mjs`) — a dedicated robot account where one exists,
+and the project owner's own login where one does not.
+
+On one project that fallback lands on **a real person's personal address**:
+
+| Project | The push signs in as | |
+|---|---|---|
+| sheeltron | `sheeltron@tenant.local` | dedicated |
+| akhil | `connector@cloudstick.io` | dedicated, but **shared with client-b** |
+| client-b | `connector@cloudstick.io` | the same account |
+| acceptance-scratch | `acceptance-scratch@tenant.local` | machine-provisioned |
+| sheeltron-staging | `sheeltron-staging@tenant.local` | machine-provisioned |
+| **global-nettech** | **`gear1.dinesh@gmail.com`** | **a person** |
+
+**Why it is a deadlock rather than untidiness.** The CMS demands a step-up
+before a clean-site import or a full publish, and step-up asks for a 6-digit code
+when the account has MFA enabled (`if (user.mfaEnabled && !hubPersonId)` in the
+CMS step-up handler). So on `global-nettech` there is no good option:
+
+- turn MFA on → every push stalls waiting for a code no machine can supply, and
+  AC-C13.2 (zero developer round trips) cannot pass;
+- leave MFA off → a real person's login has no second factor.
+
+The two uses have to be separated before either can be made right.
+
+**How it was found.** Answering the checking side's question on relay T-000011
+(inbox 0051): "are the nine step-up accounts used only by the Connector, or are
+they logins people also use?" — a good question we had not asked ourselves. All
+nine accounts across the six active projects currently have MFA off, so nothing is
+broken today; what is missing is the ability to turn it on.
+
+**Cost.** No exposure that is not already there — the push already holds this
+credential and the platform already stores it. What it costs is a control we
+cannot switch on: a person's account that must stay password-only for a machine's
+convenience.
+
+**The decision, already taken.** The owner settled the policy on 2026-09-29 (relay
+M-000121): accounts used only by the push are dedicated service accounts,
+password-only by design and recorded as such; every login a person uses gets MFA.
+Concretely — one dedicated Connector account **per project**, the shared one split,
+`global-nettech` moved onto its own, and MFA switched on for the two human logins
+that have it off.
+
+**The fix, and why it is deferred.** Three steps, and the last one is not ours:
+
+1. Create a dedicated CMS user per project that lacks one.
+2. Point the registry at it (`connector_email` + `connector_password_enc`).
+   `Operator/scripts/repair-connector-credential.mjs` already does the pairing and
+   verifies the login before writing, but nothing creates the user — that part
+   would be written by hand into live client databases (Sheeltron, Global Nettech,
+   client-b).
+3. Switch MFA on for the two human logins. **This one ends with two people and
+   their phones**: enabling the flag without the person having enrolled an
+   authenticator locks them out of their own CMS.
+
+Deferred deliberately on 2026-09-29: steps 1 and 2 write into live client systems
+and step 3 cannot be done by us at all, so this is a coordinated change with real
+people rather than a patch. Not a PRD requirement — it came out of the acceptance
+conversation and the owner's policy decision, so it gates nothing on the board.
+
 ## Not in this file
 
 Anything already reported to the other side, and anything the acceptance run
