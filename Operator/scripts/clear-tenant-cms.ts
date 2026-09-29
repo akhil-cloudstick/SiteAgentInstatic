@@ -60,7 +60,7 @@ const sql = new Bun.SQL(config.adminDatabaseUrl)
 // The provisioner sanitises the slug (hyphens -> underscores), so `t_<slug>` is wrong
 // for any hyphenated slug — e.g. "adithyan-manoj" lives in schema "t_adithyan_manoj".
 const [tenant] = await sql.unsafe(
-  `select schema_name from siteagent_control.tenants where slug = $1`,
+  `select schema_name, port from siteagent_control.tenants where slug = $1`,
   [slug],
 ) as any[]
 if (!tenant?.schema_name) {
@@ -111,18 +111,82 @@ console.log(`Backup: ${pagesBefore} content row(s) + ${mediaBefore} media asset(
 // fail EBUSY on Windows/SMB. Killing first removes both problems; the tenant is
 // restarted at the end, once the DB and disk are actually empty.
 const cpUrl = `http://127.0.0.1:${config.controlPlanePort}`
-type HealthBody = { running?: Array<{ slug: string; pid: number; port: number }> }
+const TENANT_PORT = Number(tenant.port) || 0
+
+/**
+ * Is anything actually serving this tenant?
+ *
+ * ASKED OF THE PORT, not of the control plane, and that is the whole fix. This
+ * used to read `running[]` from `GET /api/health` — a field the control plane
+ * returns ONLY to a signed-in platform administrator (server.mjs: "which projects
+ * are running is platform detail"). A CLI has no session, so the field was always
+ * undefined, every run concluded "not running", the live process was never killed,
+ * and its in-memory render cache went on serving the old site. The script then
+ * printed "Public URL cleared" because `tenantRecycled` was computed from that
+ * same wrong answer.
+ *
+ * That made the headline claim — all four places — false in exactly the case that
+ * matters: a tenant that is up. The cache is place 3, and it is the one an
+ * external wipe cannot reach.
+ *
+ * The port answers without credentials, and it answers the question actually being
+ * asked. A refused connection means nothing is serving; anything else means
+ * something is.
+ */
+async function portListening(port: number): Promise<boolean> {
+  if (!port) return false
+  try {
+    await fetch(`http://127.0.0.1:${port}/`, {
+      method: 'HEAD',
+      signal: AbortSignal.timeout(4000),
+      redirect: 'manual',
+    })
+    return true
+  } catch {
+    return false
+  }
+}
+
+/** The pid holding a port, so the tree can be killed. Null when not found. */
+function pidOnPort(port: number): number | null {
+  if (!port) return null
+  try {
+    if (process.platform === 'win32') {
+      const out = Bun.spawnSync([
+        'powershell', '-NoProfile', '-Command',
+        `(Get-NetTCPConnection -State Listen -LocalPort ${port} -ErrorAction SilentlyContinue | Select-Object -First 1).OwningProcess`,
+      ])
+      const pid = Number(new TextDecoder().decode(out.stdout).trim())
+      return Number.isInteger(pid) && pid > 0 ? pid : null
+    }
+    const out = Bun.spawnSync(['lsof', '-ti', `tcp:${port}`, '-sTCP:LISTEN'])
+    const pid = Number(new TextDecoder().decode(out.stdout).trim().split(/\s+/)[0])
+    return Number.isInteger(pid) && pid > 0 ? pid : null
+  } catch {
+    return null
+  }
+}
+
 let tenantWasRunning = false
 let tenantStopped = false
 try {
-  const health = (await fetch(`${cpUrl}/api/health`).then((r) => r.json())) as HealthBody
-  const rec = health.running?.find((r) => r.slug === slug)
-  if (!rec) {
+  tenantWasRunning = await portListening(TENANT_PORT)
+  const pid = tenantWasRunning ? pidOnPort(TENANT_PORT) : null
+  if (!tenantWasRunning) {
     // Not running — nothing holds in-memory state; the next start reads the
     // now-empty DB.
     tenantStopped = true
+  } else if (pid === null) {
+    // Something is serving the port and we cannot tell what. Do NOT proceed as
+    // though the cache were clear: the whole point of this step is that place 3
+    // cannot be wiped from outside the process. (P2 — a check that cannot run
+    // reports failure.)
+    throw new Error(
+      `port ${TENANT_PORT} is being served but its pid could not be determined, so the ` +
+        'in-memory render cache cannot be flushed. Stop the tenant and re-run.',
+    )
   } else {
-    tenantWasRunning = true
+    const rec = { pid, port: TENANT_PORT }
     // Kill the whole process tree. The control-plane spawns tenants through a
     // shell on Windows, so taskkill /T reaps the shell + the bun child.
     if (process.platform === 'win32') {
@@ -133,13 +197,14 @@ try {
     // Wait for the control-plane's child-exit handler to remove it from the
     // running set BEFORE asking it to start again — otherwise `startTenant` sees
     // it as still-running and no-ops, leaving the tenant down.
+    // Waited on the PORT for the same reason it is now used to detect: the
+    // control plane's running-set is not readable from here.
     const deadline = Date.now() + 15_000
     while (Date.now() < deadline) {
       await new Promise((r) => setTimeout(r, 400))
-      const h = (await fetch(`${cpUrl}/api/health`).then((r) => r.json()).catch(() => null)) as HealthBody | null
-      if (h && !h.running?.some((r) => r.slug === slug)) { tenantStopped = true; break }
+      if (!(await portListening(TENANT_PORT))) { tenantStopped = true; break }
     }
-    if (!tenantStopped) throw new Error('tenant process still listed as running 15s after kill')
+    if (!tenantStopped) throw new Error(`tenant is still serving port ${TENANT_PORT} 15s after kill`)
   }
 } catch (err) {
   console.error(
@@ -236,6 +301,10 @@ if (existsSync(publishedDir)) {
 // in-memory published-render cache (server/publish/renderCache.ts) and publish
 // version counter (publishState.ts). Only started if it was running before —
 // clearing a stopped tenant leaves it stopped.
+// Inferring this was the second half of the bug: "stopped and was not running"
+// computed to TRUE on every run, so the script reported the public URL cleared
+// without anything having been cleared. It is now only ever set by observing the
+// tenant come back, or by observing that it was never up.
 let tenantRecycled = tenantStopped && !tenantWasRunning
 if (tenantStopped && tenantWasRunning) {
   try {
