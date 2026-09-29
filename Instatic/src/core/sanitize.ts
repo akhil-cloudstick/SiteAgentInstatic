@@ -130,6 +130,54 @@ function stripHtmlFallback(value: string): string {
   return current
 }
 
+/**
+ * Run the purifier repeatedly until its output stops changing.
+ *
+ * WHY THIS IS NOT PARANOIA. One pass of DOMPurify on this stack removes only
+ * the FIRST disallowed element among a run of siblings and leaves the rest
+ * intact — attributes and all. Measured against the production configuration
+ * (`server/richtextSanitizer.ts`, DOMPurify 3.4.2 on happy-dom 20.9.0, with
+ * `richtextSanitizerReady() === true`):
+ *
+ *   in   <img src=a onerror=alert(1)><img src=b onerror=alert(2)><img src=c onerror=alert(3)>
+ *   out  <img src="b" onerror="alert(2)"><img src="c" onerror="alert(3)">
+ *
+ * `img` is not in `ALLOWED_TAGS` and `onerror` is not in `ALLOWED_ATTR`, so
+ * every one of those should have gone. Removing a node shifts the walk past its
+ * next sibling, so each pass drops one and steps over one.
+ *
+ * That is the same failure `stripHtmlFallback` below already loops against, for
+ * the same stated reason — "removing one match can reveal another". These two
+ * calls are where it actually bites: `escapeProps` passes richtext through
+ * UNESCAPED on the strength of this function, so a survivor is live markup on a
+ * published page.
+ *
+ * Each pass either shrinks the markup or reaches a fixpoint, so this terminates;
+ * benign content settles in two passes (one that changes nothing, one that
+ * confirms it). The bound is a backstop against a pathological input that
+ * oscillates rather than shrinks — and reaching it REFUSES rather than returning
+ * the last value, because a value that is still changing has not been proven
+ * clean. (Principle P2: a check that cannot complete reports failure.)
+ */
+const MAX_SANITIZE_PASSES = 12
+
+function sanitizeToFixpoint(
+  purifier: DOMPurifyRuntime,
+  value: string,
+  config: Config,
+): { ok: true; value: string } | { ok: false; passes: number } {
+  let current = value
+  let previous: string
+  let passes = 0
+  do {
+    previous = current
+    current = String(purifier.sanitize!(previous, config))
+    passes++
+    if (current === previous) return { ok: true, value: current }
+  } while (passes < MAX_SANITIZE_PASSES)
+  return { ok: false, passes }
+}
+
 // ---------------------------------------------------------------------------
 // DOMPurify configuration profiles
 // ---------------------------------------------------------------------------
@@ -229,7 +277,16 @@ export function sanitizeRichtext(
     )
   }
 
-  const sanitized = String(purifier.sanitize(str, config))
+  // Looped, not a single call — see `sanitizeToFixpoint`. One pass leaves every
+  // disallowed sibling after the first one standing.
+  const result = sanitizeToFixpoint(purifier, str, config)
+  if (!result.ok) {
+    throw new Error(
+      `Richtext sanitiser did not settle after ${result.passes} passes. ` +
+        'Refusing to return markup that is still changing, which has not been proven clean.',
+    )
+  }
+  const sanitized = result.value
 
   // When plain-text mode is requested, apply a post-strip pass.
   // DOMPurify's ALLOWED_TAGS:[] covers most cases but certain browsers / DOM
@@ -297,5 +354,15 @@ export function sanitizeSvg(value: unknown): string {
     return ''
   }
 
-  return String(purifier.sanitize(str, SVG_CONFIG))
+  // Looped for the same reason as richtext, and it is reachable here too:
+  //
+  //   in   <svg><foreignObject>a</foreignObject><foreignObject><img src=x onerror=alert(1)></foreignObject></svg>
+  //   out  <svg><foreignObject><img src="x" onerror="alert(1)"></foreignObject></svg>
+  //
+  // `foreignObject` is in `FORBID_TAGS` precisely so it cannot smuggle HTML, and
+  // one pass let the second one through carrying an inline handler.
+  const result = sanitizeToFixpoint(purifier, str, SVG_CONFIG)
+  // Not settling means not proven clean. This function's refusal is `''`, the
+  // same answer it gives when no runtime is available.
+  return result.ok ? result.value : ''
 }

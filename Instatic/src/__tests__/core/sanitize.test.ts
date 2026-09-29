@@ -15,7 +15,7 @@
  */
 
 import { describe, it, expect } from 'bun:test'
-import { sanitizeRichtext, isRichtextPropKey, PLAIN_TEXT_CONFIG } from '@core/sanitize'
+import { sanitizeRichtext, sanitizeSvg, isRichtextPropKey, PLAIN_TEXT_CONFIG } from '@core/sanitize'
 
 // ---------------------------------------------------------------------------
 // XSS prevention — the core contract
@@ -281,5 +281,104 @@ describe('isRichtextPropKey()', () => {
   it('is case-insensitive', () => {
     expect(isRichtextPropKey('HTML')).toBe(true)
     expect(isRichtextPropKey('RichText')).toBe(true)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// More than one dangerous element in a row
+//
+// Every test above hands the sanitiser ONE disallowed element. All 30 of them
+// passed while `sanitizeRichtext` was removing only the first of several
+// siblings and returning the rest untouched — which is the whole reason this
+// block exists, and the reason it is written as a list of siblings rather than
+// as another single payload.
+//
+// Measured on the production configuration (DOMPurify 3.4.2 on happy-dom 20.9.0,
+// `richtextSanitizerReady() === true`) before the fix:
+//
+//   in   <img src=a onerror=alert(1)><img src=b onerror=alert(2)><img src=c onerror=alert(3)>
+//   out  <img src="b" onerror="alert(2)"><img src="c" onerror="alert(3)">
+//
+// Removing a node shifts the walk past its next sibling, so one pass drops one
+// element and steps over one. `escapeProps` passes richtext through UNESCAPED on
+// the strength of this function, so each survivor was live markup on a published
+// page. The fix loops to a fixpoint (`sanitizeToFixpoint`).
+// ---------------------------------------------------------------------------
+
+describe('sanitizeRichtext() — runs of disallowed siblings', () => {
+  it('strips all three of three <img onerror> siblings, not just the first', () => {
+    const result = sanitizeRichtext(
+      '<img src=a onerror=alert(1)><img src=b onerror=alert(2)><img src=c onerror=alert(3)>',
+    )
+    expect(result).not.toContain('onerror')
+    expect(result).not.toContain('<img')
+    // Stated as an equality too: the answer is nothing at all, and "fewer
+    // survivors than before" is not the bar.
+    expect(result).toBe('')
+  })
+
+  it('strips a second disallowed element of a DIFFERENT kind from the first', () => {
+    // The mixed case matters on its own: a reader could otherwise assume the
+    // problem was some per-tag deduplication rather than a positional skip.
+    const result = sanitizeRichtext('<script>alert(1)</script><img src=x onerror=alert(1)>')
+    expect(result).not.toContain('onerror')
+    expect(result).not.toContain('<img')
+    expect(result).not.toContain('alert')
+  })
+
+  it('strips both orders of an <img>/<svg> pair, so neither position is privileged', () => {
+    const imgFirst = sanitizeRichtext('<img src=x onerror=alert(1)><svg onload=alert(1)></svg>')
+    expect(imgFirst).not.toContain('onerror')
+    expect(imgFirst).not.toContain('onload')
+
+    const svgFirst = sanitizeRichtext('<svg onload=alert(1)></svg><img src=x onerror=alert(1)>')
+    expect(svgFirst).not.toContain('onerror')
+    expect(svgFirst).not.toContain('onload')
+  })
+
+  it('strips a run nested inside an allowed element', () => {
+    // The wrapper is allowed and survives, which is correct — what must not
+    // survive is anything inside it.
+    const result = sanitizeRichtext('<p><img src=a onerror=alert(1)><img src=b onerror=alert(2)></p>')
+    expect(result).not.toContain('onerror')
+    expect(result).not.toContain('<img')
+    expect(result).toContain('<p>')
+  })
+
+  it('keeps benign siblings intact, so the loop is not just stripping everything', () => {
+    // The other edge. A fixpoint loop that over-removed would pass every
+    // assertion above and quietly destroy real content, so the loop is pinned
+    // from both sides.
+    const result = sanitizeRichtext(
+      '<p>First</p><p>Second</p><ul><li>One</li><li>Two</li></ul><strong>Bold</strong>',
+    )
+    expect(result).toContain('First')
+    expect(result).toContain('Second')
+    expect(result).toContain('<li>One</li>')
+    expect(result).toContain('<li>Two</li>')
+    expect(result).toContain('<strong>Bold</strong>')
+  })
+})
+
+describe('sanitizeSvg() — runs of forbidden siblings', () => {
+  it('strips a second <foreignObject>, which is the tag that can smuggle HTML', () => {
+    // Same defect, same file, second function. `foreignObject` is in
+    // `FORBID_TAGS` precisely because it carries HTML into the SVG namespace, and
+    // one pass let the second one through with an inline handler inside it:
+    //
+    //   out  <svg><foreignObject><img src="x" onerror="alert(1)"></foreignObject></svg>
+    const result = sanitizeSvg(
+      '<svg><foreignObject>a</foreignObject><foreignObject><img src=x onerror=alert(1)></foreignObject></svg>',
+    )
+    expect(result).not.toContain('foreignObject')
+    expect(result).not.toContain('onerror')
+    expect(result).not.toContain('<img')
+  })
+
+  it('still renders an ordinary icon, so the loop has not broken real SVG', () => {
+    const result = sanitizeSvg('<svg viewBox="0 0 2 2"><circle cx="1" cy="1" r="1" fill="currentColor"/></svg>')
+    expect(result).toContain('<svg')
+    expect(result).toContain('circle')
+    expect(result).toContain('currentColor')
   })
 })
