@@ -38,6 +38,23 @@ export const API_ERROR_CODES = [
   // `server.ts::abortForRoleMarker` alongside the existing
   // `fabricated_role_marker` warning event. Retryable.
   'ROLE_MARKER_HALLUCINATION',
+  // Untrusted content — a page being shared to a CMS, or the page text quoted
+  // back in a compliance finding — contains text that instructs the AGENT rather
+  // than describing a website: "ignore all previous instructions", "you are now
+  // a …", a forged `<system-reminder>` block. Security class E3.
+  //
+  // It is a THIRD thing, beside two codes this gate already distinguishes:
+  // `CMS_COMPLIANCE_FAILED` (422) means "we checked and it breaks the rules", and
+  // `CMS_CHECK_FAILED` (503) means "we could not check". This one means "we
+  // checked, it is well formed, and we refuse it anyway" — so it is 422 like the
+  // first, because a verdict was reached, and never 503.
+  //
+  // Emitted by `prompt-injection-guard.ts` through `server.ts` at the share route
+  // (before any machine token is signed) and, as a log-and-stop rather than a
+  // response, inside the compliance correction loop where there is no caller to
+  // answer. NOT retryable: the same content will be refused again. The wording
+  // has to change.
+  'PROMPT_INJECTION_REFUSED',
   // The agent got stuck repeating failing tool calls (e.g. re-running the same
   // Edit that errors "string not found", or the same shell command that keeps
   // exiting non-zero) without making progress. The daemon's tool-loop guard

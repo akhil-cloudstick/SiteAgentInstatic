@@ -418,6 +418,7 @@ import { ingestRoutineConnectorEvolution } from './automation-routine-evolution.
 import { createClaudeStreamHandler } from './runtimes/claude-stream.js';
 import { createAgentTitleMarkerStripper } from './title-marker.js';
 import { createRoleMarkerGuard } from './role-marker-guard.js';
+import { promptInjectionGuard, describeForOperator } from './prompt-injection-guard.js';
 import { createToolLoopGuard, resolveToolLoopMode, type ToolLoopVerdict } from './tool-loop-guard.js';
 import { diagnoseClaudeCliFailure } from './claude-diagnostics.js';
 import { loadCritiqueConfigFromEnv } from './critique/config.js';
@@ -7908,6 +7909,35 @@ export async function startServer({
           );
         }
       }
+      // Prompt injection, judged BEFORE the machine token is signed (security
+      // class E3).
+      //
+      // Placed here because everything below this line is irreversible in a way
+      // that matters: `signInstaticMachineToken` mints a credential, the SSO call
+      // opens a session on the tenant's CMS, and the staging POST puts the files
+      // where the CMS agent will read them. A refusal after any of those has
+      // already handed the payload across the boundary.
+      //
+      // The pages are judged as normalised text, which is what the CMS actually
+      // receives — not the raw upload, so an obfuscation the normaliser undoes
+      // cannot slip past by being judged in its pre-normalised form.
+      {
+        const injection = promptInjectionGuard(
+          Object.entries(files)
+            .filter(([path]) => /\.(html?|md|txt|json|css|js)$/i.test(path))
+            .map(([, f]) => Buffer.from(f.base64, 'base64').toString('utf8'))
+            .join('\n'),
+          `project ${slug} pages`,
+        );
+        if (injection.verdict === 'refuse') {
+          console.error(`[share-to-cms] ${slug} REFUSED: ` + describeForOperator(injection.findings));
+          // 422, beside CMS_COMPLIANCE_FAILED — "we checked and it breaks a rule".
+          // Not 503: the check ran and reached a verdict, which is the distinction
+          // `cms-normalize.ts` argues for at length and this code must not blur.
+          return sendApiError(res, 422, 'PROMPT_INJECTION_REFUSED', describeForOperator(injection.findings));
+        }
+      }
+
       // 1) open a MACHINE session on the tenant's Instatic, for this staging
       // call only (MMS Phase 1). It never reaches the browser.
       const token = signInstaticMachineToken(slug, 120);
@@ -14633,6 +14663,35 @@ export async function startServer({
         const summary = violations
           .map((v) => `- ${v.path}: ${v.fails.map((f) => `${f.rule}${f.detail ? ` — ${f.detail}` : ''}`).join('; ')}`)
           .join('\n');
+
+        // Prompt injection, judged before this summary becomes an agent
+        // instruction (security class E3).
+        //
+        // THIS IS THE SEAT THAT MATTERS, and the reason is `f.detail` above: the
+        // findings quote the page's own markup, and `correctionMessage` below is
+        // written into the conversation as a USER message and handed to
+        // `startChatRun`. So a page carrying "ignore all previous instructions"
+        // gets that sentence delivered to an agent with full tool access, inside a
+        // message the agent has every reason to trust — it looks like it came from
+        // the platform, because it did. Fencing cannot help here: the text is not
+        // a tool result being quoted, it is the instruction itself.
+        //
+        // A THROWN error would be invisible. This gate's own outer catch is a few
+        // dozen lines below, `runs.ts` catches again, and what survives is
+        // laundered into AGENT_EXECUTION_FAILED — so a refusal by exception is
+        // indistinguishable from no refusal at all. Hence a return plus a log line
+        // an operator can find, and a guard that returns a verdict rather than
+        // throwing one.
+        const injection = promptInjectionGuard(summary, `project ${projectId} page content`);
+        if (injection.verdict === 'refuse') {
+          console.error(
+            `[cms-compliance] project ${projectId}: REFUSED to start a correction turn. ` +
+              describeForOperator(injection.findings) +
+              ' The compliance violations were NOT fixed — this stops an automated turn, it does not ' +
+              'repair the page. The page needs a human look.',
+          );
+          return;
+        }
 
         if (attempt === CMS_COMPLIANCE_MAX_ATTEMPTS) {
           // Out of attempts — surface it loudly and stop. Never ship a

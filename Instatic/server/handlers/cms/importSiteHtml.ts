@@ -31,6 +31,7 @@ import { CMS_API_PREFIX } from './shared'
 import { stageFileMap, takeStagedFileMap } from './siteImport/stagedImports'
 import { getDesignOrigin, recordDesignOrigin, type DesignOrigin } from '../../repositories/designOrigin'
 import { getDraftPublishStatus } from '../../repositories/publish'
+import { promptInjectionGuardAll, describeForOperator } from '../../ai/tools/promptInjectionGuard'
 
 const IMPORT_SITE_HTML_PATH = `${CMS_API_PREFIX}/import/site-html`
 const STAGED_IMPORT_PREFIX = `${CMS_API_PREFIX}/import/staged/`
@@ -159,6 +160,34 @@ export async function handleImportSiteHtmlRoute(
   for (const [path, entry] of Object.entries(body.files)) {
     files[path] = { bytes: new Uint8Array(Buffer.from(entry.base64, 'base64')), mimeType: entry.mimeType }
   }
+
+  // Prompt injection, judged BEFORE staging (security class E3).
+  //
+  // Placed here rather than at the parse boundary because THIS is the point of
+  // no return: `stageFileMap` hands the bytes to the import wizard, from where
+  // they become site content that the CMS agent reads and acts on. Refusing
+  // after staging would leave a token pointing at the payload.
+  //
+  // Only the text-bearing files are read. Judging base64 image bytes would be
+  // noise, and the agent never reads them as prose.
+  const injection = promptInjectionGuardAll(
+    Object.entries(files)
+      .filter(([path]) => /\.(html?|md|txt|json|css|js)$/i.test(path))
+      .map(([path, entry]) => ({ where: path, value: Buffer.from(entry.bytes).toString('utf8') })),
+  )
+  if (injection.verdict === 'refuse') {
+    return jsonResponse(
+      {
+        error: describeForOperator(injection.findings),
+        code: 'PROMPT_INJECTION_REFUSED',
+        // Marker NAMES only. The matched spans are inside `error`, already
+        // fenced by the guard — see its `excerptFor`.
+        markers: injection.findings.map((f) => ({ marker: f.marker, where: f.where })),
+      },
+      { status: 422 },
+    )
+  }
+
   const token = stageFileMap({ files }, user.id)
   if (body.design?.id) await recordDesignOrigin(db, body.design.id, body.design.name ?? null)
   return jsonResponse(
