@@ -63,6 +63,17 @@ function buildRequest(path: string, options: HarnessRequestInit = {}): Request {
     body: requestBody(options),
   })
   if (options.cookie) req.headers.set('cookie', options.cookie)
+  // Re-apply every header through `set()` after construction.
+  //
+  // The test runtime's global `Request` is happy-dom's, and its CONSTRUCTOR
+  // drops forbidden header names — `cookie`, `origin`, `sec-fetch-site` and the
+  // rest. `set()` does not. That is why the `cookie` line above exists, and the
+  // same treatment has to extend to the others: a CSRF test that passes
+  // `headers: { origin: 'https://evil.example' }` was silently reaching the
+  // handler with NO Origin at all, so the origin gate saw a machine caller and
+  // allowed it. The test then read the route's own 405/401 and reported a
+  // failure whose cause was nowhere near the assertion.
+  for (const [name, value] of headers) req.headers.set(name, value)
   return req
 }
 

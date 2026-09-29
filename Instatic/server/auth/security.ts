@@ -104,9 +104,10 @@ export function publicOriginIsHttps(): boolean {
  * True when the request's `Origin` header is acceptable for a state-changing
  * action. The check is a CSRF defense-in-depth on top of `SameSite=Lax`:
  *
- *   - No Origin header → trust (curl, server-to-server, same-origin form
- *     POST in some browsers); cannot be a cross-origin browser fetch since
- *     all modern browsers send Origin for CORS-significant requests.
+ *   - No Origin AND no `Sec-Fetch-Site` → a non-browser caller (curl, the
+ *     Connector, the control plane's `tenantFetch`) → allow. See below.
+ *   - No Origin BUT `Sec-Fetch-Site` present and cross-site → a browser making a
+ *     cross-site request → REJECT.
  *   - Origin matches expectedOrigin(req) → allow.
  *   - Origin is one of the configured public origins (custom domain +
  *     platform domain both accepted) → allow.
@@ -116,9 +117,47 @@ export function publicOriginIsHttps(): boolean {
  * Both sides are normalized with `normalizeOrigin` so trailing-slash / case
  * differences never cause a false reject.
  */
+/**
+ * The no-Origin case, decided by `Sec-Fetch-Site` (security class E7).
+ *
+ * This used to be an unconditional `return true`, across every caller of
+ * `originAllowed` — every mutating CMS and AI route, the MCP HTTP transport, and
+ * the collab WebSocket upgrade. The comment justifying it argued that a
+ * cross-origin browser fetch always carries `Origin`, which is true for `fetch`
+ * and XHR and NOT true for every navigation-shaped request a page can cause.
+ * Anything that reached this function without one was trusted outright.
+ *
+ * WHY IT CANNOT SIMPLY RETURN FALSE. Machine callers legitimately send no
+ * Origin: the Connector, and the control plane's `tenantFetch`. Refusing them
+ * breaks every gated action on the platform, which is worse than the hole.
+ *
+ * So the second signal decides, which is what `forms/handler.ts` already does a
+ * few files away. `Sec-Fetch-Site` is set by the browser itself and cannot be
+ * set by page JavaScript (it is a forbidden header name); curl and
+ * server-to-server callers never send it at all. That splits the two cases
+ * cleanly:
+ *
+ *   - absent      → not a browser → allow, exactly as before
+ *   - same-origin → a browser, on us → allow
+ *   - none        → a browser, user-initiated (address bar, bookmark) → allow
+ *   - same-site   → a sibling subdomain → allow; `SameSite` cookies reach it
+ *                   anyway, so refusing here would change nothing an attacker
+ *                   cares about while breaking real subdomain setups
+ *   - cross-site  → a browser, from someone else's page → REJECT
+ *
+ * The console gate reached the same conclusion independently
+ * (`Operator/ui/src/lib/cp.ts`), which is the shape being matched here.
+ */
+function noOriginAllowed(req: Request): boolean {
+  const fetchSite = req.headers.get('sec-fetch-site')
+  if (!fetchSite) return true
+  const site = fetchSite.trim().toLowerCase()
+  return site === 'same-origin' || site === 'none' || site === 'same-site'
+}
+
 export function originAllowed(req: Request): boolean {
   const rawOrigin = req.headers.get('origin')
-  if (!rawOrigin) return true
+  if (!rawOrigin) return noOriginAllowed(req)
   const origin = normalizeOrigin(rawOrigin)
   if (!origin) return false
   if (origin === normalizeOrigin(expectedOrigin(req))) return true

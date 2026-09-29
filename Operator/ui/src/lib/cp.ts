@@ -13,7 +13,13 @@ export const INVITE_FLASH_COOKIE = 'sa_invite_once';
 
 /** The console's base with exactly one trailing slash: "/operator/". */
 export function basePath(): string {
-  const raw = import.meta.env.BASE_URL;
+  // `import.meta.env` is injected by Vite, so it exists in the Astro build and
+  // is `undefined` under plain Node — which is how the selftests run this file
+  // (they import it directly; Node 24 strips the types). Without the fallback,
+  // `sessionCookieOptions` throws there, and the session cookie's flags are the
+  // part of E7 that decides whether the origin gate is worth having at all. The
+  // literal matches `base` in `astro.config.mjs`.
+  const raw = (import.meta.env as { BASE_URL?: string } | undefined)?.BASE_URL ?? '/operator/';
   return raw.endsWith('/') ? raw : `${raw}/`;
 }
 

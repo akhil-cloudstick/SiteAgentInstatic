@@ -18,7 +18,7 @@
  * Imported straight from `cp.ts` (Node 24 strips the types) so this tests the
  * shipping function rather than a copy of it.
  */
-import { consoleOriginAllowed, expectedConsoleOrigin } from './cp.ts';
+import { consoleOriginAllowed, expectedConsoleOrigin, sessionCookieOptions } from './cp.ts';
 
 const GATEWAY = 'https://siteagent.tailbbb0d2.ts.net';
 
@@ -129,6 +129,97 @@ check(
 );
 
 process.env.GATEWAY_ORIGIN = GATEWAY;
+
+
+// ---------------------------------------------------------------------------
+// The session cookie's own flags (security class E7)
+//
+// The origin gate above decides whether a forged request is executed. These
+// checks are about the cookie that makes such a request worth forging, and they
+// had no coverage at all.
+//
+// Three flags, three different attacks, and on this deployment the third one is
+// not optional in the way it usually is: the console, the CMS and the design
+// studio are served from ONE origin by the gateway, so a script on any tenant
+// page is same-origin with the console. `HttpOnly` is what stops that script
+// simply reading the session out of `document.cookie` and skipping CSRF
+// entirely.
+// ---------------------------------------------------------------------------
+
+const HOUR = 3600;
+
+const viaGatewayCookie = sessionCookieOptions(viaGateway(), HOUR);
+const directCookie = sessionCookieOptions(direct(), HOUR);
+
+check('the session cookie is HttpOnly', viaGatewayCookie.httpOnly, true);
+
+check('the session cookie is SameSite=strict', viaGatewayCookie.sameSite, 'strict');
+
+check(
+  'the session cookie is scoped to the console path, not the whole origin',
+  viaGatewayCookie.path,
+  '/operator',
+);
+
+check('the requested max-age is carried through', viaGatewayCookie.maxAge, HOUR);
+
+// --- Secure, which is conditional on purpose -------------------------------
+
+check(
+  'Secure is set when the gateway says the browser is on HTTPS',
+  viaGatewayCookie.secure,
+  true,
+);
+
+check(
+  'Secure is NOT set on direct loopback access, or there would be no cookie at all',
+  directCookie.secure,
+  false,
+);
+
+// The condition is `proto === 'https' AND the host is not loopback`, and each
+// half is pinned separately — a change that dropped either one would otherwise
+// pass on the two cases above.
+check(
+  'plain http through the gateway does not get Secure',
+  sessionCookieOptions(viaGateway({ 'x-forwarded-proto': 'http' }), HOUR).secure,
+  false,
+);
+
+check(
+  'https to a loopback host does not get Secure',
+  sessionCookieOptions(
+    new Request('http://127.0.0.1:3000/operator', {
+      headers: { 'x-forwarded-proto': 'https', 'x-forwarded-host': '127.0.0.1:3000' },
+    }),
+    HOUR,
+  ).secure,
+  false,
+);
+
+check(
+  'localhost with a port is recognised as loopback too',
+  sessionCookieOptions(
+    new Request('http://localhost:3000/operator', {
+      headers: { 'x-forwarded-proto': 'https', 'x-forwarded-host': 'localhost:4321' },
+    }),
+    HOUR,
+  ).secure,
+  false,
+);
+
+// A hostname that merely CONTAINS "localhost" is not loopback, and must still
+// get Secure — the anchored regex is what makes this true, so it is pinned.
+check(
+  'a host that only looks like loopback still gets Secure',
+  sessionCookieOptions(
+    new Request('https://localhost.evil.example/operator', {
+      headers: { 'x-forwarded-proto': 'https', 'x-forwarded-host': 'localhost.evil.example' },
+    }),
+    HOUR,
+  ).secure,
+  true,
+);
 
 if (failures > 0) {
   console.error(`\n${failures} check(s) failed.`);
