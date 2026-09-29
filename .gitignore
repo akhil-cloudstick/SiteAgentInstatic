@@ -7,6 +7,26 @@ node_modules/
 # Per-tenant runtime state (instances, uploads, secrets) — never commit
 tenant-users/
 
+# The Connector's own runtime state. Same rule as above, which the line already
+# stated and did not cover — these three sat as permanently "untracked" instead,
+# which is how a real change gets lost in the noise of a status listing.
+#
+#   uploads/            site bundles fetched from the relay and kept for the
+#                       retention period. ~6MB and growing, and re-fetchable by
+#                       sha256 whenever they are wanted again.
+#   .approver-cache.json a timestamped cache of PUBLIC approver keys read from
+#                       the relay. No private material; regenerates on demand.
+#   go-ledger.jsonl     the local record of which GOs have been spent. Kept out
+#                       because the relay is the authoritative one — its
+#                       `executing` transition is what actually consumes a GO —
+#                       and because a committed ledger would be stale the moment
+#                       anyone else ran a push.
+#
+# Ignoring is not deleting: all three stay on disk and keep working.
+Connector/uploads/
+Connector/.approver-cache.json
+Connector/go-ledger.jsonl
+
 # Local dev working dir + auto-generated master key (secret) at repo root — never commit
 .tmp/
 
