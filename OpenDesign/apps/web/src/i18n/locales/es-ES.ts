@@ -4908,7 +4908,7 @@ export const esES: Dict = {
   'fileViewer.presentFromBeginning': 'Empezar desde el principio',
   'fileViewer.presentFromCurrentSlide': 'Empezar desde la diapositiva actual',
   'fileViewer.presenterMode': 'Vista del presentador',
-  'fileViewer.shareMenuPublishViaOd': 'COMPARTIR RÁPIDO · OPEN DESIGN',
+  'fileViewer.shareMenuPublishViaOd': 'COMPARTIR RÁPIDO · MMS DESIGN',
   'fileViewer.unifiedShareAria': 'Share and export actions',
   'fileViewer.unifiedShareTab': 'Share',
   'fileViewer.unifiedExportTab': 'Export',

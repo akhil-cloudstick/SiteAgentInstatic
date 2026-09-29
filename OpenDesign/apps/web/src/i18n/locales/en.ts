@@ -4925,7 +4925,7 @@ export const en: Dict = {
   'fileViewer.presentFromBeginning': 'Start from beginning',
   'fileViewer.presentFromCurrentSlide': 'Start from current slide',
   'fileViewer.presenterMode': 'Presenter mode',
-  'fileViewer.shareMenuPublishViaOd': 'QUICK SHARE · OPEN DESIGN',
+  'fileViewer.shareMenuPublishViaOd': 'QUICK SHARE · MMS DESIGN',
   'fileViewer.unifiedShareAria': 'Share and export actions',
   'fileViewer.unifiedShareTab': 'Share',
   'fileViewer.unifiedExportTab': 'Export',

@@ -4908,7 +4908,7 @@ export const id: Dict = {
   'fileViewer.presentFromBeginning': 'Mulai dari awal',
   'fileViewer.presentFromCurrentSlide': 'Mulai dari slide saat ini',
   'fileViewer.presenterMode': 'Mode penyaji',
-  'fileViewer.shareMenuPublishViaOd': 'BAGIKAN CEPAT · OPEN DESIGN',
+  'fileViewer.shareMenuPublishViaOd': 'BAGIKAN CEPAT · MMS DESIGN',
   'fileViewer.unifiedShareAria': 'Share and export actions',
   'fileViewer.unifiedShareTab': 'Share',
   'fileViewer.unifiedExportTab': 'Export',

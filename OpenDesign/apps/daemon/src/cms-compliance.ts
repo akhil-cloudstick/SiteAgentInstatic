@@ -766,6 +766,54 @@ export function checkPageCompliance(html: string): ComplianceFinding[] {
     );
   }
 
+  // 20) No inline event handlers. templateRule.md §9 — "`onclick="…"` / any `on*=`
+  // attribute is stripped on import. Attach behavior with `addEventListener` in a
+  // `<script>` instead."
+  //
+  // The rule has been in the file since the file existed and NOTHING enforced it,
+  // here or in the standalone checker this file is a port of. So a page could ship
+  // its only interaction as `onclick`, pass the gate, import, and arrive inert —
+  // the button is there, it looks right on the canvas, and it does nothing. That
+  // is the same failure shape as rule 18 (a control that imports empty): wrong in
+  // a way nobody sees until the site is live.
+  //
+  // WHAT IS DELIBERATELY NOT MATCHED, because a false positive here blocks a whole
+  // share:
+  //   - `el.onclick = fn` inside a <script>. That is a PROPERTY assignment, which
+  //     survives import and is close to what the rule tells authors to do, so
+  //     script and style bodies are removed before matching.
+  //   - `data-on-click` and any other data attribute. The `on` has to begin the
+  //     attribute name.
+  //   - `on` alone, or `on=`; two or more letters are required after it, so no
+  //     real attribute is caught by accident.
+  //
+  // Checked against every bundle in hand before it was made blocking: none of them
+  // trips it, so turning this on cannot break a share that would have passed.
+  {
+    const markupOnly = html
+      .replace(/<script[\s\S]*?<\/script>/gi, '')
+      .replace(/<style[\s\S]*?<\/style>/gi, '')
+      .replace(/<!--[\s\S]*?-->/g, '');
+    const handlers: string[] = [];
+    for (const tag of markupOnly.matchAll(/<([a-zA-Z][\w-]*)\b([^>]*)>/g)) {
+      const name = (tag[1] ?? '').toLowerCase();
+      for (const a of (tag[2] ?? '').matchAll(/(?:^|[\s"'])(on[a-z]{2,})\s*=/gi)) {
+        handlers.push(`<${name} ${(a[1] ?? '').toLowerCase()}=…>`);
+      }
+    }
+    const unique = [...new Set(handlers)];
+    add(
+      'No inline event handlers',
+      unique.length ? 'fail' : 'pass',
+      unique.length
+        ? `${handlers.length} inline handler attribute(s) — the importer strips every \`on*=\` attribute, so ` +
+          `the control imports looking correct and does nothing at all. Move the behaviour into a <script> with ` +
+          `addEventListener (the element keeps its markup; only the attribute has to go): ` +
+          `${unique.slice(0, 6).join(', ')} (see templateRule.md)`
+        : undefined,
+    );
+  }
+
   return findings;
 }
 

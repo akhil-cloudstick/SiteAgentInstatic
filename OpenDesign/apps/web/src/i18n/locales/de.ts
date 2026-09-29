@@ -4908,7 +4908,7 @@ export const de: Dict = {
   'fileViewer.presentFromBeginning': 'Von Anfang an starten',
   'fileViewer.presentFromCurrentSlide': 'Ab aktueller Folie starten',
   'fileViewer.presenterMode': 'Referentenansicht',
-  'fileViewer.shareMenuPublishViaOd': 'SCHNELL TEILEN · OPEN DESIGN',
+  'fileViewer.shareMenuPublishViaOd': 'SCHNELL TEILEN · MMS DESIGN',
   'fileViewer.unifiedShareAria': 'Share and export actions',
   'fileViewer.unifiedShareTab': 'Share',
   'fileViewer.unifiedExportTab': 'Export',

@@ -4908,7 +4908,7 @@ export const it: Dict = {
   'fileViewer.presentFromBeginning': 'Inizia dall’inizio',
   'fileViewer.presentFromCurrentSlide': 'Inizia dalla diapositiva corrente',
   'fileViewer.presenterMode': 'Modalità relatore',
-  'fileViewer.shareMenuPublishViaOd': 'CONDIVISIONE RAPIDA · OPEN DESIGN',
+  'fileViewer.shareMenuPublishViaOd': 'CONDIVISIONE RAPIDA · MMS DESIGN',
   'fileViewer.unifiedShareAria': 'Share and export actions',
   'fileViewer.unifiedShareTab': 'Share',
   'fileViewer.unifiedExportTab': 'Export',

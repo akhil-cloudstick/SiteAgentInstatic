@@ -4908,7 +4908,7 @@ export const uk: Dict = {
   'fileViewer.presentFromBeginning': 'Почати спочатку',
   'fileViewer.presentFromCurrentSlide': 'Почати з поточного слайда',
   'fileViewer.presenterMode': 'Режим доповідача',
-  'fileViewer.shareMenuPublishViaOd': 'ШВИДКИЙ ДОСТУП · OPEN DESIGN',
+  'fileViewer.shareMenuPublishViaOd': 'ШВИДКИЙ ДОСТУП · MMS DESIGN',
   'fileViewer.unifiedShareAria': 'Share and export actions',
   'fileViewer.unifiedShareTab': 'Share',
   'fileViewer.unifiedExportTab': 'Export',

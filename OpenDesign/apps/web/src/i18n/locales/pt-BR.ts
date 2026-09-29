@@ -4908,7 +4908,7 @@ export const ptBR: Dict = {
   'fileViewer.presentFromBeginning': 'Iniciar do começo',
   'fileViewer.presentFromCurrentSlide': 'Iniciar do slide atual',
   'fileViewer.presenterMode': 'Modo do apresentador',
-  'fileViewer.shareMenuPublishViaOd': 'COMPARTILHAMENTO RÁPIDO · OPEN DESIGN',
+  'fileViewer.shareMenuPublishViaOd': 'COMPARTILHAMENTO RÁPIDO · MMS DESIGN',
   'fileViewer.unifiedShareAria': 'Share and export actions',
   'fileViewer.unifiedShareTab': 'Share',
   'fileViewer.unifiedExportTab': 'Export',

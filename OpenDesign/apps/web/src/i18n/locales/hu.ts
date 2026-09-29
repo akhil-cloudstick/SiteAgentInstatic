@@ -4908,7 +4908,7 @@ export const hu: Dict = {
   'fileViewer.presentFromBeginning': 'Indítás az elejéről',
   'fileViewer.presentFromCurrentSlide': 'Indítás az aktuális diától',
   'fileViewer.presenterMode': 'Előadói mód',
-  'fileViewer.shareMenuPublishViaOd': 'GYORS MEGOSZTÁS · OPEN DESIGN',
+  'fileViewer.shareMenuPublishViaOd': 'GYORS MEGOSZTÁS · MMS DESIGN',
   'fileViewer.unifiedShareAria': 'Share and export actions',
   'fileViewer.unifiedShareTab': 'Share',
   'fileViewer.unifiedExportTab': 'Export',

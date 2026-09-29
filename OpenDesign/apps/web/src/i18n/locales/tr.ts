@@ -4908,7 +4908,7 @@ export const tr: Dict = {
   'fileViewer.presentFromBeginning': 'Baştan başlat',
   'fileViewer.presentFromCurrentSlide': 'Geçerli slayttan başlat',
   'fileViewer.presenterMode': 'Sunucu modu',
-  'fileViewer.shareMenuPublishViaOd': 'HIZLI PAYLAŞIM · OPEN DESIGN',
+  'fileViewer.shareMenuPublishViaOd': 'HIZLI PAYLAŞIM · MMS DESIGN',
   'fileViewer.unifiedShareAria': 'Share and export actions',
   'fileViewer.unifiedShareTab': 'Share',
   'fileViewer.unifiedExportTab': 'Export',

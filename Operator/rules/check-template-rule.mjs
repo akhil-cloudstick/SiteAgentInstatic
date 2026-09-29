@@ -662,6 +662,43 @@ function checkPage(html) {
         : '');
   }
 
+  // 21) No inline event handlers. templateRule.md §9 — "`onclick="…"` / any `on*=`
+  // attribute is stripped on import. Attach behavior with `addEventListener` in a
+  // `<script>` instead."
+  //
+  // The rule predates both checkers and neither enforced it, so a page whose only
+  // interaction was an `onclick` passed, imported, and arrived inert: the control
+  // is there, it looks right on the canvas, and it does nothing. Same failure shape
+  // as rule 18.
+  //
+  // Script and style bodies are removed before matching, so `el.onclick = fn` in a
+  // <script> — a property assignment, which survives import — is not mistaken for
+  // the attribute being banned. `data-on-click` is not matched either: the `on`
+  // must begin the attribute name, and two or more letters must follow it.
+  //
+  // This is the gate's rule 20; the numbers differ between the two files because
+  // this one carries linter-only checks the gate does not.
+  {
+    const markupOnly = html
+      .replace(/<script[\s\S]*?<\/script>/gi, '')
+      .replace(/<style[\s\S]*?<\/style>/gi, '')
+      .replace(/<!--[\s\S]*?-->/g, '');
+    const handlers = [];
+    for (const tag of markupOnly.matchAll(/<([a-zA-Z][\w-]*)\b([^>]*)>/g)) {
+      const name = (tag[1] ?? '').toLowerCase();
+      for (const a of (tag[2] ?? '').matchAll(/(?:^|[\s"'])(on[a-z]{2,})\s*=/gi)) {
+        handlers.push(`<${name} ${(a[1] ?? '').toLowerCase()}=…>`);
+      }
+    }
+    const uniqueHandlers = [...new Set(handlers)];
+    add('No inline event handlers', uniqueHandlers.length ? 'FAIL' : 'PASS',
+      uniqueHandlers.length
+        ? `${handlers.length} inline handler attribute(s) — the importer strips every on*= attribute, so the ` +
+          `control imports looking correct and does nothing at all. Move the behaviour into a <script> with ` +
+          `addEventListener: ${uniqueHandlers.slice(0, 6).join(', ')} (see templateRule.md)`
+        : '');
+  }
+
   // 20) A bare declaration exists for every class the CSS styles. Instatic keeps
   // ONE editable rule per class name: a bare `.name { … }` wins the slot, but
   // when none exists a descendant/compound rule (`.card .card-note`, `.btn:hover`)

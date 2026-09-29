@@ -4908,7 +4908,7 @@ export const ru: Dict = {
   'fileViewer.presentFromBeginning': 'Начать с начала',
   'fileViewer.presentFromCurrentSlide': 'Начать с текущего слайда',
   'fileViewer.presenterMode': 'Режим докладчика',
-  'fileViewer.shareMenuPublishViaOd': 'БЫСТРЫЙ ДОСТУП · OPEN DESIGN',
+  'fileViewer.shareMenuPublishViaOd': 'БЫСТРЫЙ ДОСТУП · MMS DESIGN',
   'fileViewer.unifiedShareAria': 'Share and export actions',
   'fileViewer.unifiedShareTab': 'Share',
   'fileViewer.unifiedExportTab': 'Export',
