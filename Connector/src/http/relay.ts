@@ -251,7 +251,10 @@ async function relayRequest(
 export async function openRelayDeployRequest(
   input: {
     title: string
-    action: 'import' | 'publish'
+    // `publish-row` is a ROW action on the relay, not a bundle one: it is not in
+    // `ARTEFACT_ACTIONS`, so its sha256 is the rows digest rather than bytes the
+    // validator can fetch.
+    action: 'import' | 'publish' | 'publish-row'
     target: string
     sha256: string
     contentDigest?: string
@@ -306,6 +309,46 @@ export async function readRelayGo(id: string): Promise<RelayCall<unknown | null>
   // come back as null.
   if (res.status === 409 && /awaiting_go|open|triage/i.test(res.reason)) return { ok: true, value: null }
   return res
+}
+
+/**
+ * Move a deploy-request along the relay's own state machine.
+ *
+ * WHY THIS EXISTS, and why it is not bookkeeping. The Connector used to run a
+ * push without ever telling the relay, so a completed push left its ticket
+ * reading `go_granted`, `deployId: null`, GO `consumedAt: null` — the relay's
+ * record said a GO had been granted and never used, while the site was already
+ * live. Two things were lost by that, and only one of them is paperwork:
+ *
+ *   1. The record could not say what was deployed, or that the GO was spent.
+ *   2. **The GO was never consumed.** `POST /transition` with `to: 'executing'`
+ *      is where the relay calls `consumeGo`, and that is the single-use check —
+ *      "This GO has already been consumed. A GO authorizes one run." Skipping
+ *      the transition meant the replay protection never engaged, so the same
+ *      signature stayed usable for a second run.
+ *
+ * So `executing` is called BEFORE the action, not after: it is the act of
+ * spending the authorization, and it must fail the run if the GO was already
+ * spent or has expired. `verifying_live` is called after, carrying the deploy
+ * id, and `failed` if the action did not land.
+ *
+ * `done` is deliberately NOT ours to set: the relay gives that transition to the
+ * validator, with evidence required. The Connector's last word on a ticket is
+ * `verifying_live` — "here is what I deployed, go and check it".
+ */
+export async function moveRelayTicket(
+  ticketId: string,
+  to: 'executing' | 'verifying_live' | 'failed',
+  options: { deployId?: string; note?: string; idempotencyKey: string },
+): Promise<RelayCall<Record<string, unknown>>> {
+  const body: Record<string, unknown> = { to }
+  if (options.deployId) body.deployId = options.deployId
+  if (options.note) body.note = options.note
+  return relayRequest(`/api/tickets/${encodeURIComponent(ticketId)}/transition`, {
+    method: 'POST',
+    idempotencyKey: options.idempotencyKey,
+    body,
+  })
 }
 
 /** Post a note onto a ticket, so the queue carries what the machine did. */

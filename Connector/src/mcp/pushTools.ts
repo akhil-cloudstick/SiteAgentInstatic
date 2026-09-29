@@ -34,7 +34,10 @@ import { resolve } from 'node:path'
 import type { ConnectorTool, ToolResult } from './tools'
 import { CRUD_TOOLS } from './crudTools'
 import { IMPORT_TOOLS } from './importTools'
-import { openRelayDeployRequest, postRelayMessage, readRelayGo, readRelayTicket } from '../http/relay'
+// connector_publish_rows lives here, and the push loop needs it: the row publish
+// is a step of the run, not an administrator's separate errand.
+import { ADMIN_TOOLS } from './adminTools'
+import { moveRelayTicket, openRelayDeployRequest, postRelayMessage, readRelayGo, readRelayTicket } from '../http/relay'
 import { resolveTarget } from '../http/config'
 import { requireSession } from '../http/store'
 import { stepUp } from '../http/admin'
@@ -69,6 +72,14 @@ export type PushStep =
   | 'awaiting-import-go'
   | 'importing'
   | 'inspect'
+  // A site publish bakes the pages and the entry template and leaves collection
+  // rows as drafts — documented behaviour ("publishing a row does not deploy it;
+  // plan publish-rows then publish-site"), and the reason the first full
+  // acceptance run put a site live with 8 of its 18 URLs serving the homepage.
+  // The rows are published inside the run now, under their own GO, BEFORE the
+  // site publish, because the site publish is what bakes their pages.
+  | 'awaiting-rows-go'
+  | 'publishing-rows'
   | 'awaiting-publish-go'
   | 'publishing'
   | 'done'
@@ -82,7 +93,10 @@ export interface PushState {
   source: { relaySha256?: string; uploadId?: string; path?: string }
   sha256?: string
   importTicketId?: string
+  rowsTicketId?: string
   publishTicketId?: string
+  /** The rows this run is publishing, and the digest their GO is bound to. */
+  rows?: { ids: string[]; digest: string }
   startedAt: string
   updatedAt: string
   /** Every step this run has taken, so the record is the run's own account. */
@@ -112,6 +126,127 @@ function savePush(state: PushState): PushState {
 function note(state: PushState, step: PushStep, text: string): void {
   state.step = step
   state.history.push({ at: new Date().toISOString(), step, note: text })
+}
+
+/**
+ * Every collection row on the target that is not published.
+ *
+ * Read from the TARGET, not from the bundle. After a replace import the CMS is
+ * the only thing that knows which row ids exist and what status each one carries,
+ * and the rows GO is bound to a digest of those ids — so inferring them from the
+ * bundle would bind an approval to a set that might not be what is there.
+ *
+ * `pages` is excluded because the page bake reads every non-deleted page row
+ * whatever its status, so a draft page still gets a URL. That asymmetry between
+ * pages and collections is real, and it is the reason the missing URLs were all
+ * collection entries and none of them were pages.
+ */
+async function draftCollectionRows(
+  target: string,
+): Promise<{ ok: true; ids: string[] } | { ok: false; reason: string }> {
+  const tables = await runTool('connector_list_tables', { target })
+  if (!tables.ok) return { ok: false, reason: `Could not list the tables: ${errorOf(tables.body)}` }
+  const tableList = (() => {
+    const b = tables.body as Record<string, unknown>
+    const raw = b.tables ?? (b.result as Record<string, unknown> | undefined)?.tables ?? b
+    return Array.isArray(raw) ? (raw as Record<string, unknown>[]) : []
+  })()
+  if (tableList.length === 0) return { ok: false, reason: 'The CMS reported no tables, so the rows could not be checked.' }
+
+  const ids: string[] = []
+  for (const table of tableList) {
+    const slug = str(table.slug) || str(table.id)
+    if (!slug || slug === 'pages') continue
+    // Page every table: a limit that silently truncated would under-report the
+    // drafts and put a partial site live again, which is the failure being fixed.
+    for (let offset = 0; offset < 10_000; offset += 200) {
+      const page = await runTool('connector_list_rows', { target, tableId: slug, limit: 200, offset })
+      if (!page.ok) return { ok: false, reason: `Could not list rows in "${slug}": ${errorOf(page.body)}` }
+      const b = page.body as Record<string, unknown>
+      const raw = b.rows ?? (b.result as Record<string, unknown> | undefined)?.rows ?? []
+      const rows = Array.isArray(raw) ? (raw as Record<string, unknown>[]) : []
+      for (const row of rows) {
+        const status = str(row.status)
+        if (status && status !== 'published') ids.push(str(row.id))
+      }
+      if (rows.length < 200) break
+    }
+  }
+  return { ok: true, ids: ids.filter(Boolean) }
+}
+
+/**
+ * Who actually signed, for the run's own history.
+ *
+ * It used to say "The owner granted the import GO" whatever happened, and on a
+ * test property a validator-submitted GO is the ordinary case — so the record
+ * named the wrong party for every acceptance run. A history that reports a role
+ * it did not check is worse than one that says nothing.
+ */
+function grantedBy(go: unknown): string {
+  const g = (go ?? {}) as Record<string, unknown>
+  const who = typeof g.submittedBy === 'string' ? g.submittedBy
+    : typeof g.grantedBy === 'string' ? g.grantedBy
+      : typeof g.role === 'string' ? g.role
+        : ''
+  if (/validator/i.test(who)) return 'The validator'
+  if (/owner/i.test(who)) return 'The owner'
+  return who ? `${who}` : 'The approver'
+}
+
+/**
+ * The deploy id to hand the relay's `verifying_live`.
+ *
+ * The relay requires one — it is what makes the record say WHAT was deployed
+ * rather than merely that something was. The CMS does not always return an id of
+ * its own, so this falls back to the content hash the run is bound to, which is
+ * the most specific true thing available. It never invents a value.
+ */
+function deployIdOf(body: unknown, fallback: string): string {
+  const b = (body ?? {}) as Record<string, unknown>
+  const result = (b.result ?? b) as Record<string, unknown>
+  for (const key of ['deployId', 'deploymentId', 'publishedSiteHash', 'siteHash', 'sha256']) {
+    const v = result[key] ?? b[key]
+    if (typeof v === 'string' && v.trim()) return v.trim().slice(0, 200)
+  }
+  return fallback.slice(0, 200)
+}
+
+/**
+ * Read the publish's own route check and say, in one sentence, why this push is
+ * not finished — or null when it is.
+ *
+ * Deliberately driven off `missing` rather than off the `agrees` flag. `agrees`
+ * compares the prediction with the bake, and both can be right about a site that
+ * is wrong: a draft row is correctly predicted to bake nothing and correctly
+ * bakes nothing. `missing` is the list of routes that were expected and are not
+ * there, which is the question an operator is actually asking.
+ *
+ * A check that did not run is also not a pass (`checked: false`), for the same
+ * reason the publish tool reports that state instead of staying silent: P2.
+ */
+function routeShortfall(routeCheck: unknown): string | null {
+  if (routeCheck === null || routeCheck === undefined) {
+    return 'The publish reported no route check at all, so there is no evidence the site it baked is complete. ' +
+      'Not reporting this as done.'
+  }
+  const rc = routeCheck as Record<string, unknown>
+  if (rc.checked === false) {
+    return `The route check could not run (${String(rc.why ?? 'no reason given')}), so the site was published ` +
+      'without evidence that its routes are all there. Not reporting this as done.'
+  }
+  const missing = Array.isArray(rc.missing) ? (rc.missing as unknown[]).map(String) : []
+  if (missing.length > 0) {
+    const shown = missing.slice(0, 8).join(', ')
+    return `The site published, but ${missing.length} route(s) the bundle intended are not on it: ${shown}` +
+      `${missing.length > 8 ? ', …' : ''}. A push that leaves URLs missing is not done.`
+  }
+  const unpublished = Number(rc.unpublishedRows ?? 0)
+  if (unpublished > 0) {
+    return `The site published, but ${unpublished} collection row(s) are still drafts, so their pages do not ` +
+      'exist on the site. A push that leaves URLs missing is not done.'
+  }
+  return null
 }
 
 /**
@@ -162,7 +297,7 @@ async function elevate(state: PushState, what: string): Promise<string | null> {
 
 /** Run one of the Connector's own tools, so the loop passes every gate a person would. */
 async function runTool(name: string, args: Record<string, unknown>): Promise<{ ok: boolean; body: unknown }> {
-  const tool = [...IMPORT_TOOLS, ...CRUD_TOOLS].find((t) => t.name === name)
+  const tool = [...IMPORT_TOOLS, ...CRUD_TOOLS, ...ADMIN_TOOLS].find((t) => t.name === name)
   if (!tool) return { ok: false, body: { error: `No such tool: ${name}` } }
   const result = await tool.handler(args)
   let body: unknown = null
@@ -257,8 +392,21 @@ export async function advancePush(state: PushState): Promise<PushState> {
         if (!go.ok && go.transient) return savePush(state)
         if (!go.ok) return refuse(state, `Could not read the import GO: ${go.reason}`)
         if (go.value === null) return savePush(state) // Still with the owner. Not an error.
-        note(state, 'importing', 'The owner granted the import GO.')
+        note(state, 'importing', `${grantedBy(go.value)} granted the import GO.`)
         savePush(state)
+
+        // Spend the authorization on the relay BEFORE using it. This is the call
+        // that consumes the GO — the relay's single-use check lives in the
+        // `executing` transition — so skipping it left the signature replayable
+        // and the ticket reading `go_granted` forever. A refusal here (already
+        // consumed, expired) must stop the run: it means this GO is not ours to
+        // spend.
+        const importExec = await moveRelayTicket(state.importTicketId ?? '', 'executing', {
+          idempotencyKey: stepKey(state, 'import-executing'),
+        })
+        if (!importExec.ok && importExec.transient) return savePush(state)
+        if (!importExec.ok) return refuse(state, `The relay would not let the import GO be spent: ${importExec.reason}`)
+
         // Immediately before the write, not before the wait for the GO.
         const importElevation = await elevate(state, 'import')
         if (importElevation) return refuse(state, importElevation)
@@ -269,8 +417,20 @@ export async function advancePush(state: PushState): Promise<PushState> {
           go: go.value,
           ...state.source,
         })
-        if (!run.ok) return refuse(state, `The import refused or failed: ${errorOf(run.body)}`)
-        note(state, 'inspect', 'The bundle imported under the owner-signed GO.')
+        if (!run.ok) {
+          // Tell the relay it failed, so the ticket does not sit in `executing`
+          // with a spent GO and no account of what happened.
+          await moveRelayTicket(state.importTicketId ?? '', 'failed', {
+            note: `The import refused or failed: ${errorOf(run.body)}`.slice(0, 200),
+            idempotencyKey: stepKey(state, 'import-failed'),
+          })
+          return refuse(state, `The import refused or failed: ${errorOf(run.body)}`)
+        }
+        await moveRelayTicket(state.importTicketId ?? '', 'verifying_live', {
+          deployId: deployIdOf(run.body, state.sha256 ?? 'import'),
+          idempotencyKey: stepKey(state, 'import-verifying'),
+        })
+        note(state, 'inspect', 'The bundle imported under the signed GO.')
         savePush(state)
         break
       }
@@ -284,6 +444,48 @@ export async function advancePush(state: PushState): Promise<PushState> {
         const d = digest.body as { sha256?: string; contentDigest?: string }
         if (!d.contentDigest) return refuse(state, 'The CMS reported no draft digest to bind a publish approval to.')
         state.evidence = { ...(state.evidence ?? {}), imported: d }
+
+        // The rows the import landed as drafts, read from the TARGET rather than
+        // inferred from the bundle: after a replace the CMS is the only thing that
+        // knows which ids exist and what status they carry.
+        const drafts = await draftCollectionRows(state.target)
+        if (!drafts.ok) return refuse(state, drafts.reason)
+
+        if (drafts.ids.length > 0) {
+          const rowsDigest = await runTool('connector_rows_digest', { target: state.target, rowIds: drafts.ids })
+          if (!rowsDigest.ok) {
+            return refuse(state, `Could not take the rows digest to bind a row approval to: ${errorOf(rowsDigest.body)}`)
+          }
+          const rd = rowsDigest.body as { sha256?: string; digest?: string }
+          const rowsSha = str(rd.sha256) || str(rd.digest)
+          if (!rowsSha) return refuse(state, 'The CMS reported no rows digest to bind a row approval to.')
+          state.rows = { ids: drafts.ids, digest: rowsSha }
+
+          const rowsTicket = await openRelayDeployRequest(
+            {
+              title: `${state.title} — publish ${drafts.ids.length} collection row(s)`,
+              action: 'publish-row',
+              target: resolveTarget(state.target).name,
+              sha256: rowsSha,
+              body:
+                `Opened by the Connector after the import landed. ${drafts.ids.length} collection row(s) ` +
+                'arrived as drafts, and a site publish bakes pages but not rows — so without this the ' +
+                'site would go live with those entry URLs serving the homepage. One approval covers the ' +
+                'whole set, bound to the digest of exactly these rows.',
+            },
+            stepKey(state, 'rows-ticket'),
+          )
+          if (!rowsTicket.ok && rowsTicket.transient) return savePush(state)
+          if (!rowsTicket.ok) return refuse(state, `Could not open the rows deploy-request: ${rowsTicket.reason}`)
+          state.rowsTicketId = rowsTicket.value.id
+          note(
+            state,
+            'awaiting-rows-go',
+            `Rows deploy-request ${rowsTicket.value.id} is waiting for a GO on ${drafts.ids.length} row(s).`,
+          )
+          savePush(state)
+          break
+        }
 
         const ticket = await openRelayDeployRequest(
           {
@@ -306,20 +508,146 @@ export async function advancePush(state: PushState): Promise<PushState> {
         break
       }
 
+      case 'awaiting-rows-go': {
+        const go = await readRelayGo(state.rowsTicketId ?? '')
+        if (!go.ok && go.transient) return savePush(state) // See the import case.
+        if (!go.ok) return refuse(state, `Could not read the rows GO: ${go.reason}`)
+        if (go.value === null) return savePush(state) // Still with the approver. Not an error.
+        note(state, 'publishing-rows', `${grantedBy(go.value)} granted the rows GO.`)
+        savePush(state)
+
+        const rowsExec = await moveRelayTicket(state.rowsTicketId ?? '', 'executing', {
+          idempotencyKey: stepKey(state, 'rows-executing'),
+        })
+        if (!rowsExec.ok && rowsExec.transient) return savePush(state)
+        if (!rowsExec.ok) return refuse(state, `The relay would not let the rows GO be spent: ${rowsExec.reason}`)
+
+        const rowsElevation = await elevate(state, 'publish rows')
+        if (rowsElevation) return refuse(state, rowsElevation)
+
+        const run = await runTool('connector_publish_rows', {
+          target: state.target,
+          rowIds: state.rows?.ids ?? [],
+          go: go.value,
+        })
+        if (!run.ok) {
+          await moveRelayTicket(state.rowsTicketId ?? '', 'failed', {
+            note: `The row publish refused or failed: ${errorOf(run.body)}`.slice(0, 200),
+            idempotencyKey: stepKey(state, 'rows-failed'),
+          })
+          return refuse(state, `The row publish refused or failed: ${errorOf(run.body)}`)
+        }
+
+        // A partial row publish is reported per row on purpose, so a failure is
+        // visible rather than averaged away. Any failure stops the run BEFORE the
+        // site publish — publishing the site now would bake an incomplete set and
+        // report success, which is the exact behaviour this whole change exists to
+        // remove.
+        const rowsBody = (run.body as { result?: Record<string, unknown> }).result ?? (run.body as Record<string, unknown>)
+        const failed = Array.isArray(rowsBody.failed) ? (rowsBody.failed as unknown[]) : []
+        if (failed.length > 0) {
+          await moveRelayTicket(state.rowsTicketId ?? '', 'failed', {
+            note: `${failed.length} row(s) did not publish.`,
+            idempotencyKey: stepKey(state, 'rows-partial'),
+          })
+          return refuse(
+            state,
+            `${failed.length} of ${state.rows?.ids.length ?? 0} row(s) did not publish: ` +
+              `${JSON.stringify(failed).slice(0, 400)}. The site was NOT published — it would have gone ` +
+              'live with those entry URLs missing.',
+          )
+        }
+        await moveRelayTicket(state.rowsTicketId ?? '', 'verifying_live', {
+          deployId: state.rows?.digest ?? 'publish-row',
+          idempotencyKey: stepKey(state, 'rows-verifying'),
+        })
+        state.evidence = { ...(state.evidence ?? {}), rowsPublished: rowsBody }
+        note(state, 'publishing-rows', `${state.rows?.ids.length ?? 0} collection row(s) published.`)
+        savePush(state)
+        break
+      }
+
+      case 'publishing-rows': {
+        // The rows are live; the site publish is what bakes their pages. The
+        // publish approval is opened here rather than at `inspect`, so it binds to
+        // the draft digest AS IT IS NOW — after the rows changed status. Binding
+        // it before would name a digest the publish then refuses (412).
+        const digest = await runTool('connector_site_digest', { target: state.target })
+        if (!digest.ok) return refuse(state, `Could not read the site digest: ${errorOf(digest.body)}`)
+        const d = digest.body as { sha256?: string; contentDigest?: string }
+        if (!d.contentDigest) return refuse(state, 'The CMS reported no draft digest to bind a publish approval to.')
+        state.evidence = { ...(state.evidence ?? {}), imported: d }
+
+        const ticket = await openRelayDeployRequest(
+          {
+            title: `${state.title} — publish`,
+            action: 'publish',
+            target: resolveTarget(state.target).name,
+            sha256: d.sha256 ?? state.sha256 ?? '',
+            contentDigest: d.contentDigest,
+            body:
+              'Opened by the Connector after the collection rows were published. This approval covers ' +
+              'publishing the site, and binds to the draft as it stands now.',
+          },
+          stepKey(state, 'publish-ticket'),
+        )
+        if (!ticket.ok && ticket.transient) return savePush(state)
+        if (!ticket.ok) return refuse(state, `Could not open the publish deploy-request: ${ticket.reason}`)
+        state.publishTicketId = ticket.value.id
+        note(state, 'awaiting-publish-go', `Publish deploy-request ${ticket.value.id} is waiting for the owner's GO.`)
+        savePush(state)
+        break
+      }
+
       case 'awaiting-publish-go': {
         const go = await readRelayGo(state.publishTicketId ?? '')
         if (!go.ok && go.transient) return savePush(state) // See the import case.
         if (!go.ok) return refuse(state, `Could not read the publish GO: ${go.reason}`)
         if (go.value === null) return savePush(state)
-        note(state, 'publishing', 'The owner granted the publish GO.')
+        note(state, 'publishing', `${grantedBy(go.value)} granted the publish GO.`)
         savePush(state)
+
+        const publishExec = await moveRelayTicket(state.publishTicketId ?? '', 'executing', {
+          idempotencyKey: stepKey(state, 'publish-executing'),
+        })
+        if (!publishExec.ok && publishExec.transient) return savePush(state)
+        if (!publishExec.ok) return refuse(state, `The relay would not let the publish GO be spent: ${publishExec.reason}`)
+
         const publishElevation = await elevate(state, 'publish')
         if (publishElevation) return refuse(state, publishElevation)
 
         const run = await runTool('connector_publish_site', { target: state.target, go: go.value })
-        if (!run.ok) return refuse(state, `The publish refused or failed: ${errorOf(run.body)}`)
+        if (!run.ok) {
+          await moveRelayTicket(state.publishTicketId ?? '', 'failed', {
+            note: `The publish refused or failed: ${errorOf(run.body)}`.slice(0, 200),
+            idempotencyKey: stepKey(state, 'publish-failed'),
+          })
+          return refuse(state, `The publish refused or failed: ${errorOf(run.body)}`)
+        }
         const body = run.body as { routeCheck?: unknown; result?: unknown }
         state.evidence = { ...(state.evidence ?? {}), published: body.result ?? null, routeCheck: body.routeCheck ?? null }
+
+        // A PARTIAL SITE IS NOT A DONE PUSH.
+        //
+        // The first full acceptance run reached `done` while 8 of 18 URLs served
+        // the homepage, and the route check agreed with itself because it
+        // compared what the bake WOULD do against what it DID. Both numbers were
+        // right and the site was wrong. So the run now asks the separate
+        // question — is any route the bundle intended still missing — and refuses
+        // to call itself done when the answer is yes.
+        const shortfall = routeShortfall(body.routeCheck)
+        if (shortfall) {
+          await moveRelayTicket(state.publishTicketId ?? '', 'failed', {
+            note: shortfall.slice(0, 200),
+            idempotencyKey: stepKey(state, 'publish-partial'),
+          })
+          return refuse(state, shortfall)
+        }
+
+        await moveRelayTicket(state.publishTicketId ?? '', 'verifying_live', {
+          deployId: deployIdOf(run.body, state.sha256 ?? 'publish'),
+          idempotencyKey: stepKey(state, 'publish-verifying'),
+        })
         note(state, 'done', 'The site is published.')
         savePush(state)
         // The queue carries what the machine did, so the validator reads the
@@ -345,7 +673,9 @@ export async function advancePush(state: PushState): Promise<PushState> {
 /** What a caller is told after each advance: where the run is, and whose move it is. */
 function report(state: PushState): Record<string, unknown> {
   const waitingOn =
-    state.step === 'awaiting-import-go' || state.step === 'awaiting-publish-go'
+    state.step === 'awaiting-import-go'
+    || state.step === 'awaiting-rows-go'
+    || state.step === 'awaiting-publish-go'
       ? 'owner'
       : state.step === 'done' || state.step === 'refused'
         ? 'nobody'
@@ -356,6 +686,8 @@ function report(state: PushState): Record<string, unknown> {
     step: state.step,
     waitingOn,
     ...(state.importTicketId ? { importTicket: state.importTicketId } : {}),
+    ...(state.rowsTicketId ? { rowsTicket: state.rowsTicketId } : {}),
+    ...(state.rows ? { rows: { count: state.rows.ids.length, digest: state.rows.digest } } : {}),
     ...(state.publishTicketId ? { publishTicket: state.publishTicketId } : {}),
     ...(state.refusal ? { refusal: state.refusal } : {}),
     ...(state.evidence ? { evidence: state.evidence } : {}),
@@ -494,7 +826,16 @@ const SWEEP_INTERVAL_MS = 30_000
  * that run would sit untouched forever, which is the same stall by a different
  * route. A pre-flight writes nothing, so re-running one costs nothing but time.
  */
-const PARKED: PushStep[] = ['preflight', 'awaiting-import-go', 'awaiting-publish-go']
+const PARKED: PushStep[] = [
+  'preflight',
+  'awaiting-import-go',
+  // The rows gate parks on an approver exactly like the other two, so it has to
+  // be swept like the other two. Leaving it out would have made every push that
+  // reached it wait forever unless somebody called the tool again by hand —
+  // which is the developer round trip this whole loop exists to remove.
+  'awaiting-rows-go',
+  'awaiting-publish-go',
+]
 
 let sweeping = false
 

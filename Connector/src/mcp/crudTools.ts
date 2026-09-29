@@ -54,7 +54,7 @@ const fail = (message: string): ToolResult => ({
  * disagreement worth acting on is a `missing` route, which means the prediction
  * promised a page the site does not have.
  */
-function withRouteCheck(result: ToolResult, predicted: string[]): ToolResult {
+function withRouteCheck(result: ToolResult, predicted: string[], unpublished: string[] = []): ToolResult {
   /**
    * Say the check did not run, rather than omitting it.
    *
@@ -98,6 +98,20 @@ function withRouteCheck(result: ToolResult, predicted: string[]): ToolResult {
         missing: predicted.filter((p) => !bakedSet.has(p)),
         /** Baked but not predicted — the site has pages the pre-flight did not foresee. */
         unexpected: baked.filter((b) => !predictedSet.has(b)),
+        /**
+         * Rows that would have a page if they were published, and are drafts.
+         *
+         * NOT part of `agrees`, deliberately. `agrees` answers "did the bake do
+         * what was predicted", and the honest answer about a draft row is yes —
+         * it was predicted to bake nothing and it baked nothing. That is exactly
+         * how a publish leaving 8 of 18 URLs on the homepage reported
+         * "predicted 10, baked 10, agrees: true". Both numbers were right and the
+         * site was wrong, because the question nobody asked was "did the site get
+         * everything the bundle meant it to have". This field is that question,
+         * kept separate so neither answer has to be bent.
+         */
+        unpublishedRows: unpublished.length,
+        unpublishedRoutes: unpublished.slice(0, 20),
       },
     })
   } catch (err) {
@@ -354,6 +368,7 @@ export const CRUD_TOOLS: ConnectorTool[] = [
       guarded(async () => {
         const session = requireSession(str(a.target))
         let predicted: string[] = []
+        let unpublished: string[] = []
         // The signed draft hash goes to the CMS as the publish precondition, so
         // an edit that lands after this check is still refused.
         const result = await runGated(
@@ -371,11 +386,12 @@ export const CRUD_TOOLS: ConnectorTool[] = [
             before: async () => {
               const projection = projectPublish(await currentDraftBundle(session))
               predicted = projection.routes.map((r) => r.path)
+              unpublished = projection.unpublishedRows.map((r) => r.path)
               return preflightRefusal(projection, 'publish')
             },
           },
         )
-        return result.isError ? result : withRouteCheck(result, predicted)
+        return result.isError ? result : withRouteCheck(result, predicted, unpublished)
       }),
   },
 

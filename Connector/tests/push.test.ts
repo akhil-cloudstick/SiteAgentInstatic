@@ -45,31 +45,99 @@ let draftSite = 'draft site v1'
 /** Who did what, in order. The milestone is measured off this list. */
 let actions: { by: 'connector' | 'owner' | 'developer'; what: string }[] = []
 
+/**
+ * The fake CMS's tables and rows.
+ *
+ * Defaults to the shape the first acceptance run actually hit: a `pages` table
+ * plus a collection whose rows arrived as DRAFTS. That is the state a replace
+ * import leaves, and publishing the site over it is what put 8 of 18 URLs on the
+ * homepage — so it is the default here rather than a special case, and a test
+ * that wants the simple world empties `cmsRows`.
+ */
+let cmsTables: { id: string; slug: string; kind?: string }[] = []
+let cmsRows: { id: string; tableSlug: string; slug: string; status: string }[] = []
+
+/** The routes the fake bake produces: `/` plus every PUBLISHED collection row. */
+const bakedRoutes = (): string[] => [
+  '/',
+  ...cmsRows.filter((r) => r.status === 'published').map((r) => `/${r.tableSlug}/${r.slug}`),
+]
+
 /** The relay's tickets, and the GO an owner has signed for each. */
 let tickets = new Map<string, { id: string; action: string; target: string; sha256: string; contentDigest?: string }>()
 let goByTicket = new Map<string, Go>()
+/** The state each deploy-request has been moved to, and whose GO is spent. */
+let ticketStates = new Map<string, string>()
+let consumedGos = new Set<string>()
 let ticketSeq = 0
 let steppedUp = false
+/** A row id the fake CMS refuses to publish, for the partial-site test. */
+let failRowPublish: string | null = null
+/** The CMS answers 200 to a row publish but leaves the row a draft. */
+let silentRowPublish = false
 
 const hashOf = (s: string): string => createHash('sha256').update(s).digest('hex')
 
+const emptyPageBody = () => ({
+  rootNodeId: 'r',
+  nodes: { r: { id: 'r', moduleId: 'base.container', props: {}, children: [], classIds: [] } },
+})
+
+/**
+ * What the fake CMS exports as its current draft.
+ *
+ * Built from `cmsRows`, so the site the projection reads and the site the bake
+ * reports are the SAME site. They used to disagree — the export knew only about
+ * `pages` while the bake produced entry routes — and a fake whose two answers
+ * describe different sites cannot tell a real route mismatch from its own
+ * inconsistency, which is precisely the confusion this whole change is about.
+ *
+ * The `news` entry template is included because a collection with no template
+ * bakes nothing for any of its rows (and is reported as a blocking finding), so
+ * without it the rows here would be a different bug than the one under test.
+ */
 const cleanExport = () => ({
   site: { name: 'fixture', styleRules: {} },
-  tables: [{ id: 'pages', slug: 'pages' }],
+  tables: [
+    { id: 'pages', slug: 'pages' },
+    { id: 'news', slug: 'news', kind: 'postType', routeBase: '/news' },
+  ],
   rows: [
     {
       id: 'p1',
       tableId: 'pages',
       slug: 'index',
       status: 'published',
+      cells: { title: 'Home', body: emptyPageBody() },
+    },
+    // The entry template, as a `pages` ROW — which is how the publisher finds one
+    // (`pageFromRow` reads `templateEnabled` / `templateTarget` out of the cells).
+    // Without it the projection blocks the whole bundle with
+    // ENTRY_ROWS_WITHOUT_TEMPLATE, which is a different defect than the one under
+    // test: rows that have a template and are left as drafts.
+    {
+      id: 'tpl-news',
+      tableId: 'pages',
+      slug: 'news-template',
+      status: 'published',
       cells: {
-        title: 'Home',
-        body: { rootNodeId: 'r', nodes: { r: { id: 'r', moduleId: 'base.container', props: {}, children: [], classIds: [] } } },
+        title: 'News template',
+        body: emptyPageBody(),
+        templateEnabled: true,
+        templateTarget: { kind: 'postTypes', tableSlugs: ['news'] },
+        templatePriority: 100,
       },
     },
+    ...cmsRows.map((r) => ({
+      id: r.id,
+      tableId: 'news',
+      slug: r.slug,
+      status: r.status,
+      cells: { title: r.slug, body: 'A news body.' },
+    })),
   ],
 })
-let exportedSite: unknown = cleanExport()
+let exportedSite: unknown = null
 
 const call = (name: string, args: Record<string, unknown>) => PUSH_TOOLS.find((t) => t.name === name)!.handler(args)
 const parse = (r: { content: { text: string }[] }) => JSON.parse(r.content[0]!.text)
@@ -138,8 +206,22 @@ beforeEach(async () => {
   tickets = new Map()
   goByTicket = new Map()
   ticketSeq = 0
+  ticketStates = new Map()
+  cmsTables = [
+    { id: 'pages', slug: 'pages' },
+    { id: 'news', slug: 'news', kind: 'postType' },
+  ]
+  cmsRows = [
+    { id: 'n1', tableSlug: 'news', slug: 'first', status: 'draft' },
+    { id: 'n2', tableSlug: 'news', slug: 'second', status: 'draft' },
+  ]
+  consumedGos = new Set()
+  failRowPublish = null
+  silentRowPublish = false
   draftSite = 'draft site v1'
-  exportedSite = cleanExport()
+  // Left null so it is derived from cmsRows on each request; a test that wants a
+  // specific bundle assigns exportedSite itself.
+  exportedSite = null
 
   globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
     const url = new URL(input instanceof Request ? input.url : String(input))
@@ -168,6 +250,43 @@ beforeEach(async () => {
       }
       if (method === 'POST' && /\/messages$/.test(url.pathname)) {
         return new Response(JSON.stringify({ ok: true }), { status: 201 })
+      }
+      // The state machine, as strict as the real relay's on the two things that
+      // matter here. Before this existed the fake answered 400 to every
+      // transition, so the push loop could not have advanced a ticket even if it
+      // tried — which is how the missing transitions went unnoticed until an
+      // acceptance run read the ticket and found `go_granted` with a live site.
+      const transition = /^\/api\/tickets\/([^/]+)\/transition$/.exec(url.pathname)
+      if (method === 'POST' && transition) {
+        const id = transition[1]!
+        const body = JSON.parse(String(init?.body ?? '{}')) as { to?: string; deployId?: string }
+        const to = String(body.to ?? '')
+        if (to === 'executing') {
+          // `executing` is where the real relay consumes the GO, and consuming it
+          // twice is refused — that IS the single-use guarantee. A fake that let
+          // it through twice would hide a replayed approval.
+          if (consumedGos.has(id)) {
+            return new Response(
+              JSON.stringify({ error: 'This GO has already been consumed. A GO authorizes one run.' }),
+              { status: 409 },
+            )
+          }
+          if (!goByTicket.has(id)) {
+            return new Response(JSON.stringify({ error: 'There is no GO on this deploy-request.' }), { status: 409 })
+          }
+          consumedGos.add(id)
+        }
+        // The real relay refuses `verifying_live` without a deploy id, because a
+        // record that cannot say WHAT was deployed is the gap this closes.
+        if (to === 'verifying_live' && !body.deployId) {
+          return new Response(
+            JSON.stringify({ error: 'Moving to verifying_live needs the deployId the import or publish returned.' }),
+            { status: 422 },
+          )
+        }
+        ticketStates.set(id, to)
+        actions.push({ by: 'connector', what: `moved ${id} to ${to}` })
+        return new Response(JSON.stringify({ ok: true, state: to }), { status: 200 })
       }
       return new Response(JSON.stringify({ error: 'unexpected relay call' }), { status: 400 })
     }
@@ -201,10 +320,35 @@ beforeEach(async () => {
       return new Response(JSON.stringify({ draftMatchesPublished: false, draftSiteHash: hashOf(draftSite) }), { status: 200 })
     }
     if (method === 'GET' && url.pathname.endsWith('/export')) {
-      return new Response(zipSync({ '.instatic/site-bundle.json': strToU8(JSON.stringify(exportedSite)) }) as unknown as BodyInit, { status: 200 })
+      // Re-derived per request, so a row that just changed status is reflected.
+      return new Response(zipSync({ '.instatic/site-bundle.json': strToU8(JSON.stringify(exportedSite ?? cleanExport())) }) as unknown as BodyInit, { status: 200 })
     }
     if (method === 'POST' && url.pathname.endsWith('/cms/publish')) {
-      return new Response(JSON.stringify({ publishedPages: 1, bakedRoutes: ['/'] }), { status: 200 })
+      return new Response(JSON.stringify({ publishedPages: 1, bakedRoutes: bakedRoutes() }), { status: 200 })
+    }
+    // The tables and their rows, so the push can see which collection rows the
+    // import landed as drafts. The fake used to answer `{ ok: true }` to these,
+    // which reads as "no tables" — and a push that cannot tell whether rows are
+    // drafts must not publish the site, so it refused. That refusal is correct;
+    // what was missing was the fake being able to answer at all.
+    if (method === 'GET' && url.pathname.endsWith('/data/tables')) {
+      return new Response(JSON.stringify({ tables: cmsTables }), { status: 200 })
+    }
+    const rowsList = /\/data\/tables\/([^/]+)\/rows/.exec(url.pathname)
+    if (method === 'GET' && rowsList) {
+      const slug = decodeURIComponent(rowsList[1]!)
+      return new Response(JSON.stringify({ rows: cmsRows.filter((r) => r.tableSlug === slug) }), { status: 200 })
+    }
+    // Publishing a set of rows flips their status. The site publish then bakes
+    // their pages, which is the ordering the whole two-gate row flow exists for.
+    if (method === 'POST' && /\/data\/rows\/[^/]+\/publish/.test(url.pathname)) {
+      const id = decodeURIComponent(url.pathname.split('/data/rows/')[1]!.split('/')[0]!)
+      if (failRowPublish && id === failRowPublish) {
+        return new Response(JSON.stringify({ error: 'row refused' }), { status: 409 })
+      }
+      const row = silentRowPublish ? undefined : cmsRows.find((r) => r.id === id)
+      if (row) row.status = 'published'
+      return new Response(JSON.stringify({ ok: true, id }), { status: 200 })
     }
     return new Response(JSON.stringify({ ok: true }), { status: 200 })
   }) as typeof fetch
@@ -238,23 +382,78 @@ test('a full push completes with the owner signing twice and no developer action
   // 2. The owner signs the import.
   ownerSigns(started.importTicket)
   const afterImport = parse(await call('connector_push_site', { pushId: started.pushId }))
-  expect(afterImport.step).toBe('awaiting-publish-go')
+  // THREE gates, not two, and this one is the fix for the first acceptance run.
+  // The import lands collection rows as DRAFTS, and a site publish bakes pages
+  // but not rows — so publishing straight from here put a site live with every
+  // entry URL serving the homepage. The rows get their own approval, bound to a
+  // digest of exactly those rows, before the site is published.
+  expect(afterImport.step).toBe('awaiting-rows-go')
   expect(afterImport.waitingOn).toBe('owner')
-  // The second approval is a separate one, on its own ticket (AC-B7.5).
-  expect(afterImport.publishTicket).not.toBe(started.importTicket)
+  expect(afterImport.rows).toMatchObject({ count: 2 })
+  expect(afterImport.rowsTicket).not.toBe(started.importTicket)
 
-  // 3. The owner signs the publish.
-  ownerSigns(afterImport.publishTicket)
+  // 3. The owner signs the rows.
+  ownerSigns(afterImport.rowsTicket)
+  const afterRows = parse(await call('connector_push_site', { pushId: started.pushId }))
+  expect(afterRows.step).toBe('awaiting-publish-go')
+  expect(afterRows.waitingOn).toBe('owner')
+  // Each approval is its own ticket (AC-B7.5).
+  expect(afterRows.publishTicket).not.toBe(afterImport.rowsTicket)
+  expect(afterRows.publishTicket).not.toBe(started.importTicket)
+
+  // 4. The owner signs the publish.
+  ownerSigns(afterRows.publishTicket)
   const done = parse(await call('connector_push_site', { pushId: started.pushId }))
   expect(done.step).toBe('done')
   expect(done.waitingOn).toBe('nobody')
 
-  // The milestone, as arithmetic.
+  // The milestone, as arithmetic. Three signatures now rather than two — the
+  // owner signing is part of the loop, not a developer round trip.
   expect(actions.filter((a) => a.by === 'developer')).toEqual([])
-  expect(actions.filter((a) => a.by === 'owner').length).toBe(2)
+  expect(actions.filter((a) => a.by === 'owner').length).toBe(3)
   expect(done.developerActions).toBe(0)
-  // And the publish reported its own route check rather than needing a look.
-  expect(done.evidence.routeCheck).toMatchObject({ agrees: true })
+
+  // The publish reported its own route check, and the site is COMPLETE: the two
+  // collection rows have their pages. Before the fix this read
+  // `predicted 1, baked 1, agrees: true` while both entry URLs were missing.
+  expect(done.evidence.routeCheck).toMatchObject({ agrees: true, unpublishedRows: 0 })
+  expect(done.evidence.routeCheck.baked).toBe(3)
+  expect(done.evidence.routeCheck.missing).toEqual([])
+
+  // And the relay's own record was closed rather than left at `go_granted`:
+  // every ticket was spent and then handed to the validator to confirm.
+  const moved = actions.filter((a) => a.what.startsWith('moved '))
+  expect(moved.map((a) => a.what)).toEqual([
+    `moved ${started.importTicket} to executing`,
+    `moved ${started.importTicket} to verifying_live`,
+    `moved ${afterImport.rowsTicket} to executing`,
+    `moved ${afterImport.rowsTicket} to verifying_live`,
+    `moved ${afterRows.publishTicket} to executing`,
+    `moved ${afterRows.publishTicket} to verifying_live`,
+  ])
+})
+
+test('a push that cannot publish the rows does NOT publish the site (the partial-site bug)', async () => {
+  // The defect the first acceptance run found, as a test: a site publish that
+  // goes ahead over unpublished rows bakes an incomplete site and reports
+  // success. Here the row publish fails, and the run must stop — no publish
+  // ticket, nothing live.
+  const uploadId = bundleUpload()
+  const started = parse(await call('connector_push_site', { target: 'alpha', uploadId, title: 'Green Kitchen' }))
+  ownerSigns(started.importTicket)
+  const afterImport = parse(await call('connector_push_site', { pushId: started.pushId }))
+  expect(afterImport.step).toBe('awaiting-rows-go')
+
+  // The CMS refuses one of the two rows.
+  failRowPublish = 'n2'
+  ownerSigns(afterImport.rowsTicket)
+  const stopped = parse(await call('connector_push_site', { pushId: started.pushId }))
+
+  expect(stopped.step).toBe('refused')
+  expect(stopped.refusal).toContain('did not publish')
+  // The site was never published, and no publish approval was ever opened.
+  expect(stopped.publishTicket ?? null).toBeNull()
+  expect(actions.some((a) => a.what.includes('published the site'))).toBe(false)
 })
 
 test('a bundle the pre-flight refuses stops the push before anyone is asked to approve it', async () => {
@@ -312,7 +511,13 @@ test('a push survives the process that started it', async () => {
   expect(listed.pushes.map((p: { pushId: string }) => p.pushId)).toContain(started.pushId)
 
   const resumed = parse(await call('connector_push_site', { pushId: started.pushId }))
-  expect(resumed.step).toBe('awaiting-publish-go')
+  // The rows gate, which is where a resumed run now lands after the import.
+  expect(resumed.step).toBe('awaiting-rows-go')
+
+  // And it survives across the rows gate too, which is the property being tested
+  // rather than which gate happens to be next.
+  ownerSigns(resumed.rowsTicket)
+  expect(parse(await call('connector_push_site', { pushId: started.pushId })).step).toBe('awaiting-publish-go')
 })
 
 test('a push that cannot reach the relay stops, rather than carrying on unapproved', async () => {
@@ -342,6 +547,14 @@ test('a parked push resumes on its own once the owner signs — nobody nudges it
   ownerSigns(started.importTicket)
   const moved = await sweepParkedPushes()
   expect(moved.advanced.length).toBe(1)
+  expect(parse(await call('connector_push_status', { pushId: started.pushId })).step).toBe('awaiting-rows-go')
+
+  // The rows gate resumes on a sweep exactly like the others — the point of the
+  // test is that no human nudges the run between gates, and adding a gate must
+  // not add a nudge.
+  const rowsTicket = parse(await call('connector_push_status', { pushId: started.pushId })).rowsTicket
+  ownerSigns(rowsTicket)
+  await sweepParkedPushes()
   expect(parse(await call('connector_push_status', { pushId: started.pushId })).step).toBe('awaiting-publish-go')
 
   // And again for the publish, which finishes the push with no call from us
@@ -353,7 +566,7 @@ test('a parked push resumes on its own once the owner signs — nobody nudges it
   const final = parse(await call('connector_push_status', { pushId: started.pushId }))
   expect(final.step).toBe('done')
   expect(actions.filter((a) => a.by === 'developer')).toEqual([])
-  expect(actions.filter((a) => a.by === 'owner').length).toBe(2)
+  expect(actions.filter((a) => a.by === 'owner').length).toBe(3)
 })
 
 test('a sweep that cannot reach the relay leaves the run parked, not refused', async () => {
@@ -373,14 +586,46 @@ test('a sweep that cannot reach the relay leaves the run parked, not refused', a
   expect(parse(await call('connector_push_status', { pushId: started.pushId })).step).toBe('awaiting-import-go')
 })
 
+test('a publish whose rows never actually went live is NOT reported as done', async () => {
+  // The safety net, pinned independently of the rows gate that feeds it.
+  //
+  // Here every step reports success — the row publish answers 200 — and the rows
+  // are still drafts afterwards. That is the shape of the original defect: the
+  // route check compares what the bake WOULD do against what it DID, and for a
+  // draft row both answers are "nothing", so it agreed with itself while the
+  // site was missing those pages. The run must not call that done.
+  const uploadId = bundleUpload()
+  const started = parse(await call('connector_push_site', { target: 'alpha', uploadId, title: 'Green Kitchen' }))
+  ownerSigns(started.importTicket)
+  const afterImport = parse(await call('connector_push_site', { pushId: started.pushId }))
+
+  silentRowPublish = true
+  ownerSigns(afterImport.rowsTicket)
+  const afterRows = parse(await call('connector_push_site', { pushId: started.pushId }))
+  expect(afterRows.step).toBe('awaiting-publish-go')
+
+  ownerSigns(afterRows.publishTicket)
+  const result = parse(await call('connector_push_site', { pushId: started.pushId }))
+
+  expect(result.step).toBe('refused')
+  expect(result.refusal).toContain('still drafts')
+  // The route check itself still "agrees" — which is exactly why the run cannot
+  // be allowed to read `agrees` as "the site is complete".
+  expect(result.evidence.routeCheck).toMatchObject({ agrees: true, unpublishedRows: 2 })
+})
+
 test('a finished push is not swept again', async () => {
   const uploadId = bundleUpload()
   const started = parse(await call('connector_push_site', { target: 'alpha', uploadId }))
+  const status = async () => parse(await call('connector_push_status', { pushId: started.pushId }))
+
   ownerSigns(started.importTicket)
   await sweepParkedPushes()
-  const publishTicket = parse(await call('connector_push_status', { pushId: started.pushId })).publishTicket
-  ownerSigns(publishTicket)
+  ownerSigns((await status()).rowsTicket)
   await sweepParkedPushes()
+  ownerSigns((await status()).publishTicket)
+  await sweepParkedPushes()
+  expect((await status()).step).toBe('done')
 
   const after = await sweepParkedPushes()
   expect(after.swept).toBe(0)

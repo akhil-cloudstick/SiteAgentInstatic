@@ -85,6 +85,18 @@ export interface PublishProjection {
   keptForContentHtml: string[]
   keptForScripts: string[]
   routes: { path: string; table: string; rowId: string }[]
+  /**
+   * Collection rows that WOULD have a public route if they were published, and
+   * are still drafts — so the site will not carry their pages.
+   *
+   * Separate from `routes` on purpose. `routes` is a faithful prediction of what
+   * the bake will produce, and a draft row correctly predicts nothing; that is
+   * why the route check could report "predicted 10, baked 10, agrees" about a
+   * site where 8 of 18 intended URLs served the homepage. Both numbers were
+   * right and the site was wrong, because nobody was asking this question. This
+   * is that question, counted separately so neither answer has to lie.
+   */
+  unpublishedRows: { path: string; table: string; rowId: string }[]
   entryTemplates: { tableSlug: string; rows: number; hasTemplate: boolean }[]
   scriptFiles: number
   /**
@@ -321,6 +333,7 @@ export function projectPublish(bundleValue: unknown): PublishProjection {
   // non-deleted row regardless of status, so filtering them here would under-
   // predict. That asymmetry is real, and copying the bake is the point.
   const routes: PublishProjection['routes'] = []
+  const unpublishedRows: PublishProjection['unpublishedRows'] = []
   const isPublished = (row: { cells?: unknown; status?: unknown }): boolean => {
     const cells = (row.cells ?? {}) as Record<string, unknown>
     const status = row.status ?? cells.status
@@ -340,7 +353,10 @@ export function projectPublish(bundleValue: unknown): PublishProjection {
       })
       continue
     }
-    if (!isPublished(row)) continue
+    // A table with no entry template bakes nothing for any of its rows, which is
+    // already a blocking finding — so those rows are not counted as "missing"
+    // here. The gap this records is narrower and more actionable: the template
+    // exists, the row would have a page, and the row is a draft.
     if (tableHasTemplate.get(tableId) !== true) continue
     const table = tables.find((t) => str(t.id) === tableId)
     const tableSlug = str(table?.slug) || tableId
@@ -348,11 +364,16 @@ export function projectPublish(bundleValue: unknown): PublishProjection {
       typeof table?.routeBase === 'string' ? table.routeBase : undefined,
       tableSlug,
     )
-    routes.push({
+    const entry = {
       path: applyRoutePolicy(publicRowPath(base, slug), trailingSlash),
       table: tableSlug,
       rowId: str(row.id),
-    })
+    }
+    if (!isPublished(row)) {
+      unpublishedRows.push(entry)
+      continue
+    }
+    routes.push(entry)
   }
 
   const findings: Finding[] = []
@@ -452,6 +473,7 @@ export function projectPublish(bundleValue: unknown): PublishProjection {
     keptForContentHtml: keptOnly(contentClassNames),
     keptForScripts: keptOnly(scriptClassNames),
     routes,
+    unpublishedRows,
     entryTemplates,
     scriptFiles: files.filter((file) => file?.type === 'script').length,
     warnings: findings.map((f) => f.message),

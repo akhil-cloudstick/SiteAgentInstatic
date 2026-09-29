@@ -879,6 +879,13 @@ test('a publish reports whether the routes the pre-flight predicted are the rout
     agrees: true,
     missing: [],
     unexpected: [],
+    // Reported alongside `agrees`, not folded into it. A draft collection row is
+    // correctly predicted to bake nothing and correctly bakes nothing, so
+    // `agrees` stays true while the site is missing that row's page — which is
+    // how a publish that left 8 of 18 URLs on the homepage reported success.
+    // This pair is the question that was not being asked.
+    unpublishedRows: 0,
+    unpublishedRoutes: [],
   })
 })
 
